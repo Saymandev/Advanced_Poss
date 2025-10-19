@@ -1,6 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 export interface CompanyOwnerRegisterRequest {
   companyName: string;
@@ -8,13 +8,7 @@ export interface CompanyOwnerRegisterRequest {
   country: string;
   companyEmail: string;
   branchName: string;
-  branchAddress: {
-    street: string;
-    city?: string;
-    state?: string;
-    country: string;
-    zipCode?: string;
-  };
+  branchAddress: string; // Changed to string to match backend
   package: string;
   firstName: string;
   lastName: string;
@@ -67,6 +61,15 @@ export interface CompanyRegistrationResponse extends AuthResponse {
     id: string;
     name: string;
     address: any;
+  };
+  requiresPayment?: boolean;
+  subscriptionPlan?: {
+    name: string;
+    displayName: string;
+    price: number;
+    currency: string;
+    stripePriceId: string;
+    trialPeriod: number;
   };
 }
 

@@ -10,6 +10,7 @@ import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
+import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { UsersService } from '../users/users.service';
 import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -24,6 +25,7 @@ export class AuthService {
     private usersService: UsersService,
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
+    private subscriptionPlansService: SubscriptionPlansService,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
@@ -195,8 +197,8 @@ export class AuthService {
     // Find users in this branch with the specified role
     const users = await this.usersService.findByBranch(branchId);
     
-    // Filter users by role
-    const usersWithRole = users.filter(user => user.role === role);
+    // Filter users by role (case-insensitive)
+    const usersWithRole = users.filter(user => user.role.toLowerCase() === role.toLowerCase());
 
     if (usersWithRole.length === 0) {
       throw new UnauthorizedException(`No users found with role '${role}' in this branch`);
@@ -306,11 +308,12 @@ export class AuthService {
       throw new BadRequestException('Company with this email already exists');
     }
 
-    // Create company first
+    // Create company first (without ownerId initially)
     const company = await this.companiesService.create({
       name: companyName,
       email: companyEmail,
       phone: phoneNumber,
+      subscriptionPlan: subscriptionPackage,
       address: {
         street: branchAddress,
         city: 'Unknown', // Will be updated later
@@ -318,8 +321,7 @@ export class AuthService {
         country,
         zipCode: '00000',
       },
-      ownerId: '', // Will be updated after user creation
-    });
+    } as any);
 
     // Create the first branch
     const branch = await this.branchesService.create({
@@ -354,7 +356,13 @@ export class AuthService {
     });
 
     // Update company with owner ID
-    await this.companiesService.update((company as any)._id.toString(), { ownerId: (user as any)._id.toString() });
+    await this.companiesService.update((company as any)._id.toString(), { 
+      ownerId: (user as any)._id.toString() 
+    } as any);
+
+    // Get subscription plan details
+    const subscriptionPlan = await this.subscriptionPlansService.findByName(subscriptionPackage);
+    const requiresPayment = subscriptionPlan.price > 0;
 
     // Generate tokens
     const tokens = await this.generateTokens(user);
@@ -381,6 +389,15 @@ export class AuthService {
         address: branch.address,
       },
       tokens,
+      requiresPayment,
+      subscriptionPlan: {
+        name: subscriptionPlan.name,
+        displayName: subscriptionPlan.displayName,
+        price: subscriptionPlan.price,
+        currency: subscriptionPlan.currency,
+        stripePriceId: subscriptionPlan.stripePriceId,
+        trialPeriod: subscriptionPlan.trialPeriod,
+      },
     };
   }
 
@@ -537,6 +554,14 @@ export class AuthService {
       targetCompanyId = user.companyId;
     }
 
+    // Validate that we have a valid company ID
+    if (!targetCompanyId) {
+      return {
+        found: false,
+        message: 'No company associated with this user',
+      };
+    }
+
     // Get company details
     const company = await this.usersService.getCompanyById(targetCompanyId.toString());
     if (!company) {
@@ -551,16 +576,31 @@ export class AuthService {
 
     // Get available roles for each branch
     const branchesWithRoles = await Promise.all(
-      branches.map(async (branch) => {
-        const branchUsers = await this.usersService.findByBranch(branch.id);
+      branches.map(async (branch: any) => {
+        const branchUsers = await this.usersService.findByBranch(branch._id.toString());
         const availableRoles = [...new Set(branchUsers.map(user => user.role))];
-        
+
+        // Group users by role for selection
+        const usersByRole = {};
+        branchUsers.forEach(user => {
+          if (!usersByRole[user.role]) {
+            usersByRole[user.role] = [];
+          }
+          usersByRole[user.role].push({
+            id: (user as any)._id.toString(),
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email
+          });
+        });
+
         return {
-          id: branch.id,
+          id: branch._id.toString(),
           name: branch.name,
           address: branch.address,
           isActive: branch.isActive,
-          availableRoles: availableRoles
+          availableRoles: availableRoles,
+          usersByRole: usersByRole
         };
       })
     );
@@ -573,6 +613,77 @@ export class AuthService {
       logoUrl: company.logoUrl,
       branches: branchesWithRoles,
       message: 'Please select a branch, role, and enter your PIN to continue',
+    };
+  }
+
+  async loginWithRole(loginData: {
+    companyId: string;
+    branchId: string;
+    role: string;
+    userId?: string;
+    pin: string;
+  }) {
+    const { companyId, branchId, role, userId, pin } = loginData;
+
+    // Find user by role and branch
+    let user: any;
+    if (userId) {
+      // If userId is provided, find specific user
+      user = await this.usersService.findOne(userId);
+      if (!user || user.role !== role || user.branchId !== branchId) {
+        throw new UnauthorizedException('Invalid user selection');
+      }
+    } else {
+      // Find user by role and branch
+      const users = await this.usersService.findByBranch(branchId);
+      const roleUsers = users.filter(u => u.role === role);
+      
+      if (roleUsers.length === 0) {
+        throw new UnauthorizedException('No users found with this role in this branch');
+      }
+      
+      if (roleUsers.length > 1) {
+        throw new BadRequestException('Multiple users found with this role. Please select a specific user.');
+      }
+      
+      user = roleUsers[0];
+    }
+
+    // Verify PIN
+    if (!user.pin || user.pin !== pin) {
+      throw new UnauthorizedException('Invalid PIN');
+    }
+
+    // Generate tokens
+    const payload = { 
+      sub: user._id.toString(), 
+      email: user.email, 
+      role: user.role,
+      companyId: user.companyId,
+      branchId: user.branchId
+    };
+    
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    // Update last login
+    await this.usersService.update(user._id.toString(), { lastLogin: new Date() } as any);
+
+    return {
+      success: true,
+      data: {
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          companyId: user.companyId,
+          branchId: user.branchId
+        },
+        accessToken,
+        refreshToken
+      }
     };
   }
 }

@@ -60,8 +60,8 @@ export class Company {
   // Subscription
   @Prop({
     type: String,
-    enum: ['free', 'basic', 'premium'],
-    default: 'free',
+    enum: ['basic', 'premium', 'enterprise'],
+    default: 'basic',
   })
   subscriptionPlan: string;
 
@@ -87,7 +87,7 @@ export class Company {
   // Settings
   @Prop({
     type: {
-      currency: { type: String, default: 'USD' },
+      currency: { type: String, default: 'BDT' },
       timezone: String,
       dateFormat: String,
       language: { type: String, default: 'en' },

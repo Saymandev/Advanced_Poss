@@ -1,7 +1,7 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -79,7 +79,7 @@ export class BranchesService {
 
   async findByCompany(companyId: string): Promise<Branch[]> {
     return this.branchModel
-      .find({ companyId: new Types.ObjectId(companyId) })
+      .find({ companyId: companyId })
       .populate('managerId', 'firstName lastName email')
       .exec();
   }

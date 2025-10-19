@@ -1,7 +1,7 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -11,23 +11,22 @@ import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { UpgradeSubscriptionDto } from './dto/upgrade-subscription.dto';
 import {
-    BillingHistory,
-    BillingHistoryDocument,
-    InvoiceStatus,
-    PaymentStatus,
+  BillingHistory,
+  BillingHistoryDocument,
+  InvoiceStatus,
+  PaymentStatus,
 } from './schemas/billing-history.schema';
 import {
-    SubscriptionPlanConfig,
-    SubscriptionPlanDocument,
+  SubscriptionPlan,
+  SubscriptionPlanDocument,
 } from './schemas/subscription-plan.schema';
 import {
-    BillingCycle,
-    Subscription,
-    SubscriptionDocument,
-    SubscriptionLimits,
-    SubscriptionPlan,
-    SubscriptionStatus,
-    UsageMetrics,
+  BillingCycle,
+  Subscription,
+  SubscriptionDocument,
+  SubscriptionLimits,
+  SubscriptionStatus,
+  UsageMetrics
 } from './schemas/subscription.schema';
 import { StripeService } from './stripe.service';
 
@@ -38,7 +37,7 @@ export class SubscriptionsService {
   constructor(
     @InjectModel(Subscription.name)
     private subscriptionModel: Model<SubscriptionDocument>,
-    @InjectModel(SubscriptionPlanConfig.name)
+    @InjectModel(SubscriptionPlan.name)
     private planModel: Model<SubscriptionPlanDocument>,
     @InjectModel(BillingHistory.name)
     private billingModel: Model<BillingHistoryDocument>,
@@ -86,7 +85,7 @@ export class SubscriptionsService {
       // Calculate trial dates
       const trialStartDate = new Date();
       const trialEndDate = new Date();
-      trialEndDate.setDate(trialEndDate.getDate() + plan.trialDays);
+      trialEndDate.setDate(trialEndDate.getDate() + (plan.trialPeriod / 24));
 
       const subscription = new this.subscriptionModel({
         companyId: createSubscriptionDto.companyId,
@@ -101,7 +100,21 @@ export class SubscriptionsService {
         currentPeriodStart: trialStartDate,
         currentPeriodEnd: trialEndDate,
         nextBillingDate: trialEndDate,
-        limits: plan.limits,
+        limits: {
+          maxBranches: plan.features.maxBranches,
+          maxUsers: plan.features.maxUsers,
+          maxMenuItems: plan.features.maxUsers * 10,
+          maxOrders: plan.features.maxUsers * 50,
+          maxTables: plan.features.maxBranches * 10,
+          maxCustomers: plan.features.maxUsers * 100,
+          aiInsightsEnabled: plan.features.aiInsights,
+          advancedReportsEnabled: plan.features.accounting,
+          multiLocationEnabled: plan.features.multiBranch,
+          apiAccessEnabled: plan.features.crm,
+          whitelabelEnabled: false,
+          customDomainEnabled: false,
+          prioritySupportEnabled: plan.features.aiInsights,
+        },
         usage: this.getInitialUsage(),
         autoRenew: true,
       });
@@ -117,7 +130,7 @@ export class SubscriptionsService {
   async findAll(filters: {
     companyId?: MongooseSchema.Types.ObjectId;
     status?: SubscriptionStatus;
-    plan?: SubscriptionPlan;
+    plan?: string;
     limit?: number;
     offset?: number;
   }): Promise<{ subscriptions: SubscriptionDocument[]; total: number }> {
@@ -233,7 +246,21 @@ export class SubscriptionsService {
 
     subscription.plan = upgradeDto.newPlan;
     subscription.price = newPrice;
-    subscription.limits = newPlan.limits;
+    subscription.limits = {
+      maxBranches: newPlan.features.maxBranches,
+      maxUsers: newPlan.features.maxUsers,
+      maxMenuItems: newPlan.features.maxUsers * 10,
+      maxOrders: newPlan.features.maxUsers * 50,
+      maxTables: newPlan.features.maxBranches * 10,
+      maxCustomers: newPlan.features.maxUsers * 100,
+      aiInsightsEnabled: newPlan.features.aiInsights,
+      advancedReportsEnabled: newPlan.features.accounting,
+      multiLocationEnabled: newPlan.features.multiBranch,
+      apiAccessEnabled: newPlan.features.crm,
+      whitelabelEnabled: false,
+      customDomainEnabled: false,
+      prioritySupportEnabled: newPlan.features.aiInsights,
+    };
 
     if (upgradeDto.billingCycle) {
       subscription.billingCycle = upgradeDto.billingCycle;

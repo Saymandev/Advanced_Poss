@@ -25,7 +25,9 @@ import { IngredientsModule } from './modules/ingredients/ingredients.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { MenuItemsModule } from './modules/menu-items/menu-items.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { TablesModule } from './modules/tables/tables.module';
@@ -107,12 +109,14 @@ import { AppService } from './app.service';
     MenuItemsModule,
     TablesModule,
     OrdersModule,
+    PaymentsModule,
     CustomersModule,
     IngredientsModule,
     SuppliersModule,
     ExpensesModule,
     AttendanceModule,
     SubscriptionsModule,
+    SubscriptionPlansModule,
     BackupsModule,
     ReportsModule,
     KitchenModule,

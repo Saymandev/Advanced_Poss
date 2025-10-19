@@ -12,7 +12,7 @@ export interface CompanyOwnerRegisterData {
   country: string;
   companyEmail: string;
   branchName: string;
-  branchAddress: BranchAddress;
+  branchAddress: string; // Changed from BranchAddress object to string
   package: string;
   firstName: string;
   lastName: string;
@@ -24,5 +24,6 @@ export interface LoginFlowData {
   companyId: string;
   branchId: string;
   role: string;
+  userId?: string;
   pin: string;
 }

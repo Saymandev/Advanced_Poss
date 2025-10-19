@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
-    BillingHistory,
-    BillingHistorySchema,
+  BillingHistory,
+  BillingHistorySchema,
 } from './schemas/billing-history.schema';
 import {
-    SubscriptionPlanConfig,
-    SubscriptionPlanSchema,
+  SubscriptionPlan,
+  SubscriptionPlanSchema,
 } from './schemas/subscription-plan.schema';
 import { Subscription, SubscriptionSchema } from './schemas/subscription.schema';
 import { StripeService } from './stripe.service';
@@ -18,7 +18,7 @@ import { SubscriptionsService } from './subscriptions.service';
   imports: [
     MongooseModule.forFeature([
       { name: Subscription.name, schema: SubscriptionSchema },
-      { name: SubscriptionPlanConfig.name, schema: SubscriptionPlanSchema },
+      { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: BillingHistory.name, schema: BillingHistorySchema },
     ]),
   ],

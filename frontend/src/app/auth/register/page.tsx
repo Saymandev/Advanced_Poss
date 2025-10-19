@@ -1,6 +1,7 @@
 'use client';
 
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { useHydration } from '@/hooks/useHydration';
 import { useRegisterCompanyOwnerMutation } from '@/lib/api/authApi';
 import { setCredentials } from '@/lib/slices/authSlice';
 import { CompanyOwnerRegisterData } from '@/types/auth';
@@ -9,9 +10,11 @@ import { ArrowLeft, Building2, MapPin, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { useDispatch } from 'react-redux';
 
 export default function RegisterPage() {
+  const isHydrated = useHydration();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<CompanyOwnerRegisterData>({
     // Company Information
@@ -22,13 +25,7 @@ export default function RegisterPage() {
     
     // Branch Information
     branchName: '',
-    branchAddress: {
-      street: '',
-      city: '',
-      state: '',
-      country: '',
-      zipCode: '',
-    },
+    branchAddress: '', // Changed to string
     package: 'basic',
     
     // Owner Information
@@ -48,9 +45,31 @@ export default function RegisterPage() {
   const dispatch = useDispatch();
   const [registerCompanyOwner, { isLoading }] = useRegisterCompanyOwnerMutation();
 
+
+  const validatePhoneNumber = (phone: string): boolean => {
+    // BD phone number: +880 followed by 11 digits (total 14 digits)
+    const bdPhoneRegex = /^\+8801[3-9]\d{8}$/;
+    return bdPhoneRegex.test(phone);
+  };
+
+  const validateStep = (step: number): boolean => {
+    switch (step) {
+      case 1: // Company Info
+        return !!(formData.companyName && formData.companyType && formData.country && formData.companyEmail);
+      case 2: // Branch Info
+        return !!(formData.branchName && formData.branchAddress);
+      case 3: // Owner Info
+        return !!(formData.firstName && formData.lastName && formData.phoneNumber && formData.pin && validatePhoneNumber(formData.phoneNumber));
+      default:
+        return false;
+    }
+  };
+
   const handleNext = () => {
-    if (currentStep < 3) {
+    if (currentStep < 3 && validateStep(currentStep)) {
       setCurrentStep(currentStep + 1);
+    } else if (!validateStep(currentStep)) {
+      toast.error('Please fill in all required fields before proceeding');
     }
   };
 
@@ -65,11 +84,20 @@ export default function RegisterPage() {
     try {
       const result = await registerCompanyOwner(formData).unwrap();
       dispatch(setCredentials(result));
-      router.push('/dashboard');
+      
+      // Check if payment is required
+      if (result.requiresPayment) {
+        toast.success('Registration successful! Redirecting to payment...');
+        // Redirect to Stripe payment page
+        router.push(`/payment?plan=${formData.package}`);
+      } else {
+        toast.success('Registration successful! Welcome to your dashboard!');
+        router.push('/dashboard');
+      }
     } catch (error: unknown) {
       console.error('Registration error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
-      alert(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -148,7 +176,17 @@ export default function RegisterPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {!isHydrated ? (
+            <div className="space-y-6">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                <div className="h-10 bg-gray-200 rounded mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+                <div className="h-10 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
             {currentStep === 1 && (
               <CompanyInfoStep
                 data={formData}
@@ -188,25 +226,27 @@ export default function RegisterPage() {
                 <motion.button
                   type="button"
                   onClick={handleNext}
-                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl cursor-pointer"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  disabled={!validateStep(currentStep)}
+                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  whileHover={{ scale: validateStep(currentStep) ? 1.05 : 1 }}
+                  whileTap={{ scale: validateStep(currentStep) ? 0.95 : 1 }}
                 >
                   Next Step
                 </motion.button>
               ) : (
                  <motion.button
                    type="submit"
-                   disabled={isLoading}
+                   disabled={isLoading || !validateStep(3)}
                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                   whileHover={{ scale: isLoading ? 1 : 1.05 }}
-                   whileTap={{ scale: isLoading ? 1 : 0.95 }}
+                   whileHover={{ scale: (isLoading || !validateStep(3)) ? 1 : 1.05 }}
+                   whileTap={{ scale: (isLoading || !validateStep(3)) ? 1 : 0.95 }}
                  >
                    {isLoading ? 'Registering...' : 'Complete Registration'}
                  </motion.button>
               )}
             </div>
           </form>
+          )}
 
           {/* Footer */}
           <div className="mt-8 text-center">
@@ -310,74 +350,46 @@ function BranchInfoStep({ data, onChange }: { data: CompanyOwnerRegisterData; on
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Street Address *
+          Branch Address *
         </label>
-        <input
-          type="text"
-          value={data.branchAddress.street}
-          onChange={(e) => onChange({ 
-            ...data, 
-            branchAddress: { ...data.branchAddress, street: e.target.value }
-          })}
+        <textarea
+          value={data.branchAddress}
+          onChange={(e) => onChange({ ...data, branchAddress: e.target.value })}
           className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          placeholder="123 Main Street"
+          placeholder="123 Main Street, New York, NY 10001, United States"
+          rows={3}
           required
         />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            City
-          </label>
-          <input
-            type="text"
-            value={data.branchAddress.city}
-            onChange={(e) => onChange({ 
-              ...data, 
-              branchAddress: { ...data.branchAddress, city: e.target.value }
-            })}
-            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            placeholder="New York"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            State
-          </label>
-          <input
-            type="text"
-            value={data.branchAddress.state}
-            onChange={(e) => onChange({ 
-              ...data, 
-              branchAddress: { ...data.branchAddress, state: e.target.value }
-            })}
-            className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            placeholder="NY"
-          />
-        </div>
+        <p className="text-sm text-gray-500 mt-1">
+          Enter the complete address including street, city, state, zip code, and country
+        </p>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Zip Code
+          Subscription Package *
         </label>
-        <input
-          type="text"
-          value={data.branchAddress.zipCode}
-          onChange={(e) => onChange({ 
-            ...data, 
-            branchAddress: { ...data.branchAddress, zipCode: e.target.value }
-          })}
+        <select
+          value={data.package}
+          onChange={(e) => onChange({ ...data, package: e.target.value })}
           className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          placeholder="10001"
-        />
+          required
+        >
+          <option value="basic">Basic - FREE (12h trial)</option>
+          <option value="premium">Premium - ৳2,500/month (7 days trial)</option>
+          <option value="enterprise">Enterprise - ৳5,000/month (7 days trial)</option>
+        </select>
       </div>
     </div>
   );
 }
 
 function OwnerInfoStep({ data, onChange }: { data: CompanyOwnerRegisterData; onChange: (data: CompanyOwnerRegisterData) => void }) {
+  const validatePhoneNumber = (phone: string): boolean => {
+    // BD phone number: +880 followed by 11 digits (total 14 digits)
+    const bdPhoneRegex = /^\+8801[3-9]\d{8}$/;
+    return bdPhoneRegex.test(phone);
+  };
   return (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Owner Information</h3>
@@ -419,10 +431,22 @@ function OwnerInfoStep({ data, onChange }: { data: CompanyOwnerRegisterData; onC
           type="tel"
           value={data.phoneNumber}
           onChange={(e) => onChange({ ...data, phoneNumber: e.target.value })}
-          className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          placeholder="+1234567890"
+          className={`w-full px-3 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+            data.phoneNumber && !validatePhoneNumber(data.phoneNumber) 
+              ? 'border-red-500 dark:border-red-500' 
+              : 'border-gray-300 dark:border-gray-600'
+          }`}
+          placeholder="+8801712345678"
           required
         />
+        {data.phoneNumber && !validatePhoneNumber(data.phoneNumber) && (
+          <p className="text-red-500 text-sm mt-1">
+            Please enter a valid BD phone number (e.g., +8801712345678)
+          </p>
+        )}
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          BD phone number: +880 followed by 11 digits (e.g., +8801712345678)
+        </p>
       </div>
 
       <div>

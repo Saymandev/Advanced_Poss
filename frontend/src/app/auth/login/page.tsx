@@ -2,28 +2,32 @@
 
 import LoginFlow from '@/components/auth/LoginFlow';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
-import { AuthResponse, useFindCompanyMutation, useSuperAdminLoginMutation } from '@/lib/api/authApi';
+import { useHydration } from '@/hooks/useHydration';
+import { AuthResponse, FindCompanyResponse, useFindCompanyMutation, useSuperAdminLoginMutation } from '@/lib/api/authApi';
 import { setCredentials } from '@/lib/slices/authSlice';
 import { motion } from 'framer-motion';
 import { Building2, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { useDispatch } from 'react-redux';
 
 export default function LoginPage() {
+  const isHydrated = useHydration();
   const [loginType, setLoginType] = useState<'user' | 'super-admin'>('user');
   const [showLoginFlow, setShowLoginFlow] = useState(false);
-  // const [companyData, setCompanyData] = useState<unknown>(null);
+  const [companyData, setCompanyData] = useState<FindCompanyResponse | null>(null);
   
   const router = useRouter();
   const dispatch = useDispatch();
   const [findCompany, { isLoading: isFindingCompany }] = useFindCompanyMutation();
   const [superAdminLogin, { isLoading: isSuperAdminLoading }] = useSuperAdminLoginMutation();
 
+
   const handleLoginSuccess = (userData: AuthResponse) => {
     dispatch(setCredentials(userData));
-    if (userData.user.isSuperAdmin) {
+    if (userData?.user?.isSuperAdmin) {
       router.push('/admin/dashboard');
     } else {
       router.push('/dashboard');
@@ -39,7 +43,19 @@ export default function LoginPage() {
       <LoginFlow
         onComplete={handleLoginSuccess as (data: unknown) => void}
         onBack={handleBackToLogin}
+        companyData={companyData || undefined}
       />
+    );
+  }
+
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4 pt-20">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-48 mb-8"></div>
+          <div className="h-64 bg-gray-200 rounded w-96"></div>
+        </div>
+      </div>
     );
   }
 
@@ -112,12 +128,14 @@ export default function LoginPage() {
              <UserLoginForm 
                onFindCompany={async (email) => {
                  try {
-                   await findCompany({ email }).unwrap();
+                   const result = await findCompany({ email }).unwrap();
+                   setCompanyData(result);
+                   toast.success('Company found! Please select your role and enter PIN.');
                    setShowLoginFlow(true);
                  } catch (error: unknown) {
                    console.error('Find company error:', error);
                    const errorMessage = error instanceof Error ? error.message : 'Failed to find company';
-                   alert(errorMessage);
+                   toast.error(errorMessage);
                  }
                }}
                isLoading={isFindingCompany}
@@ -131,7 +149,7 @@ export default function LoginPage() {
                  } catch (error: unknown) {
                    console.error('Super admin login error:', error);
                    const errorMessage = error instanceof Error ? error.message : 'Login failed';
-                   alert(errorMessage);
+                   toast.error(errorMessage);
                  }
                }}
                isLoading={isSuperAdminLoading}

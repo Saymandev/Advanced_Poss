@@ -113,6 +113,36 @@ export class AuthController {
   }
 
   @Public()
+  @Post('login-with-role')
+  @ApiOperation({ summary: 'Login with role selection - Professional login flow' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Login successful with role selection',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          user: {
+            id: '507f1f77bcf86cd799439010',
+            email: 'waiter1@pizzapalace.com',
+            firstName: 'Maria',
+            lastName: 'Garcia',
+            role: 'waiter',
+            companyId: '507f1f77bcf86cd799439012',
+            branchId: '507f1f77bcf86cd799439013'
+          },
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid credentials or user not found' })
+  loginWithRole(@Body() loginWithRoleDto: any) {
+    return this.authService.loginWithRole(loginWithRoleDto);
+  }
+
+  @Public()
   @Post('login/pin')
   @ApiOperation({ summary: 'Login with PIN - Step 2 of authentication (requires company context)' })
   loginWithPin(@Body() pinLoginDto: PinLoginDto) {

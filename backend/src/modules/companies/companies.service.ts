@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { Company, CompanyDocument } from './schemas/company.schema';
@@ -13,6 +14,7 @@ import { Company, CompanyDocument } from './schemas/company.schema';
 export class CompaniesService {
   constructor(
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
+    private subscriptionPlansService: SubscriptionPlansService,
   ) {}
 
   async create(createCompanyDto: CreateCompanyDto): Promise<Company> {
@@ -25,9 +27,14 @@ export class CompaniesService {
       throw new BadRequestException('Company with this email already exists');
     }
 
-    // Set trial period (30 days)
+    // Get subscription plan details
+    const subscriptionPlan = await this.subscriptionPlansService.findByName(
+      createCompanyDto.subscriptionPlan || 'basic',
+    );
+
+    // Set trial period based on subscription plan
     const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + 30);
+    trialEndDate.setHours(trialEndDate.getHours() + subscriptionPlan.trialPeriod);
 
     const company = new this.companyModel({
       ...createCompanyDto,
@@ -36,15 +43,9 @@ export class CompaniesService {
       trialEndDate,
       subscriptionStartDate: new Date(),
       settings: {
-        currency: 'USD',
+        currency: 'BDT', // Bangladesh Taka
         language: 'en',
-        features: {
-          pos: true,
-          inventory: true,
-          crm: true,
-          accounting: true,
-          aiInsights: false,
-        },
+        features: subscriptionPlan.features,
       },
     });
 

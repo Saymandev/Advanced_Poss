@@ -1,5 +1,6 @@
 import { ReduxProvider } from "@/components/providers/ReduxProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -44,7 +45,9 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
         <ReduxProvider>
           <ThemeProvider>
-            {children}
+            <ToastProvider>
+              {children}
+            </ToastProvider>
           </ThemeProvider>
         </ReduxProvider>
       </body>
