@@ -14,10 +14,13 @@
 ### **Public Endpoints** (No Authentication Required)
 | Method | Endpoint | Purpose | Description |
 |--------|----------|---------|-------------|
-| `POST` | `/auth/register` | User Registration | Register new user account |
-| `POST` | `/auth/login` | Email Login | Login with email and password |
-| `POST` | `/auth/login/pin` | PIN Login | Login with PIN (for POS terminals) |
-| `POST` | `/auth/find-company` | Find Company | Find company by email |
+| `POST` | `/auth/register` | **Company Owner Registration** | Register new company owner with company, branch, and owner info |
+| `POST` | `/auth/register/user` | **User Registration** | Register new user account (legacy endpoint) |
+| `POST` | `/auth/find-company` | **Step 1: Find Company** | Find company by email or company ID and get branches with roles |
+| `POST` | `/auth/login/pin` | **Step 2: PIN Login** | Login with PIN (legacy endpoint) |
+| `POST` | `/auth/login/pin-with-role` | **Step 2: PIN Login with Role** | Enhanced PIN login with role context |
+| `POST` | `/auth/login/super-admin` | **Super Admin Login** | Super admin login with email and password |
+| `POST` | `/auth/login` | Legacy Email Login | Login with email and password (deprecated) |
 | `POST` | `/auth/refresh` | Refresh Token | Get new access token using refresh token |
 | `GET` | `/auth/verify-email/:token` | Email Verification | Verify email with token |
 | `POST` | `/auth/forgot-password` | Password Reset Request | Request password reset email |
@@ -28,6 +31,209 @@
 |--------|----------|---------|-------------|
 | `POST` | `/auth/logout` | User Logout | Logout and invalidate tokens |
 | `POST` | `/auth/change-password` | Change Password | Change password (authenticated) |
+
+---
+
+## 🔄 **Authentication Flow**
+
+### **Company Owner Registration Process:**
+
+#### **Company Owner Registration** (`POST /auth/register`)
+```json
+{
+  "companyName": "The Golden Fork Restaurant",
+  "companyType": "restaurant",
+  "country": "United States",
+  "companyEmail": "contact@goldenfork.com",
+  "branchName": "Downtown Branch",
+  "branchAddress": {
+    "street": "123 Main Street",
+    "city": "New York",
+    "state": "NY",
+    "country": "United States",
+    "zipCode": "10001"
+  },
+  "package": "basic",
+  "firstName": "John",
+  "lastName": "Smith",
+  "phoneNumber": "+1234567890",
+  "pin": "1234"
+}
+```
+
+**Response:**
+```json
+{
+  "user": {
+    "id": "507f1f77bcf86cd799439010",
+    "email": "contact@goldenfork.com",
+    "firstName": "John",
+    "lastName": "Smith",
+    "role": "owner",
+    "companyId": "507f1f77bcf86cd799439012",
+    "branchId": "507f1f77bcf86cd799439013"
+  },
+  "company": {
+    "id": "507f1f77bcf86cd799439012",
+    "name": "The Golden Fork Restaurant",
+    "type": "restaurant",
+    "email": "contact@goldenfork.com"
+  },
+  "branch": {
+    "id": "507f1f77bcf86cd799439013",
+    "name": "Downtown Branch",
+    "address": {
+      "street": "123 Main Street",
+      "city": "New York",
+      "state": "NY",
+      "country": "United States",
+      "zipCode": "10001"
+    }
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+### **Three-Step User Authentication Process:**
+
+#### **Step 1: Find Company** (`POST /auth/find-company`)
+
+**Option A: Find by Email**
+```json
+{
+  "email": "user@restaurant.com"
+}
+```
+
+**Option B: Find by Company ID**
+```json
+{
+  "companyId": "507f1f77bcf86cd799439012"
+}
+```
+
+**Response:**
+```json
+{
+  "found": true,
+  "companyId": "507f1f77bcf86cd799439012",
+  "companyName": "Restaurant ABC",
+  "companySlug": "restaurant-abc",
+  "logoUrl": "https://example.com/logo.png",
+  "branches": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "name": "Main Branch",
+      "address": "123 Main St, City",
+      "isActive": true,
+      "availableRoles": ["owner", "manager", "waiter", "chef", "cashier"]
+    },
+    {
+      "id": "507f1f77bcf86cd799439014",
+      "name": "Downtown Branch",
+      "address": "456 Downtown Ave, City",
+      "isActive": true,
+      "availableRoles": ["manager", "waiter", "chef"]
+    }
+  ],
+  "message": "Please select a branch, role, and enter your PIN to continue"
+}
+```
+
+#### **Step 2: Login with PIN and Role** (`POST /auth/login/pin-with-role`)
+```json
+{
+  "companyId": "507f1f77bcf86cd799439012",
+  "branchId": "507f1f77bcf86cd799439011",
+  "role": "waiter",
+  "pin": "1234"
+}
+```
+
+**Legacy PIN Login** (`POST /auth/login/pin`)
+```json
+{
+  "pin": "123456",
+  "branchId": "507f1f77bcf86cd799439011",
+  "companyId": "507f1f77bcf86cd799439012"
+}
+```
+
+**Response:**
+```json
+{
+  "user": {
+    "id": "507f1f77bcf86cd799439010",
+    "email": "user@restaurant.com",
+    "firstName": "John",
+    "lastName": "Doe",
+    "role": "waiter",
+    "companyId": "507f1f77bcf86cd799439012",
+    "branchId": "507f1f77bcf86cd799439011"
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+### **Super Admin Authentication:**
+
+#### **Super Admin Login** (`POST /auth/login/super-admin`)
+```json
+{
+  "email": "admin@restaurantpos.com",
+  "password": "Admin@123456"
+}
+```
+
+**Response:**
+```json
+{
+  "user": {
+    "id": "507f1f77bcf86cd799439015",
+    "email": "admin@restaurantpos.com",
+    "firstName": "Super",
+    "lastName": "Admin",
+    "role": "super_admin",
+    "companyId": null,
+    "branchId": null,
+    "isSuperAdmin": true
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+---
+
+## 🔄 **Authentication Flow Summary**
+
+### **For New Company Owners:**
+1. **Register** → `POST /auth/register` (Company + Branch + Owner setup)
+2. **Access Dashboard** → Use returned tokens to access the system
+
+### **For Existing Users:**
+1. **Find Company** → `POST /auth/find-company` (Provide email)
+2. **Select Branch & Role** → Choose from available options
+3. **PIN Login** → `POST /auth/login/pin-with-role` (Provide PIN)
+
+### **For Super Admins:**
+1. **Direct Login** → `POST /auth/login/super-admin` (Email + Password)
+
+### **Supported User Roles:**
+- `super_admin` - System administrators
+- `owner` - Company owners
+- `manager` - Branch managers
+- `waiter` - Wait staff
+- `chef` - Kitchen staff
+- `cashier` - Cash register operators
 
 ---
 
@@ -161,15 +367,10 @@
 | Method | Endpoint | Purpose | Roles | Description |
 |--------|----------|---------|-------|-------------|
 | `GET` | `/reports/dashboard` | Dashboard Stats | SUPER_ADMIN, OWNER, MANAGER | Get dashboard statistics |
-| `GET` | `/reports/dashboard-test` | Dashboard Stats (Test) | Public | Get dashboard stats (no auth) |
 | `GET` | `/reports/sales-analytics` | Sales Analytics | SUPER_ADMIN, OWNER, MANAGER | Get sales analytics for charts |
-| `GET` | `/reports/sales-analytics-test` | Sales Analytics (Test) | Public | Get sales analytics (no auth) |
 | `GET` | `/reports/top-selling-items` | Top Items | SUPER_ADMIN, OWNER, MANAGER | Get top selling items |
-| `GET` | `/reports/top-selling-items-test` | Top Items (Test) | Public | Get top selling items (no auth) |
 | `GET` | `/reports/revenue-by-category` | Revenue by Category | SUPER_ADMIN, OWNER, MANAGER | Get revenue breakdown by category |
-| `GET` | `/reports/revenue-by-category-test` | Revenue by Category (Test) | Public | Get revenue by category (no auth) |
 | `GET` | `/reports/low-stock` | Low Stock Items | SUPER_ADMIN, OWNER, MANAGER | Get low stock items |
-| `GET` | `/reports/low-stock-test` | Low Stock (Test) | Public | Get low stock items (no auth) |
 
 ### **Detailed Reports**
 | Method | Endpoint | Purpose | Roles | Description |
@@ -292,11 +493,15 @@
 ## 🎯 **Key Features Implemented**
 
 ### ✅ **Authentication & Authorization**
-- JWT-based authentication
-- Role-based access control (RBAC)
-- PIN-based login for POS terminals
-- Password reset functionality
-- Email verification
+- JWT-based authentication with access and refresh tokens
+- Role-based access control (RBAC) with multiple user roles
+- **Company Owner Registration Flow** - Complete business setup in one step
+- **Three-Step User Authentication** - Find company → Select role → PIN authentication
+- **Super Admin Authentication** - Dedicated super admin login
+- PIN-based login for POS terminals with role context
+- Password reset functionality with email verification
+- Account locking and login attempt tracking
+- Email verification and user activation
 
 ### ✅ **Core POS Features**
 - Order management with real-time status updates
@@ -345,9 +550,6 @@
    - Swagger UI: `http://localhost:5000/api/docs`
    - Health Check: `http://localhost:5000/health`
 
-3. **Test Endpoints**:
-   - Use the test endpoints (with `-test` suffix) for development
-   - All test endpoints don't require authentication
 
 ---
 

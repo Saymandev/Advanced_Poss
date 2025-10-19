@@ -6,7 +6,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -31,6 +31,45 @@ export class AuthController {
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register new company owner with company, branch, and owner information' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Company owner registered successfully',
+    schema: {
+      example: {
+        user: {
+          id: '507f1f77bcf86cd799439010',
+          email: 'contact@goldenfork.com',
+          firstName: 'John',
+          lastName: 'Smith',
+          role: 'owner',
+          companyId: '507f1f77bcf86cd799439012',
+          branchId: '507f1f77bcf86cd799439013'
+        },
+        company: {
+          id: '507f1f77bcf86cd799439012',
+          name: 'The Golden Fork Restaurant',
+          type: 'restaurant',
+          email: 'contact@goldenfork.com'
+        },
+        branch: {
+          id: '507f1f77bcf86cd799439013',
+          name: 'Downtown Branch',
+          address: {
+            street: '123 Main Street',
+            city: 'New York',
+            state: 'NY',
+            country: 'United States',
+            zipCode: '10001'
+          }
+        },
+        tokens: {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Company with this email already exists' })
   register(@Body() registerDto: CompanyOwnerRegisterDto) {
     return this.authService.registerCompanyOwner(registerDto);
   }
@@ -45,6 +84,30 @@ export class AuthController {
   @Public()
   @Post('find-company')
   @ApiOperation({ summary: 'Find company by email or company ID - Step 1 of authentication' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Company found successfully',
+    schema: {
+      example: {
+        found: true,
+        companyId: '507f1f77bcf86cd799439012',
+        companyName: 'Restaurant ABC',
+        companySlug: 'restaurant-abc',
+        logoUrl: 'https://example.com/logo.png',
+        branches: [
+          {
+            id: '507f1f77bcf86cd799439011',
+            name: 'Main Branch',
+            address: '123 Main St, City',
+            isActive: true,
+            availableRoles: ['owner', 'manager', 'waiter', 'chef', 'cashier']
+          }
+        ],
+        message: 'Please select a branch, role, and enter your PIN to continue'
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Company not found or invalid input' })
   findCompany(@Body() findCompanyDto: FindCompanyDto) {
     return this.authService.findCompany(findCompanyDto.email, findCompanyDto.companyId);
   }
@@ -59,6 +122,29 @@ export class AuthController {
   @Public()
   @Post('login/pin-with-role')
   @ApiOperation({ summary: 'Login with PIN and role context - Enhanced authentication flow' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Login successful',
+    schema: {
+      example: {
+        user: {
+          id: '507f1f77bcf86cd799439010',
+          email: 'user@restaurant.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          role: 'waiter',
+          companyId: '507f1f77bcf86cd799439012',
+          branchId: '507f1f77bcf86cd799439011'
+        },
+        tokens: {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Invalid PIN or role not found' })
+  @ApiResponse({ status: 400, description: 'Account locked or deactivated' })
   pinLoginWithRole(@Body() pinLoginDto: PinLoginWithRoleDto) {
     return this.authService.pinLoginWithRole(pinLoginDto);
   }
@@ -66,6 +152,30 @@ export class AuthController {
   @Public()
   @Post('login/super-admin')
   @ApiOperation({ summary: 'Super admin login with email and password' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Super admin login successful',
+    schema: {
+      example: {
+        user: {
+          id: '507f1f77bcf86cd799439015',
+          email: 'admin@restaurantpos.com',
+          firstName: 'Super',
+          lastName: 'Admin',
+          role: 'super_admin',
+          companyId: null,
+          branchId: null,
+          isSuperAdmin: true
+        },
+        tokens: {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Invalid credentials or access denied' })
+  @ApiResponse({ status: 400, description: 'Account locked' })
   superAdminLogin(@Body() superAdminLoginDto: SuperAdminLoginDto) {
     return this.authService.superAdminLogin(superAdminLoginDto);
   }
