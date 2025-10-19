@@ -45,39 +45,28 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
+      - name: Cache node modules
         uses: actions/cache@v3
         with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+            ${{ runner.os }}-node-
 
       - name: Install dependencies
         run: |
           cd backend
-          pnpm install --frozen-lockfile
+          npm ci
 
       - name: Lint
         run: |
           cd backend
-          pnpm lint
+          npm run lint
 
       - name: Run tests
         run: |
           cd backend
-          pnpm test:cov
+          npm run test:cov
         env:
           MONGODB_URI: mongodb://localhost:27017/restaurant_pos_test
           REDIS_HOST: localhost
@@ -91,71 +80,12 @@ jobs:
           file: ./backend/coverage/lcov.info
           flags: backend
 
-  # Frontend Tests
-  frontend-test:
-    name: Frontend Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: |
-          cd frontend
-          pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: |
-          cd frontend
-          pnpm lint
-
-      - name: Type check
-        run: |
-          cd frontend
-          pnpm type-check || true
-
-      - name: Build
-        run: |
-          cd frontend
-          pnpm build
-        env:
-          NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
-
-      - name: Run tests
-        run: |
-          cd frontend
-          pnpm test || true
 
   # Build Docker Images
   build-images:
     name: Build Docker Images
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-test]
+    needs: [backend-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -182,16 +112,6 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/restaurant-pos-backend:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/restaurant-pos-backend:buildcache,mode=max
 
-      - name: Build and push frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/restaurant-pos-frontend:latest
-            ${{ secrets.DOCKER_USERNAME }}/restaurant-pos-frontend:${{ github.sha }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/restaurant-pos-frontend:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/restaurant-pos-frontend:buildcache,mode=max
 
   # Deploy to Production
   deploy:
@@ -213,8 +133,8 @@ jobs:
           script: |
             cd /var/www/restaurant-pos
             git pull origin main
-            docker-compose -f docker-compose.prod.yml pull
-            docker-compose -f docker-compose.prod.yml up -d
+            docker-compose pull
+            docker-compose up -d
             docker system prune -f
 
       - name: Notify deployment
