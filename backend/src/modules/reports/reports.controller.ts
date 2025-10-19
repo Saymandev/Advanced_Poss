@@ -23,14 +23,6 @@ export class ReportsController {
     return this.reportsService.getDashboardStats(branchId, companyId);
   }
 
-  @Get('dashboard-test')
-  @ApiOperation({ summary: 'Get dashboard statistics (test endpoint - no auth required)' })
-  getDashboardStatsTest(
-    @Query('branchId') branchId?: string,
-    @Query('companyId') companyId?: string,
-  ) {
-    return this.reportsService.getDashboardStats(branchId, companyId);
-  }
 
   @Get('dashboard/:branchId')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
@@ -169,14 +161,6 @@ export class ReportsController {
     return this.reportsService.getSalesAnalytics(period, branchId);
   }
 
-  @Get('sales-analytics-test')
-  @ApiOperation({ summary: 'Get sales analytics for charts (test endpoint - no auth required)' })
-  getSalesAnalyticsTest(
-    @Query('period') period: string = 'week',
-    @Query('branchId') branchId?: string,
-  ) {
-    return this.reportsService.getSalesAnalytics(period, branchId);
-  }
 
   @Get('top-selling-items')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
@@ -188,14 +172,6 @@ export class ReportsController {
     return this.reportsService.getTopSellingItems(limit || 10, branchId);
   }
 
-  @Get('top-selling-items-test')
-  @ApiOperation({ summary: 'Get top selling items (test endpoint - no auth required)' })
-  getTopSellingItemsTest(
-    @Query('limit') limit?: number,
-    @Query('branchId') branchId?: string,
-  ) {
-    return this.reportsService.getTopSellingItems(limit || 10, branchId);
-  }
 
   @Get('revenue-by-category')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
@@ -204,11 +180,6 @@ export class ReportsController {
     return this.reportsService.getRevenueByCategory(branchId);
   }
 
-  @Get('revenue-by-category-test')
-  @ApiOperation({ summary: 'Get revenue by category (test endpoint - no auth required)' })
-  getRevenueByCategoryTest(@Query('branchId') branchId?: string) {
-    return this.reportsService.getRevenueByCategory(branchId);
-  }
 
   @Get('low-stock')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
@@ -217,10 +188,5 @@ export class ReportsController {
     return this.reportsService.getLowStockItems(companyId);
   }
 
-  @Get('low-stock-test')
-  @ApiOperation({ summary: 'Get low stock items (test endpoint - no auth required)' })
-  getLowStockItemsTest(@Query('companyId') companyId?: string) {
-    return this.reportsService.getLowStockItems(companyId);
-  }
 }
 

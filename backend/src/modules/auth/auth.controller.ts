@@ -1,10 +1,10 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Post,
-    UseGuards,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -12,13 +12,16 @@ import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
 import { FindCompanyDto } from './dto/find-company.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { PinLoginWithRoleDto } from './dto/pin-login-with-role.dto';
 import { PinLoginDto } from './dto/pin-login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SuperAdminLoginDto } from './dto/super-admin-login.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -27,30 +30,51 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Register new user' })
-  register(@Body() registerDto: RegisterDto) {
+  @ApiOperation({ summary: 'Register new company owner with company, branch, and owner information' })
+  register(@Body() registerDto: CompanyOwnerRegisterDto) {
+    return this.authService.registerCompanyOwner(registerDto);
+  }
+
+  @Public()
+  @Post('register/user')
+  @ApiOperation({ summary: 'Register new user (legacy endpoint)' })
+  registerUser(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
   @Public()
-  @Post('login')
-  @ApiOperation({ summary: 'Login with email and password' })
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  @Post('find-company')
+  @ApiOperation({ summary: 'Find company by email or company ID - Step 1 of authentication' })
+  findCompany(@Body() findCompanyDto: FindCompanyDto) {
+    return this.authService.findCompany(findCompanyDto.email, findCompanyDto.companyId);
   }
 
   @Public()
   @Post('login/pin')
-  @ApiOperation({ summary: 'Login with PIN (for POS)' })
+  @ApiOperation({ summary: 'Login with PIN - Step 2 of authentication (requires company context)' })
   loginWithPin(@Body() pinLoginDto: PinLoginDto) {
     return this.authService.loginWithPin(pinLoginDto);
   }
 
   @Public()
-  @Post('find-company')
-  @ApiOperation({ summary: 'Find company by email' })
-  findCompany(@Body() findCompanyDto: FindCompanyDto) {
-    return this.authService.findCompany(findCompanyDto.email);
+  @Post('login/pin-with-role')
+  @ApiOperation({ summary: 'Login with PIN and role context - Enhanced authentication flow' })
+  pinLoginWithRole(@Body() pinLoginDto: PinLoginWithRoleDto) {
+    return this.authService.pinLoginWithRole(pinLoginDto);
+  }
+
+  @Public()
+  @Post('login/super-admin')
+  @ApiOperation({ summary: 'Super admin login with email and password' })
+  superAdminLogin(@Body() superAdminLoginDto: SuperAdminLoginDto) {
+    return this.authService.superAdminLogin(superAdminLoginDto);
+  }
+
+  @Public()
+  @Post('login')
+  @ApiOperation({ summary: 'Legacy email/password login (deprecated - use find-company + login/pin flow)' })
+  login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
 
   @Public()

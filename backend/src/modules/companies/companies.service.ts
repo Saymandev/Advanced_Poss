@@ -1,7 +1,7 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -75,6 +75,10 @@ export class CompaniesService {
     return this.companyModel
       .find({ ownerId: new Types.ObjectId(ownerId) })
       .exec();
+  }
+
+  async findByEmail(email: string): Promise<Company | null> {
+    return this.companyModel.findOne({ email: email.toLowerCase() }).exec();
   }
 
   async update(id: string, updateCompanyDto: UpdateCompanyDto): Promise<Company> {

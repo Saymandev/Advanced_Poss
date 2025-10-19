@@ -1,21 +1,29 @@
 import {
-    BadRequestException,
-    Injectable,
-    UnauthorizedException,
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
+import { BranchesService } from '../branches/branches.service';
+import { CompaniesService } from '../companies/companies.service';
 import { UsersService } from '../users/users.service';
+import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
 import { LoginDto } from './dto/login.dto';
+import { PinLoginWithRoleDto } from './dto/pin-login-with-role.dto';
 import { PinLoginDto } from './dto/pin-login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SuperAdminLoginDto } from './dto/super-admin-login.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
+    private companiesService: CompaniesService,
+    private branchesService: BranchesService,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
@@ -82,6 +90,68 @@ export class AuthService {
     };
   }
 
+  async superAdminLogin(superAdminLoginDto: SuperAdminLoginDto) {
+    const { email, password } = superAdminLoginDto;
+
+    // Find user by email
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Check if user is super admin
+    if (user.role !== UserRole.SUPER_ADMIN) {
+      throw new UnauthorizedException('Access denied. Super admin privileges required.');
+    }
+
+    // Check if account is locked
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      const remainingTime = Math.ceil(
+        (user.lockUntil.getTime() - Date.now()) / 60000,
+      );
+      throw new UnauthorizedException(
+        `Account is locked. Try again in ${remainingTime} minutes`,
+      );
+    }
+
+    // Validate password
+    const isPasswordValid = await PasswordUtil.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      // Increment login attempts
+      await this.usersService.incrementLoginAttempts(user.id);
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Reset login attempts on successful login
+    await this.usersService.updateLastLogin(user.id, '0.0.0.0');
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is deactivated');
+    }
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user);
+
+    // Save refresh token
+    await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        companyId: user.companyId,
+        branchId: user.branchId,
+        isSuperAdmin: true,
+      },
+      tokens,
+    };
+  }
+
   async loginWithPin(pinLoginDto: PinLoginDto) {
     const { pin, branchId } = pinLoginDto;
 
@@ -119,6 +189,68 @@ export class AuthService {
     throw new UnauthorizedException('Invalid PIN');
   }
 
+  async pinLoginWithRole(pinLoginDto: PinLoginWithRoleDto) {
+    const { pin, branchId, companyId, role } = pinLoginDto;
+
+    // Find users in this branch with the specified role
+    const users = await this.usersService.findByBranch(branchId);
+    
+    // Filter users by role
+    const usersWithRole = users.filter(user => user.role === role);
+
+    if (usersWithRole.length === 0) {
+      throw new UnauthorizedException(`No users found with role '${role}' in this branch`);
+    }
+
+    for (const user of usersWithRole) {
+      const userWithPin = await this.usersService.findByEmail(user.email);
+      
+      if (userWithPin?.pin) {
+        const isPinValid = await PasswordUtil.compare(pin, userWithPin.pin);
+        
+        if (isPinValid) {
+          // Check if account is locked
+          if (userWithPin.lockUntil && userWithPin.lockUntil > new Date()) {
+            const remainingTime = Math.ceil(
+              (userWithPin.lockUntil.getTime() - Date.now()) / 60000,
+            );
+            throw new UnauthorizedException(
+              `Account is locked. Try again in ${remainingTime} minutes`,
+            );
+          }
+
+          // Check if user is active
+          if (!userWithPin.isActive) {
+            throw new UnauthorizedException('Account is deactivated');
+          }
+
+          // Reset login attempts on successful login
+          await this.usersService.updateLastLogin(userWithPin.id, '0.0.0.0');
+
+          const tokens = await this.generateTokens(userWithPin);
+          // @ts-ignore - Mongoose virtual property
+          await this.usersService.updateRefreshToken(userWithPin.id, tokens.refreshToken);
+
+          return {
+            user: {
+              // @ts-ignore - Mongoose virtual property
+              id: userWithPin.id,
+              email: userWithPin.email,
+              firstName: userWithPin.firstName,
+              lastName: userWithPin.lastName,
+              role: userWithPin.role,
+              companyId: userWithPin.companyId,
+              branchId: userWithPin.branchId,
+            },
+            tokens,
+          };
+        }
+      }
+    }
+
+    throw new UnauthorizedException('Invalid PIN for this role');
+  }
+
   async register(registerDto: RegisterDto) {
     const user = await this.usersService.create({
       ...registerDto,
@@ -150,6 +282,105 @@ export class AuthService {
       },
       tokens,
       verificationToken, // For development only
+    };
+  }
+
+  async registerCompanyOwner(registerDto: CompanyOwnerRegisterDto) {
+    const {
+      companyName,
+      companyType,
+      country,
+      companyEmail,
+      branchName,
+      branchAddress,
+      package: subscriptionPackage,
+      firstName,
+      lastName,
+      phoneNumber,
+      pin,
+    } = registerDto;
+
+    // Check if company email already exists
+    const existingCompany = await this.companiesService.findByEmail(companyEmail);
+    if (existingCompany) {
+      throw new BadRequestException('Company with this email already exists');
+    }
+
+    // Create company first
+    const company = await this.companiesService.create({
+      name: companyName,
+      email: companyEmail,
+      phone: phoneNumber,
+      address: {
+        street: branchAddress,
+        city: 'Unknown', // Will be updated later
+        state: 'Unknown',
+        country,
+        zipCode: '00000',
+      },
+      ownerId: '', // Will be updated after user creation
+    });
+
+    // Create the first branch
+    const branch = await this.branchesService.create({
+      companyId: (company as any)._id.toString(),
+      name: branchName,
+      address: {
+        street: branchAddress,
+        city: 'Unknown',
+        state: 'Unknown',
+        country,
+        zipCode: '00000',
+      },
+    });
+
+    // Hash the PIN
+    const hashedPin = await PasswordUtil.hash(pin);
+    
+    // Generate a temporary password (user will change it later)
+    const tempPassword = GeneratorUtil.generateToken();
+
+    // Create the owner user
+    const user = await this.usersService.create({
+      firstName,
+      lastName,
+      email: companyEmail,
+      phone: phoneNumber,
+      password: tempPassword,
+      pin: hashedPin,
+      role: UserRole.OWNER,
+      companyId: (company as any)._id.toString(),
+      branchId: (branch as any)._id.toString(),
+    });
+
+    // Update company with owner ID
+    await this.companiesService.update((company as any)._id.toString(), { ownerId: (user as any)._id.toString() });
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user);
+    await this.usersService.updateRefreshToken((user as any)._id.toString(), tokens.refreshToken);
+
+    return {
+      user: {
+        id: (user as any)._id.toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        companyId: user.companyId,
+        branchId: user.branchId,
+      },
+      company: {
+        id: (company as any)._id.toString(),
+        name: company.name,
+        email: company.email,
+      },
+      branch: {
+        id: (branch as any)._id.toString(),
+        name: branch.name,
+        address: branch.address,
+      },
+      tokens,
     };
   }
 
@@ -282,21 +513,66 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
-  async findCompany(email: string) {
-    const user = await this.usersService.findByEmail(email);
-
-    if (!user) {
+  async findCompany(email?: string, companyId?: string) {
+    // Validate that at least one parameter is provided
+    if (!email && !companyId) {
       return {
         found: false,
-        message: 'No restaurant found with this email',
+        message: 'Please provide either email or company ID',
       };
     }
 
+    let user = null;
+    let targetCompanyId = companyId;
+
+    // If email is provided, find user by email
+    if (email) {
+      user = await this.usersService.findByEmail(email);
+      if (!user) {
+        return {
+          found: false,
+          message: 'No restaurant found with this email',
+        };
+      }
+      targetCompanyId = user.companyId;
+    }
+
+    // Get company details
+    const company = await this.usersService.getCompanyById(targetCompanyId.toString());
+    if (!company) {
+      return {
+        found: false,
+        message: 'Company not found',
+      };
+    }
+
+    // Get all branches for this company
+    const branches = await this.usersService.getCompanyBranches(targetCompanyId.toString());
+
+    // Get available roles for each branch
+    const branchesWithRoles = await Promise.all(
+      branches.map(async (branch) => {
+        const branchUsers = await this.usersService.findByBranch(branch.id);
+        const availableRoles = [...new Set(branchUsers.map(user => user.role))];
+        
+        return {
+          id: branch.id,
+          name: branch.name,
+          address: branch.address,
+          isActive: branch.isActive,
+          availableRoles: availableRoles
+        };
+      })
+    );
+
     return {
       found: true,
-      companyId: user.companyId,
-      branchId: user.branchId,
-      message: 'Company found',
+      companyId: targetCompanyId,
+      companyName: company.name,
+      companySlug: company.slug || company.name.toLowerCase().replace(/\s+/g, '-'),
+      logoUrl: company.logoUrl,
+      branches: branchesWithRoles,
+      message: 'Please select a branch, role, and enter your PIN to continue',
     };
   }
 }

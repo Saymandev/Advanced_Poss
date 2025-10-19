@@ -1,13 +1,15 @@
 import {
-    BadRequestException,
-    ConflictException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
+import { BranchesService } from '../branches/branches.service';
+import { CompaniesService } from '../companies/companies.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserDocument } from './schemas/user.schema';
@@ -16,6 +18,8 @@ import { User, UserDocument } from './schemas/user.schema';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private companiesService: CompaniesService,
+    private branchesService: BranchesService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -225,6 +229,22 @@ export class UsersService {
     return this.userModel
       .countDocuments({ companyId: new Types.ObjectId(companyId) })
       .exec();
+  }
+
+  async getCompanyById(companyId: string): Promise<any> {
+    try {
+      return await this.companiesService.findOne(companyId);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async getCompanyBranches(companyId: string): Promise<any[]> {
+    try {
+      return await this.branchesService.findByCompany(companyId);
+    } catch (error) {
+      return [];
+    }
   }
 }
 
