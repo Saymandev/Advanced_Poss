@@ -1,10 +1,11 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { IngredientFilterDto } from '../../common/dto/pagination.dto';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
@@ -37,12 +38,49 @@ export class IngredientsService {
     return ingredient.save();
   }
 
-  async findAll(filter: any = {}): Promise<Ingredient[]> {
-    return this.ingredientModel
-      .find(filter)
+  async findAll(filterDto: IngredientFilterDto): Promise<{ ingredients: Ingredient[], total: number, page: number, limit: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'name', 
+      sortOrder = 'asc',
+      search,
+      ...filters 
+    } = filterDto;
+    
+    const skip = (page - 1) * limit;
+    const query: any = { ...filters };
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } },
+        { unit: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sortOptions: any = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const ingredients = await this.ingredientModel
+      .find(query)
       .populate('preferredSupplierId', 'name contactPerson phone')
-      .sort({ name: 1 })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
       .exec();
+
+    const total = await this.ingredientModel.countDocuments(query);
+
+    return {
+      ingredients,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<Ingredient> {

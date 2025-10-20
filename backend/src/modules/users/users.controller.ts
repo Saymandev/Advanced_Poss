@@ -1,17 +1,18 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { UserFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -34,18 +35,9 @@ export class UsersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all users' })
-  findAll(
-    @Query('role') role?: string,
-    @Query('companyId') companyId?: string,
-    @Query('branchId') branchId?: string,
-  ) {
-    const filter: any = {};
-    if (role) filter.role = role;
-    if (companyId) filter.companyId = companyId;
-    if (branchId) filter.branchId = branchId;
-
-    return this.usersService.findAll(filter);
+  @ApiOperation({ summary: 'Get all users with pagination, filtering, and search' })
+  findAll(@Query() filterDto: UserFilterDto) {
+    return this.usersService.findAll(filterDto);
   }
 
   @Get('me')

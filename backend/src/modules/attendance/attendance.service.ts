@@ -1,10 +1,11 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { AttendanceFilterDto } from '../../common/dto/pagination.dto';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 import { Attendance, AttendanceDocument } from './schemas/attendance.schema';
@@ -82,14 +83,57 @@ export class AttendanceService {
     return attendance.save();
   }
 
-  async findAll(filter: any = {}): Promise<Attendance[]> {
-    return this.attendanceModel
-      .find(filter)
+  async findAll(filterDto: AttendanceFilterDto): Promise<{ attendance: Attendance[], total: number, page: number, limit: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'date', 
+      sortOrder = 'desc',
+      search,
+      ...filters 
+    } = filterDto;
+    
+    const skip = (page - 1) * limit;
+    const query: any = { ...filters };
+
+    // Add date range filtering
+    if (filters.startDate || filters.endDate) {
+      query.date = {};
+      if (filters.startDate) query.date.$gte = new Date(filters.startDate);
+      if (filters.endDate) query.date.$lte = new Date(filters.endDate);
+    }
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { 'user.firstName': { $regex: search, $options: 'i' } },
+        { 'user.lastName': { $regex: search, $options: 'i' } },
+        { 'user.employeeId': { $regex: search, $options: 'i' } },
+        { notes: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sortOptions: any = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const attendance = await this.attendanceModel
+      .find(query)
       .populate('userId', 'firstName lastName employeeId')
       .populate('branchId', 'name code')
       .populate('approvedBy', 'firstName lastName')
-      .sort({ date: -1 })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
       .exec();
+
+    const total = await this.attendanceModel.countDocuments(query);
+
+    return {
+      attendance,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<Attendance> {

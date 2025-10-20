@@ -48,6 +48,10 @@ export class GeneratorUtil {
     return `${prefix}-${year}${month}-${random}`;
   }
 
+  static generateId(): string {
+    return uuidv4();
+  }
+
   static generatePin(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }

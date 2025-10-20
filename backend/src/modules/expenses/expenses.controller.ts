@@ -1,16 +1,17 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { ExpenseFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -34,12 +35,9 @@ export class ExpensesController {
 
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Get all expenses' })
-  findAll(@Query('branchId') branchId?: string, @Query('category') category?: string) {
-    const filter: any = {};
-    if (branchId) filter.branchId = branchId;
-    if (category) filter.category = category;
-    return this.expensesService.findAll(filter);
+  @ApiOperation({ summary: 'Get all expenses with pagination, filtering, and search' })
+  findAll(@Query() filterDto: ExpenseFilterDto) {
+    return this.expensesService.findAll(filterDto);
   }
 
   @Get('branch/:branchId')

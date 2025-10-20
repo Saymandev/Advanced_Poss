@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
+import { LoginActivityModule } from '../login-activity/login-activity.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
@@ -18,6 +19,7 @@ import { TwoFactorService } from './two-factor.service';
     forwardRef(() => CompaniesModule),
     forwardRef(() => BranchesModule),
     forwardRef(() => SubscriptionPlansModule),
+    forwardRef(() => LoginActivityModule),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

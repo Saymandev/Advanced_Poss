@@ -1,10 +1,11 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { SupplierFilterDto } from '../../common/dto/pagination.dto';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { Supplier, SupplierDocument } from './schemas/supplier.schema';
@@ -33,8 +34,50 @@ export class SuppliersService {
     return supplier.save();
   }
 
-  async findAll(filter: any = {}): Promise<Supplier[]> {
-    return this.supplierModel.find(filter).sort({ name: 1 }).exec();
+  async findAll(filterDto: SupplierFilterDto): Promise<{ suppliers: Supplier[], total: number, page: number, limit: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc',
+      search,
+      ...filters 
+    } = filterDto;
+    
+    const skip = (page - 1) * limit;
+    const query: any = { ...filters };
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { contactPerson: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { address: { $regex: search, $options: 'i' } },
+        { type: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sortOptions: any = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const suppliers = await this.supplierModel
+      .find(query)
+      .populate('companyId', 'name email')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    const total = await this.supplierModel.countDocuments(query);
+
+    return {
+      suppliers,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<Supplier> {

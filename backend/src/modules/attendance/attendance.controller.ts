@@ -1,16 +1,17 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { AttendanceFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -39,19 +40,9 @@ export class AttendanceController {
 
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Get all attendance records' })
-  findAll(@Query('branchId') branchId?: string, @Query('date') date?: string) {
-    const filter: any = {};
-    if (branchId) filter.branchId = branchId;
-    if (date) {
-      const targetDate = new Date(date);
-      const startOfDay = new Date(targetDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(targetDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      filter.date = { $gte: startOfDay, $lte: endOfDay };
-    }
-    return this.attendanceService.findAll(filter);
+  @ApiOperation({ summary: 'Get all attendance records with pagination, filtering, and search' })
+  findAll(@Query() filterDto: AttendanceFilterDto) {
+    return this.attendanceService.findAll(filterDto);
   }
 
   @Get('branch/:branchId/today')

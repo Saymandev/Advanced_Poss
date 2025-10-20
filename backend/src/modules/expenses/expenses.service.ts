@@ -1,10 +1,11 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { ExpenseFilterDto } from '../../common/dto/pagination.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { Expense, ExpenseDocument } from './schemas/expense.schema';
@@ -30,15 +31,58 @@ export class ExpensesService {
     return expense.save();
   }
 
-  async findAll(filter: any = {}): Promise<Expense[]> {
-    return this.expenseModel
-      .find(filter)
+  async findAll(filterDto: ExpenseFilterDto): Promise<{ expenses: Expense[], total: number, page: number, limit: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'date', 
+      sortOrder = 'desc',
+      search,
+      ...filters 
+    } = filterDto;
+    
+    const skip = (page - 1) * limit;
+    const query: any = { ...filters };
+
+    // Add date range filtering
+    if (filters.startDate || filters.endDate) {
+      query.date = {};
+      if (filters.startDate) query.date.$gte = new Date(filters.startDate);
+      if (filters.endDate) query.date.$lte = new Date(filters.endDate);
+    }
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { description: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } },
+        { vendor: { $regex: search, $options: 'i' } },
+        { reference: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sortOptions: any = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const expenses = await this.expenseModel
+      .find(query)
       .populate('branchId', 'name code')
       .populate('supplierId', 'name contactPerson')
       .populate('createdBy', 'firstName lastName')
       .populate('approvedBy', 'firstName lastName')
-      .sort({ date: -1 })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
       .exec();
+
+    const total = await this.expenseModel.countDocuments(query);
+
+    return {
+      expenses,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<Expense> {

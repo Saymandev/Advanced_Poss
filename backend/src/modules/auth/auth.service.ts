@@ -10,6 +10,8 @@ import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
+import { LoginActivityService } from '../login-activity/login-activity.service';
+import { LoginMethod, LoginStatus } from '../login-activity/schemas/login-activity.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { UsersService } from '../users/users.service';
 import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
@@ -26,6 +28,7 @@ export class AuthService {
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
     private subscriptionPlansService: SubscriptionPlansService,
+    private loginActivityService: LoginActivityService,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
@@ -622,8 +625,10 @@ export class AuthService {
     role: string;
     userId?: string;
     pin: string;
+    ipAddress?: string;
+    userAgent?: string;
   }) {
-    const { companyId, branchId, role, userId, pin } = loginData;
+    const { companyId, branchId, role, userId, pin, ipAddress, userAgent } = loginData;
 
     // Find user by role and branch
     let user: any;
@@ -631,18 +636,57 @@ export class AuthService {
       // If userId is provided, find specific user
       user = await this.usersService.findOne(userId);
       if (!user || user.role !== role || user.branchId !== branchId) {
+        // Log failed login attempt
+        await this.logLoginActivity({
+          userId: userId || 'unknown',
+          companyId,
+          branchId,
+          email: 'unknown',
+          role: role as any,
+          status: LoginStatus.FAILED,
+          method: LoginMethod.PIN_ROLE,
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          failureReason: 'Invalid user selection',
+        });
         throw new UnauthorizedException('Invalid user selection');
       }
     } else {
       // Find user by role and branch
       const users = await this.usersService.findByBranch(branchId);
-      const roleUsers = users.filter(u => u.role === role);
+      const roleUsers = users.filter(u => u.role.toLowerCase() === role.toLowerCase());
       
       if (roleUsers.length === 0) {
+        // Log failed login attempt
+        await this.logLoginActivity({
+          userId: 'unknown',
+          companyId,
+          branchId,
+          email: 'unknown',
+          role: role as any,
+          status: LoginStatus.FAILED,
+          method: LoginMethod.PIN_ROLE,
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          failureReason: 'No users found with this role in this branch',
+        });
         throw new UnauthorizedException('No users found with this role in this branch');
       }
       
       if (roleUsers.length > 1) {
+        // Log failed login attempt
+        await this.logLoginActivity({
+          userId: 'unknown',
+          companyId,
+          branchId,
+          email: 'unknown',
+          role: role as any,
+          status: LoginStatus.FAILED,
+          method: LoginMethod.PIN_ROLE,
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          failureReason: 'Multiple users found with this role',
+        });
         throw new BadRequestException('Multiple users found with this role. Please select a specific user.');
       }
       
@@ -650,8 +694,40 @@ export class AuthService {
     }
 
     // Verify PIN
-    if (!user.pin || user.pin !== pin) {
-      throw new UnauthorizedException('Invalid PIN');
+    const userWithPin = await this.usersService.findByEmail(user.email);
+    if (!userWithPin?.pin) {
+      // Log failed login attempt
+      await this.logLoginActivity({
+        userId: user._id.toString(),
+        companyId: user.companyId,
+        branchId: user.branchId,
+        email: user.email,
+        role: user.role,
+        status: LoginStatus.FAILED,
+        method: LoginMethod.PIN_ROLE,
+        ipAddress: ipAddress || 'unknown',
+        userAgent: userAgent || 'unknown',
+        failureReason: 'PIN not set',
+      });
+      throw new UnauthorizedException('PIN not set for this user');
+    }
+
+    const isPinValid = await PasswordUtil.compare(pin, userWithPin.pin);
+    if (!isPinValid) {
+      // Log failed login attempt
+      await this.logLoginActivity({
+        userId: user._id.toString(),
+        companyId: user.companyId,
+        branchId: user.branchId,
+        email: user.email,
+        role: user.role,
+        status: LoginStatus.FAILED,
+        method: LoginMethod.PIN_ROLE,
+        ipAddress: ipAddress || 'unknown',
+        userAgent: userAgent || 'unknown',
+        failureReason: 'Invalid PIN',
+      });
+      throw new UnauthorizedException('Invalid PIN for this role');
     }
 
     // Generate tokens
@@ -665,6 +741,37 @@ export class AuthService {
     
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    // Generate session ID
+    const sessionId = GeneratorUtil.generateId();
+
+    // Log successful login activity
+    await this.logLoginActivity({
+      userId: user._id.toString(),
+      companyId: user.companyId,
+      branchId: user.branchId,
+      email: user.email,
+      role: user.role,
+      status: LoginStatus.SUCCESS,
+      method: LoginMethod.PIN_ROLE,
+      ipAddress: ipAddress || 'unknown',
+      userAgent: userAgent || 'unknown',
+      sessionId,
+    });
+
+    // Create login session
+    await this.loginActivityService.createLoginSession({
+      userId: user._id.toString(),
+      companyId: user.companyId,
+      branchId: user.branchId,
+      sessionId,
+      accessToken,
+      refreshToken,
+      ipAddress: ipAddress || 'unknown',
+      userAgent: userAgent || 'unknown',
+      loginTime: new Date(),
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+    });
 
     // Update last login
     await this.usersService.update(user._id.toString(), { lastLogin: new Date() } as any);
@@ -682,9 +789,36 @@ export class AuthService {
           branchId: user.branchId
         },
         accessToken,
-        refreshToken
+        refreshToken,
+        sessionId
       }
     };
+  }
+
+  private async logLoginActivity(activityData: {
+    userId: string;
+    companyId?: string;
+    branchId?: string;
+    email: string;
+    role: any;
+    status: LoginStatus;
+    method: LoginMethod;
+    ipAddress: string;
+    userAgent: string;
+    location?: string;
+    deviceInfo?: string;
+    failureReason?: string;
+    sessionId?: string;
+  }) {
+    try {
+      await this.loginActivityService.createLoginActivity({
+        ...activityData,
+        loginTime: new Date(),
+      });
+    } catch (error) {
+      // Log error but don't fail the login process
+      console.error('Failed to log login activity:', error);
+    }
   }
 }
 

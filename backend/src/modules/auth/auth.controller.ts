@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -175,8 +176,15 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Invalid PIN or role not found' })
   @ApiResponse({ status: 400, description: 'Account locked or deactivated' })
-  pinLoginWithRole(@Body() pinLoginDto: PinLoginWithRoleDto) {
-    return this.authService.pinLoginWithRole(pinLoginDto);
+  pinLoginWithRole(@Body() pinLoginDto: PinLoginWithRoleDto, @Req() req: any) {
+    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    return this.authService.loginWithRole({
+      ...pinLoginDto,
+      ipAddress,
+      userAgent,
+    });
   }
 
   @Public()

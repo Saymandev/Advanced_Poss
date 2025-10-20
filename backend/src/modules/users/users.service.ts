@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { UserFilterDto } from '../../common/dto/pagination.dto';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
@@ -62,8 +63,52 @@ export class UsersService {
     return user.save();
   }
 
-  async findAll(filter: any = {}): Promise<User[]> {
-    return this.userModel.find(filter).select('-password -pin').exec();
+  async findAll(filterDto: UserFilterDto): Promise<{ users: User[], total: number, page: number, limit: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc',
+      search,
+      ...filters 
+    } = filterDto;
+    
+    const skip = (page - 1) * limit;
+    const query: any = { ...filters };
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { employeeId: { $regex: search, $options: 'i' } },
+        { role: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sortOptions: any = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const users = await this.userModel
+      .find(query)
+      .select('-password -pin')
+      .populate('companyId', 'name email')
+      .populate('branchId', 'name address')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    const total = await this.userModel.countDocuments(query);
+
+    return {
+      users,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<User> {

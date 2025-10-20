@@ -23,6 +23,7 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { IngredientsModule } from './modules/ingredients/ingredients.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
+import { LoginActivityModule } from './modules/login-activity/login-activity.module';
 import { MenuItemsModule } from './modules/menu-items/menu-items.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -116,6 +117,7 @@ import { AppService } from './app.service';
     ExpensesModule,
     AttendanceModule,
     SubscriptionsModule,
+    LoginActivityModule,
     SubscriptionPlansModule,
     BackupsModule,
     ReportsModule,

@@ -1,10 +1,11 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { CustomerFilterDto } from '../../common/dto/pagination.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { Customer, CustomerDocument } from './schemas/customer.schema';
@@ -46,8 +47,50 @@ export class CustomersService {
     return customer.save();
   }
 
-  async findAll(filter: any = {}): Promise<Customer[]> {
-    return this.customerModel.find(filter).sort({ createdAt: -1 }).exec();
+  async findAll(filterDto: CustomerFilterDto): Promise<{ customers: Customer[], total: number, page: number, limit: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc',
+      search,
+      ...filters 
+    } = filterDto;
+    
+    const skip = (page - 1) * limit;
+    const query: any = { ...filters };
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { address: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sortOptions: any = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const customers = await this.customerModel
+      .find(query)
+      .populate('companyId', 'name email')
+      .populate('branchId', 'name address')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    const total = await this.customerModel.countDocuments(query);
+
+    return {
+      customers,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<Customer> {

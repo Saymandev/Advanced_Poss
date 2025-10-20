@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
+import { MenuItemFilterDto } from '../../common/dto/pagination.dto';
 import { MenuItemsService } from './menu-items.service';
 
 @ApiTags('Menu')
@@ -33,19 +34,9 @@ export class MenuItemsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all menu items' })
-  findAll(
-    @Query('companyId') companyId?: string,
-    @Query('branchId') branchId?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('isAvailable') isAvailable?: string,
-  ) {
-    const filter: any = {};
-    if (companyId) filter.companyId = companyId;
-    if (branchId) filter.branchId = branchId;
-    if (categoryId) filter.categoryId = categoryId;
-    if (isAvailable) filter.isAvailable = isAvailable === 'true';
-    return this.menuItemsService.findAll(filter);
+  @ApiOperation({ summary: 'Get all menu items with pagination, filtering, and search' })
+  findAll(@Query() filterDto: MenuItemFilterDto) {
+    return this.menuItemsService.findAll(filterDto);
   }
 
   @Get('search')

@@ -1,16 +1,17 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CustomerFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -38,11 +39,9 @@ export class CustomersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all customers' })
-  findAll(@Query('companyId') companyId?: string) {
-    const filter: any = {};
-    if (companyId) filter.companyId = companyId;
-    return this.customersService.findAll(filter);
+  @ApiOperation({ summary: 'Get all customers with pagination, filtering, and search' })
+  findAll(@Query() filterDto: CustomerFilterDto) {
+    return this.customersService.findAll(filterDto);
   }
 
   @Get('search')

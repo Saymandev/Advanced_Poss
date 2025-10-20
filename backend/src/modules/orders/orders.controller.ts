@@ -1,16 +1,17 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { OrderFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -40,17 +41,9 @@ export class OrdersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all orders' })
-  findAll(
-    @Query('branchId') branchId?: string,
-    @Query('status') status?: string,
-    @Query('customerId') customerId?: string,
-  ) {
-    const filter: any = {};
-    if (branchId) filter.branchId = branchId;
-    if (status) filter.status = status;
-    if (customerId) filter.customerId = customerId;
-    return this.ordersService.findAll(filter);
+  @ApiOperation({ summary: 'Get all orders with pagination, filtering, and search' })
+  findAll(@Query() filterDto: OrderFilterDto) {
+    return this.ordersService.findAll(filterDto);
   }
 
   @Get('branch/:branchId')

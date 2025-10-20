@@ -1,10 +1,11 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { MenuItemFilterDto } from '../../common/dto/pagination.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 import { MenuItem, MenuItemDocument } from './schemas/menu-item.schema';
@@ -33,12 +34,49 @@ export class MenuItemsService {
     return menuItem.save();
   }
 
-  async findAll(filter: any = {}): Promise<MenuItem[]> {
-    return this.menuItemModel
-      .find(filter)
+  async findAll(filterDto: MenuItemFilterDto): Promise<{ menuItems: MenuItem[], total: number, page: number, limit: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc',
+      search,
+      ...filters 
+    } = filterDto;
+    
+    const skip = (page - 1) * limit;
+    const query: any = { ...filters };
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } },
+        { 'category.name': { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sortOptions: any = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const menuItems = await this.menuItemModel
+      .find(query)
       .populate('categoryId', 'name type')
       .populate('ingredients.ingredientId', 'name unit')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
       .exec();
+
+    const total = await this.menuItemModel.countDocuments(query);
+
+    return {
+      menuItems,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<MenuItem> {

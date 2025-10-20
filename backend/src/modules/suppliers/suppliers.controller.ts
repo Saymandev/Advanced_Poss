@@ -1,16 +1,17 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { SupplierFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -34,12 +35,9 @@ export class SuppliersController {
 
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Get all suppliers' })
-  findAll(@Query('companyId') companyId?: string, @Query('type') type?: string) {
-    const filter: any = {};
-    if (companyId) filter.companyId = companyId;
-    if (type) filter.type = type;
-    return this.suppliersService.findAll(filter);
+  @ApiOperation({ summary: 'Get all suppliers with pagination, filtering, and search' })
+  findAll(@Query() filterDto: SupplierFilterDto) {
+    return this.suppliersService.findAll(filterDto);
   }
 
   @Get('search')

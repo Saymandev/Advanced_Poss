@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { OrderFilterDto } from '../../common/dto/pagination.dto';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { TablesService } from '../tables/tables.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
@@ -136,15 +137,62 @@ export class OrdersService {
     return this.findOne(savedOrder._id.toString());
   }
 
-  async findAll(filter: any = {}): Promise<Order[]> {
-    return this.orderModel
-      .find(filter)
+  async findAll(filterDto: OrderFilterDto): Promise<{ orders: Order[], total: number, page: number, limit: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc',
+      search,
+      ...filters 
+    } = filterDto;
+    
+    const skip = (page - 1) * limit;
+    const query: any = { ...filters };
+
+    // Add date range filtering
+    if (filters.startDate || filters.endDate) {
+      query.createdAt = {};
+      if (filters.startDate) query.createdAt.$gte = new Date(filters.startDate);
+      if (filters.endDate) query.createdAt.$lte = new Date(filters.endDate);
+    }
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { orderNumber: { $regex: search, $options: 'i' } },
+        { 'customer.firstName': { $regex: search, $options: 'i' } },
+        { 'customer.lastName': { $regex: search, $options: 'i' } },
+        { 'customer.phone': { $regex: search, $options: 'i' } },
+        { 'waiter.firstName': { $regex: search, $options: 'i' } },
+        { 'waiter.lastName': { $regex: search, $options: 'i' } },
+        { 'table.tableNumber': { $regex: search, $options: 'i' } },
+        { notes: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sortOptions: any = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const orders = await this.orderModel
+      .find(query)
       .populate('tableId', 'tableNumber location')
       .populate('customerId', 'firstName lastName phone')
       .populate('waiterId', 'firstName lastName')
       .populate('items.menuItemId', 'name image category')
-      .sort({ createdAt: -1 })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
       .exec();
+
+    const total = await this.orderModel.countDocuments(query);
+
+    return {
+      orders,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<Order> {
