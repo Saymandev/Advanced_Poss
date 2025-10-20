@@ -500,6 +500,147 @@ export class OrdersService {
     return stats;
   }
 
+  async getDailySeries(
+    branchId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<{ date: string; orders: number; revenue: number }[]> {
+    const series = await this.orderModel.aggregate([
+      {
+        $match: {
+          branchId: new Types.ObjectId(branchId),
+          status: 'completed',
+          completedAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            y: { $year: '$completedAt' },
+            m: { $month: '$completedAt' },
+            d: { $dayOfMonth: '$completedAt' },
+          },
+          orders: { $sum: 1 },
+          revenue: { $sum: '$total' },
+        },
+      },
+      { $sort: { '_id.y': 1, '_id.m': 1, '_id.d': 1 } },
+    ]);
+
+    return series.map((s) => ({
+      date: `${s._id.y}-${String(s._id.m).padStart(2, '0')}-${String(s._id.d).padStart(2, '0')}`,
+      orders: s.orders,
+      revenue: s.revenue,
+    }));
+  }
+
+  async getTopProducts(
+    branchId: string,
+    startDate: Date,
+    endDate: Date,
+    limit = 5,
+  ): Promise<{ menuItemId: string; name: string; sales: number; revenue: number }[]> {
+    const rows = await this.orderModel.aggregate([
+      {
+        $match: {
+          branchId: new Types.ObjectId(branchId),
+          status: 'completed',
+          completedAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.menuItemId',
+          sales: { $sum: { $ifNull: ['$items.quantity', 1] } },
+          revenue: {
+            $sum: {
+              $ifNull: [
+                '$items.total',
+                { $multiply: [{ $ifNull: ['$items.quantity', 1] }, { $ifNull: ['$items.price', 0] }] },
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { revenue: -1 } },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'menuitems', // collection name
+          localField: '_id',
+          foreignField: '_id',
+          as: 'menuItem',
+        },
+      },
+      { $unwind: { path: '$menuItem', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          menuItemId: { $toString: '$_id' },
+          name: { $ifNull: ['$menuItem.name', 'Unknown Item'] },
+          sales: 1,
+          revenue: 1,
+        },
+      },
+    ]);
+
+    return rows;
+  }
+
+  async getTopEmployees(
+    branchId: string,
+    startDate: Date,
+    endDate: Date,
+    limit = 4,
+  ): Promise<{ userId: string; name: string; role: string; orders: number }[]> {
+    const rows = await this.orderModel.aggregate([
+      {
+        $match: {
+          branchId: new Types.ObjectId(branchId),
+          status: 'completed',
+          completedAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: '$waiterId',
+          orders: { $sum: 1 },
+        },
+      },
+      { $sort: { orders: -1 } },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          userId: { $toString: '$_id' },
+          name: {
+            $trim: {
+              input: {
+                $concat: [
+                  { $ifNull: ['$user.firstName', ''] },
+                  ' ',
+                  { $ifNull: ['$user.lastName', ''] },
+                ],
+              },
+            },
+          },
+          role: { $ifNull: ['$user.role', 'STAFF'] },
+          orders: 1,
+        },
+      },
+    ]);
+
+    return rows;
+  }
+
   private async generateOrderNumber(branchId: string): Promise<string> {
     const date = new Date();
     const dateStr = date.toISOString().slice(2, 10).replace(/-/g, ''); // YYMMDD

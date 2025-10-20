@@ -1,24 +1,17 @@
-import { configureStore } from '@reduxjs/toolkit';
-import { setupListeners } from '@reduxjs/toolkit/query';
-import { authApi } from './api/authApi';
-import { themeSlice } from './slices/themeSlice';
-import { authSlice } from './slices/authSlice';
+import { apiSlice } from '@/lib/api/apiSlice'
+import authReducer from '@/lib/slices/authSlice'
+import { configureStore } from '@reduxjs/toolkit'
 
 export const store = configureStore({
   reducer: {
-    theme: themeSlice.reducer,
-    auth: authSlice.reducer,
-    [authApi.reducerPath]: authApi.reducer,
+    [apiSlice.reducerPath]: apiSlice.reducer,
+    auth: authReducer,
   },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
-      },
-    }).concat(authApi.middleware),
-});
+  middleware: (getDefault) => getDefault({ serializableCheck: false }).concat(apiSlice.middleware),
+  devTools: process.env.NODE_ENV !== 'production',
+})
 
-setupListeners(store.dispatch);
+export type RootState = ReturnType<typeof store.getState>
+export type AppDispatch = typeof store.dispatch
 
-export type RootState = ReturnType<typeof store.getState>;
-export type AppDispatch = typeof store.dispatch;
+

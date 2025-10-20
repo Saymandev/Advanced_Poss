@@ -1,17 +1,25 @@
-'use client';
+"use client";
+import { ReactNode, useEffect, useState } from 'react';
 
-import { ThemeProvider as NextThemesProvider, type ThemeProviderProps } from 'next-themes';
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false)
+  const [theme, setTheme] = useState<string>('light')
 
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  return (
-    <NextThemesProvider 
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-      {...props}
-    >
-      {children}
-    </NextThemesProvider>
-  );
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('theme') : null
+    const initial = saved || 'light'
+    setTheme(initial)
+    setMounted(true)
+    document.documentElement.classList.toggle('dark', initial === 'dark')
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    localStorage.setItem('theme', theme)
+  }, [mounted, theme])
+
+  return <>{children}</>
 }
+
+

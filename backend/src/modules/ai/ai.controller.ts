@@ -1,9 +1,9 @@
 import {
-    Controller,
-    Get,
-    Param,
-    Query,
-    UseGuards,
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { Schema as MongooseSchema } from 'mongoose';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -93,6 +93,36 @@ export class AiController {
       companyId as unknown as MongooseSchema.Types.ObjectId,
       branchId ? (branchId as unknown as MongooseSchema.Types.ObjectId) : undefined,
       period || 'month',
+    );
+  }
+
+  // Generate AI-powered sales analytics
+  @Get('sales-analytics')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  async getSalesAnalytics(
+    @Query('branchId') branchId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.aiService.generateSalesAnalytics(
+      branchId,
+      new Date(startDate),
+      new Date(endDate),
+    );
+  }
+
+  // Generate AI-powered order analytics
+  @Get('order-analytics')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  async getOrderAnalytics(
+    @Query('branchId') branchId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.aiService.generateOrderAnalytics(
+      branchId,
+      new Date(startDate),
+      new Date(endDate),
     );
   }
 }

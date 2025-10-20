@@ -485,8 +485,8 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
-      companyId: user.companyId,
-      branchId: user.branchId,
+      companyId: user.companyId?.toString(),
+      branchId: user.branchId?.toString(),
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -735,8 +735,8 @@ export class AuthService {
       sub: user._id.toString(), 
       email: user.email, 
       role: user.role,
-      companyId: user.companyId,
-      branchId: user.branchId
+      companyId: user.companyId?.toString(),
+      branchId: user.branchId?.toString()
     };
     
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });

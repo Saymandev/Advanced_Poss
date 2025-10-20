@@ -83,6 +83,55 @@ export class OrdersController {
     );
   }
 
+  @Get('branch/:branchId/series')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get daily series of orders and revenue' })
+  getDailySeries(
+    @Param('branchId') branchId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.ordersService.getDailySeries(
+      branchId,
+      new Date(startDate),
+      new Date(endDate),
+    );
+  }
+
+  @Get('branch/:branchId/top-products')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get top selling products' })
+  getTopProducts(
+    @Param('branchId') branchId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('limit') limit = '5',
+  ) {
+    return this.ordersService.getTopProducts(
+      branchId,
+      new Date(startDate),
+      new Date(endDate),
+      parseInt(limit, 10) || 5,
+    );
+  }
+
+  @Get('branch/:branchId/top-employees')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get best employees by orders served' })
+  getTopEmployees(
+    @Param('branchId') branchId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('limit') limit = '4',
+  ) {
+    return this.ordersService.getTopEmployees(
+      branchId,
+      new Date(startDate),
+      new Date(endDate),
+      parseInt(limit, 10) || 4,
+    );
+  }
+
   @Get('table/:tableId')
   @ApiOperation({ summary: 'Get orders for table' })
   findByTable(@Param('tableId') tableId: string) {
