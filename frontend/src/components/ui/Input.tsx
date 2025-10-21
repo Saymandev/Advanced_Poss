@@ -18,8 +18,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           className={cn(
-            'input w-full',
-            error && 'border-danger-500 focus:ring-danger-500',
+            'w-full px-4 py-2 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all duration-200',
+            'border-gray-300 dark:border-gray-600 focus:border-primary-500 dark:focus:border-primary-400',
+            'focus:ring-2 focus:ring-primary-500/20 dark:focus:ring-primary-400/20 focus:outline-none',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            'hover:border-gray-400 dark:hover:border-gray-500',
+            error && 'border-danger-500 focus:border-danger-500 focus:ring-danger-500/20 dark:border-danger-400',
             className
           )}
           {...props}

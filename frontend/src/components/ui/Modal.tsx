@@ -30,25 +30,29 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto animate-fade-in">
       <div className="flex min-h-full items-center justify-center p-4">
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
           onClick={onClose}
         />
         <div className={cn(
-          'relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full',
+          'relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full transform transition-all duration-300 animate-scale-in',
+          'border border-gray-200 dark:border-gray-700',
           sizeClasses[size],
           className
         )}>
+          {/* Top gradient border */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500 rounded-t-2xl" />
+          
           {title && (
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                 {title}
               </h3>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg p-1.5 transition-all hover:rotate-90"
               >
                 <XMarkIcon className="w-6 h-6" />
               </button>

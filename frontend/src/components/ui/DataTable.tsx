@@ -3,9 +3,9 @@ import { Pagination } from '@/components/ui/Pagination';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { cn } from '@/lib/utils';
 import {
-    ChevronDownIcon,
-    ChevronUpIcon,
-    MagnifyingGlassIcon
+  ChevronDownIcon,
+  ChevronUpIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { Checkbox } from './Checkbox';
@@ -143,7 +143,7 @@ export function DataTable<T extends Record<string, any>>({
       {/* Header with search and export */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         {searchable && (
-          <div className="w-full sm:w-64">
+          <div className="w-full sm:w-64 lg:w-80">
             <SearchBar
               value={searchQuery}
               onChange={(query) => {
@@ -156,12 +156,14 @@ export function DataTable<T extends Record<string, any>>({
         )}
         
         {exportable && (
-          <ExportButton
-            data={selectedItems.length > 0 ? selectedItems : data}
-            filename={exportFilename}
-            formats={exportFormats}
-            onExport={(format) => onExport?.(format, selectedItems.length > 0 ? selectedItems : data)}
-          />
+          <div className="w-full sm:w-auto flex justify-end">
+            <ExportButton
+              data={selectedItems.length > 0 ? selectedItems : data}
+              filename={exportFilename}
+              formats={exportFormats}
+              onExport={(format) => onExport?.(format, selectedItems.length > 0 ? selectedItems : data)}
+            />
+          </div>
         )}
       </div>
 

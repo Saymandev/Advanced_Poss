@@ -77,17 +77,19 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['WorkPeriod'],
     }),
-    startWorkPeriod: builder.mutation<WorkPeriod, string>({
-      query: (id) => ({
-        url: `/work-periods/${id}/start`,
+    startWorkPeriod: builder.mutation<WorkPeriod, { openingBalance: number; pin: string }>({
+      query: (data) => ({
+        url: '/work-periods/start',
         method: 'POST',
+        body: data,
       }),
       invalidatesTags: ['WorkPeriod'],
     }),
-    endWorkPeriod: builder.mutation<WorkPeriod, string>({
-      query: (id) => ({
+    endWorkPeriod: builder.mutation<WorkPeriod, { id: string; actualClosingBalance: number; note?: string; pin: string }>({
+      query: ({ id, ...data }) => ({
         url: `/work-periods/${id}/end`,
         method: 'POST',
+        body: data,
       }),
       invalidatesTags: ['WorkPeriod'],
     }),
@@ -102,11 +104,8 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['WorkPeriod'],
     }),
-    getCurrentWorkPeriod: builder.query<WorkPeriod | null, { branchId: string }>({
-      query: (params) => ({
-        url: '/work-periods/current',
-        params,
-      }),
+    getCurrentWorkPeriod: builder.query<WorkPeriod | null, void>({
+      query: () => '/work-periods/active',
       providesTags: ['WorkPeriod'],
     }),
   }),

@@ -3,26 +3,27 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { StatsSkeleton } from '@/components/ui/Skeleton';
 import { useGetDashboardQuery } from '@/lib/api/endpoints/reportsApi';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ArrowTrendingDownIcon,
-    ArrowTrendingUpIcon,
-    BeakerIcon,
-    BellIcon,
-    ChartBarIcon,
-    ClockIcon,
-    CurrencyDollarIcon,
-    ShoppingCartIcon,
-    TableCellsIcon,
-    UsersIcon,
+  ArrowTrendingDownIcon,
+  ArrowTrendingUpIcon,
+  BeakerIcon,
+  BellIcon,
+  ChartBarIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  ShoppingCartIcon,
+  TableCellsIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
+const _COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
 
 export default function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
@@ -31,8 +32,29 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-64"></div>
+          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-96"></div>
+        </div>
+        <StatsSkeleton count={4} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24"></div>
+            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20"></div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24"></div>
+            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20"></div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24"></div>
+            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20"></div>
+          </div>
+        </div>
       </div>
     );
   }

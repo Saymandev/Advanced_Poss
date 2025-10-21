@@ -60,6 +60,37 @@ export const ordersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Order', 'Kitchen'],
     }),
+    updateOrder: builder.mutation<Order, { id: string; data: Partial<CreateOrderRequest> }>({
+      query: ({ id, data }) => ({
+        url: `/orders/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['Order'],
+    }),
+    addPayment: builder.mutation<Order, { id: string; amount: number; method: string }>({
+      query: ({ id, ...data }) => ({
+        url: `/orders/${id}/payment`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Order'],
+    }),
+    splitOrder: builder.mutation<Order, { id: string; splitData: any }>({
+      query: ({ id, splitData }) => ({
+        url: `/orders/${id}/split`,
+        method: 'POST',
+        body: splitData,
+      }),
+      invalidatesTags: ['Order'],
+    }),
+    deleteOrder: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/orders/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Order'],
+    }),
   }),
 });
 
@@ -68,5 +99,9 @@ export const {
   useGetOrderByIdQuery,
   useCreateOrderMutation,
   useUpdateOrderStatusMutation,
+  useUpdateOrderMutation,
+  useAddPaymentMutation,
+  useSplitOrderMutation,
+  useDeleteOrderMutation,
 } = ordersApi;
 

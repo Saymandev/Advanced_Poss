@@ -7,17 +7,17 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { CreateTableRequest, Table, useCreateTableMutation, useDeleteTableMutation, useGetTablesQuery, useUpdateTableMutation } from '@/lib/api/endpoints/tablesApi';
+import { Table, useCreateTableMutation, useDeleteTableMutation, useGetTablesQuery, useUpdateTableMutation } from '@/lib/api/endpoints/tablesApi';
 import { useAppSelector } from '@/lib/store';
 import {
-    CheckCircleIcon,
-    ClockIcon,
-    PencilIcon,
-    PlusIcon,
-    TableCellsIcon,
-    TrashIcon,
-    UserGroupIcon,
-    XCircleIcon
+  CheckCircleIcon,
+  ClockIcon,
+  PencilIcon,
+  PlusIcon,
+  TableCellsIcon,
+  TrashIcon,
+  UserGroupIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -43,17 +43,17 @@ export default function TablesPage() {
   const [updateTable] = useUpdateTableMutation();
   const [deleteTable] = useDeleteTableMutation();
 
-  const [formData, setFormData] = useState<CreateTableRequest>({
-    number: 1,
-    capacity: 4,
+  const [formData, setFormData] = useState<any>({
     branchId: user?.branchId || '',
+    tableNumber: '1',
+    capacity: 4,
   });
 
   const resetForm = () => {
     setFormData({
-      number: 1,
-      capacity: 4,
       branchId: user?.branchId || '',
+      tableNumber: '1',
+      capacity: 4,
     });
     setSelectedTable(null);
   };
@@ -76,12 +76,10 @@ export default function TablesPage() {
     try {
       await updateTable({
         id: selectedTable.id,
-        data: {
-          number: formData.number,
-          capacity: formData.capacity,
-          status: selectedTable.status,
-        },
-      }).unwrap();
+        tableNumber: formData.tableNumber,
+        capacity: formData.capacity,
+        status: selectedTable.status,
+      } as any).unwrap();
       toast.success('Table updated successfully');
       setIsEditModalOpen(false);
       resetForm();
@@ -107,8 +105,8 @@ export default function TablesPage() {
     try {
       await updateTable({
         id: table.id,
-        data: { status },
-      }).unwrap();
+        status,
+      } as any).unwrap();
       toast.success(`Table ${table.number} is now ${status}`);
       refetch();
     } catch (error: any) {
@@ -119,33 +117,35 @@ export default function TablesPage() {
   const openEditModal = (table: Table) => {
     setSelectedTable(table);
     setFormData({
-      number: table.number,
+      branchId: user?.branchId || '',
+      tableNumber: (table as any).tableNumber || table.number?.toString() || '1',
       capacity: table.capacity,
-      branchId: table.branchId,
     });
     setIsEditModalOpen(true);
   };
 
   const getStatusBadge = (status: Table['status']) => {
-    const variants = {
+    const variants: any = {
       available: 'success',
       occupied: 'danger',
       reserved: 'warning',
       needs_cleaning: 'info',
-    } as const;
+      maintenance: 'secondary',
+    };
 
-    return <Badge variant={variants[status]}>{status.replace('_', ' ')}</Badge>;
+    return <Badge variant={variants[status] || 'secondary'}>{status.replace('_', ' ')}</Badge>;
   };
 
   const getStatusIcon = (status: Table['status']) => {
-    const icons = {
+    const icons: any = {
       available: CheckCircleIcon,
       occupied: XCircleIcon,
       reserved: ClockIcon,
       needs_cleaning: ClockIcon,
+      maintenance: ClockIcon,
     };
 
-    const Icon = icons[status];
+    const Icon = icons[status] || CheckCircleIcon;
     return <Icon className="w-4 h-4" />;
   };
 
@@ -201,7 +201,7 @@ export default function TablesPage() {
       render: (value: string) => (
         <div className="text-center">
           {value ? (
-            <Badge variant="primary">Order #{value.slice(-6)}</Badge>
+            <Badge variant="info">Order #{value.slice(-6)}</Badge>
           ) : (
             <span className="text-gray-500 dark:text-gray-400">None</span>
           )}
@@ -245,13 +245,13 @@ export default function TablesPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleStatusChange(row, 'needs_cleaning')}
+              onClick={() => handleStatusChange(row, 'needs_cleaning' as any)}
               className="text-blue-600 hover:text-blue-700"
             >
               <ClockIcon className="w-4 h-4" />
             </Button>
           )}
-          {row.status === 'needs_cleaning' && (
+          {(row as any).status === 'needs_cleaning' && (
             <Button
               variant="ghost"
               size="sm"
@@ -286,7 +286,7 @@ export default function TablesPage() {
     available: data?.tables?.filter(t => t.status === 'available').length || 0,
     occupied: data?.tables?.filter(t => t.status === 'occupied').length || 0,
     reserved: data?.tables?.filter(t => t.status === 'reserved').length || 0,
-    cleaning: data?.tables?.filter(t => t.status === 'needs_cleaning').length || 0,
+    cleaning: data?.tables?.filter((t: any) => t.status === 'needs_cleaning').length || 0,
   };
 
   return (

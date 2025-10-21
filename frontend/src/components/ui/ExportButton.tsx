@@ -26,6 +26,7 @@ export function ExportButton({
   size = 'md',
 }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const exportToCSV = () => {
     if (data.length === 0) {
@@ -182,29 +183,44 @@ export function ExportButton({
         variant={variant}
         size={size}
         disabled={disabled || isExporting}
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="flex items-center gap-2"
       >
         <DocumentArrowDownIcon className="w-4 h-4" />
         Export
-        <ArrowDownTrayIcon className="w-3 h-3" />
+        <ArrowDownTrayIcon className={cn("w-3 h-3 transition-transform", isDropdownOpen && "rotate-180")} />
       </Button>
 
       {/* Dropdown menu */}
-      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-10">
-        <div className="py-1">
-          {formats.map((format) => (
-            <button
-              key={format}
-              onClick={() => handleExport(format)}
-              disabled={disabled || isExporting}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-            >
-              <DocumentArrowDownIcon className="w-4 h-4" />
-              Export as {format.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
+      {isDropdownOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-10" 
+            onClick={() => setIsDropdownOpen(false)}
+          />
+          
+          {/* Dropdown */}
+          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 sm:right-0 sm:left-auto">
+            <div className="py-1">
+              {formats.map((format) => (
+                <button
+                  key={format}
+                  onClick={() => {
+                    handleExport(format);
+                    setIsDropdownOpen(false);
+                  }}
+                  disabled={disabled || isExporting}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  <DocumentArrowDownIcon className="w-4 h-4" />
+                  Export as {format.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

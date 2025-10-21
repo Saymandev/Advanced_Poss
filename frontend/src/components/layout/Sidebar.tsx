@@ -5,24 +5,24 @@ import { Button } from '@/components/ui/Button';
 import { useAppSelector } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-    Bars3Icon,
-    BeakerIcon,
-    BuildingOfficeIcon,
-    ChartBarIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    CogIcon,
-    CurrencyDollarIcon,
-    GiftIcon,
-    HomeIcon,
-    ReceiptPercentIcon,
-    ShoppingBagIcon,
-    TableCellsIcon,
-    TruckIcon,
-    UserCircleIcon,
-    UserGroupIcon,
-    UsersIcon,
-    XMarkIcon
+  Bars3Icon,
+  BeakerIcon,
+  BuildingOfficeIcon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  CogIcon,
+  CurrencyDollarIcon,
+  GiftIcon,
+  HomeIcon,
+  ReceiptPercentIcon,
+  ShoppingBagIcon,
+  TableCellsIcon,
+  TruckIcon,
+  UserCircleIcon,
+  UserGroupIcon,
+  UsersIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -44,9 +44,26 @@ const navigation: NavigationItem[] = [
     icon: HomeIcon,
   },
   {
+    name: 'POS System',
+    href: '/dashboard/pos',
+    icon: ShoppingBagIcon,
+  },
+  {
     name: 'Orders',
     href: '/dashboard/orders',
     icon: ClipboardDocumentListIcon,
+    children: [
+      {
+        name: 'Active Orders',
+        href: '/dashboard/orders',
+        icon: ClipboardDocumentListIcon,
+      },
+      {
+        name: 'Order History',
+        href: '/dashboard/order-history',
+        icon: ClockIcon,
+      },
+    ],
   },
   {
     name: 'Menu',
@@ -74,6 +91,11 @@ const navigation: NavigationItem[] = [
     icon: UsersIcon,
   },
   {
+    name: 'Schedule',
+    href: '/dashboard/schedule',
+    icon: ClockIcon,
+  },
+  {
     name: 'Inventory',
     href: '/dashboard/ingredients',
     icon: ClipboardDocumentListIcon,
@@ -84,9 +106,19 @@ const navigation: NavigationItem[] = [
         icon: BeakerIcon,
       },
       {
+        name: 'Stocks',
+        href: '/dashboard/stocks',
+        icon: ClipboardDocumentListIcon,
+      },
+      {
         name: 'Suppliers',
         href: '/dashboard/suppliers',
         icon: TruckIcon,
+      },
+      {
+        name: 'Purchase Orders',
+        href: '/dashboard/purchase-orders',
+        icon: ShoppingBagIcon,
       },
     ],
   },
@@ -109,6 +141,40 @@ const navigation: NavigationItem[] = [
         name: 'Work Periods',
         href: '/dashboard/work-periods',
         icon: ClockIcon,
+      },
+    ],
+  },
+  {
+    name: 'Digital Services',
+    href: '/dashboard/digital-receipts',
+    icon: ReceiptPercentIcon,
+    children: [
+      {
+        name: 'Digital Receipts',
+        href: '/dashboard/digital-receipts',
+        icon: ReceiptPercentIcon,
+      },
+      {
+        name: 'QR Menus',
+        href: '/dashboard/qr-code-menus',
+        icon: TableCellsIcon,
+      },
+    ],
+  },
+  {
+    name: 'AI Features',
+    href: '/dashboard/ai-menu-optimization',
+    icon: ChartBarIcon,
+    children: [
+      {
+        name: 'Menu Optimization',
+        href: '/dashboard/ai-menu-optimization',
+        icon: ChartBarIcon,
+      },
+      {
+        name: 'Customer Loyalty AI',
+        href: '/dashboard/customer-loyalty-ai',
+        icon: UserGroupIcon,
       },
     ],
   },
@@ -163,6 +229,16 @@ export function Sidebar({ className }: SidebarProps) {
         ? prev.filter(name => name !== itemName)
         : [...prev, itemName]
     );
+  };
+
+  const toggleCollapsed = () => {
+    const newCollapsed = !isCollapsed;
+    setIsCollapsed(newCollapsed);
+    
+    // Dispatch custom event to notify layout
+    window.dispatchEvent(new CustomEvent('sidebar-toggle', {
+      detail: { collapsed: newCollapsed }
+    }));
   };
 
   const isActive = (href: string) => {
@@ -270,7 +346,7 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Sidebar */}
       <div className={cn(
-        'fixed inset-y-0 left-0 z-50 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-all duration-300 ease-in-out',
+        'fixed inset-y-0 left-0 z-50 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-all duration-300 ease-in-out flex flex-col',
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         isCollapsed ? 'lg:w-16' : 'lg:w-64',
         className
@@ -295,7 +371,7 @@ export function Sidebar({ className }: SidebarProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsCollapsed(!isCollapsed)}
+              onClick={toggleCollapsed}
               className="hidden lg:flex"
             >
               <Bars3Icon className={cn(
@@ -346,9 +422,9 @@ export function Sidebar({ className }: SidebarProps) {
 
         {/* Navigation */}
         <nav className={cn(
-          "flex-1 p-4 space-y-1 overflow-y-auto transition-all duration-300",
+          "flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent transition-all duration-300",
           isCollapsed ? "px-2" : ""
-        )}>
+        )} style={{ maxHeight: 'calc(100vh - 240px)' }}>
           {navigation.map((item) => renderNavigationItem(item))}
         </nav>
 

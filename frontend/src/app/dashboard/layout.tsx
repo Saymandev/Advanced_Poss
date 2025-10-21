@@ -2,9 +2,10 @@
 
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
+import { DashboardSkeleton } from '@/components/ui/DashboardSkeleton';
 import { useAppSelector } from '@/lib/store';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function DashboardLayout({
   children,
@@ -13,31 +14,61 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const router = useRouter();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Check if auth state is being restored
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 1000); // Give time for auth restoration
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isInitializing && !isAuthenticated) {
       router.push('/auth/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isInitializing, router]);
 
-  if (!isAuthenticated || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+  // Listen for sidebar state changes
+  useEffect(() => {
+    const handleSidebarToggle = (event: CustomEvent) => {
+      setSidebarCollapsed(event.detail.collapsed);
+    };
+
+    window.addEventListener('sidebar-toggle', handleSidebarToggle as EventListener);
+    return () => {
+      window.removeEventListener('sidebar-toggle', handleSidebarToggle as EventListener);
+    };
+  }, []);
+
+  // Show skeleton while initializing or if not authenticated
+  if (isInitializing || !isAuthenticated || !user) {
+    return <DashboardSkeleton />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar />
-      <div className="lg:pl-64">
-        <Topbar />
-        <main className="py-6">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div 
+        className={`transition-all duration-300 ${
+          sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
+        }`}
+      >
+        {/* Fixed Topbar */}
+        <div 
+          className={`fixed top-0 right-0 z-40 transition-all duration-300 ${
+            sidebarCollapsed ? 'left-16' : 'left-64'
+          }`}
+        >
+          <Topbar />
+        </div>
+        
+        {/* Main content with top padding to account for fixed navbar */}
+        <main className="pt-16 py-6">
+          <div className="mx-auto w-full px-4">
             {children}
           </div>
         </main>

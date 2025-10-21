@@ -11,23 +11,23 @@ import { useGetMenuItemsQuery } from '@/lib/api/endpoints/menuItemsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-    ArrowTrendingDownIcon,
-    ArrowTrendingUpIcon,
-    ChartBarIcon,
-    EyeIcon,
-    LightBulbIcon,
-    SparklesIcon,
-    XMarkIcon
+  ArrowTrendingDownIcon,
+  ArrowTrendingUpIcon,
+  ChartBarIcon,
+  EyeIcon,
+  LightBulbIcon,
+  SparklesIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
 } from 'recharts';
 
 export default function AIMenuOptimizationPage() {

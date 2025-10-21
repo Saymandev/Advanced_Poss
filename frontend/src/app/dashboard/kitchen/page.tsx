@@ -3,6 +3,18 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import {
+  useCancelKitchenOrderMutation,
+  useCompleteKitchenOrderItemMutation,
+  useCompleteKitchenOrderMutation,
+  useGetKitchenPendingOrdersQuery,
+  useGetKitchenPreparingOrdersQuery,
+  useGetKitchenReadyOrdersQuery,
+  useGetKitchenStatsQuery,
+  useMarkKitchenOrderUrgentMutation,
+  useStartKitchenOrderItemMutation,
+  useStartKitchenOrderMutation
+} from '@/lib/api/endpoints/kitchenApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -34,8 +46,8 @@ interface KitchenOrder {
   specialInstructions?: string;
 }
 
-// Mock data for kitchen display
-const mockKitchenOrders: KitchenOrder[] = [
+// Mock data for kitchen display (removed - using real API)
+const _mockKitchenOrders: KitchenOrder[] = [
   {
     id: '1',
     orderNumber: 'ORD-2024-001',
@@ -112,64 +124,95 @@ const mockKitchenOrders: KitchenOrder[] = [
 
 export default function KitchenPage() {
   const { user } = useAppSelector((state) => state.auth);
-  const [orders, setOrders] = useState<KitchenOrder[]>(mockKitchenOrders);
   const [selectedOrder, setSelectedOrder] = useState<KitchenOrder | null>(null);
 
-  const handleItemStatusChange = (orderId: string, itemId: string, newStatus: 'pending' | 'preparing' | 'ready') => {
-    setOrders(prev => prev.map(order =>
-      order.id === orderId
-        ? {
-            ...order,
-            items: order.items.map(item =>
-              item.id === itemId ? { ...item, status: newStatus } : item
-            ),
-          }
-        : order
-    ));
+  // API calls
+  const { data: kitchenStats, isLoading: statsLoading } = useGetKitchenStatsQuery(user?.branchId || '');
+  const { data: pendingOrders = [], isLoading: pendingLoading } = useGetKitchenPendingOrdersQuery(user?.branchId || '');
+  const { data: preparingOrders = [], isLoading: preparingLoading } = useGetKitchenPreparingOrdersQuery(user?.branchId || '');
+  const { data: readyOrders = [], isLoading: readyLoading } = useGetKitchenReadyOrdersQuery(user?.branchId || '');
 
-    if (newStatus === 'ready') {
-      toast.success('Item marked as ready!');
+  // Mutations
+  const [startOrder] = useStartKitchenOrderMutation();
+  const [startItem] = useStartKitchenOrderItemMutation();
+  const [completeItem] = useCompleteKitchenOrderItemMutation();
+  const [completeOrder] = useCompleteKitchenOrderMutation();
+  const [markUrgent] = useMarkKitchenOrderUrgentMutation();
+  const [cancelOrder] = useCancelKitchenOrderMutation();
+
+  const handleItemStatusChange = async (orderId: string, itemId: string, newStatus: 'pending' | 'preparing' | 'ready') => {
+    try {
+      if (newStatus === 'preparing') {
+        await startItem({ id: orderId, itemId }).unwrap();
+        toast.success('Item preparation started');
+      } else if (newStatus === 'ready') {
+        await completeItem({ id: orderId, itemId }).unwrap();
+        toast.success('Item completed');
+      }
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update item status');
     }
   };
 
-  const handleOrderStatusChange = (orderId: string, newStatus: KitchenOrder['status']) => {
-    setOrders(prev => prev.map(order =>
-      order.id === orderId
-        ? {
-            ...order,
-            status: newStatus,
-            items: order.items.map(item => ({ ...item, status: newStatus === 'ready' ? 'ready' : item.status })),
-          }
-        : order
-    ));
-
-    toast.success(`Order marked as ${newStatus}`);
+  const handleOrderStatusChange = async (orderId: string, newStatus: KitchenOrder['status']) => {
+    try {
+      if (newStatus === 'preparing') {
+        await startOrder(orderId).unwrap();
+        toast.success('Order preparation started');
+      } else if (newStatus === 'ready') {
+        await completeOrder(orderId).unwrap();
+        toast.success('Order completed');
+      }
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update order status');
+    }
   };
 
-  const getPriorityBadge = (priority: KitchenOrder['priority']) => {
+  const _handleMarkUrgent = async (orderId: string) => {
+    try {
+      await markUrgent(orderId).unwrap();
+      toast.success('Order marked as urgent');
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to mark order as urgent');
+    }
+  };
+
+  const _handleCancelOrder = async (orderId: string) => {
+    try {
+      await cancelOrder(orderId).unwrap();
+      toast.success('Order cancelled');
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to cancel order');
+    }
+  };
+
+  const getPriorityBadge = (priority: 'urgent' | 'high' | 'normal' | 'low' | undefined) => {
     const variants = {
       urgent: 'danger',
       high: 'warning',
       normal: 'secondary',
+      low: 'secondary',
     } as const;
 
     return (
-      <Badge variant={variants[priority]}>
-        {priority.toUpperCase()}
+      <Badge variant={variants[priority || 'normal']}>
+        {(priority || 'normal').toUpperCase()}
       </Badge>
     );
   };
 
   const getStatusBadge = (status: KitchenOrder['status']) => {
-    const variants = {
+    const variants: any = {
       pending: 'warning',
       preparing: 'info',
       ready: 'success',
-      served: 'primary',
-    } as const;
+      served: 'info',
+      completed: 'secondary',
+      cancelled: 'danger',
+    };
 
     return (
-      <Badge variant={variants[status]}>
+      <Badge variant={variants[status] || 'secondary'}>
         {status.toUpperCase()}
       </Badge>
     );
@@ -189,9 +232,8 @@ export default function KitchenPage() {
     );
   };
 
-  const pendingOrders = orders.filter(order => order.status === 'pending');
-  const preparingOrders = orders.filter(order => order.status === 'preparing');
-  const readyOrders = orders.filter(order => order.status === 'ready');
+  // Use API data instead of filtered local state
+  const isLoading = pendingLoading || preparingLoading || readyLoading || statsLoading;
 
   return (
     <div className="space-y-6">
@@ -220,7 +262,9 @@ export default function KitchenPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Pending Orders</p>
-                <p className="text-3xl font-bold text-yellow-600">{pendingOrders.length}</p>
+                <p className="text-3xl font-bold text-yellow-600">
+                  {isLoading ? '...' : pendingOrders.length}
+                </p>
               </div>
               <ClockIcon className="w-8 h-8 text-yellow-600" />
             </div>
@@ -232,7 +276,9 @@ export default function KitchenPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Preparing</p>
-                <p className="text-3xl font-bold text-blue-600">{preparingOrders.length}</p>
+                <p className="text-3xl font-bold text-blue-600">
+                  {isLoading ? '...' : preparingOrders.length}
+                </p>
               </div>
               <FireIcon className="w-8 h-8 text-blue-600" />
             </div>
@@ -244,7 +290,9 @@ export default function KitchenPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Ready for Service</p>
-                <p className="text-3xl font-bold text-green-600">{readyOrders.length}</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {isLoading ? '...' : readyOrders.length}
+                </p>
               </div>
               <CheckCircleIcon className="w-8 h-8 text-green-600" />
             </div>
@@ -256,7 +304,9 @@ export default function KitchenPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Prep Time</p>
-                <p className="text-3xl font-bold text-purple-600">18 min</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {isLoading ? '...' : `${kitchenStats?.avgPrepTime || 0} min`}
+                </p>
               </div>
               <ClockIcon className="w-8 h-8 text-purple-600" />
             </div>
@@ -275,7 +325,18 @@ export default function KitchenPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {pendingOrders.map((order) => (
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mx-auto"></div>
+                <p className="text-gray-600 dark:text-gray-400 mt-2">Loading orders...</p>
+              </div>
+            ) : pendingOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <ClockIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 dark:text-gray-400">No pending orders</p>
+              </div>
+            ) : (
+              pendingOrders.map((order) => (
               <div key={order.id} className="border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 bg-yellow-50 dark:bg-yellow-900/20">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -331,12 +392,7 @@ export default function KitchenPage() {
                   Start Preparing
                 </Button>
               </div>
-            ))}
-
-            {pendingOrders.length === 0 && (
-              <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                No pending orders
-              </p>
+            ))
             )}
           </CardContent>
         </Card>
@@ -350,7 +406,18 @@ export default function KitchenPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {preparingOrders.map((order) => (
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-gray-600 dark:text-gray-400 mt-2">Loading orders...</p>
+              </div>
+            ) : preparingOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <FireIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 dark:text-gray-400">No orders being prepared</p>
+              </div>
+            ) : (
+              preparingOrders.map((order) => (
               <div key={order.id} className="border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -364,7 +431,7 @@ export default function KitchenPage() {
                       Table {order.tableNumber}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
-                      Est: {order.estimatedReadyTime ? formatDateTime(order.estimatedReadyTime) : 'TBD'}
+                      Est: {order.estimatedTime ? `${order.estimatedTime} min` : 'TBD'}
                     </p>
                   </div>
                 </div>
@@ -416,12 +483,7 @@ export default function KitchenPage() {
                   </Button>
                 </div>
               </div>
-            ))}
-
-            {preparingOrders.length === 0 && (
-              <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                No orders being prepared
-              </p>
+            ))
             )}
           </CardContent>
         </Card>
@@ -435,7 +497,18 @@ export default function KitchenPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {readyOrders.map((order) => (
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                <p className="text-gray-600 dark:text-gray-400 mt-2">Loading orders...</p>
+              </div>
+            ) : readyOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircleIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 dark:text-gray-400">No orders ready for service</p>
+              </div>
+            ) : (
+              readyOrders.map((order) => (
               <div key={order.id} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -449,7 +522,7 @@ export default function KitchenPage() {
                       Table {order.tableNumber}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
-                      Ready since: {formatDateTime(order.estimatedReadyTime || order.createdAt)}
+                      Ready since: {formatDateTime(order.updatedAt)}
                     </p>
                   </div>
                 </div>
@@ -481,12 +554,7 @@ export default function KitchenPage() {
                   Mark as Served
                 </Button>
               </div>
-            ))}
-
-            {readyOrders.length === 0 && (
-              <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                No orders ready for service
-              </p>
+            ))
             )}
           </CardContent>
         </Card>

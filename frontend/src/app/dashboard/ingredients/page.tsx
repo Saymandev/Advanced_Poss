@@ -7,16 +7,16 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { CreateInventoryItemRequest, InventoryItem, useAdjustStockMutation, useCreateInventoryItemMutation, useDeleteInventoryItemMutation, useGetInventoryItemsQuery, useUpdateInventoryItemMutation } from '@/lib/api/endpoints/inventoryApi';
+import { InventoryItem, useAdjustStockMutation, useCreateInventoryItemMutation, useDeleteInventoryItemMutation, useGetInventoryItemsQuery, useUpdateInventoryItemMutation } from '@/lib/api/endpoints/inventoryApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-    ArchiveBoxIcon,
-    BeakerIcon,
-    ExclamationTriangleIcon,
-    PencilIcon,
-    PlusIcon,
-    TrashIcon
+  ArchiveBoxIcon,
+  BeakerIcon,
+  ExclamationTriangleIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -47,17 +47,17 @@ export default function IngredientsPage() {
   const [deleteIngredient] = useDeleteInventoryItemMutation();
   const [adjustStock] = useAdjustStockMutation();
 
-  const [formData, setFormData] = useState<CreateInventoryItemRequest>({
+  const [formData, setFormData] = useState<any>({
     name: '',
     description: '',
-    quantity: 0,
+    currentStock: 0,
+    minStock: 10,
+    maxStock: 100,
     unit: 'pieces',
-    minStockLevel: 10,
-    costPerUnit: 0,
+    unitPrice: 0,
     category: 'food',
     supplierId: '',
     expiryDate: '',
-    branchId: user?.branchId || '',
   });
 
   const [stockAdjustment, setStockAdjustment] = useState({
@@ -69,14 +69,14 @@ export default function IngredientsPage() {
     setFormData({
       name: '',
       description: '',
-      quantity: 0,
+      currentStock: 0,
+      minStock: 10,
+      maxStock: 100,
       unit: 'pieces',
-      minStockLevel: 10,
-      costPerUnit: 0,
+      unitPrice: 0,
       category: 'food',
       supplierId: '',
       expiryDate: '',
-      branchId: user?.branchId || '',
     });
     setSelectedIngredient(null);
   };
@@ -90,7 +90,19 @@ export default function IngredientsPage() {
 
   const handleCreate = async () => {
     try {
-      await createIngredient(formData).unwrap();
+      await createIngredient({
+        companyId: user?.companyId || '',
+        branchId: user?.branchId,
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        unit: formData.unit,
+        currentStock: formData.currentStock,
+        minimumStock: formData.minStock,
+        maximumStock: formData.maxStock,
+        unitCost: formData.unitPrice,
+        preferredSupplierId: formData.supplierId || undefined,
+      } as any).unwrap();
       toast.success('Ingredient created successfully');
       setIsCreateModalOpen(false);
       resetForm();
@@ -106,8 +118,16 @@ export default function IngredientsPage() {
     try {
       await updateIngredient({
         id: selectedIngredient.id,
-        data: formData,
-      }).unwrap();
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        unit: formData.unit,
+        currentStock: formData.currentStock,
+        minimumStock: formData.minStock,
+        maximumStock: formData.maxStock,
+        unitCost: formData.unitPrice,
+        preferredSupplierId: formData.supplierId || undefined,
+      } as any).unwrap();
       toast.success('Ingredient updated successfully');
       setIsEditModalOpen(false);
       resetForm();
@@ -134,9 +154,9 @@ export default function IngredientsPage() {
 
     try {
       await adjustStock({
-        id: selectedIngredient.id,
-        data: stockAdjustment,
-      }).unwrap();
+        inventoryItemId: selectedIngredient.id,
+        ...stockAdjustment,
+      } as any).unwrap();
       toast.success('Stock adjusted successfully');
       setIsAdjustStockModalOpen(false);
       resetStockAdjustment();
@@ -151,14 +171,14 @@ export default function IngredientsPage() {
     setFormData({
       name: ingredient.name,
       description: ingredient.description || '',
-      quantity: ingredient.quantity,
+      currentStock: ingredient.currentStock,
+      minStock: ingredient.minStock,
+      maxStock: ingredient.maxStock,
       unit: ingredient.unit,
-      minStockLevel: ingredient.minStockLevel,
-      costPerUnit: ingredient.costPerUnit,
+      unitPrice: ingredient.unitPrice,
       category: ingredient.category,
-      supplierId: ingredient.supplierId || '',
+      supplierId: ingredient.supplier?.id || '',
       expiryDate: ingredient.expiryDate || '',
-      branchId: ingredient.branchId,
     });
     setIsEditModalOpen(true);
   };
@@ -168,10 +188,13 @@ export default function IngredientsPage() {
     setIsAdjustStockModalOpen(true);
   };
 
-  const getStockStatus = (ingredient: InventoryItem) => {
-    if (ingredient.quantity <= 0) {
+  const getStockStatus = (ingredient: any) => {
+    const stock = ingredient.currentStock || ingredient.quantity || 0;
+    const minLevel = ingredient.minStock || ingredient.minStockLevel || 10;
+    
+    if (stock <= 0) {
       return { status: 'out', label: 'Out of Stock', variant: 'danger' as const };
-    } else if (ingredient.quantity <= ingredient.minStockLevel) {
+    } else if (stock <= minLevel) {
       return { status: 'low', label: 'Low Stock', variant: 'warning' as const };
     } else {
       return { status: 'good', label: 'In Stock', variant: 'success' as const };
@@ -196,31 +219,31 @@ export default function IngredientsPage() {
       ),
     },
     {
-      key: 'quantity',
+      key: 'currentStock',
       title: 'Stock',
       align: 'right' as const,
-      render: (value: number, row: InventoryItem) => (
+      render: (value: number, row: any) => (
         <div className="text-right">
           <p className="font-semibold text-gray-900 dark:text-white">
             {value} {row.unit}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Min: {row.minStockLevel} {row.unit}
+            Min: {row.minStock} {row.unit}
           </p>
         </div>
       ),
     },
     {
-      key: 'costPerUnit',
+      key: 'unitPrice',
       title: 'Cost',
       align: 'right' as const,
-      render: (value: number, row: InventoryItem) => (
+      render: (value: number, row: any) => (
         <div className="text-right">
           <p className="font-semibold text-gray-900 dark:text-white">
             {formatCurrency(value)}/{row.unit}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Total: {formatCurrency(value * row.quantity)}
+            Total: {formatCurrency(value * row.currentStock)}
           </p>
         </div>
       ),
@@ -301,10 +324,10 @@ export default function IngredientsPage() {
 
   const stats = {
     total: data?.total || 0,
-    inStock: data?.items?.filter(i => i.quantity > i.minStockLevel).length || 0,
-    lowStock: data?.items?.filter(i => i.quantity > 0 && i.quantity <= i.minStockLevel).length || 0,
-    outOfStock: data?.items?.filter(i => i.quantity <= 0).length || 0,
-    totalValue: data?.items?.reduce((sum, item) => sum + (item.costPerUnit * item.quantity), 0) || 0,
+    inStock: data?.items?.filter((i: any) => i.currentStock > i.minStock).length || 0,
+    lowStock: data?.items?.filter((i: any) => i.currentStock > 0 && i.currentStock <= i.minStock).length || 0,
+    outOfStock: data?.items?.filter((i: any) => i.currentStock <= 0).length || 0,
+    totalValue: data?.items?.reduce((sum: number, item: any) => sum + (item.unitPrice * item.currentStock), 0) || 0,
   };
 
   return (
@@ -500,7 +523,7 @@ export default function IngredientsPage() {
             <Input
               label="Current Stock"
               type="number"
-              value={formData.quantity}
+              value={formData.currentStock}
               onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
               required
             />
@@ -524,7 +547,7 @@ export default function IngredientsPage() {
             <Input
               label="Min Stock Level"
               type="number"
-              value={formData.minStockLevel}
+              value={formData.minStock}
               onChange={(e) => setFormData({ ...formData, minStockLevel: parseInt(e.target.value) || 0 })}
               required
             />
@@ -535,7 +558,7 @@ export default function IngredientsPage() {
               label="Cost per Unit"
               type="number"
               step="0.01"
-              value={formData.costPerUnit}
+              value={formData.unitPrice}
               onChange={(e) => setFormData({ ...formData, costPerUnit: parseFloat(e.target.value) || 0 })}
               required
             />
@@ -613,7 +636,7 @@ export default function IngredientsPage() {
             <Input
               label="Current Stock"
               type="number"
-              value={formData.quantity}
+              value={formData.currentStock}
               onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
               required
             />
@@ -637,7 +660,7 @@ export default function IngredientsPage() {
             <Input
               label="Min Stock Level"
               type="number"
-              value={formData.minStockLevel}
+              value={formData.minStock}
               onChange={(e) => setFormData({ ...formData, minStockLevel: parseInt(e.target.value) || 0 })}
               required
             />
@@ -648,7 +671,7 @@ export default function IngredientsPage() {
               label="Cost per Unit"
               type="number"
               step="0.01"
-              value={formData.costPerUnit}
+              value={formData.unitPrice}
               onChange={(e) => setFormData({ ...formData, costPerUnit: parseFloat(e.target.value) || 0 })}
               required
             />
@@ -697,7 +720,7 @@ export default function IngredientsPage() {
                 {selectedIngredient.name}
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Current stock: {selectedIngredient.quantity} {selectedIngredient.unit}
+                Current stock: {selectedIngredient.currentStock} {selectedIngredient.unit}
               </p>
             </div>
 
@@ -707,14 +730,14 @@ export default function IngredientsPage() {
               </label>
               <div className="flex gap-2">
                 <Button
-                  variant={stockAdjustment.change > 0 ? 'primary' : 'outline'}
+                  variant={stockAdjustment.change > 0 ? 'primary' : 'secondary'}
                   onClick={() => setStockAdjustment({ ...stockAdjustment, change: Math.abs(stockAdjustment.change) })}
                   className="flex-1"
                 >
                   + Add Stock
                 </Button>
                 <Button
-                  variant={stockAdjustment.change < 0 ? 'primary' : 'outline'}
+                  variant={stockAdjustment.change < 0 ? 'primary' : 'secondary'}
                   onClick={() => setStockAdjustment({ ...stockAdjustment, change: -Math.abs(stockAdjustment.change) })}
                   className="flex-1"
                 >
@@ -762,7 +785,7 @@ export default function IngredientsPage() {
 
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
               <p className="text-sm text-blue-800 dark:text-blue-400 text-center">
-                New stock level will be: {selectedIngredient.quantity + stockAdjustment.change} {selectedIngredient.unit}
+                New stock level will be: {selectedIngredient.currentStock + stockAdjustment.change} {selectedIngredient.unit}
               </p>
             </div>
 

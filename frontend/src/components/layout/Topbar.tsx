@@ -4,19 +4,19 @@ import { Button } from '@/components/ui/Button';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { useAppSelector } from '@/lib/store';
 import {
-    ArrowRightOnRectangleIcon,
-    CogIcon,
-    MagnifyingGlassIcon,
-    MoonIcon,
-    SunIcon,
-    UserCircleIcon
+  ArrowRightOnRectangleIcon,
+  CogIcon,
+  MagnifyingGlassIcon,
+  MoonIcon,
+  SunIcon,
+  UserCircleIcon
 } from '@heroicons/react/24/outline';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 export function Topbar() {
-  const { user, companyContext } = useAppSelector((state) => state.auth);
+  const { user, companyContext: _companyContext } = useAppSelector((state) => state.auth);
   const { theme, setTheme } = useTheme();
   const router = useRouter();
 
@@ -33,7 +33,7 @@ export function Topbar() {
 
 
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 backdrop-blur-sm bg-white/95 dark:bg-gray-800/95">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Left side - Search and breadcrumbs could go here */}
