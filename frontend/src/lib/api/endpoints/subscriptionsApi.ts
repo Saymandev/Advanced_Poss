@@ -1,25 +1,178 @@
-import { apiSlice } from '@/lib/api/apiSlice';
+import { apiSlice } from '../apiSlice';
 
-export interface Subscription { id: string; plan: string; status: string }
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  billingCycle: 'monthly' | 'yearly';
+  features: string[];
+  limits: {
+    maxBranches: number;
+    maxUsers: number;
+    maxTables: number;
+    maxMenuItems: number;
+    maxCustomers: number;
+    storageGB: number;
+  };
+  isActive: boolean;
+  isPopular?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Subscription {
+  id: string;
+  companyId: string;
+  planId: string;
+  plan: SubscriptionPlan;
+  status: 'active' | 'cancelled' | 'expired' | 'suspended';
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  cancelledAt?: string;
+  trialEnd?: string;
+  isTrial: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BillingHistory {
+  id: string;
+  subscriptionId: string;
+  amount: number;
+  currency: string;
+  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  paymentMethod: string;
+  invoiceUrl?: string;
+  paidAt?: string;
+  createdAt: string;
+}
+
+export interface UsageStats {
+  branches: number;
+  users: number;
+  tables: number;
+  menuItems: number;
+  customers: number;
+  storageUsed: number;
+  storageLimit: number;
+}
 
 export const subscriptionsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    listSubscriptions: builder.query<Subscription[] | { data: Subscription[] }, void>({ query: () => '/subscriptions', providesTags: ['Subscriptions'] }),
-    getSubscription: builder.query<Subscription, string>({ query: (id) => `/subscriptions/${id}`, providesTags: (_r,_e,id)=>[{ type:'Subscriptions', id } as any] }),
-    createSubscription: builder.mutation<Subscription, Partial<Subscription>>({ query: (body) => ({ url: '/subscriptions', method: 'POST', body }), invalidatesTags: ['Subscriptions'] }),
-    updateSubscription: builder.mutation<Subscription, { id: string; changes: Partial<Subscription> }>({ query: ({ id, changes }) => ({ url: `/subscriptions/${id}`, method: 'PUT', body: changes }), invalidatesTags: (_r,_e,arg)=>[{ type:'Subscriptions', id: arg.id } as any] }),
-    upgradeSubscription: builder.mutation<Subscription, { id: string; plan: string }>({ query: ({ id, plan }) => ({ url: `/subscriptions/${id}/upgrade`, method: 'PATCH', body: { plan } }), invalidatesTags: (_r,_e,arg)=>[{ type:'Subscriptions', id: arg.id } as any] }),
-    cancelSubscription: builder.mutation<Subscription, string>({ query: (id) => ({ url: `/subscriptions/${id}/cancel`, method: 'PATCH' }), invalidatesTags: (_r,_e,id)=>[{ type:'Subscriptions', id } as any] }),
-    reactivateSubscription: builder.mutation<Subscription, string>({ query: (id) => ({ url: `/subscriptions/${id}/reactivate`, method: 'PATCH' }), invalidatesTags: (_r,_e,id)=>[{ type:'Subscriptions', id } as any] }),
-    pauseSubscription: builder.mutation<Subscription, string>({ query: (id) => ({ url: `/subscriptions/${id}/pause`, method: 'PATCH' }), invalidatesTags: (_r,_e,id)=>[{ type:'Subscriptions', id } as any] }),
-    resumeSubscription: builder.mutation<Subscription, string>({ query: (id) => ({ url: `/subscriptions/${id}/resume`, method: 'PATCH' }), invalidatesTags: (_r,_e,id)=>[{ type:'Subscriptions', id } as any] }),
-    processPayment: builder.mutation<any, { id: string; amount: number; method: string }>({ query: ({ id, ...body }) => ({ url: `/subscriptions/${id}/payment`, method: 'POST', body }), invalidatesTags: (_r,_e,arg)=>[{ type:'Subscriptions', id: arg.id } as any] }),
-    listPlans: builder.query<any, void>({ query: () => '/subscriptions/plans/list', providesTags: ['Subscriptions'] }),
-    companyBillingHistory: builder.query<any, string>({ query: (companyId) => `/subscriptions/company/${companyId}/billing-history`, providesTags: ['Subscriptions'] }),
-    checkLimit: builder.query<any, { companyId: string; limitType: string }>({ query: ({ companyId, limitType }) => `/subscriptions/${companyId}/limits/${limitType}`, providesTags: ['Subscriptions'] }),
+    getSubscriptionPlans: builder.query<{ plans: SubscriptionPlan[]; total: number }, any>({
+      query: (params) => ({
+        url: '/subscription-plans',
+        params,
+      }),
+      providesTags: ['Subscription'],
+    }),
+    getCurrentSubscription: builder.query<Subscription, { companyId: string }>({
+      query: (params) => ({
+        url: '/subscriptions/current',
+        params,
+      }),
+      providesTags: ['Subscription'],
+    }),
+    createSubscription: builder.mutation<Subscription, { 
+      planId: string; 
+      paymentMethodId: string;
+      companyId: string;
+    }>({
+      query: (data) => ({
+        url: '/subscriptions',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    updateSubscription: builder.mutation<Subscription, { 
+      id: string; 
+      planId: string;
+      paymentMethodId?: string;
+    }>({
+      query: ({ id, ...data }) => ({
+        url: `/subscriptions/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    cancelSubscription: builder.mutation<Subscription, { 
+      id: string; 
+      cancelAtPeriodEnd?: boolean;
+    }>({
+      query: ({ id, ...data }) => ({
+        url: `/subscriptions/${id}/cancel`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    reactivateSubscription: builder.mutation<Subscription, string>({
+      query: (id) => ({
+        url: `/subscriptions/${id}/reactivate`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    getBillingHistory: builder.query<{ history: BillingHistory[]; total: number }, any>({
+      query: (params) => ({
+        url: '/subscriptions/billing-history',
+        params,
+      }),
+      providesTags: ['Subscription'],
+    }),
+    getUsageStats: builder.query<UsageStats, { companyId: string }>({
+      query: (params) => ({
+        url: '/subscriptions/usage',
+        params,
+      }),
+      providesTags: ['Subscription'],
+    }),
+    createPaymentMethod: builder.mutation<{ paymentMethodId: string }, {
+      type: 'card';
+      card: {
+        number: string;
+        expMonth: number;
+        expYear: number;
+        cvc: string;
+      };
+    }>({
+      query: (data) => ({
+        url: '/subscriptions/payment-methods',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    getPaymentMethods: builder.query<{ paymentMethods: any[] }, { companyId: string }>({
+      query: (params) => ({
+        url: '/subscriptions/payment-methods',
+        params,
+      }),
+      providesTags: ['Subscription'],
+    }),
+    deletePaymentMethod: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/subscriptions/payment-methods/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
   }),
-})
+});
 
-export const { useListSubscriptionsQuery, useGetSubscriptionQuery, useCreateSubscriptionMutation, useUpdateSubscriptionMutation, useUpgradeSubscriptionMutation, useCancelSubscriptionMutation, useReactivateSubscriptionMutation, usePauseSubscriptionMutation, useResumeSubscriptionMutation, useProcessPaymentMutation, useListPlansQuery, useCompanyBillingHistoryQuery, useCheckLimitQuery } = subscriptionsApi
-
-
+export const {
+  useGetSubscriptionPlansQuery,
+  useGetCurrentSubscriptionQuery,
+  useCreateSubscriptionMutation,
+  useUpdateSubscriptionMutation,
+  useCancelSubscriptionMutation,
+  useReactivateSubscriptionMutation,
+  useGetBillingHistoryQuery,
+  useGetUsageStatsQuery,
+  useCreatePaymentMethodMutation,
+  useGetPaymentMethodsQuery,
+  useDeletePaymentMethodMutation,
+} = subscriptionsApi;

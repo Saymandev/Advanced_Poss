@@ -1,48 +1,42 @@
-import type { RootState } from '@/lib/store'
-import { BaseQueryFn, createApi, FetchArgs, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { RootState } from '../store';
 
-const BASE_URL = 'http://localhost:5000/api/v1'
-
-const rawBaseQuery = fetchBaseQuery({
-  baseUrl: BASE_URL,
+const baseQuery = fetchBaseQuery({
+  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
   prepareHeaders: (headers, { getState }) => {
-    const state = getState() as RootState
-    const token = state.auth.accessToken
+    const token = (getState() as RootState).auth.accessToken;
     if (token) {
-      headers.set('authorization', `Bearer ${token}`)
+      headers.set('authorization', `Bearer ${token}`);
     }
-    headers.set('content-type', 'application/json')
-    return headers
+    return headers;
   },
-})
-
-const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, unknown> = async (args, api, extraOptions) => {
-  let result: any = await rawBaseQuery(args, api, extraOptions)
-  if (result?.error && (result.error as any).status === 401) {
-    const refreshToken = (api.getState() as RootState).auth.refreshToken
-    if (!refreshToken) return result
-    const refreshResult: any = await rawBaseQuery(
-      { url: '/auth/refresh', method: 'POST', body: { refreshToken } },
-      api,
-      extraOptions
-    )
-    if (refreshResult.data) {
-      api.dispatch({ type: 'auth/setTokens', payload: refreshResult.data })
-      result = await rawBaseQuery(args, api, extraOptions)
-    } else {
-      api.dispatch({ type: 'auth/logout' })
-    }
-  }
-  return result
-}
+});
 
 export const apiSlice = createApi({
   reducerPath: 'api',
-  baseQuery: baseQueryWithReauth,
+  baseQuery,
   tagTypes: [
-    'Auth','Users','Companies','Company','Branches','Categories','MenuItems','Tables','Orders','Payments','Customers','Kitchen','Ingredients','Suppliers','Expenses','Attendance','Subscriptions','SubscriptionPlans','Reports','Backups','AI','Websockets','WorkPeriods','LoginActivity'
+    'Auth',
+    'User',
+    'Company',
+    'Branch',
+    'MenuItem',
+    'Category',
+    'Order',
+    'Table',
+    'Customer',
+    'Kitchen',
+    'Ingredient',
+    'Supplier',
+    'Expense',
+    'Report',
+    'Subscription',
+    'WorkPeriod',
+    'Attendance',
+    'Staff',
+    'Reservation',
+    'AI',
   ],
   endpoints: () => ({}),
-})
-
+});
 

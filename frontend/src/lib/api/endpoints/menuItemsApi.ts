@@ -1,42 +1,90 @@
-import { apiSlice } from '@/lib/api/apiSlice'
+import { apiSlice } from '../apiSlice';
 
 export interface MenuItem {
-  id: string
-  name: string
-  price: number
-  categoryId?: string
-  isActive?: boolean
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  isAvailable: boolean;
+  imageUrl?: string;
+  ingredients?: string[];
+  allergens?: string[];
+  preparationTime?: number;
+  calories?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMenuItemRequest {
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  isAvailable?: boolean;
+  imageUrl?: string;
+  ingredients?: string[];
+  allergens?: string[];
+  preparationTime?: number;
+  calories?: number;
+}
+
+export interface UpdateMenuItemRequest extends Partial<CreateMenuItemRequest> {
+  id: string;
 }
 
 export const menuItemsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    listMenuItems: builder.query<{ data: MenuItem[] } | MenuItem[], { page?: number; limit?: number } | void>({
-      query: (params) => ({ url: '/menu-items', params }),
-      providesTags: ['MenuItems'],
+    getMenuItems: builder.query<{ items: MenuItem[]; total: number }, any>({
+      query: (params) => ({
+        url: '/menu-items',
+        params,
+      }),
+      providesTags: ['MenuItem'],
     }),
-    getMenuItem: builder.query<MenuItem, string>({
+    getMenuItemById: builder.query<MenuItem, string>({
       query: (id) => `/menu-items/${id}`,
-      providesTags: (_r, _e, id) => [{ type: 'MenuItems', id } as any],
+      providesTags: ['MenuItem'],
     }),
-    createMenuItem: builder.mutation<MenuItem, Partial<MenuItem>>({
-      query: (body) => ({ url: '/menu-items', method: 'POST', body }),
-      invalidatesTags: ['MenuItems'],
+    createMenuItem: builder.mutation<MenuItem, CreateMenuItemRequest>({
+      query: (data) => ({
+        url: '/menu-items',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['MenuItem'],
     }),
-    updateMenuItem: builder.mutation<MenuItem, { id: string; changes: Partial<MenuItem> }>({
-      query: ({ id, changes }) => ({ url: `/menu-items/${id}`, method: 'PUT', body: changes }),
-      invalidatesTags: (_r, _e, arg) => [{ type: 'MenuItems', id: arg.id } as any],
+    updateMenuItem: builder.mutation<MenuItem, UpdateMenuItemRequest>({
+      query: ({ id, ...data }) => ({
+        url: `/menu-items/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['MenuItem'],
     }),
-    deleteMenuItem: builder.mutation<{ success: boolean }, string>({
-      query: (id) => ({ url: `/menu-items/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['MenuItems'],
+    deleteMenuItem: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/menu-items/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['MenuItem'],
     }),
-    toggleMenuItemStatus: builder.mutation<MenuItem, { id: string; isActive: boolean }>({
-      query: ({ id, isActive }) => ({ url: `/menu-items/${id}/status`, method: 'PATCH', body: { isActive } }),
-      invalidatesTags: (_r, _e, arg) => [{ type: 'MenuItems', id: arg.id } as any],
+    toggleAvailability: builder.mutation<MenuItem, { id: string; isAvailable: boolean }>({
+      query: ({ id, isAvailable }) => ({
+        url: `/menu-items/${id}/availability`,
+        method: 'PATCH',
+        body: { isAvailable },
+      }),
+      invalidatesTags: ['MenuItem'],
     }),
   }),
-})
+});
 
-export const { useListMenuItemsQuery, useGetMenuItemQuery, useCreateMenuItemMutation, useUpdateMenuItemMutation, useDeleteMenuItemMutation, useToggleMenuItemStatusMutation } = menuItemsApi
-
-
+export const {
+  useGetMenuItemsQuery,
+  useGetMenuItemByIdQuery,
+  useCreateMenuItemMutation,
+  useUpdateMenuItemMutation,
+  useDeleteMenuItemMutation,
+  useToggleAvailabilityMutation,
+} = menuItemsApi;

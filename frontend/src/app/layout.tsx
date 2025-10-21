@@ -1,20 +1,26 @@
-import '@/app/globals.css'
-import { ReduxProvider } from '@/components/providers/ReduxProvider'
-import { ThemeProvider } from '@/components/providers/ThemeProvider'
-import { ReactNode } from 'react'
+import { Providers } from '@/components/providers/Providers';
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'Advanced Restaurant POS',
+  description: 'Modern restaurant management system for bars, cafes, and restaurants',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        <ReduxProvider>
-          <ThemeProvider>
-            {children}
-          </ThemeProvider>
-        </ReduxProvider>
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
       </body>
     </html>
-  )
+  );
 }
-
 

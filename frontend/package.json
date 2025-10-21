@@ -1,38 +1,39 @@
 {
   "name": "advanced-pos-frontend",
-  "private": true,
   "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
-    "start": "next start -p 3000",
-    "lint": "eslint ."
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "@reduxjs/toolkit": "^2.2.5",
-    "axios": "^1.7.2",
-    "classnames": "^2.5.1",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "@reduxjs/toolkit": "^2.2.0",
+    "react-redux": "^9.1.0",
+    "axios": "^1.6.0",
+    "@heroicons/react": "^2.1.0",
+    "recharts": "^2.12.0",
+    "clsx": "^2.1.0",
+    "date-fns": "^3.3.0",
     "framer-motion": "^11.0.0",
-    "js-cookie": "^3.0.5",
-    "next": "^15.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-hook-form": "^7.53.0",
-    "react-redux": "^9.1.2",
-    "recharts": "^2.12.7",
-    "zod": "^3.23.8"
+    "react-hot-toast": "^2.4.0",
+    "next-themes": "^0.2.1",
+    "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {
-    "@types/node": "^20.14.11",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^15.0.0",
-    "postcss": "^8.4.41",
-    "tailwindcss": "^3.4.12",
-    "typescript": "^5.6.2"
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.3.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.2.0"
   }
 }
-
 

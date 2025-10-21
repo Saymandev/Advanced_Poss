@@ -261,7 +261,7 @@ export class UsersService {
 
   async findByBranch(branchId: string): Promise<User[]> {
     return this.userModel
-      .find({ branchId: branchId })
+      .find({ branchId: new Types.ObjectId(branchId) })
       .select('-password -pin')
       .exec();
   }
