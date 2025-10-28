@@ -86,12 +86,15 @@ export interface CustomerReport {
 
 export const reportsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getDashboard: builder.query<DashboardStats, { branchId?: string; date?: string }>({
+    getDashboard: builder.query<DashboardStats, { branchId?: string; companyId?: string; date?: string }>({
       query: (params) => ({
         url: '/reports/dashboard',
         params,
       }),
       providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
     getSalesAnalytics: builder.query<SalesAnalytics, { 
       branchId?: string; 
@@ -100,10 +103,31 @@ export const reportsApi = apiSlice.injectEndpoints({
       period?: 'day' | 'week' | 'month' | 'year' 
     }>({
       query: (params) => ({
-        url: '/reports/sales',
+        url: '/reports/sales-analytics',
         params,
       }),
       providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
+    }),
+    
+    getTopSellingItems: builder.query<Array<{
+      name: string;
+      quantity: number;
+      revenue: number;
+    }>, { 
+      branchId?: string;
+      limit?: number;
+    }>({
+      query: (params) => ({
+        url: '/reports/top-selling-items',
+        params,
+      }),
+      providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
     getInventoryReport: builder.query<InventoryReport, { branchId?: string }>({
       query: (params) => ({
@@ -151,6 +175,7 @@ export const reportsApi = apiSlice.injectEndpoints({
 export const {
   useGetDashboardQuery,
   useGetSalesAnalyticsQuery,
+  useGetTopSellingItemsQuery,
   useGetInventoryReportQuery,
   useGetCustomerReportQuery,
   useGetStaffReportQuery,

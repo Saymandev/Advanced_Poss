@@ -8,6 +8,9 @@ export class Company {
   @Prop({ required: true, trim: true })
   name: string;
 
+  @Prop({ unique: true, sparse: true, trim: true, lowercase: true })
+  slug?: string;
+
   @Prop({ trim: true })
   legalName?: string;
 
@@ -128,6 +131,7 @@ export const CompanySchema = SchemaFactory.createForClass(Company);
 // Indexes
 CompanySchema.index({ ownerId: 1 });
 CompanySchema.index({ email: 1 });
+CompanySchema.index({ slug: 1 }, { unique: true, sparse: true });
 CompanySchema.index({ subscriptionStatus: 1 });
 
 // Transform output

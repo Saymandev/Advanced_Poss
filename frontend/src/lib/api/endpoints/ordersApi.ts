@@ -39,10 +39,20 @@ export const ordersApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['Order'],
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          orders: data.orders || data.items || [],
+          total: data.total || (Array.isArray(data.orders) ? data.orders.length : 0),
+        };
+      },
     }),
     getOrderById: builder.query<Order, string>({
       query: (id) => `/orders/${id}`,
       providesTags: ['Order'],
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
     createOrder: builder.mutation<Order, CreateOrderRequest>({
       query: (data) => ({

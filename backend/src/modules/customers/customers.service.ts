@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -91,6 +91,33 @@ export class CustomersService {
       page,
       limit,
     };
+  }
+
+  async findOrCreate(customerData: any): Promise<Customer> {
+    // Try to find existing customer by email or phone
+    const existingCustomer = await this.customerModel.findOne({
+      companyId: new Types.ObjectId(customerData.companyId),
+      $or: [
+        { email: customerData.email },
+        { phone: customerData.phone },
+      ],
+    });
+
+    if (existingCustomer) {
+      return existingCustomer;
+    }
+
+    // Create new customer
+    const [firstName, ...lastNameParts] = (customerData.name || customerData.firstName || 'Customer').split(' ');
+    const lastName = lastNameParts.join(' ') || customerData.lastName || '';
+
+    return this.create({
+      companyId: customerData.companyId,
+      firstName,
+      lastName,
+      email: customerData.email || '',
+      phone: customerData.phone || '',
+    } as any);
   }
 
   async findOne(id: string): Promise<Customer> {

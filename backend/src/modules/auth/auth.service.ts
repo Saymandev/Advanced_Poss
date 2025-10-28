@@ -545,16 +545,23 @@ export class AuthService {
     let user = null;
     let targetCompanyId = companyId;
 
-    // If email is provided, find user by email
+    // If email is provided, first try to find company by email, then user by email
     if (email) {
-      user = await this.usersService.findByEmail(email);
-      if (!user) {
-        return {
-          found: false,
-          message: 'No restaurant found with this email',
-        };
+      // First try to find company by email
+      const company = await this.companiesService.findByEmail(email);
+      if (company) {
+        targetCompanyId = (company as any)._id.toString();
+      } else {
+        // If no company found, try to find user by email
+        user = await this.usersService.findByEmail(email);
+        if (!user) {
+          return {
+            found: false,
+            message: 'No restaurant found with this email',
+          };
+        }
+        targetCompanyId = user.companyId;
       }
-      targetCompanyId = user.companyId;
     }
 
     // Validate that we have a valid company ID
@@ -566,7 +573,15 @@ export class AuthService {
     }
 
     // Get company details
-    const company = await this.usersService.getCompanyById(targetCompanyId.toString());
+    let company;
+    if (email && !user) {
+      // We found company by email, use it directly
+      company = await this.companiesService.findByEmail(email);
+    } else {
+      // We found user by email or have companyId, get company by ID
+      company = await this.usersService.getCompanyById(targetCompanyId.toString());
+    }
+    
     if (!company) {
       return {
         found: false,

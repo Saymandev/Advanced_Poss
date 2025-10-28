@@ -3,20 +3,27 @@ import { apiSlice } from '../apiSlice';
 export interface SubscriptionPlan {
   id: string;
   name: string;
+  displayName: string;
   description: string;
   price: number;
+  currency: string;
   billingCycle: 'monthly' | 'yearly';
-  features: string[];
-  limits: {
-    maxBranches: number;
+  trialPeriod: number; // Trial period in hours
+  stripePriceId?: string;
+  features: {
+    pos: boolean;
+    inventory: boolean;
+    crm: boolean;
+    accounting: boolean;
+    aiInsights: boolean;
+    multiBranch: boolean;
     maxUsers: number;
-    maxTables: number;
-    maxMenuItems: number;
-    maxCustomers: number;
-    storageGB: number;
+    maxBranches: number;
   };
   isActive: boolean;
   isPopular?: boolean;
+  sortOrder?: number;
+  featureList?: string[]; // Admin-manageable feature descriptions
   createdAt: string;
   updatedAt: string;
 }
@@ -61,12 +68,19 @@ export interface UsageStats {
 
 export const subscriptionsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getSubscriptionPlans: builder.query<{ plans: SubscriptionPlan[]; total: number }, any>({
+    getSubscriptionPlans: builder.query<SubscriptionPlan[] | { plans: SubscriptionPlan[]; total: number }, any>({
       query: (params) => ({
         url: '/subscription-plans',
         params,
       }),
       providesTags: ['Subscription'],
+      transformResponse: (response: SubscriptionPlan[] | { plans: SubscriptionPlan[]; total: number }) => {
+        // Handle both array and object responses
+        if (Array.isArray(response)) {
+          return response;
+        }
+        return response;
+      },
     }),
     getCurrentSubscription: builder.query<Subscription, { companyId: string }>({
       query: (params) => ({

@@ -58,6 +58,9 @@ export class SubscriptionPlan {
 
   @Prop({ default: 0 })
   sortOrder: number; // For display ordering
+
+  @Prop({ type: [String], default: [] })
+  featureList: string[]; // Array of feature descriptions to display
 }
 
 export const SubscriptionPlanSchema = SchemaFactory.createForClass(SubscriptionPlan);

@@ -4,7 +4,14 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatsSkeleton } from '@/components/ui/Skeleton';
-import { useGetDashboardQuery } from '@/lib/api/endpoints/reportsApi';
+import { useGetOrdersQuery } from '@/lib/api/endpoints/ordersApi';
+import {
+  useGetDashboardQuery,
+  useGetSalesAnalyticsQuery,
+  useGetTopSellingItemsQuery,
+} from '@/lib/api/endpoints/reportsApi';
+import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
+import { useGetTablesQuery } from '@/lib/api/endpoints/tablesApi';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -21,14 +28,129 @@ import {
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const _COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
 
 export default function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
-  const { data, isLoading } = useGetDashboardQuery({ branchId: user?.branchId || undefined });
+  const branchId = user?.branchId || undefined;
+  const companyId = user?.companyId || undefined;
+  
+  // Fetch all dashboard data
+  const { data: dashboardData, isLoading: isLoadingDashboard } = useGetDashboardQuery({ 
+    branchId,
+    companyId 
+  });
+  
+  const { data: salesAnalytics, isLoading: isLoadingAnalytics } = useGetSalesAnalyticsQuery({
+    branchId,
+    period: 'week',
+  });
+  
+  const { data: topSellingData, isLoading: isLoadingTopSelling } = useGetTopSellingItemsQuery({
+    branchId,
+    limit: 10,
+  });
+  
+  const { data: tablesData, isLoading: isLoadingTables } = useGetTablesQuery({ branchId });
+  const { data: staffData, isLoading: isLoadingStaff } = useGetStaffQuery({ 
+    branchId,
+    isActive: true 
+  });
+  const { data: recentOrdersData, isLoading: isLoadingOrders } = useGetOrdersQuery({
+    branchId,
+    page: 1,
+    limit: 5,
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
+  });
+  
   const { addNotification } = useNotifications();
+  
+  // Transform data from backend response
+  const dashboardStats = useMemo(() => {
+    const data = dashboardData as any;
+    return data?.data || data || {};
+  }, [dashboardData]);
+  
+  // Get tables data
+  const tables = useMemo(() => {
+    const data = tablesData as any;
+    const tablesArray = data?.data?.tables || data?.tables || [];
+    return Array.isArray(tablesArray) ? tablesArray : [];
+  }, [tablesData]);
+  
+  // Get staff data
+  const staff = useMemo(() => {
+    const data = staffData as any;
+    const staffArray = data?.data?.staff || data?.staff || [];
+    return Array.isArray(staffArray) ? staffArray : [];
+  }, [staffData]);
+  
+  // Get recent orders
+  const recentOrders = useMemo(() => {
+    const data = recentOrdersData as any;
+    const ordersArray = data?.data?.orders || data?.orders || [];
+    return Array.isArray(ordersArray) ? ordersArray : [];
+  }, [recentOrdersData]);
+  
+  // Transform sales analytics for charts
+  const salesTrend = useMemo(() => {
+    const analytics = salesAnalytics as any;
+    const salesByDay = analytics?.data?.salesByDay || analytics?.salesByDay || [];
+    
+    if (salesByDay.length > 0) {
+      return salesByDay.map((day: any) => ({
+        date: day.day,
+        sales: day.sales || 0,
+      }));
+    }
+    
+    // Fallback: generate last 7 days
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      days.push({
+        date: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        sales: 0,
+      });
+    }
+    return days;
+  }, [salesAnalytics]);
+  
+  const topSellingItems = useMemo(() => {
+    const items = topSellingData || [];
+    
+    if (!Array.isArray(items)) {
+      return [];
+    }
+    
+    return items.slice(0, 5).map((item: any) => ({
+      name: item.name || item.menuItemId?.name || 'Unknown',
+      quantity: item.quantity || item.totalQuantity || 0,
+      revenue: item.revenue || item.totalRevenue || 0,
+    }));
+  }, [topSellingData]);
+  
+  // Calculate yesterday for comparison
+  const yesterdayStats = useMemo(() => {
+    // For now, using week average as approximation
+    // In production, you'd fetch yesterday's data
+    const weekOrders = dashboardStats?.week?.orders || 0;
+    const weekRevenue = dashboardStats?.week?.revenue || 0;
+    const avgDailyOrders = weekOrders / 7;
+    const avgDailyRevenue = weekRevenue / 7;
+    
+    return {
+      orders: avgDailyOrders,
+      revenue: avgDailyRevenue,
+    };
+  }, [dashboardStats]);
+  
+  const isLoading = isLoadingDashboard || isLoadingAnalytics || isLoadingTopSelling || isLoadingTables || isLoadingStaff || isLoadingOrders;
 
   if (isLoading) {
     return (
@@ -59,39 +181,58 @@ export default function DashboardPage() {
     );
   }
 
+  // Extract stats values
+  const todaySales = dashboardStats?.today?.revenue || 0;
+  const todayOrders = dashboardStats?.today?.orders || 0;
+  const activeOrders = dashboardStats?.active?.orders || 0;
+  const totalCustomers = dashboardStats?.customers?.total || 0;
+  const lowStockItems = dashboardStats?.inventory?.lowStock || 0;
+  
+  // Calculate percentage changes
+  const salesChange = yesterdayStats.revenue > 0
+    ? ((todaySales - yesterdayStats.revenue) / yesterdayStats.revenue) * 100
+    : todaySales > 0 ? 100 : 0;
+  const ordersChange = yesterdayStats.orders > 0
+    ? ((todayOrders - yesterdayStats.orders) / yesterdayStats.orders) * 100
+    : todayOrders > 0 ? 100 : 0;
+  
+  const availableTables = tables.filter((t: any) => t.status === 'available').length;
+  const occupiedTables = tables.filter((t: any) => t.status === 'occupied').length;
+  const activeStaff = staff.filter((s: any) => s.isActive).length;
+
   const stats = [
     {
       name: "Today's Sales",
-      value: formatCurrency(data?.todaySales || 0),
+      value: formatCurrency(todaySales),
       icon: CurrencyDollarIcon,
-      change: '+12.5%',
-      changeType: 'positive',
+      change: `${salesChange >= 0 ? '+' : ''}${salesChange.toFixed(1)}%`,
+      changeType: salesChange >= 0 ? 'positive' : 'negative',
       color: 'bg-green-500',
       href: '/dashboard/reports',
     },
     {
       name: "Today's Orders",
-      value: data?.todayOrders || 0,
+      value: todayOrders,
       icon: ShoppingCartIcon,
-      change: '+8.2%',
-      changeType: 'positive',
+      change: `${ordersChange >= 0 ? '+' : ''}${ordersChange.toFixed(1)}%`,
+      changeType: ordersChange >= 0 ? 'positive' : 'negative',
       color: 'bg-blue-500',
       href: '/dashboard/orders',
     },
     {
       name: 'Active Orders',
-      value: data?.activeOrders || 0,
+      value: activeOrders,
       icon: ClockIcon,
-      change: '-2.4%',
-      changeType: 'negative',
+      change: activeOrders > 0 ? 'Active' : 'None',
+      changeType: activeOrders > 0 ? 'positive' : 'neutral',
       color: 'bg-orange-500',
       href: '/dashboard/orders',
     },
     {
       name: 'Total Customers',
-      value: data?.totalCustomers || 0,
+      value: totalCustomers,
       icon: UsersIcon,
-      change: '+15.3%',
+      change: '+0%', // Would calculate from historical data
       changeType: 'positive',
       color: 'bg-purple-500',
       href: '/dashboard/customers',
@@ -222,21 +363,28 @@ export default function DashboardPage() {
             <CardTitle>Sales Trend (Last 7 Days)</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={data?.salesTrend || []}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
-                <XAxis dataKey="date" className="text-sm" />
-                <YAxis className="text-sm" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Line type="monotone" dataKey="sales" stroke="#0ea5e9" strokeWidth={3} />
-              </LineChart>
-            </ResponsiveContainer>
+            {salesTrend.length > 0 && salesTrend.some((day: any) => day.sales > 0) ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={salesTrend}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                  <XAxis dataKey="date" className="text-sm" />
+                  <YAxis className="text-sm" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                    }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                  <Line type="monotone" dataKey="sales" stroke="#0ea5e9" strokeWidth={3} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                No sales data available for this period
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -245,21 +393,28 @@ export default function DashboardPage() {
             <CardTitle>Top Selling Items</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data?.topSellingItems || []}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
-                <XAxis dataKey="name" className="text-sm" />
-                <YAxis className="text-sm" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Bar dataKey="quantity" fill="#8b5cf6" />
-              </BarChart>
-            </ResponsiveContainer>
+            {topSellingItems.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={topSellingItems} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                  <XAxis type="number" className="text-sm" />
+                  <YAxis dataKey="name" type="category" className="text-sm" width={120} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                    }}
+                    formatter={(value: number) => `${value} orders`}
+                  />
+                  <Bar dataKey="quantity" fill="#8b5cf6" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                No top selling items data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -278,31 +433,37 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {data?.recentOrders?.slice(0, 5).map((order: any) => (
-              <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                    <ShoppingCartIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            {recentOrders.length > 0 ? (
+              recentOrders.slice(0, 5).map((order: any) => (
+                <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                      <ShoppingCartIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        Order #{order.orderNumber || order.id}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {order.items?.length || 0} items • {formatCurrency(order.total || 0)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      Order #{order.orderNumber}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {order.customerName || 'Walk-in'} • {order.itemCount} items • {formatCurrency(order.total)}
+                  <div className="text-right">
+                    <Badge variant={
+                      order.status === 'completed' ? 'success' : 
+                      order.status === 'pending' ? 'warning' : 
+                      order.status === 'cancelled' ? 'danger' : 'info'
+                    }>
+                      {order.status || 'pending'}
+                    </Badge>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      {formatDateTime(order.createdAt)}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <Badge variant={order.status === 'completed' ? 'success' : order.status === 'pending' ? 'warning' : 'info'}>
-                    {order.status}
-                  </Badge>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {formatDateTime(order.createdAt)}
-                  </p>
-                </div>
-              </div>
-            )) || (
+              ))
+            ) : (
               <p className="text-center text-gray-500 dark:text-gray-400 py-8">
                 No recent orders
               </p>
@@ -319,11 +480,19 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Tables Available</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {Math.max(0, 12 - (data?.activeOrders || 0))}
+                  {availableTables}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {occupiedTables} occupied
                 </p>
               </div>
               <TableCellsIcon className="w-8 h-8 text-green-600" />
             </div>
+            <Link href="/dashboard/tables">
+              <Button variant="ghost" size="sm" className="mt-2 w-full">
+                Manage Tables
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
@@ -333,11 +502,23 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Low Stock Items</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {data?.todayOrders || 0}
+                  {lowStockItems}
                 </p>
+                {lowStockItems > 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Action needed
+                  </p>
+                )}
               </div>
               <ChartBarIcon className="w-8 h-8 text-yellow-600" />
             </div>
+            {lowStockItems > 0 && (
+              <Link href="/dashboard/inventory">
+                <Button variant="ghost" size="sm" className="mt-2 w-full">
+                  Check Inventory
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
 
@@ -347,11 +528,19 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Active Staff</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {data?.totalCustomers || 0}
+                  {activeStaff}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {staff.length} total
                 </p>
               </div>
               <UsersIcon className="w-8 h-8 text-blue-600" />
             </div>
+            <Link href="/dashboard/staff">
+              <Button variant="ghost" size="sm" className="mt-2 w-full">
+                View Staff
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

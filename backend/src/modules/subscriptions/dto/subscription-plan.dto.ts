@@ -63,6 +63,17 @@ export class CreateSubscriptionPlanDto {
   @IsOptional()
   @IsNumber()
   sortOrder?: number;
+
+  @ApiPropertyOptional({
+    example: [
+      'Unlimited orders & access accounts',
+      'Realtime restaurant sales status',
+      'Stock, Inventory & Accounting',
+    ],
+    description: 'List of feature descriptions to display on pricing page',
+  })
+  @IsOptional()
+  featureList?: string[];
 }
 
 export class UpdateSubscriptionPlanDto {
@@ -130,4 +141,14 @@ export class UpdateSubscriptionPlanDto {
   @IsOptional()
   @IsNumber()
   sortOrder?: number;
+
+  @ApiPropertyOptional({
+    example: [
+      'Unlimited orders & access accounts',
+      'Realtime restaurant sales status',
+    ],
+    description: 'List of feature descriptions to display on pricing page',
+  })
+  @IsOptional()
+  featureList?: string[];
 }

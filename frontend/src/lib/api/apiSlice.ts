@@ -4,7 +4,14 @@ import { RootState } from '../store';
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
   prepareHeaders: (headers, { getState }) => {
-    const token = (getState() as RootState).auth.accessToken;
+    // Try to get token from Redux state first
+    let token = (getState() as RootState).auth.accessToken;
+    
+    // Fallback to localStorage if not in Redux (for edge cases)
+    if (!token && typeof window !== 'undefined') {
+      token = localStorage.getItem('accessToken');
+    }
+    
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
@@ -12,9 +19,36 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+// Wrapper to handle subscription expiry errors
+const baseQueryWithSubscriptionHandling = async (args: any, api: any, extraOptions: any) => {
+  const result = await baseQuery(args, api, extraOptions);
+  
+  // Handle subscription expired errors
+  if (result.error && result.error.status === 401) {
+    const errorData = result.error.data as any;
+    
+    // Check if it's a subscription expiry error
+    if (errorData?.code === 'SUBSCRIPTION_EXPIRED' || errorData?.code === 'TRIAL_EXPIRED') {
+      // Redirect to upgrade page if in browser
+      if (typeof window !== 'undefined') {
+        // Show subscription expired message
+        if (errorData?.message) {
+          console.error('Subscription Expired:', errorData.message);
+          // You can show a toast/notification here
+        }
+        
+        // Redirect to subscriptions page
+        window.location.href = '/dashboard/subscriptions';
+      }
+    }
+  }
+  
+  return result;
+};
+
 export const apiSlice = createApi({
   reducerPath: 'api',
-  baseQuery,
+  baseQuery: baseQueryWithSubscriptionHandling,
   tagTypes: [
     'Auth',
     'User',
@@ -41,6 +75,8 @@ export const apiSlice = createApi({
     'LoginActivity',
     'Schedule',
     'POS',
+    'Printer',
+    'PrintJob',
   ],
   endpoints: () => ({}),
 });

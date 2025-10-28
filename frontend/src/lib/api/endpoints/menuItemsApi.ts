@@ -35,7 +35,7 @@ export interface UpdateMenuItemRequest extends Partial<CreateMenuItemRequest> {
 
 export const menuItemsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getMenuItems: builder.query<{ items: MenuItem[]; total: number }, any>({
+    getMenuItems: builder.query<{ menuItems: MenuItem[]; total: number; page: number; limit: number } | { items: MenuItem[]; total: number }, any>({
       query: (params) => ({
         url: '/menu-items',
         params,

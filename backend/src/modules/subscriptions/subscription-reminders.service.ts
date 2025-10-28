@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model } from 'mongoose';
+import { EmailService } from '../../common/services/email.service';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 
@@ -12,6 +13,7 @@ export class SubscriptionRemindersService {
   constructor(
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private emailService: EmailService,
   ) {}
 
   // Run every hour to check for expiring subscriptions
@@ -95,30 +97,28 @@ export class SubscriptionRemindersService {
         return;
       }
 
-      const timeLeftText = timeLeft === '24h' ? '24 hours' : '1 hour';
-      const subject = `Trial Expiring Soon - ${company.name}`;
-      
-      const message = `
-        Dear ${owner.firstName} ${owner.lastName},
-        
-        Your trial period for ${company.name} will expire in ${timeLeftText}.
-        
-        To continue using our services, please upgrade to a paid plan:
-        - Premium Plan: ৳2,500/month
-        - Enterprise Plan: ৳5,000/month
-        
-        Upgrade now to avoid service interruption.
-        
-        Best regards,
-        RestaurantPOS Team
-      `;
+      const ownerName = `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || 'Valued Customer';
+      const planNames: Record<string, string> = {
+        basic: 'Free Trial',
+        premium: 'Premium Trial',
+        enterprise: 'Enterprise Trial',
+      };
+      const planName = planNames[company.subscriptionPlan] || 'Trial';
 
-      // TODO: Implement actual email sending
-      // For now, just log the reminder
-      this.logger.log(`Trial expiry reminder sent to ${owner.email} for company ${company.name} (${timeLeft} left)`);
-      
-      // In production, you would use an email service like SendGrid, AWS SES, etc.
-      // await this.emailService.sendEmail(owner.email, subject, message);
+      // Send email notification
+      const emailSent = await this.emailService.sendTrialExpiryReminder(
+        owner.email,
+        ownerName,
+        company.name,
+        timeLeft,
+        planName,
+      );
+
+      if (emailSent) {
+        this.logger.log(`Trial expiry reminder email sent to ${owner.email} for company ${company.name} (${timeLeft} left)`);
+      } else {
+        this.logger.warn(`Failed to send trial expiry reminder email to ${owner.email}`);
+      }
 
     } catch (error) {
       this.logger.error(`Error sending trial expiry reminder for company ${company._id}:`, error);
@@ -143,7 +143,8 @@ export class SubscriptionRemindersService {
       // Send expiry notification
       const owner = await this.userModel.findById(company.ownerId);
       if (owner && owner.email) {
-        await this.sendAccountExpiredNotification(owner.email, company.name);
+        const ownerName = `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || 'Valued Customer';
+        await this.sendAccountExpiredNotification(owner.email, ownerName, company.name);
       }
 
     } catch (error) {
@@ -151,31 +152,20 @@ export class SubscriptionRemindersService {
     }
   }
 
-  private async sendAccountExpiredNotification(email: string, companyName: string) {
+  private async sendAccountExpiredNotification(email: string, ownerName: string, companyName: string) {
     try {
-      const subject = `Account Expired - ${companyName}`;
-      const message = `
-        Dear Customer,
-        
-        Your trial period for ${companyName} has expired.
-        
-        Your account has been temporarily locked. To reactivate your account, please:
-        1. Upgrade to a paid plan
-        2. Complete the payment process
-        3. Your account will be automatically reactivated
-        
-        Available plans:
-        - Premium Plan: ৳2,500/month
-        - Enterprise Plan: ৳5,000/month
-        
-        If you have any questions, please contact our support team.
-        
-        Best regards,
-        RestaurantPOS Team
-      `;
+      // Send email notification
+      const emailSent = await this.emailService.sendAccountExpiredNotification(
+        email,
+        ownerName,
+        companyName,
+      );
 
-      // TODO: Implement actual email sending
-      this.logger.log(`Account expired notification sent to ${email} for company ${companyName}`);
+      if (emailSent) {
+        this.logger.log(`Account expired notification email sent to ${email} for company ${companyName}`);
+      } else {
+        this.logger.warn(`Failed to send account expired notification email to ${email}`);
+      }
 
     } catch (error) {
       this.logger.error(`Error sending account expired notification to ${email}:`, error);

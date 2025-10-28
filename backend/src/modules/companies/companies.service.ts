@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { GeneratorUtil } from '../../common/utils/generator.util';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -33,12 +34,24 @@ export class CompaniesService {
     );
 
     // Set trial period based on subscription plan
-    const trialEndDate = new Date();
-    trialEndDate.setHours(trialEndDate.getHours() + subscriptionPlan.trialPeriod);
+    // Use millisecond-based calculation for precision and consistency
+    const now = new Date();
+    const trialEndDate = new Date(now.getTime() + (subscriptionPlan.trialPeriod * 60 * 60 * 1000));
+
+    // Generate unique slug if not provided
+    let slug = (createCompanyDto as any).slug || GeneratorUtil.generateSlug(createCompanyDto.name);
+    if (!(createCompanyDto as any).slug) {
+      const existingSlugs = await this.companyModel.find({ slug: { $exists: true } })
+        .select('slug')
+        .lean();
+      const slugsList = existingSlugs.map((c: any) => c.slug).filter(Boolean);
+      slug = GeneratorUtil.generateUniqueSlug(createCompanyDto.name, slugsList);
+    }
 
     const company = new this.companyModel({
       ...createCompanyDto,
       email: createCompanyDto.email.toLowerCase(),
+      slug,
       subscriptionStatus: 'trial',
       trialEndDate,
       subscriptionStartDate: new Date(),
@@ -63,13 +76,29 @@ export class CompaniesService {
 
     const company = await this.companyModel
       .findById(id)
-      .populate('ownerId', 'firstName lastName email');
+      .populate('ownerId', 'firstName lastName email')
+      .select('+subscriptionStatus +subscriptionPlan +trialEndDate +subscriptionEndDate')
+      .lean();
 
     if (!company) {
       throw new NotFoundException('Company not found');
     }
 
-    return company;
+    // Return company with subscription data
+    return company as any;
+  }
+
+  async findBySlug(slug: string): Promise<Company> {
+    const company = await this.companyModel
+      .findOne({ slug })
+      .populate('ownerId', 'firstName lastName email')
+      .lean();
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    return company as any;
   }
 
   async findByOwner(ownerId: string): Promise<Company[]> {

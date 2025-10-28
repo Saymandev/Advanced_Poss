@@ -14,6 +14,9 @@ export class Branch {
   @Prop({ unique: true, trim: true })
   code: string;
 
+  @Prop({ trim: true, lowercase: true })
+  slug?: string;
+
   // Contact
   @Prop()
   phone?: string;
@@ -107,6 +110,7 @@ export const BranchSchema = SchemaFactory.createForClass(Branch);
 // Indexes
 BranchSchema.index({ companyId: 1 });
 BranchSchema.index({ code: 1 }, { unique: true });
+BranchSchema.index({ companyId: 1, slug: 1 }, { unique: true, sparse: true });
 BranchSchema.index({ isActive: 1 });
 
 // Transform output

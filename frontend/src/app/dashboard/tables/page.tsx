@@ -32,12 +32,47 @@ export default function TablesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const { data, isLoading, refetch } = useGetTablesQuery({
-    branchId: user?.branchId,
+  // Get branchId from multiple sources
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  console.log('🔍 Tables Debug:', { branchId, user, companyContext });
+
+  const { data, isLoading, error, refetch } = useGetTablesQuery({
+    branchId,
     status: statusFilter === 'all' ? undefined : statusFilter,
     page: currentPage,
     limit: itemsPerPage,
-  });
+  }, { skip: !branchId });
+
+  console.log('📊 Tables API Response:', { data, isLoading, error, tablesCount: (data as any)?.tables?.length || (data as any)?.length || 0 });
+
+  // Extract tables from response - handle different response structures
+  const tables = (() => {
+    if (!data) return [];
+    // Handle nested response structures (backend wraps in { success, data })
+    if (Array.isArray(data)) return data;
+    
+    // Check for { success: true, data: [...] } structure
+    const responseData = (data as any)?.data;
+    if (Array.isArray(responseData)) {
+      console.log('✅ Extracted tables from data.data:', responseData.length);
+      return responseData;
+    }
+    
+    // Check for { tables: [...] } structure
+    if (Array.isArray((data as any)?.tables)) {
+      console.log('✅ Extracted tables from data.tables:', (data as any).tables.length);
+      return (data as any).tables;
+    }
+    
+    console.warn('⚠️ Could not extract tables array. Data structure:', data);
+    return [];
+  })();
+  
+  console.log('🔍 Tables extracted:', { count: tables.length, firstTable: tables[0] });
 
   const [createTable] = useCreateTableMutation();
   const [updateTable] = useUpdateTableMutation();
@@ -281,12 +316,20 @@ export default function TablesPage() {
     },
   ];
 
+  // Filter tables based on search and status
+  const filteredTables = tables.filter((table: any) => {
+    const tableNum = (table.tableNumber || table.number || '').toString();
+    const matchesSearch = !searchQuery || tableNum.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || table.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   const stats = {
-    total: data?.total || 0,
-    available: data?.tables?.filter(t => t.status === 'available').length || 0,
-    occupied: data?.tables?.filter(t => t.status === 'occupied').length || 0,
-    reserved: data?.tables?.filter(t => t.status === 'reserved').length || 0,
-    cleaning: data?.tables?.filter((t: any) => t.status === 'needs_cleaning').length || 0,
+    total: filteredTables.length || tables.length || (data as any)?.total || 0,
+    available: filteredTables.filter((t: any) => t.status === 'available').length || 0,
+    occupied: filteredTables.filter((t: any) => t.status === 'occupied').length || 0,
+    reserved: filteredTables.filter((t: any) => t.status === 'reserved').length || 0,
+    cleaning: filteredTables.filter((t: any) => t.status === 'needs_cleaning').length || 0,
   };
 
   return (
@@ -375,7 +418,7 @@ export default function TablesPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {data?.tables?.map((table) => (
+            {filteredTables.map((table: any) => (
               <div
                 key={table.id}
                 className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
@@ -399,7 +442,7 @@ export default function TablesPage() {
                       table.status === 'reserved' ? 'text-yellow-600 dark:text-yellow-400' :
                       'text-blue-600 dark:text-blue-400'
                     }`}>
-                      {table.number}
+                      {(table as any).tableNumber || table.number}
                     </span>
                   </div>
                   <p className={`text-xs font-medium ${
@@ -423,7 +466,7 @@ export default function TablesPage() {
               </div>
             ))}
 
-            {(!data?.tables || data.tables.length === 0) && (
+            {filteredTables.length === 0 && !isLoading && (
               <div className="col-span-full text-center py-8">
                 <TableCellsIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500 dark:text-gray-400">
@@ -466,16 +509,16 @@ export default function TablesPage() {
 
       {/* Tables Table */}
       <DataTable
-        data={data?.tables || []}
+        data={filteredTables}
         columns={columns}
         loading={isLoading}
         searchable={false}
         selectable={true}
         pagination={{
           currentPage,
-          totalPages: Math.ceil((data?.total || 0) / itemsPerPage),
+          totalPages: Math.ceil((filteredTables.length || (data as any)?.total || 0) / itemsPerPage),
           itemsPerPage,
-          totalItems: data?.total || 0,
+          totalItems: filteredTables.length || (data as any)?.total || 0,
           onPageChange: setCurrentPage,
           onItemsPerPageChange: setItemsPerPage,
         }}

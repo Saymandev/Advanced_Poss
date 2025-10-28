@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsEmail,
-  IsNotEmpty,
-  IsObject,
-  IsOptional,
-  IsString,
+    IsEmail,
+    IsNotEmpty,
+    IsObject,
+    IsOptional,
+    IsString,
 } from 'class-validator';
 
 export class CreateCompanyDto {
@@ -12,6 +12,11 @@ export class CreateCompanyDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @ApiPropertyOptional({ example: 'delicious-bites' })
+  @IsOptional()
+  @IsString()
+  slug?: string;
 
   @ApiPropertyOptional({ example: 'Delicious Bites Corporation' })
   @IsOptional()

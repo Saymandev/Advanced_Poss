@@ -1,11 +1,12 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
+import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import {
   ArrowRightIcon,
   BellAlertIcon,
   ChartBarIcon,
-  CheckIcon,
+  CheckCircleIcon,
   CloudArrowUpIcon,
   CreditCardIcon,
   DevicePhoneMobileIcon,
@@ -13,8 +14,7 @@ import {
   UserGroupIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const features = [
   {
@@ -49,55 +49,7 @@ const features = [
   },
 ];
 
-const pricingPlans = [
-  {
-    name: 'Starter',
-    price: '$29',
-    period: '/month',
-    description: 'Perfect for small restaurants',
-    features: [
-      'Up to 10 staff members',
-      '1 Branch location',
-      'Basic reporting',
-      'Email support',
-      '10GB storage',
-    ],
-    popular: false,
-  },
-  {
-    name: 'Professional',
-    price: '$79',
-    period: '/month',
-    description: 'Best for growing businesses',
-    features: [
-      'Up to 50 staff members',
-      'Up to 5 branches',
-      'Advanced analytics',
-      'Priority support',
-      '100GB storage',
-      'Kitchen display system',
-      'QR code menus',
-    ],
-    popular: true,
-  },
-  {
-    name: 'Enterprise',
-    price: '$199',
-    period: '/month',
-    description: 'For large restaurant chains',
-    features: [
-      'Unlimited staff',
-      'Unlimited branches',
-      'AI-powered insights',
-      '24/7 phone support',
-      'Unlimited storage',
-      'Custom integrations',
-      'Dedicated account manager',
-      'White-label options',
-    ],
-    popular: false,
-  },
-];
+// Legacy pricing plans removed - now fetched from API
 
 const testimonials = [
   {
@@ -124,7 +76,53 @@ const testimonials = [
 ];
 
 export default function LandingPage() {
-  const router = useRouter();
+  const { data: plansData, isLoading: isLoadingPlans, error } = useGetSubscriptionPlansQuery({});
+  
+  // Debug logging
+  useEffect(() => {
+    if (plansData) {
+      console.log('📦 Plans Data:', { 
+        isArray: Array.isArray(plansData), 
+        type: typeof plansData,
+        data: plansData 
+      });
+    }
+    if (error) {
+      console.error('❌ Plans API Error:', error);
+    }
+  }, [plansData, error]);
+  
+  // Get available plans from API - handle both array and object responses
+  const plans = useMemo(() => {
+    if (!plansData) return [];
+    // Handle different response structures
+    if (Array.isArray(plansData)) return plansData;
+    
+    // Check for nested data structures: data.data or data.plans
+    const nestedData = (plansData as any)?.data;
+    if (Array.isArray(nestedData)) return nestedData;
+    if (Array.isArray(nestedData?.data)) return nestedData.data;
+    if (Array.isArray(nestedData?.plans)) return nestedData.plans;
+    
+    // Fallback to direct plans property
+    return (plansData as any)?.plans || [];
+  }, [plansData]);
+  
+  const activePlans = useMemo(() => {
+    return plans.filter((plan: any) => plan.isActive !== false).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  }, [plans]);
+  
+  // Debug logging for plans processing
+  useEffect(() => {
+    if (plansData !== undefined) {
+      console.log('🔍 Plans Processing:', { 
+        plansCount: plans.length, 
+        activePlansCount: activePlans.length,
+        plansData,
+        plans: plans.map((p: any) => ({ name: p.name, isActive: p.isActive, displayName: p.displayName }))
+      });
+    }
+  }, [plans, activePlans, plansData]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -250,7 +248,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8">
+      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
@@ -261,55 +259,118 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {pricingPlans.map((plan, index) => (
-              <div
-                key={index}
-                className={`relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 ${
-                  plan.popular ? 'ring-4 ring-primary-500 scale-105' : ''
-                } hover:shadow-2xl transition-all duration-300`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-primary-500 to-secondary-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    {plan.name}
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">{plan.description}</p>
-                  <div className="flex items-baseline justify-center">
-                    <span className="text-5xl font-bold text-gray-900 dark:text-white">
-                      {plan.price}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-300 ml-2">{plan.period}</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-4 mb-8">
-                  {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-start">
-                      <CheckIcon className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-600 dark:text-gray-300">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link href="/auth/register">
-                  <Button
-                    className="w-full"
-                    variant={plan.popular ? 'primary' : 'secondary'}
+          {isLoadingPlans ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+          ) : activePlans.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-gray-600 dark:text-gray-400 mb-2">No pricing plans available at the moment.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500">
+                {plans.length > 0 && activePlans.length === 0 && 'All plans are currently inactive.'}
+                {plans.length === 0 && 'Please check back later or contact support.'}
+              </p>
+            </div>
+          ) : (
+            <div className={`grid grid-cols-1 ${activePlans.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-6 max-w-5xl mx-auto`}>
+              {activePlans.map((plan: any, index: number) => {
+                const isPopular = plan.isPopular || index === 1;
+                
+                // Use admin-managed featureList if available, otherwise generate from features
+                let featureList: string[] = [];
+                
+                if (plan.featureList && plan.featureList.length > 0) {
+                  // Use backend-managed feature list
+                  featureList = plan.featureList;
+                } else {
+                  // Fallback: Generate from plan.features (for backward compatibility)
+                  if (plan.features?.pos) featureList.push('Unlimited orders & access accounts');
+                  if (plan.features?.accounting) featureList.push('Realtime restaurant sales status');
+                  if (plan.features?.inventory) featureList.push('Stock, Inventory & Accounting');
+                  if (plan.features?.crm) featureList.push('Customer Loyalty & Discount');
+                  featureList.push('Daily SMS & Email sales report');
+                  if (plan.features?.multiBranch) featureList.push('Kitchen & Customer Display System');
+                  featureList.push('Mobile, Tablet and any OS friendly');
+                  featureList.push('Cloud data backup & security');
+                  if (plan.features?.aiInsights) featureList.push('AI Insight and analytics');
+                  if (index === 1 && plan.features?.multiBranch) {
+                    featureList.push('Online Ordering');
+                    featureList.push('Table Touch QR Ordering');
+                    featureList.push('Customer Feedback System');
+                    featureList.push('Target SMS marketing');
+                    featureList.push('Priority 24/7 Call & Agent Support');
+                  }
+                }
+                
+                return (
+                  <div
+                    key={plan.id}
+                    className={`relative rounded-xl shadow-xl p-8 transition-all border-2 ${
+                      isPopular
+                        ? 'border-primary-400 bg-gray-800 dark:bg-gray-800 scale-105'
+                        : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-2xl'
+                    }`}
                   >
-                    Get Started
-                  </Button>
-                </Link>
-              </div>
-            ))}
-          </div>
+                    {isPopular && (
+                      <div className="absolute -top-3 right-4">
+                        <span className="bg-primary-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                          Most Popular
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="mb-6">
+                      <h3 className={`text-2xl font-bold mb-2 ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                        {(plan.displayName || plan.name).toUpperCase()}
+                      </h3>
+                      
+                      <div className="">
+                        <div className={`text-4xl font-bold ${isPopular ? 'text-white' : 'text-primary-600 dark:text-primary-400'}`}>
+                          {plan.currency} {plan.price.toLocaleString()}
+                          {plan.price > 0 && <span className="text-xl">/{plan.billingCycle}</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          *Per Branch
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          + Installation & Training Fees
+                        </div>
+                      </div>
+                    </div>
+
+                    
+
+                    <div className="space-y-3">
+                      {featureList.map((feature, idx) => (
+                        <div key={idx} className="flex items-start gap-2">
+                          <CheckCircleIcon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                            isPopular ? 'text-white' : 'text-green-500'
+                          }`} />
+                          <span className={`text-sm ${isPopular ? 'text-gray-200' : 'text-gray-600 dark:text-gray-300'}`}>
+                            {feature}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className='space-y-1'>
+                    <Link href="/auth/register" >
+                      <button
+                        className={`w-full py-3 rounded-lg font-semibold my-6 transition-all ${
+                          isPopular
+                            ? 'bg-red-600 text-white hover:bg-red-700'
+                            : 'bg-white text-gray-900 hover:bg-gray-100 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        Get Started
+                      </button>
+                    </Link>
+                    </div>
+                   
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 

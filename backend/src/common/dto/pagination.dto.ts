@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsDateString, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsDateString, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class PaginationDto {
   @IsOptional()
@@ -98,6 +98,10 @@ export class MenuItemFilterDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
   categoryId?: string;
 
   @IsOptional()
@@ -107,6 +111,11 @@ export class MenuItemFilterDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string; // Search by name
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  isAvailable?: boolean;
 }
 
 export class IngredientFilterDto extends PaginationDto {

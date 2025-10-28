@@ -7,16 +7,18 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useDeleteOrderMutation, useGetOrderByIdQuery, useGetOrdersQuery, useUpdateOrderStatusMutation } from '@/lib/api/endpoints/ordersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
     ClockIcon,
     EyeIcon,
     PlusIcon,
+    PrinterIcon,
     ShoppingCartIcon,
     UserIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 interface Order {
@@ -45,8 +47,8 @@ interface Order {
   completedAt?: string;
 }
 
-// Mock data for demonstration
-const mockOrders: Order[] = [
+// Mock data for demonstration (not used - replaced by API)
+const _mockOrders: Order[] = [
   {
     id: '1',
     orderNumber: 'ORD-2024-001',
@@ -104,35 +106,154 @@ const mockOrders: Order[] = [
 ];
 
 export default function OrdersPage() {
-  const { user } = useAppSelector((state) => state.auth);
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+  
+  const { data: ordersResponse, isLoading, error, refetch } = useGetOrdersQuery({
+    branchId,
+    search: searchQuery || undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    page: currentPage,
+    limit: itemsPerPage,
+  }, { skip: !branchId });
+  
+  const { data: selectedOrderData } = useGetOrderByIdQuery(selectedOrderId, {
+    skip: !selectedOrderId || !isViewModalOpen,
+  });
+  
+  const [updateOrderStatus, { isLoading: isUpdatingStatus }] = useUpdateOrderStatusMutation();
+  const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
+  
+  // Extract orders from API response
+  const orders = useMemo(() => {
+    if (!ordersResponse) return [];
+    
+    const response = ordersResponse as any;
+    let items = [];
+    
+    if (response.data) {
+      items = response.data.orders || response.data.items || [];
+    } else {
+      items = response.orders || response.items || [];
+    }
+    
+    if (!Array.isArray(items)) return [];
+    
+    return items.map((order: any) => ({
+      id: order._id || order.id,
+      orderNumber: order.orderNumber || order.order_id,
+      customerName: order.customerId?.name || order.customer?.name,
+      customerPhone: order.customerId?.phone || order.customer?.phone,
+      tableNumber: order.tableId?.number || order.tableId?.tableNumber || order.tableNumber || 'N/A',
+      status: order.status || 'pending',
+      items: order.items?.map((item: any) => ({
+        id: item._id || item.id,
+        name: item.menuItemId?.name || item.name,
+        quantity: item.quantity,
+        price: item.price,
+        notes: item.notes,
+      })) || [],
+      total: order.total || order.totalAmount || 0,
+      tax: order.tax || order.taxAmount || 0,
+      tip: order.tip || order.tipAmount,
+      discount: order.discount || order.discountAmount,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus || 'pending',
+      createdAt: order.createdAt || new Date().toISOString(),
+      updatedAt: order.updatedAt || new Date().toISOString(),
+      servedAt: order.servedAt,
+      completedAt: order.completedAt,
+    }));
+  }, [ordersResponse]);
+  
+  const totalOrders = useMemo(() => {
+    const response = ordersResponse as any;
+    if (response?.data?.total) return response.data.total;
+    if (response?.total) return response.total;
+    return orders.length;
+  }, [ordersResponse, orders.length]);
 
-  const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
-    setOrders(prev => prev.map(order =>
-      order.id === orderId
-        ? {
-            ...order,
-            status: newStatus,
-            updatedAt: new Date().toISOString(),
-            ...(newStatus === 'served' && !order.servedAt && { servedAt: new Date().toISOString() }),
-            ...(newStatus === 'completed' && !order.completedAt && { completedAt: new Date().toISOString() }),
-          }
-        : order
-    ));
-    toast.success(`Order status updated to ${newStatus}`);
+  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
+    try {
+      await updateOrderStatus({ id: orderId, status: newStatus }).unwrap();
+      toast.success(`Order status updated to ${newStatus}`);
+      refetch();
+      if (selectedOrderId === orderId && selectedOrderData) {
+        // Update local state if viewing this order
+        const updated = orders.find(o => o.id === orderId);
+        if (updated) setSelectedOrder(updated);
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to update order status');
+    }
+  };
+  
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      await deleteOrder(orderId).unwrap();
+      toast.success('Order deleted successfully');
+      refetch();
+      if (selectedOrderId === orderId) {
+        setIsViewModalOpen(false);
+        setSelectedOrderId('');
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to delete order');
+    }
   };
 
   const openViewModal = (order: Order) => {
     setSelectedOrder(order);
+    setSelectedOrderId(order.id);
     setIsViewModalOpen(true);
   };
+  
+  // Update selected order when data loads
+  useEffect(() => {
+    if (selectedOrderData && selectedOrderId) {
+      const orderData = selectedOrderData as any;
+      setSelectedOrder({
+        id: orderData._id || orderData.id,
+        orderNumber: orderData.orderNumber || orderData.order_id,
+        customerName: orderData.customerId?.name || orderData.customer?.name,
+        customerPhone: orderData.customerId?.phone || orderData.customer?.phone,
+        tableNumber: orderData.tableId?.number || orderData.tableId?.tableNumber || orderData.tableNumber || 'N/A',
+        status: orderData.status || 'pending',
+        items: orderData.items?.map((item: any) => ({
+          id: item._id || item.id,
+          name: item.menuItemId?.name || item.name,
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes,
+        })) || [],
+        total: orderData.total || orderData.totalAmount || 0,
+        tax: orderData.tax || orderData.taxAmount || 0,
+        tip: orderData.tip || orderData.tipAmount,
+        discount: orderData.discount || orderData.discountAmount,
+        paymentMethod: orderData.paymentMethod,
+        paymentStatus: orderData.paymentStatus || 'pending',
+        createdAt: orderData.createdAt || new Date().toISOString(),
+        updatedAt: orderData.updatedAt || new Date().toISOString(),
+        servedAt: orderData.servedAt,
+        completedAt: orderData.completedAt,
+      });
+    }
+  }, [selectedOrderData, selectedOrderId]);
 
   const getStatusBadge = (status: Order['status']) => {
     const variants = {
@@ -169,9 +290,11 @@ export default function OrdersPage() {
             <ShoppingCartIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <p className="font-medium text-gray-900 dark:text-white">{value}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Table {row.tableNumber}</p>
-          </div>
+                <p className="font-medium text-gray-900 dark:text-white">{value}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {typeof row.tableNumber === 'number' ? `Table ${row.tableNumber}` : row.tableNumber}
+                </p>
+              </div>
         </div>
       ),
     },
@@ -252,14 +375,33 @@ export default function OrdersPage() {
     },
   ];
 
-  const stats = {
-    total: orders.length,
+  const stats = useMemo(() => ({
+    total: totalOrders,
     pending: orders.filter(o => o.status === 'pending').length,
     preparing: orders.filter(o => o.status === 'preparing').length,
     ready: orders.filter(o => o.status === 'ready').length,
     completed: orders.filter(o => o.status === 'completed').length,
     totalRevenue: orders.filter(o => o.paymentStatus === 'paid').reduce((sum, o) => sum + o.total, 0),
-  };
+  }), [orders, totalOrders]);
+  
+  const filteredOrders = useMemo(() => {
+    let filtered = orders;
+    
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(o => o.status === statusFilter);
+    }
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(o => 
+        o.orderNumber.toLowerCase().includes(query) ||
+        (o.customerName && o.customerName.toLowerCase().includes(query)) ||
+        (o.customerPhone && o.customerPhone.includes(query))
+      );
+    }
+    
+    return filtered;
+  }, [orders, statusFilter, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -271,10 +413,12 @@ export default function OrdersPage() {
             Manage restaurant orders and transactions
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          New Order
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => window.open('/dashboard/pos', '_blank')}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            New Order
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -373,27 +517,49 @@ export default function OrdersPage() {
       </Card>
 
       {/* Orders Table */}
-      <DataTable
-        data={orders}
-        columns={columns}
-        loading={false}
-        searchable={false}
-        selectable={true}
-        pagination={{
-          currentPage,
-          totalPages: Math.ceil(orders.length / itemsPerPage),
-          itemsPerPage,
-          totalItems: orders.length,
-          onPageChange: setCurrentPage,
-          onItemsPerPageChange: setItemsPerPage,
-        }}
-        exportable={true}
-        exportFilename="orders"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} orders as ${format}`);
-        }}
-        emptyMessage="No orders found."
-      />
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">Loading orders...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : error ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-red-600">Error loading orders. Please try again.</p>
+              <Button onClick={() => refetch()} className="mt-4">
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          data={filteredOrders}
+          columns={columns}
+          loading={isLoading}
+          searchable={false}
+          selectable={true}
+          pagination={{
+            currentPage,
+            totalPages: Math.ceil(totalOrders / itemsPerPage),
+            itemsPerPage,
+            totalItems: totalOrders,
+            onPageChange: setCurrentPage,
+            onItemsPerPageChange: setItemsPerPage,
+          }}
+          exportable={true}
+          exportFilename="orders"
+          onExport={(format, items) => {
+            console.log(`Exporting ${items.length} orders as ${format}`);
+            toast.success(`Exporting ${items.length} orders as ${format.toUpperCase()}`);
+          }}
+          emptyMessage="No orders found."
+        />
+      )}
 
       {/* Order Details Modal */}
       <Modal
@@ -552,9 +718,27 @@ export default function OrdersPage() {
                 onClick={() => {
                   setIsViewModalOpen(false);
                   setSelectedOrder(null);
+                  setSelectedOrderId('');
                 }}
               >
                 Close
+              </Button>
+              {selectedOrder.paymentStatus !== 'paid' && selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
+                <Button
+                  variant="secondary"
+                  onClick={() => window.open(`/dashboard/pos/receipts/${selectedOrder.id}`, '_blank')}
+                >
+                  <PrinterIcon className="w-4 h-4 mr-2" />
+                  Print Receipt
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                onClick={() => handleDeleteOrder(selectedOrder.id)}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Order'}
               </Button>
               {selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
                 <Select
@@ -570,6 +754,7 @@ export default function OrdersPage() {
                   value={selectedOrder.status}
                   onChange={(value) => handleStatusChange(selectedOrder.id, value as Order['status'])}
                   className="w-40"
+                  disabled={isUpdatingStatus}
                 />
               )}
             </div>
@@ -577,31 +762,6 @@ export default function OrdersPage() {
         )}
       </Modal>
 
-      {/* Create Order Modal */}
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title="Create New Order"
-        className="max-w-2xl"
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Order creation functionality would be implemented here with menu item selection, customer details, and table assignment.
-          </p>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              variant="secondary"
-              onClick={() => setIsCreateModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button>
-              Create Order
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

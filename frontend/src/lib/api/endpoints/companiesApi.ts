@@ -32,14 +32,14 @@ export interface Company {
     deliveryFee: number;
     freeDeliveryThreshold: number;
   };
-  subscription: {
+  subscription?: {
     planId: string;
     planName: string;
-    status: 'active' | 'inactive' | 'cancelled' | 'expired';
-    startDate: string;
-    endDate: string;
-    features: string[];
-    limits: {
+    status: 'active' | 'inactive' | 'cancelled' | 'expired' | 'trial';
+    startDate?: string;
+    endDate?: string;
+    features?: string[];
+    limits?: {
       branches: number;
       users: number;
       menuItems: number;
@@ -47,6 +47,10 @@ export interface Company {
       storage: number;
     };
   };
+  subscriptionStatus?: 'active' | 'inactive' | 'trial' | 'expired' | 'suspended';
+  subscriptionPlan?: 'basic' | 'premium' | 'enterprise';
+  trialEndDate?: string;
+  subscriptionEndDate?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

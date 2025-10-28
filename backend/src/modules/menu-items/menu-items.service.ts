@@ -47,6 +47,17 @@ export class MenuItemsService {
     const skip = (page - 1) * limit;
     const query: any = { ...filters };
 
+    // Convert string IDs to ObjectIds for proper MongoDB querying
+    if (query.branchId && typeof query.branchId === 'string') {
+      query.branchId = new Types.ObjectId(query.branchId);
+    }
+    if (query.categoryId && typeof query.categoryId === 'string') {
+      query.categoryId = new Types.ObjectId(query.categoryId);
+    }
+    if (query.companyId && typeof query.companyId === 'string') {
+      query.companyId = new Types.ObjectId(query.companyId);
+    }
+
     // Add search functionality
     if (search) {
       query.$or = [
@@ -150,8 +161,20 @@ export class MenuItemsService {
       throw new BadRequestException('Invalid menu item ID');
     }
 
+    // Convert string IDs to ObjectIds if needed
+    const updateData: any = { ...updateMenuItemDto };
+    if (updateData.branchId && typeof updateData.branchId === 'string') {
+      updateData.branchId = new Types.ObjectId(updateData.branchId);
+    }
+    if (updateData.categoryId && typeof updateData.categoryId === 'string') {
+      updateData.categoryId = new Types.ObjectId(updateData.categoryId);
+    }
+    if (updateData.companyId && typeof updateData.companyId === 'string') {
+      updateData.companyId = new Types.ObjectId(updateData.companyId);
+    }
+
     const menuItem = await this.menuItemModel
-      .findByIdAndUpdate(id, updateMenuItemDto, { new: true })
+      .findByIdAndUpdate(id, updateData, { new: true })
       .populate('categoryId', 'name type');
 
     if (!menuItem) {

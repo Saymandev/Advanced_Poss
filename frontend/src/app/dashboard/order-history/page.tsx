@@ -7,18 +7,20 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { useGetOrdersQuery } from '@/lib/api/endpoints/ordersApi';
+import { useGetOrderByIdQuery, useGetOrdersQuery } from '@/lib/api/endpoints/ordersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ClockIcon,
-    CurrencyDollarIcon,
-    DocumentTextIcon,
-    EyeIcon,
-    MagnifyingGlassIcon,
-    UserIcon
+  ClockIcon,
+  CurrencyDollarIcon,
+  DocumentTextIcon,
+  EyeIcon,
+  MagnifyingGlassIcon,
+  PrinterIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 
 interface Order {
   id: string;
@@ -26,7 +28,7 @@ interface Order {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
-  tableNumber?: number;
+  tableNumber?: number | string;
   status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled' | 'completed';
   total: number;
   subtotal: number;
@@ -44,31 +46,172 @@ interface Order {
   completedAt?: string;
   notes?: string;
   paymentMethod: string;
+  paymentStatus?: 'pending' | 'paid' | 'partially_paid' | 'refunded';
   waiterName?: string;
+  orderType?: string;
 }
 
 export default function OrderHistoryPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
 
-  // Mock data for now - replace with actual API call
-  const { data: ordersData, isLoading } = useGetOrdersQuery({
-    branchId: user?.branchId,
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  // Calculate date range based on filter
+  const dateRange = useMemo(() => {
+    const today = new Date();
+    const start = new Date();
+    const end = new Date(today);
+    end.setHours(23, 59, 59, 999);
+
+    switch (dateFilter) {
+      case 'today':
+        start.setHours(0, 0, 0, 0);
+        return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+      case 'yesterday':
+        start.setDate(today.getDate() - 1);
+        start.setHours(0, 0, 0, 0);
+        end.setDate(today.getDate() - 1);
+        end.setHours(23, 59, 59, 999);
+        return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+      case 'this_week':
+        start.setDate(today.getDate() - today.getDay());
+        start.setHours(0, 0, 0, 0);
+        return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+      case 'this_month':
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+      case 'custom':
+        return { start: startDate, end: endDate };
+      default:
+        return { start: undefined, end: undefined };
+    }
+  }, [dateFilter, startDate, endDate]);
+
+  const { data: ordersResponse, isLoading, error, refetch } = useGetOrdersQuery({
+    branchId,
     search: searchQuery || undefined,
-    status: statusFilter === 'all' ? undefined : statusFilter,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
     page: currentPage,
     limit: itemsPerPage,
+  }, { skip: !branchId });
+
+  const { data: selectedOrderData } = useGetOrderByIdQuery(selectedOrderId, {
+    skip: !selectedOrderId || !isDetailsModalOpen,
   });
+
+  // Extract orders from API response
+  const orders = useMemo(() => {
+    if (!ordersResponse) return [];
+    
+    const response = ordersResponse as any;
+    let items = [];
+    
+    if (response.data) {
+      items = response.data.orders || response.data.items || [];
+    } else {
+      items = response.orders || response.items || [];
+    }
+    
+    if (!Array.isArray(items)) return [];
+    
+    return items.map((order: any) => ({
+      id: order._id || order.id,
+      orderNumber: order.orderNumber || order.order_id,
+      customerName: order.customerId?.name || order.customer?.name || 'Walk-in',
+      customerPhone: order.customerId?.phone || order.customer?.phone,
+      customerEmail: order.customerId?.email || order.customer?.email,
+      tableNumber: order.tableId?.number || order.tableId?.tableNumber || order.tableNumber,
+      status: order.status || 'pending',
+      total: order.total || order.totalAmount || 0,
+      subtotal: order.subtotal || order.total - (order.tax || 0),
+      tax: order.tax || order.taxAmount || 0,
+      tip: order.tip || order.tipAmount,
+      items: order.items?.map((item: any) => ({
+        id: item._id || item.id,
+        name: item.menuItemId?.name || item.name,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.quantity * item.price,
+        notes: item.notes,
+      })) || [],
+      createdAt: order.createdAt || new Date().toISOString(),
+      completedAt: order.completedAt,
+      notes: order.notes,
+      paymentMethod: order.paymentMethod || 'cash',
+      paymentStatus: order.paymentStatus || (order.status === 'completed' ? 'paid' : 'pending'),
+      waiterName: order.waiterId?.name || order.waiter?.name,
+      orderType: order.orderType || 'dine_in',
+    }));
+  }, [ordersResponse]);
+
+  const totalOrders = useMemo(() => {
+    const response = ordersResponse as any;
+    if (response?.data?.total) return response.data.total;
+    if (response?.total) return response.total;
+    return orders.length;
+  }, [ordersResponse, orders.length]);
+
+  // Client-side payment filter
+  const filteredByPayment = useMemo(() => {
+    if (paymentFilter === 'all') return orders;
+    return orders.filter(o => o.paymentMethod?.toLowerCase() === paymentFilter.toLowerCase());
+  }, [orders, paymentFilter]);
+
+  // Update selected order when data loads
+  useEffect(() => {
+    if (selectedOrderData && selectedOrderId) {
+      const orderData = selectedOrderData as any;
+      setSelectedOrder({
+        id: orderData._id || orderData.id,
+        orderNumber: orderData.orderNumber || orderData.order_id,
+        customerName: orderData.customerId?.name || orderData.customer?.name || 'Walk-in',
+        customerPhone: orderData.customerId?.phone || orderData.customer?.phone,
+        customerEmail: orderData.customerId?.email || orderData.customer?.email,
+        tableNumber: orderData.tableId?.number || orderData.tableId?.tableNumber || orderData.tableNumber,
+        status: orderData.status || 'pending',
+        total: orderData.total || orderData.totalAmount || 0,
+        subtotal: orderData.subtotal || orderData.total - (orderData.tax || 0),
+        tax: orderData.tax || orderData.taxAmount || 0,
+        tip: orderData.tip || orderData.tipAmount,
+        items: orderData.items?.map((item: any) => ({
+          id: item._id || item.id,
+          name: item.menuItemId?.name || item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.quantity * item.price,
+          notes: item.notes,
+        })) || [],
+        createdAt: orderData.createdAt || new Date().toISOString(),
+        completedAt: orderData.completedAt,
+        notes: orderData.notes,
+        paymentMethod: orderData.paymentMethod || 'cash',
+        paymentStatus: orderData.paymentStatus || (orderData.status === 'completed' ? 'paid' : 'pending'),
+        waiterName: orderData.waiterId?.name || orderData.waiter?.name,
+        orderType: orderData.orderType || 'dine_in',
+      });
+    }
+  }, [selectedOrderData, selectedOrderId]);
 
   const openDetailsModal = (order: Order) => {
     setSelectedOrder(order);
+    setSelectedOrderId(order.id);
     setIsDetailsModalOpen(true);
   };
 
@@ -89,7 +232,7 @@ export default function OrderHistoryPage() {
       key: 'orderNumber',
       title: 'Order #',
       sortable: true,
-      render: (value: string, row: Order) => (
+      render: (value: string) => (
         <div className="flex items-center gap-2">
           <DocumentTextIcon className="w-4 h-4 text-gray-400" />
           <span className="font-medium text-gray-900 dark:text-white">{value}</span>
@@ -97,7 +240,7 @@ export default function OrderHistoryPage() {
       ),
     },
     {
-      key: 'customerId',
+      key: 'customerName',
       title: 'Customer',
       sortable: true,
       render: (value: string, row: Order) => (
@@ -105,18 +248,21 @@ export default function OrderHistoryPage() {
           <UserIcon className="w-4 h-4 text-gray-400" />
           <div>
             <p className="font-medium text-gray-900 dark:text-white">
-              {value ? `Customer ${value.slice(-6)}` : 'Walk-in'}
+              {value || 'Walk-in'}
             </p>
+            {row.customerPhone && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">{row.customerPhone}</p>
+            )}
           </div>
         </div>
       ),
     },
     {
-      key: 'tableId',
+      key: 'tableNumber',
       title: 'Table',
-      render: (value?: string) => (
+      render: (value?: number | string) => (
         <span className="font-medium text-gray-900 dark:text-white">
-          {value ? `Table ${value.slice(-3)}` : 'Takeout'}
+          {value ? (typeof value === 'number' ? `Table ${value}` : `Table ${value}`) : 'Takeout'}
         </span>
       ),
     },
@@ -146,9 +292,9 @@ export default function OrderHistoryPage() {
     {
       key: 'orderType',
       title: 'Type',
-      render: (value: string) => (
+      render: (value?: string) => (
         <Badge variant="secondary" className="capitalize">
-          {value.replace('_', ' ')}
+          {value ? value.replace('_', ' ') : 'Dine In'}
         </Badge>
       ),
     },
@@ -177,12 +323,21 @@ export default function OrderHistoryPage() {
     },
   ];
 
-  const stats = {
-    total: ordersData?.total || 0,
-    totalRevenue: ordersData?.orders?.reduce((sum, order) => sum + order.total, 0) || 0,
-    completed: ordersData?.orders?.filter(order => order.status === 'completed').length || 0,
-    cancelled: ordersData?.orders?.filter(order => order.status === 'cancelled').length || 0,
-  };
+  const stats = useMemo(() => {
+    const completedOrders = orders.filter(o => o.status === 'completed');
+    const paidOrders = orders.filter(o => o.paymentStatus === 'paid' || o.status === 'completed');
+    
+    return {
+      total: totalOrders,
+      totalRevenue: paidOrders.reduce((sum, o) => sum + o.total, 0),
+      completed: completedOrders.length,
+      cancelled: orders.filter(o => o.status === 'cancelled').length,
+    };
+  }, [orders, totalOrders]);
+  
+  const filteredOrders = useMemo(() => {
+    return filteredByPayment; // Filtered by payment method
+  }, [filteredByPayment]);
 
   return (
     <div className="space-y-6">
@@ -287,6 +442,30 @@ export default function OrderHistoryPage() {
               onChange={setDateFilter}
               placeholder="Filter by date"
             />
+            {dateFilter === 'custom' && (
+              <div className="col-span-5 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Start Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    End Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
             <Select
               options={[
                 { value: 'all', label: 'All Payments' },
@@ -306,6 +485,8 @@ export default function OrderHistoryPage() {
                 setStatusFilter('all');
                 setDateFilter('all');
                 setPaymentFilter('all');
+                setStartDate('');
+                setEndDate('');
               }}
             >
               Clear Filters
@@ -315,27 +496,49 @@ export default function OrderHistoryPage() {
       </Card>
 
       {/* Orders Table */}
-      <DataTable
-        data={ordersData?.orders as any || []}
-        columns={columns}
-        loading={isLoading}
-        searchable={false}
-        selectable={true}
-        pagination={{
-          currentPage,
-          totalPages: Math.ceil((ordersData?.total || 0) / itemsPerPage),
-          itemsPerPage,
-          totalItems: ordersData?.total || 0,
-          onPageChange: setCurrentPage,
-          onItemsPerPageChange: setItemsPerPage,
-        }}
-        exportable={true}
-        exportFilename="order-history"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} orders as ${format}`);
-        }}
-        emptyMessage="No orders found."
-      />
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">Loading order history...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : error ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-red-600">Error loading orders. Please try again.</p>
+              <Button onClick={() => refetch()} className="mt-4">
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          data={filteredOrders}
+          columns={columns}
+          loading={isLoading}
+          searchable={false}
+          selectable={true}
+          pagination={{
+            currentPage,
+            totalPages: Math.ceil(totalOrders / itemsPerPage),
+            itemsPerPage,
+            totalItems: totalOrders,
+            onPageChange: setCurrentPage,
+            onItemsPerPageChange: setItemsPerPage,
+          }}
+          exportable={true}
+          exportFilename="order-history"
+          onExport={(format, items) => {
+            console.log(`Exporting ${items.length} orders as ${format}`);
+            toast.success(`Exporting ${items.length} orders as ${format.toUpperCase()}`);
+          }}
+          emptyMessage="No orders found."
+        />
+      )}
 
       {/* Order Details Modal */}
       <Modal
@@ -454,6 +657,22 @@ export default function OrderHistoryPage() {
               </div>
             </div>
 
+            {selectedOrder.notes && (
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Notes</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  {selectedOrder.notes}
+                </p>
+              </div>
+            )}
+
+            {selectedOrder.waiterName && (
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Served By</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedOrder.waiterName}</p>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
@@ -461,11 +680,22 @@ export default function OrderHistoryPage() {
                 onClick={() => {
                   setIsDetailsModalOpen(false);
                   setSelectedOrder(null);
+                  setSelectedOrderId('');
                 }}
               >
                 Close
               </Button>
-              <Button variant="secondary">
+              <Button 
+                variant="secondary"
+                onClick={() => {
+                  if (selectedOrder?.id) {
+                    window.open(`/dashboard/pos/receipts/${selectedOrder.id}`, '_blank');
+                  } else {
+                    toast.error('Receipt not available');
+                  }
+                }}
+              >
+                <PrinterIcon className="w-4 h-4 mr-2" />
                 Print Receipt
               </Button>
             </div>

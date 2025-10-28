@@ -5,10 +5,12 @@ import { Card } from '@/components/ui/Card';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
 import { useRegisterCompanyOwnerMutation } from '@/lib/api/endpoints/authApi';
+import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { setCredentials } from '@/lib/slices/authSlice';
 import { useAppDispatch } from '@/lib/store';
 import {
   BuildingStorefrontIcon,
+  CheckCircleIcon,
   EnvelopeIcon,
   HomeIcon,
   MapPinIcon,
@@ -43,8 +45,26 @@ export default function RegisterPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [registerCompanyOwner, { isLoading }] = useRegisterCompanyOwnerMutation();
+  const { data: plansData, isLoading: isLoadingPlans } = useGetSubscriptionPlansQuery({});
   const [step, setStep] = useState(1);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  
+  // Get available plans from API - handle both array and object responses
+  const plans = (() => {
+    if (!plansData) return [];
+    if (Array.isArray(plansData)) return plansData;
+    
+    // Check for nested data structures: data.data or data.plans
+    const nestedData = (plansData as any)?.data;
+    if (Array.isArray(nestedData)) return nestedData;
+    if (Array.isArray(nestedData?.data)) return nestedData.data;
+    if (Array.isArray(nestedData?.plans)) return nestedData.plans;
+    
+    return (plansData as any)?.plans || [];
+  })();
+  
+  const activePlans = plans.filter((plan: any) => plan.isActive !== false).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const defaultPlan = activePlans.length > 0 ? activePlans[0].name : 'basic';
 
   const [formData, setFormData] = useState({
     // Company Info
@@ -53,6 +73,7 @@ export default function RegisterPage() {
     companyEmail: '',
     companyPhone: '',
     country: 'USA',
+    subscriptionPackage: defaultPlan,
     
     // Branch Info
     branchName: '',
@@ -136,7 +157,7 @@ export default function RegisterPage() {
           country: formData.country,
           zipCode: formData.branchZipCode,
         },
-        package: 'starter',
+        package: formData.subscriptionPackage || 'basic',
         firstName: formData.firstName,
         lastName: formData.lastName,
         phoneNumber: formData.phoneNumber,
@@ -152,7 +173,18 @@ export default function RegisterPage() {
       );
 
       toast.success('Registration successful! Welcome to Advanced POS.');
-      router.push('/dashboard');
+
+      // Check if payment is required (Premium/Enterprise plans)
+      const responseData = response.data as any;
+      if (responseData.requiresPayment) {
+        // Redirect to payment page after registration for Premium/Enterprise plans
+        // User can complete payment immediately or start trial first
+        const planName = responseData.subscriptionPlan?.name || 'premium';
+        router.push(`/dashboard/subscriptions/checkout?plan=${planName}&after_registration=true`);
+      } else {
+        // Basic plan - direct to dashboard
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       toast.error(error?.data?.message || 'Registration failed. Please try again.');
     }
@@ -444,6 +476,119 @@ export default function RegisterPage() {
                     />
                   </div>
                 </div>
+
+                {/* Plan Selection with Features */}
+                {isLoadingPlans ? (
+                  <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4">
+                    <p className="text-gray-400 text-sm">Loading plans...</p>
+                  </div>
+                ) : activePlans.length > 0 && (
+                  <div>
+                    <label className="text-sm text-gray-400 mb-4 block font-semibold">Select Plan</label>
+                    <div className={`grid grid-cols-1 ${activePlans.length > 1 ? 'md:grid-cols-2' : ''} gap-4 mb-4`}>
+                      {activePlans.map((plan: any, index: number) => {
+                        const isPopular = plan.isPopular || index === 1;
+                        const isSelected = formData.subscriptionPackage === plan.name;
+                        
+                        // Use admin-managed featureList if available
+                        const featureList: string[] = plan.featureList && plan.featureList.length > 0 
+                          ? plan.featureList 
+                          : [];
+                        
+                        // Fallback: Generate from plan.features if no featureList exists
+                        if (featureList.length === 0) {
+                          if (plan.features?.pos) featureList.push('Unlimited orders & access accounts');
+                          if (plan.features?.accounting) featureList.push('Realtime restaurant sales status');
+                          if (plan.features?.inventory) featureList.push('Stock, Inventory & Accounting');
+                          if (plan.features?.crm) featureList.push('Customer Loyalty & Discount');
+                          featureList.push('Daily SMS & Email sales report');
+                          if (plan.features?.multiBranch) featureList.push('Kitchen & Customer Display System');
+                          featureList.push('Mobile, Tablet and any OS friendly');
+                          featureList.push('Cloud data backup & security');
+                          if (plan.features?.aiInsights) featureList.push('AI Insight and analytics');
+                          if (index === 1 && plan.features?.multiBranch) {
+                            featureList.push('Online Ordering');
+                            featureList.push('Table Touch QR Ordering');
+                            featureList.push('Customer Feedback System');
+                            featureList.push('Target SMS marketing');
+                            featureList.push('Priority 24/7 Call & Agent Support');
+                          }
+                        }
+                        
+                        return (
+                          <div
+                            key={plan.id}
+                            onClick={() => setFormData({ ...formData, subscriptionPackage: plan.name })}
+                            className={`relative rounded-xl p-6 cursor-pointer transition-all border-2 ${
+                              isSelected
+                                ? 'border-primary-500 bg-primary-500/10 scale-105'
+                                : isPopular
+                                ? 'border-primary-400 bg-gray-800'
+                                : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                            }`}
+                          >
+                            {isPopular && (
+                              <div className="absolute -top-3 right-4">
+                                <span className="bg-primary-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                                  Most Popular
+                                </span>
+                              </div>
+                            )}
+                            
+                            <div className="mb-4">
+                              <h3 className={`text-2xl font-bold mb-2 ${isPopular ? 'text-white' : 'text-gray-200'}`}>
+                                {(plan.displayName || plan.name).toUpperCase()}
+                              </h3>
+                              
+                              <div className="space-y-1">
+                                <div className={`text-3xl font-bold ${isPopular ? 'text-white' : 'text-primary-400'}`}>
+                                  {plan.currency} {plan.price.toLocaleString()}
+                                  {plan.price > 0 && <span className="text-lg">/{plan.billingCycle}</span>}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  *Per Branch
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  + Installation & Training Fees
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFormData({ ...formData, subscriptionPackage: plan.name });
+                              }}
+                              className={`w-full py-3 rounded-lg font-semibold mb-4 transition-all ${
+                                isSelected
+                                  ? 'bg-primary-600 text-white'
+                                  : isPopular
+                                  ? 'bg-red-600 text-white hover:bg-red-700'
+                                  : 'bg-white text-gray-900 hover:bg-gray-100'
+                              }`}
+                            >
+                              Get Started
+                            </button>
+
+                            <div className="space-y-2">
+                              {featureList.map((feature, idx) => (
+                                <div key={idx} className="flex items-start gap-2">
+                                  <CheckCircleIcon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                                    isPopular ? 'text-white' : 'text-gray-400'
+                                  }`} />
+                                  <span className={`text-sm ${isPopular ? 'text-gray-200' : 'text-gray-400'}`}>
+                                    {feature}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4">
                   <Checkbox

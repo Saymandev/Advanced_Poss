@@ -1,0 +1,217 @@
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post
+} from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Public } from '../../common/decorators/public.decorator';
+import { BranchesService } from '../branches/branches.service';
+import { CategoriesService } from '../categories/categories.service';
+import { CompaniesService } from '../companies/companies.service';
+import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
+import { MenuItemsService } from '../menu-items/menu-items.service';
+import { PublicService } from './public.service';
+
+@ApiTags('Public')
+@Controller('public')
+export class PublicController {
+  constructor(
+    private readonly companiesService: CompaniesService,
+    private readonly branchesService: BranchesService,
+    private readonly menuItemsService: MenuItemsService,
+    private readonly categoriesService: CategoriesService,
+    private readonly zonesService: DeliveryZonesService,
+    private readonly publicService: PublicService,
+  ) {}
+
+  @Public()
+  @Get('companies/:slug')
+  @ApiOperation({ summary: 'Get company by slug (public)' })
+  async getCompanyBySlug(@Param('slug') slug: string) {
+    try {
+      const company = await this.companiesService.findBySlug(slug);
+      return {
+        success: true,
+        data: company,
+      };
+    } catch (error) {
+      throw new NotFoundException('Company not found');
+    }
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches')
+  @ApiOperation({ summary: 'Get all branches for a company (public)' })
+  async getCompanyBranches(@Param('companySlug') companySlug: string) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branches = await this.branchesService.findByCompany(companyId);
+    
+    return {
+      success: true,
+      data: branches.filter((b: any) => b.isActive),
+    };
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug')
+  @ApiOperation({ summary: 'Get branch by slug (public)' })
+  async getBranchBySlug(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    
+    return {
+      success: true,
+      data: branch,
+    };
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/menu')
+  @ApiOperation({ summary: 'Get menu items for a branch (public)' })
+  async getBranchMenu(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    const categories = await this.categoriesService.findAll({ branchId } as any);
+    const menuItems = await this.menuItemsService.findAll({ 
+      branchId,
+      isAvailable: true 
+    } as any);
+
+    return {
+      success: true,
+      data: {
+        categories,
+        menuItems,
+      },
+    };
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/products/:productId')
+  @ApiOperation({ summary: 'Get single product details (public)' })
+  async getProduct(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Param('productId') productId: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    const product = await this.menuItemsService.findOne(productId);
+
+    // Verify product belongs to this branch
+    const productBranchId = (product as any).branchId?.toString() || (product as any).branchId;
+    if (productBranchId !== branchId) {
+      throw new NotFoundException('Product not found in this branch');
+    }
+
+    return {
+      success: true,
+      data: product,
+    };
+  }
+
+  @Public()
+  @Post('companies/:companySlug/branches/:branchSlug/orders')
+  @ApiOperation({ summary: 'Create public order (public)' })
+  async createPublicOrder(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Body() orderData: any,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    
+    return this.publicService.createOrder({
+      ...orderData,
+      companyId,
+      branchId,
+    });
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/reviews')
+  @ApiOperation({ summary: 'Get branch reviews (public)' })
+  async getBranchReviews(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    
+    return this.publicService.getReviews(branchId);
+  }
+
+  @Public()
+  @Get('companies/:companySlug/gallery')
+  @ApiOperation({ summary: 'Get company gallery (public)' })
+  async getGallery(@Param('companySlug') companySlug: string) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    return this.publicService.getGallery(companyId);
+  }
+
+  @Public()
+  @Get('orders/:orderId/track')
+  @ApiOperation({ summary: 'Track order by ID (public)' })
+  async trackOrder(@Param('orderId') orderId: string) {
+    return this.publicService.getOrderById(orderId);
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/delivery-zones')
+  @ApiOperation({ summary: 'Get delivery zones for a branch (public)' })
+  async getBranchZones(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    const zones = await this.zonesService.findByBranch(branchId);
+    
+    return {
+      success: true,
+      data: zones,
+    };
+  }
+
+  @Public()
+  @Post('companies/:companySlug/branches/:branchSlug/find-zone')
+  @ApiOperation({ summary: 'Find delivery zone by address (public)' })
+  async findZone(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Body() addressData: { zipCode?: string; city?: string; street?: string },
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    const zone = await this.zonesService.findZoneByAddress(companyId, branchId, addressData);
+    
+    return {
+      success: true,
+      data: zone,
+    };
+  }
+}
+

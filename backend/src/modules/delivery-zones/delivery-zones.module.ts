@@ -1,0 +1,16 @@
+import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { DeliveryZonesController } from './delivery-zones.controller';
+import { DeliveryZonesService } from './delivery-zones.service';
+import { DeliveryZone, DeliveryZoneSchema } from './schemas/delivery-zone.schema';
+
+@Module({
+  imports: [
+    MongooseModule.forFeature([{ name: DeliveryZone.name, schema: DeliveryZoneSchema }]),
+  ],
+  controllers: [DeliveryZonesController],
+  providers: [DeliveryZonesService],
+  exports: [DeliveryZonesService],
+})
+export class DeliveryZonesModule {}
+

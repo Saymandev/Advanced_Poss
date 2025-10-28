@@ -63,7 +63,10 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Order', 'POS'],
+      invalidatesTags: ['Order', 'POS', 'Table'],
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
 
     // Get POS orders
@@ -80,6 +83,13 @@ export const posApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['POS'],
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          orders: data.orders || data || [],
+          total: data.total || (Array.isArray(data) ? data.length : 0),
+        };
+      },
     }),
 
     // Get POS order by ID
@@ -133,6 +143,9 @@ export const posApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['POS'],
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
 
     // Get available tables for POS
@@ -148,6 +161,9 @@ export const posApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['Table'],
+      transformResponse: (response: any) => {
+        return response.data || response || [];
+      },
     }),
 
     // Get menu items for POS
@@ -174,6 +190,9 @@ export const posApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['MenuItem'],
+      transformResponse: (response: any) => {
+        return response.data || response || [];
+      },
     }),
 
     // Get quick stats for POS dashboard
@@ -235,15 +254,175 @@ export const posApi = apiSlice.injectEndpoints({
     }),
 
     // Print receipt
-    printReceipt: builder.mutation<{ receiptUrl: string }, {
+    printReceipt: builder.mutation<{ success: boolean; message: string; jobId?: string }, {
       orderId: string;
       printerId?: string;
     }>({
+      query: ({ orderId, printerId }) => ({
+        url: `/pos/receipts/${orderId}/print`,
+        method: 'POST',
+        body: { printerId },
+      }),
+    }),
+
+    // Print receipt as PDF
+    printReceiptPDF: builder.mutation<{ success: boolean; message: string; jobId?: string }, {
+      orderId: string;
+      printerId?: string;
+    }>({
+      query: ({ orderId, printerId }) => ({
+        url: `/pos/receipts/${orderId}/print-pdf`,
+        method: 'POST',
+        body: { printerId },
+      }),
+    }),
+
+    // Get receipt HTML
+    getReceiptHTML: builder.query<{ html: string }, string>({
+      query: (orderId) => `/pos/receipts/${orderId}/html`,
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
+    }),
+
+    // Download receipt PDF
+    downloadReceiptPDF: builder.mutation<Blob, string>({
+      query: (orderId) => ({
+        url: `/pos/receipts/${orderId}/pdf`,
+        method: 'GET',
+        responseType: 'blob',
+      }),
+    }),
+
+    // Printer management
+    getPrinters: builder.query<Array<{
+      name: string;
+      type: string;
+      width: number;
+      enabled: boolean;
+      isOnline: boolean;
+    }>, void>({
+      query: () => '/pos/printers',
+      providesTags: ['Printer'],
+    }),
+
+    // Test printer
+    testPrinter: builder.mutation<{ success: boolean; message: string }, {
+      printerName: string;
+    }>({
       query: (data) => ({
-        url: '/pos/receipts/print',
+        url: '/pos/printers/test',
         method: 'POST',
         body: data,
       }),
+    }),
+    
+    // Create printer
+    createPrinter: builder.mutation<any, {
+      name: string;
+      type: string;
+      width: number;
+      height?: number;
+      networkUrl?: string;
+      driver?: string;
+      enabled?: boolean;
+      location?: any;
+      copies?: number;
+      priority?: string;
+      autoPrint?: boolean;
+      description?: string;
+      settings?: any;
+    }>({
+      query: (data) => ({
+        url: '/pos/printers',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Printer'],
+    }),
+    
+    // Update printer
+    updatePrinter: builder.mutation<any, {
+      name: string;
+      data: {
+        name?: string;
+        type?: string;
+        width?: number;
+        height?: number;
+        networkUrl?: string;
+        driver?: string;
+        enabled?: boolean;
+        location?: any;
+        copies?: number;
+        priority?: string;
+        autoPrint?: boolean;
+        description?: string;
+        settings?: any;
+      };
+    }>({
+      query: ({ name, data }) => ({
+        url: `/pos/printers/${name}`,
+        method: 'PUT',
+        body: data,
+      }),
+      invalidatesTags: ['Printer'],
+    }),
+    
+    // Delete printer
+    deletePrinter: builder.mutation<{ success: boolean; message: string }, string>({
+      query: (name) => ({
+        url: `/pos/printers/${name}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Printer'],
+    }),
+    
+    // Get printer status
+    getPrinterStatus: builder.query<{
+      isOnline: boolean;
+      enabled: boolean;
+      lastPrinted?: string;
+      queueLength: number;
+    }, string>({
+      query: (name) => `/pos/printers/${name}/status`,
+      providesTags: (result, error, name) => [{ type: 'Printer', id: name }],
+    }),
+
+    // Get print queue
+    getPrintQueue: builder.query<Array<{
+      id: string;
+      content: string;
+      printerName: string;
+      status: string;
+      createdAt: string;
+      completedAt?: string;
+      error?: string;
+    }>, void>({
+      query: () => '/pos/printers/queue',
+      providesTags: ['PrintJob'],
+    }),
+
+    // Get print job status
+    getPrintJobStatus: builder.query<{
+      id: string;
+      content: string;
+      printerName: string;
+      status: string;
+      createdAt: string;
+      completedAt?: string;
+      error?: string;
+    }, string>({
+      query: (jobId) => `/pos/print-jobs/${jobId}`,
+      providesTags: (result, error, jobId) => [{ type: 'PrintJob', id: jobId }],
+    }),
+
+    // Cancel print job
+    cancelPrintJob: builder.mutation<{ success: boolean; message: string }, string>({
+      query: (jobId) => ({
+        url: `/pos/print-jobs/${jobId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['PrintJob'],
     }),
 
     // Get POS settings
@@ -267,6 +446,9 @@ export const posApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['POS'],
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
 
     // Update POS settings
@@ -302,6 +484,18 @@ export const {
   useRefundOrderMutation,
   useGetTableOrderHistoryQuery,
   usePrintReceiptMutation,
+  usePrintReceiptPDFMutation,
+  useGetReceiptHTMLQuery,
+  useDownloadReceiptPDFMutation,
+  useGetPrintersQuery,
+  useTestPrinterMutation,
+  useCreatePrinterMutation,
+  useUpdatePrinterMutation,
+  useDeletePrinterMutation,
+  useGetPrinterStatusQuery,
+  useGetPrintQueueQuery,
+  useGetPrintJobStatusQuery,
+  useCancelPrintJobMutation,
   useGetPOSSettingsQuery,
   useUpdatePOSSettingsMutation,
 } = posApi;

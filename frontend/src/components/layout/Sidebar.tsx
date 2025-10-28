@@ -15,9 +15,11 @@ import {
   CurrencyDollarIcon,
   GiftIcon,
   HomeIcon,
+  PrinterIcon,
   ReceiptPercentIcon,
   ShoppingBagIcon,
   TableCellsIcon,
+  TagIcon,
   TruckIcon,
   UserCircleIcon,
   UserGroupIcon,
@@ -47,6 +49,28 @@ const navigation: NavigationItem[] = [
     name: 'POS System',
     href: '/dashboard/pos',
     icon: ShoppingBagIcon,
+    children: [
+      {
+        name: 'POS Terminal',
+        href: '/dashboard/pos',
+        icon: ShoppingBagIcon,
+      },
+      {
+        name: 'POS Reports',
+        href: '/dashboard/pos-reports',
+        icon: ChartBarIcon,
+      },
+      {
+        name: 'POS Settings',
+        href: '/dashboard/pos-settings',
+        icon: CogIcon,
+      },
+      {
+        name: 'Printer Management',
+        href: '/dashboard/printer-management',
+        icon: PrinterIcon,
+      },
+    ],
   },
   {
     name: 'Orders',
@@ -69,6 +93,18 @@ const navigation: NavigationItem[] = [
     name: 'Menu',
     href: '/dashboard/menu-items',
     icon: ShoppingBagIcon,
+    children: [
+      {
+        name: 'Menu Items',
+        href: '/dashboard/menu-items',
+        icon: ShoppingBagIcon,
+      },
+      {
+        name: 'Categories',
+        href: '/dashboard/categories',
+        icon: TagIcon,
+      },
+    ],
   },
   {
     name: 'Tables',

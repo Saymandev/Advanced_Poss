@@ -1,8 +1,8 @@
 import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -11,6 +11,7 @@ import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
+import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserDocument } from './schemas/user.schema';
@@ -21,6 +22,7 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
+    private subscriptionPlansService: SubscriptionPlansService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -31,6 +33,22 @@ export class UsersService {
 
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
+    }
+
+    // Check subscription limits for max users
+    if (createUserDto.companyId) {
+      const company = await this.companiesService.findOne(createUserDto.companyId);
+      if (company.subscriptionPlan) {
+        const plan = await this.subscriptionPlansService.findByName(company.subscriptionPlan);
+        if (plan && plan.features.maxUsers !== -1) {
+          const existingUsers = await this.userModel.countDocuments({ companyId: createUserDto.companyId });
+          if (existingUsers >= plan.features.maxUsers) {
+            throw new BadRequestException(
+              `You have reached the maximum user limit (${plan.features.maxUsers}) for your ${plan.displayName} plan. Please upgrade to add more users.`
+            );
+          }
+        }
+      }
     }
 
     // Hash password

@@ -280,28 +280,546 @@ export class AiService {
     };
   }
 
-  // Placeholder methods for existing endpoints
+  // Predict sales for the next N days
   async predictSales(companyId: any, branchId?: any, daysAhead = 7): Promise<any> {
-    return { message: 'Sales prediction feature coming soon' };
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30); // Use last 30 days for prediction
+
+    const matchQuery: any = {
+      status: 'completed',
+      completedAt: { $gte: startDate, $lte: endDate },
+    };
+
+    if (branchId) {
+      matchQuery.branchId = branchId;
+    }
+
+    // Get historical sales data
+    const historicalData = await this.orderModel.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$completedAt' },
+          },
+          dailyRevenue: { $sum: '$total' },
+          dailyOrders: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Simple linear regression for prediction
+    const n = historicalData.length;
+    if (n < 2) {
+      return {
+        predictions: [],
+        confidence: 'low',
+        message: 'Insufficient data for accurate prediction',
+      };
+    }
+
+    // Calculate trend
+    const sumX = (n * (n - 1)) / 2;
+    const sumY = historicalData.reduce((sum, item) => sum + item.dailyRevenue, 0);
+    const sumXY = historicalData.reduce((sum, item, index) => sum + (index * item.dailyRevenue), 0);
+    const sumXX = (n * (n - 1) * (2 * n - 1)) / 6;
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    // Generate predictions
+    const predictions = [];
+    const avgDailyRevenue = sumY / n;
+    const variance = historicalData.reduce((sum, item) => sum + Math.pow(item.dailyRevenue - avgDailyRevenue, 2), 0) / n;
+    const standardDeviation = Math.sqrt(variance);
+
+    for (let i = 1; i <= daysAhead; i++) {
+      const predictedRevenue = slope * (n + i - 1) + intercept;
+      const confidence = Math.max(0, 1 - (standardDeviation / avgDailyRevenue));
+      
+      predictions.push({
+        date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        predictedRevenue: Math.max(0, predictedRevenue),
+        confidence: Math.round(confidence * 100),
+        range: {
+          min: Math.max(0, predictedRevenue - standardDeviation),
+          max: predictedRevenue + standardDeviation,
+        },
+      });
+    }
+
+    return {
+      predictions,
+      confidence: standardDeviation < avgDailyRevenue * 0.3 ? 'high' : 'medium',
+      trend: slope > 0 ? 'increasing' : slope < 0 ? 'decreasing' : 'stable',
+      averageDailyRevenue: avgDailyRevenue,
+    };
   }
 
+  // Recommend pricing for menu items
   async recommendPricing(menuItemId: any): Promise<any> {
-    return { message: 'Pricing recommendation feature coming soon' };
+    // Get sales data for this menu item
+    const menuItemData = await this.orderModel.aggregate([
+      {
+        $unwind: '$items',
+      },
+      {
+        $match: {
+          'items.menuItemId': menuItemId,
+          status: 'completed',
+        },
+      },
+      {
+        $group: {
+          _id: '$items.menuItemId',
+          currentPrice: { $first: '$items.price' },
+          totalQuantity: { $sum: '$items.quantity' },
+          totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          avgOrderValue: { $avg: '$total' },
+        },
+      },
+    ]);
+
+    if (menuItemData.length === 0) {
+      return {
+        message: 'No sales data found for this menu item',
+        recommendations: [],
+      };
+    }
+
+    const item = menuItemData[0];
+    const currentPrice = item.currentPrice;
+    const totalQuantity = item.totalQuantity;
+    const totalRevenue = item.totalRevenue;
+    const avgOrderValue = item.avgOrderValue;
+
+    // Calculate price elasticity (simplified)
+    const priceElasticity = -0.5; // Assumed elasticity
+    const optimalPrice = currentPrice * (1 + (1 / Math.abs(priceElasticity)));
+
+    // Generate recommendations
+    const recommendations = [];
+
+    if (totalQuantity < 10) {
+      recommendations.push({
+        type: 'price_reduction',
+        suggestedPrice: currentPrice * 0.9,
+        reason: 'Low sales volume - consider reducing price to increase demand',
+        expectedImpact: 'Increase sales by 20-30%',
+      });
+    } else if (totalQuantity > 100 && currentPrice < avgOrderValue * 0.3) {
+      recommendations.push({
+        type: 'price_increase',
+        suggestedPrice: currentPrice * 1.1,
+        reason: 'High demand and low price relative to average order value',
+        expectedImpact: 'Increase revenue by 10-15%',
+      });
+    }
+
+    if (currentPrice > avgOrderValue * 0.5) {
+      recommendations.push({
+        type: 'premium_positioning',
+        suggestedPrice: currentPrice,
+        reason: 'Item is already positioned as premium - maintain current pricing',
+        expectedImpact: 'Maintain current performance',
+      });
+    }
+
+    return {
+      currentPrice,
+      totalQuantity,
+      totalRevenue,
+      recommendations,
+      optimalPrice: Math.round(optimalPrice * 100) / 100,
+      priceElasticity,
+    };
   }
 
+  // Analyze peak hours
   async analyzePeakHours(companyId: any, branchId?: any): Promise<any> {
-    return { message: 'Peak hours analysis feature coming soon' };
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    const matchQuery: any = {
+      status: 'completed',
+      completedAt: { $gte: startDate, $lte: endDate },
+    };
+
+    if (branchId) {
+      matchQuery.branchId = branchId;
+    }
+
+    const hourlyData = await this.orderModel.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: { $hour: '$completedAt' },
+          totalOrders: { $sum: 1 },
+          totalRevenue: { $sum: '$total' },
+          avgOrderValue: { $avg: '$total' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Find peak hours
+    const peakHours = hourlyData
+      .sort((a, b) => b.totalOrders - a.totalOrders)
+      .slice(0, 3)
+      .map(hour => ({
+        hour: hour._id,
+        timeRange: `${hour._id}:00 - ${hour._id + 1}:00`,
+        orders: hour.totalOrders,
+        revenue: hour.totalRevenue,
+        avgOrderValue: hour.avgOrderValue,
+      }));
+
+    // Calculate busy periods
+    const totalOrders = hourlyData.reduce((sum, hour) => sum + hour.totalOrders, 0);
+    const busyThreshold = totalOrders * 0.1; // 10% of total orders
+
+    const busyHours = hourlyData
+      .filter(hour => hour.totalOrders >= busyThreshold)
+      .map(hour => ({
+        hour: hour._id,
+        timeRange: `${hour._id}:00 - ${hour._id + 1}:00`,
+        orders: hour.totalOrders,
+        revenue: hour.totalRevenue,
+        percentage: Math.round((hour.totalOrders / totalOrders) * 100),
+      }));
+
+    return {
+      peakHours,
+      busyHours,
+      totalHoursAnalyzed: hourlyData.length,
+      recommendations: [
+        'Consider increasing staff during peak hours',
+        'Optimize menu items for quick service during busy periods',
+        'Implement dynamic pricing during peak hours',
+      ],
+    };
   }
 
+  // Get customer recommendations
   async getCustomerRecommendations(customerId: any): Promise<any> {
-    return { message: 'Customer recommendations feature coming soon' };
+    // Get customer's order history
+    const customerOrders = await this.orderModel.find({
+      'customerInfo.customerId': customerId,
+      status: 'completed',
+    }).sort({ completedAt: -1 }).limit(20);
+
+    if (customerOrders.length === 0) {
+      return {
+        message: 'No order history found for this customer',
+        recommendations: [],
+      };
+    }
+
+    // Analyze customer preferences
+    const itemFrequency = {};
+    const totalSpent = customerOrders.reduce((sum, order) => sum + order.total, 0);
+    const avgOrderValue = totalSpent / customerOrders.length;
+
+    customerOrders.forEach(order => {
+      order.items.forEach(item => {
+        const itemId = item.menuItemId.toString();
+        if (!itemFrequency[itemId]) {
+          itemFrequency[itemId] = {
+            name: item.name,
+            quantity: 0,
+            totalSpent: 0,
+          };
+        }
+        itemFrequency[itemId].quantity += item.quantity;
+        itemFrequency[itemId].totalSpent += item.quantity * (item.basePrice + (item.selectedVariant?.priceModifier || 0) + (item.selectedAddons?.reduce((sum, addon) => sum + addon.price, 0) || 0));
+      });
+    });
+
+    // Get most popular items across all customers
+    const popularItems = await this.orderModel.aggregate([
+      {
+        $unwind: '$items',
+      },
+      {
+        $match: {
+          status: 'completed',
+          completedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        },
+      },
+      {
+        $group: {
+          _id: '$items.menuItemId',
+          name: { $first: '$items.name' },
+          totalOrders: { $sum: 1 },
+          totalQuantity: { $sum: '$items.quantity' },
+        },
+      },
+      { $sort: { totalOrders: -1 } },
+      { $limit: 10 },
+    ]);
+
+    // Generate recommendations
+    const recommendations = [];
+
+    // Recommend items customer hasn't tried but are popular
+    const customerItemIds = Object.keys(itemFrequency);
+    const newItems = popularItems.filter(item => !customerItemIds.includes(item._id.toString()));
+
+    if (newItems.length > 0) {
+      recommendations.push({
+        type: 'new_items',
+        items: newItems.slice(0, 3).map(item => ({
+          menuItemId: item._id,
+          name: item.name,
+          reason: 'Popular item you haven\'t tried yet',
+        })),
+      });
+    }
+
+    // Recommend similar items to what they order frequently
+    const frequentItems = Object.values(itemFrequency)
+      .sort((a: any, b: any) => b.quantity - a.quantity)
+      .slice(0, 3);
+
+    if (frequentItems.length > 0) {
+      recommendations.push({
+        type: 'similar_items',
+        items: frequentItems.map((item: any) => ({
+          name: item.name,
+          reason: 'You order this frequently - you might like similar items',
+        })),
+      });
+    }
+
+    return {
+      customerStats: {
+        totalOrders: customerOrders.length,
+        totalSpent,
+        avgOrderValue,
+        favoriteItems: Object.values(itemFrequency)
+          .sort((a: any, b: any) => b.quantity - a.quantity)
+          .slice(0, 5),
+      },
+      recommendations,
+    };
   }
 
+  // Analyze menu performance
   async analyzeMenuPerformance(companyId: any, branchId?: any): Promise<any> {
-    return { message: 'Menu performance analysis feature coming soon' };
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    const matchQuery: any = {
+      status: 'completed',
+      completedAt: { $gte: startDate, $lte: endDate },
+    };
+
+    if (branchId) {
+      matchQuery.branchId = branchId;
+    }
+
+    const menuPerformance = await this.orderModel.aggregate([
+      {
+        $unwind: '$items',
+      },
+      {
+        $match: matchQuery,
+      },
+      {
+        $group: {
+          _id: '$items.menuItemId',
+          name: { $first: '$items.name' },
+          totalQuantity: { $sum: '$items.quantity' },
+          totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          avgPrice: { $avg: '$items.price' },
+          orderCount: { $sum: 1 },
+        },
+      },
+      {
+        $addFields: {
+          revenuePerOrder: { $divide: ['$totalRevenue', '$orderCount'] },
+        },
+      },
+      { $sort: { totalRevenue: -1 } },
+    ]);
+
+    const totalRevenue = menuPerformance.reduce((sum, item) => sum + item.totalRevenue, 0);
+    const totalQuantity = menuPerformance.reduce((sum, item) => sum + item.totalQuantity, 0);
+
+    // Categorize items
+    const topPerformers = menuPerformance.slice(0, 5);
+    const underPerformers = menuPerformance
+      .filter(item => item.totalRevenue < totalRevenue / menuPerformance.length)
+      .slice(0, 5);
+
+    // Calculate menu efficiency
+    const menuEfficiency = menuPerformance.length > 0 ? 
+      (topPerformers.reduce((sum, item) => sum + item.totalRevenue, 0) / totalRevenue) * 100 : 0;
+
+    return {
+      totalItems: menuPerformance.length,
+      totalRevenue,
+      totalQuantity,
+      menuEfficiency: Math.round(menuEfficiency),
+      topPerformers: topPerformers.map(item => ({
+        ...item,
+        revenuePercentage: Math.round((item.totalRevenue / totalRevenue) * 100),
+      })),
+      underPerformers: underPerformers.map(item => ({
+        ...item,
+        revenuePercentage: Math.round((item.totalRevenue / totalRevenue) * 100),
+        recommendation: 'Consider promoting or removing this item',
+      })),
+      recommendations: [
+        'Focus marketing on top-performing items',
+        'Consider removing or repositioning underperforming items',
+        'Analyze pricing strategy for low-revenue items',
+      ],
+    };
   }
 
+  // Generate business insights
   async generateBusinessInsights(companyId: any, branchId?: any, period = 'month'): Promise<any> {
-    return { message: 'Business insights feature coming soon' };
+    const endDate = new Date();
+    const startDate = new Date();
+    
+    switch (period) {
+      case 'week':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case 'quarter':
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 30);
+    }
+
+    const matchQuery: any = {
+      status: 'completed',
+      completedAt: { $gte: startDate, $lte: endDate },
+    };
+
+    if (branchId) {
+      matchQuery.branchId = branchId;
+    }
+
+    // Get comprehensive business data
+    const [revenueData, orderData, customerData] = await Promise.all([
+      this.orderModel.aggregate([
+        { $match: matchQuery },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$total' },
+            avgOrderValue: { $avg: '$total' },
+            maxOrderValue: { $max: '$total' },
+            minOrderValue: { $min: '$total' },
+          },
+        },
+      ]),
+      this.orderModel.aggregate([
+        { $match: matchQuery },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } },
+            dailyOrders: { $sum: 1 },
+            dailyRevenue: { $sum: '$total' },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      this.orderModel.aggregate([
+        { $match: matchQuery },
+        {
+          $group: {
+            _id: '$customerInfo.customerId',
+            totalOrders: { $sum: 1 },
+            totalSpent: { $sum: '$total' },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            uniqueCustomers: { $sum: 1 },
+            avgOrdersPerCustomer: { $avg: '$totalOrders' },
+            avgSpentPerCustomer: { $avg: '$totalSpent' },
+          },
+        },
+      ]),
+    ]);
+
+    const revenue = revenueData[0] || { totalRevenue: 0, avgOrderValue: 0, maxOrderValue: 0, minOrderValue: 0 };
+    const orders = orderData;
+    const customers = customerData[0] || { uniqueCustomers: 0, avgOrdersPerCustomer: 0, avgSpentPerCustomer: 0 };
+
+    // Calculate trends
+    const revenueTrend = orders.length > 1 ? 
+      ((orders[orders.length - 1].dailyRevenue - orders[0].dailyRevenue) / orders[0].dailyRevenue) * 100 : 0;
+
+    const orderTrend = orders.length > 1 ? 
+      ((orders[orders.length - 1].dailyOrders - orders[0].dailyOrders) / orders[0].dailyOrders) * 100 : 0;
+
+    // Generate insights
+    const insights = [];
+
+    if (revenueTrend > 10) {
+      insights.push({
+        type: 'positive',
+        message: `Revenue has increased by ${Math.round(revenueTrend)}% over the period`,
+        impact: 'high',
+      });
+    } else if (revenueTrend < -10) {
+      insights.push({
+        type: 'negative',
+        message: `Revenue has decreased by ${Math.round(Math.abs(revenueTrend))}% over the period`,
+        impact: 'high',
+      });
+    }
+
+    if (customers.avgOrdersPerCustomer > 3) {
+      insights.push({
+        type: 'positive',
+        message: 'High customer loyalty - customers are returning frequently',
+        impact: 'medium',
+      });
+    }
+
+    if (revenue.avgOrderValue > revenue.maxOrderValue * 0.7) {
+      insights.push({
+        type: 'positive',
+        message: 'Consistent high-value orders',
+        impact: 'medium',
+      });
+    }
+
+    return {
+      period,
+      summary: {
+        totalRevenue: revenue.totalRevenue,
+        totalOrders: orders.reduce((sum, order) => sum + order.dailyOrders, 0),
+        uniqueCustomers: customers.uniqueCustomers,
+        avgOrderValue: Math.round(revenue.avgOrderValue * 100) / 100,
+        avgOrdersPerCustomer: Math.round(customers.avgOrdersPerCustomer * 100) / 100,
+        avgSpentPerCustomer: Math.round(customers.avgSpentPerCustomer * 100) / 100,
+      },
+      trends: {
+        revenue: Math.round(revenueTrend * 100) / 100,
+        orders: Math.round(orderTrend * 100) / 100,
+      },
+      insights,
+      recommendations: [
+        'Monitor daily performance to identify patterns',
+        'Focus on customer retention strategies',
+        'Analyze peak performance days for optimization',
+        'Consider seasonal adjustments based on trends',
+      ],
+    };
   }
 }

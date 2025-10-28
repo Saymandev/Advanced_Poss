@@ -19,6 +19,11 @@ export class CreateBranchDto {
   @IsNotEmpty()
   name: string;
 
+  @ApiPropertyOptional({ example: 'downtown-branch' })
+  @IsOptional()
+  @IsString()
+  slug?: string;
+
   @ApiPropertyOptional({ example: '+1234567891' })
   @IsOptional()
   @IsString()

@@ -3,6 +3,7 @@
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { DashboardSkeleton } from '@/components/ui/DashboardSkeleton';
+import { SubscriptionIndicator } from '@/components/ui/SubscriptionIndicator';
 import { useAppSelector } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -66,8 +67,13 @@ export default function DashboardLayout({
           <Topbar />
         </div>
         
+        {/* Subscription/Trial Indicator */}
+        <div className={`mt-16 ${sidebarCollapsed ? 'ml-0' : 'ml-0'}`}>
+          <SubscriptionIndicator />
+        </div>
+        
         {/* Main content with top padding to account for fixed navbar */}
-        <main className="pt-16 py-6">
+        <main className="pt-0 py-6">
           <div className="mx-auto w-full px-4">
             {children}
           </div>

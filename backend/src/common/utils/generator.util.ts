@@ -63,5 +63,27 @@ export class GeneratorUtil {
   static generateToken(length: number = 32): string {
     return uuidv4().replace(/-/g, '').substring(0, length);
   }
+
+  static generateSlug(text: string): string {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
+      .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+  }
+
+  static generateUniqueSlug(baseText: string, existingSlugs: string[] = []): string {
+    let slug = this.generateSlug(baseText);
+    let counter = 1;
+    let uniqueSlug = slug;
+
+    while (existingSlugs.includes(uniqueSlug)) {
+      uniqueSlug = `${slug}-${counter}`;
+      counter++;
+    }
+
+    return uniqueSlug;
+  }
 }
 

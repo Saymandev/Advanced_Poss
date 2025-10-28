@@ -54,11 +54,9 @@ export const paymentsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Payment'],
     }),
-    createCheckoutSession: builder.mutation<CheckoutSession, { 
-      amount: number; 
-      currency?: string; 
-      orderId?: string; 
-      customerId?: string;
+    createCheckoutSession: builder.mutation<{ sessionId: string; url: string }, { 
+      companyId: string;
+      planName: string;
       successUrl?: string;
       cancelUrl?: string;
     }>({

@@ -98,10 +98,9 @@ export class PaymentsService {
         throw new NotFoundException('Subscription plan not found');
       }
 
-      // Calculate subscription dates
+      // Calculate subscription dates using millisecond-based calculation
       const now = new Date();
-      const subscriptionEndDate = new Date();
-      subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1); // 1 month
+      const subscriptionEndDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days (1 month)
 
       // Update company subscription
       await this.companyModel.findByIdAndUpdate(companyId, {
@@ -252,10 +251,10 @@ export class PaymentsService {
       return;
     }
 
-    // Calculate subscription dates
+    // Calculate subscription dates using millisecond-based calculation
     const now = new Date();
-    const subscriptionEndDate = new Date();
-    subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1);
+    // Add 30 days for monthly subscription (more accurate than setMonth)
+    const subscriptionEndDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
 
     // Update company subscription
     await this.companyModel.findByIdAndUpdate(companyId, {

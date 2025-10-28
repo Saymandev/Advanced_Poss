@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { CompaniesService } from '../companies/companies.service';
+import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { Branch, BranchDocument } from './schemas/branch.schema';
@@ -16,15 +17,47 @@ export class BranchesService {
   constructor(
     @InjectModel(Branch.name) private branchModel: Model<BranchDocument>,
     private companiesService: CompaniesService,
+    private subscriptionPlansService: SubscriptionPlansService,
   ) {}
 
   async create(createBranchDto: CreateBranchDto): Promise<Branch> {
     // Verify company exists
-    await this.companiesService.findOne(createBranchDto.companyId);
+    const company = await this.companiesService.findOne(createBranchDto.companyId);
+
+    // Check subscription limits for multi-branch feature
+    if (company.subscriptionPlan) {
+      const plan = await this.subscriptionPlansService.findByName(company.subscriptionPlan);
+      if (plan) {
+        // Check if multi-branch is enabled
+        if (!plan.features.multiBranch) {
+          throw new BadRequestException('Multi-branch feature is not available in your current plan. Please upgrade to create additional branches.');
+        }
+
+        // Check branch limit
+        if (plan.features.maxBranches !== -1) {
+          const existingBranches = await this.branchModel.countDocuments({ companyId: createBranchDto.companyId });
+          if (existingBranches >= plan.features.maxBranches) {
+            throw new BadRequestException(
+              `You have reached the maximum branch limit (${plan.features.maxBranches}) for your ${plan.displayName} plan. Please upgrade to create more branches.`
+            );
+          }
+        }
+      }
+    }
 
     // Generate unique branch code
-    const company = await this.companiesService.findOne(createBranchDto.companyId);
     const code = GeneratorUtil.generateBranchCode(company.name);
+
+    // Generate unique slug if not provided
+    let slug = (createBranchDto as any).slug || GeneratorUtil.generateSlug(createBranchDto.name);
+    if (!(createBranchDto as any).slug) {
+      const existingBranches = await this.branchModel.find({ 
+        companyId: createBranchDto.companyId,
+        slug: { $exists: true }
+      }).select('slug').lean();
+      const slugsList = existingBranches.map((b: any) => b.slug).filter(Boolean);
+      slug = GeneratorUtil.generateUniqueSlug(createBranchDto.name, slugsList);
+    }
 
     // Set default opening hours if not provided
     const defaultOpeningHours = [
@@ -40,6 +73,7 @@ export class BranchesService {
     const branch = new this.branchModel({
       ...createBranchDto,
       code,
+      slug,
       openingHours: createBranchDto.openingHours || defaultOpeningHours,
       settings: {
         autoAcceptOrders: true,
@@ -75,6 +109,23 @@ export class BranchesService {
     }
 
     return branch;
+  }
+
+  async findBySlug(companyId: string, branchSlug: string): Promise<Branch> {
+    const branch = await this.branchModel
+      .findOne({ 
+        companyId: new Types.ObjectId(companyId),
+        slug: branchSlug
+      })
+      .populate('companyId', 'name email')
+      .populate('managerId', 'firstName lastName email')
+      .lean();
+
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    return branch as any;
   }
 
   async findByCompany(companyId: string): Promise<Branch[]> {

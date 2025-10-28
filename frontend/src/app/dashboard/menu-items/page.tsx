@@ -7,16 +7,20 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useGetCategoriesByBranchQuery } from '@/lib/api/endpoints/categoriesApi';
+import { useCreateMenuItemMutation, useDeleteMenuItemMutation, useGetMenuItemsQuery, useToggleAvailabilityMutation, useUpdateMenuItemMutation } from '@/lib/api/endpoints/menuItemsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ClockIcon,
-    EyeIcon,
-    PencilIcon,
-    PlusIcon,
-    ShoppingBagIcon
+  ClockIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  ShoppingBagIcon,
+  TrashIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 interface MenuItem {
@@ -43,96 +47,271 @@ interface MenuItem {
   updatedAt: string;
 }
 
-// Mock data for demonstration
-const mockMenuItems: MenuItem[] = [
-  {
-    id: '1',
-    name: 'Grilled Salmon',
-    description: 'Fresh Atlantic salmon grilled to perfection with lemon herb seasoning',
-    price: 24.99,
-    category: 'Main Course',
-    subcategory: 'Seafood',
-    isAvailable: true,
-    preparationTime: 15,
-    ingredients: ['Salmon', 'Lemon', 'Herbs', 'Olive Oil'],
-    allergens: ['Fish'],
-    nutritionalInfo: { calories: 320, protein: 28, carbs: 2, fat: 22 },
-    tags: ['Gluten-Free', 'Keto-Friendly'],
-    popularity: 4.5,
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Caesar Salad',
-    description: 'Crisp romaine lettuce with Caesar dressing, croutons, and parmesan cheese',
-    price: 12.99,
-    category: 'Appetizer',
-    subcategory: 'Salads',
-    isAvailable: true,
-    preparationTime: 8,
-    ingredients: ['Romaine Lettuce', 'Caesar Dressing', 'Croutons', 'Parmesan'],
-    allergens: ['Dairy', 'Gluten'],
-    nutritionalInfo: { calories: 180, protein: 8, carbs: 12, fat: 14 },
-    tags: ['Vegetarian'],
-    popularity: 4.2,
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: '3',
-    name: 'Chicken Parmesan',
-    description: 'Breaded chicken breast topped with marinara sauce and melted mozzarella',
-    price: 18.99,
-    category: 'Main Course',
-    subcategory: 'Poultry',
-    isAvailable: true,
-    preparationTime: 20,
-    ingredients: ['Chicken Breast', 'Breadcrumbs', 'Marinara Sauce', 'Mozzarella'],
-    allergens: ['Dairy', 'Gluten'],
-    nutritionalInfo: { calories: 450, protein: 35, carbs: 25, fat: 28 },
-    popularity: 4.8,
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: '4',
-    name: 'Chocolate Lava Cake',
-    description: 'Warm chocolate cake with a molten center, served with vanilla ice cream',
-    price: 8.99,
-    category: 'Dessert',
-    isAvailable: false,
-    preparationTime: 12,
-    ingredients: ['Chocolate', 'Flour', 'Eggs', 'Sugar', 'Vanilla Ice Cream'],
-    allergens: ['Dairy', 'Gluten', 'Eggs'],
-    nutritionalInfo: { calories: 380, protein: 6, carbs: 45, fat: 22 },
-    tags: ['Vegetarian'],
-    popularity: 4.9,
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  },
-];
+
 
 export default function MenuItemsPage() {
-  const { user } = useAppSelector((state) => state.auth);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(mockMenuItems);
+  const { companyContext, user } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [availabilityFilter, setAvailabilityFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    price: 0,
+    categoryId: '',
+    preparationTime: 0,
+    isAvailable: true,
+    images: [] as string[],
+    ingredients: [] as string[],
+    allergens: [] as string[],
+    tags: [] as string[],
+    nutritionalInfo: {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+    },
+  });
 
-  const handleAvailabilityToggle = (itemId: string) => {
-    setMenuItems(prev => prev.map(item =>
-      item.id === itemId
-        ? { ...item, isAvailable: !item.isAvailable, updatedAt: new Date().toISOString() }
-        : item
-    ));
-    toast.success('Menu item availability updated');
+  // Fetch real menu items from API - try multiple ways to get branchId
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+  
+  console.log('🔍 Menu Items Debug:', {
+    branchId,
+    user,
+    companyContext,
+    hasBranchId: !!branchId
+  });
+
+  const { data: menuItemsResponse, isLoading, error, refetch } = useGetMenuItemsQuery({
+    branchId,
+    search: searchQuery || undefined,
+    page: currentPage,
+    limit: itemsPerPage,
+  }, { skip: !branchId });
+  
+  const { data: categoriesResponse } = useGetCategoriesByBranchQuery(branchId || '', { skip: !branchId });
+  
+  const categories = useMemo(() => {
+    const cats = categoriesResponse as any;
+    if (!cats) return [];
+    return (cats.data?.categories || cats.categories || cats || []).map((cat: any) => ({
+      id: cat._id || cat.id,
+      name: cat.name,
+    }));
+  }, [categoriesResponse]);
+  
+  const responseAny = menuItemsResponse as any;
+  console.log('📊 Menu Items API Response:', {
+    menuItemsResponse,
+    isLoading,
+    error,
+    menuItemsCount: responseAny?.menuItems?.length || responseAny?.items?.length || 0
+  });
+
+  const [toggleAvailability] = useToggleAvailabilityMutation();
+  const [createMenuItem, { isLoading: isCreating }] = useCreateMenuItemMutation();
+  const [updateMenuItem, { isLoading: isUpdating }] = useUpdateMenuItemMutation();
+  const [deleteMenuItem, { isLoading: isDeleting }] = useDeleteMenuItemMutation();
+
+  // Transform API response to local format
+  const menuItems = useMemo(() => {
+    if (!menuItemsResponse) return [];
+    
+    // Handle different response formats - backend TransformInterceptor wraps in { success: true, data: {...} }
+    // Direct service response: { menuItems: [], total, page, limit }
+    const response = menuItemsResponse as any;
+    let items = [];
+    
+    // Check for wrapped response format (TransformInterceptor)
+    if (response.data) {
+      items = response.data.menuItems || response.data.items || [];
+    } else {
+      // Direct response format
+      items = response.menuItems || response.items || [];
+    }
+    
+    if (!Array.isArray(items)) {
+      console.warn('⚠️ Menu items is not an array:', items);
+      return [];
+    }
+    
+    console.log(`✅ Extracted ${items.length} menu items from API response`);
+    
+    return items.map((item: any) => ({
+      id: item._id || item.id,
+      name: item.name,
+      description: item.description || '',
+      price: item.price,
+      category: item.categoryId?.name || 'Uncategorized',
+      subcategory: item.subcategory,
+      imageUrl: item.images?.[0],
+      isAvailable: item.isAvailable !== false,
+      preparationTime: item.preparationTime || item.prepTime,
+      ingredients: item.ingredients?.map((ing: any) => {
+        // Handle different ingredient formats
+        if (typeof ing === 'string') return ing;
+        if (ing?.ingredientId?.name) return ing.ingredientId.name;
+        if (ing?.name) return ing.name;
+        // If ingredientId is null but we have quantity and unit, show that
+        if (ing?.quantity && ing?.unit) {
+          return `${ing.quantity} ${ing.unit}`;
+        }
+        // Return empty string to skip this ingredient instead of "Unknown"
+        return null;
+      }).filter((ing: any) => ing !== null) || [],
+      allergens: item.allergens || [],
+      nutritionalInfo: item.nutritionalInfo,
+      tags: item.tags || [],
+      popularity: item.popularity || 4.0,
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt || new Date().toISOString(),
+    }));
+  }, [menuItemsResponse]);
+  
+  // Extract total from API response
+  const totalItems = useMemo(() => {
+    const response = menuItemsResponse as any;
+    if (response?.data?.total) return response.data.total;
+    if (response?.total) return response.total;
+    if (response?.data?.menuItems) return response.data.menuItems.length;
+    return menuItems.length;
+  }, [menuItemsResponse, menuItems.length]);
+
+  // Populate form when editing
+  useEffect(() => {
+    if (isEditModalOpen && selectedMenuItem) {
+      const itemData = selectedMenuItem as any;
+      setFormData({
+        name: itemData.name || '',
+        description: itemData.description || '',
+        price: itemData.price || 0,
+        categoryId: itemData.categoryId || categories[0]?.id || '',
+        preparationTime: itemData.preparationTime || 0,
+        isAvailable: itemData.isAvailable !== false,
+        images: itemData.images || (itemData.imageUrl ? [itemData.imageUrl] : []),
+        ingredients: itemData.ingredients || [],
+        allergens: itemData.allergens || [],
+        tags: itemData.tags || [],
+        nutritionalInfo: itemData.nutritionalInfo || {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+        },
+      });
+    }
+  }, [isEditModalOpen, selectedMenuItem, categories]);
+
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!isCreateModalOpen && !isEditModalOpen) {
+      setFormData({
+        name: '',
+        description: '',
+        price: 0,
+        categoryId: categories[0]?.id || '',
+        preparationTime: 0,
+        isAvailable: true,
+        images: [],
+        ingredients: [],
+        allergens: [],
+        tags: [],
+        nutritionalInfo: {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+        },
+      });
+    }
+  }, [isCreateModalOpen, isEditModalOpen, categories]);
+
+  const handleCreateMenuItem = async () => {
+    if (!formData.name || !formData.price || !formData.categoryId) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const companyId = (companyContext as any)?.companyId || (user as any)?.companyId;
+      await createMenuItem({
+        ...formData,
+        companyId,
+        branchId,
+        images: formData.images.filter(Boolean),
+      } as any).unwrap();
+      toast.success('Menu item created successfully');
+      setIsCreateModalOpen(false);
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to create menu item');
+    }
+  };
+
+  const handleUpdateMenuItem = async () => {
+    if (!selectedMenuItem?.id || !formData.name || !formData.price) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      await updateMenuItem({
+        id: selectedMenuItem.id,
+        ...formData,
+        images: formData.images.filter(Boolean),
+      } as any).unwrap();
+      toast.success('Menu item updated successfully');
+      setIsEditModalOpen(false);
+      setSelectedMenuItem(null);
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to update menu item');
+    }
+  };
+
+  const handleDeleteMenuItem = async () => {
+    if (!itemToDelete) return;
+
+    try {
+      await deleteMenuItem(itemToDelete).unwrap();
+      toast.success('Menu item deleted successfully');
+      setIsDeleteModalOpen(false);
+      setItemToDelete('');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to delete menu item');
+    }
+  };
+
+  const handleDeleteClick = (itemId: string) => {
+    setItemToDelete(itemId);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleAvailabilityToggle = async (itemId: string) => {
+    const item = menuItems.find((i: MenuItem) => i.id === itemId);
+    if (!item) return;
+    
+    try {
+      await toggleAvailability({ id: itemId, isAvailable: !item.isAvailable }).unwrap();
+      toast.success('Menu item availability updated');
+      refetch();
+    } catch (error) {
+      toast.error('Failed to update availability');
+    }
   };
 
   const openEditModal = (item: MenuItem) => {
@@ -143,6 +322,46 @@ export default function MenuItemsPage() {
   const openViewModal = (item: MenuItem) => {
     setSelectedMenuItem(item);
     setIsViewModalOpen(true);
+  };
+  
+  const addIngredient = () => {
+    setFormData({
+      ...formData,
+      ingredients: [...formData.ingredients, ''],
+    });
+  };
+  
+  const updateIngredient = (index: number, value: string) => {
+    const newIngredients = [...formData.ingredients];
+    newIngredients[index] = value;
+    setFormData({ ...formData, ingredients: newIngredients });
+  };
+  
+  const removeIngredient = (index: number) => {
+    setFormData({
+      ...formData,
+      ingredients: formData.ingredients.filter((_, i) => i !== index),
+    });
+  };
+  
+  const addTag = (tag: string) => {
+    if (tag && !formData.tags.includes(tag)) {
+      setFormData({ ...formData, tags: [...formData.tags, tag] });
+    }
+  };
+  
+  const removeTag = (tag: string) => {
+    setFormData({ ...formData, tags: formData.tags.filter(t => t !== tag) });
+  };
+  
+  const addAllergen = (allergen: string) => {
+    if (allergen && !formData.allergens.includes(allergen)) {
+      setFormData({ ...formData, allergens: [...formData.allergens, allergen] });
+    }
+  };
+  
+  const removeAllergen = (allergen: string) => {
+    setFormData({ ...formData, allergens: formData.allergens.filter(a => a !== allergen) });
   };
 
   const renderStars = (rating: number) => {
@@ -244,6 +463,13 @@ export default function MenuItemsPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => handleDeleteClick(row.id)}
+          >
+            <TrashIcon className="w-4 h-4 text-red-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => handleAvailabilityToggle(row.id)}
             className={row.isAvailable ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
           >
@@ -256,11 +482,29 @@ export default function MenuItemsPage() {
 
   const stats = {
     total: menuItems.length,
-    available: menuItems.filter(i => i.isAvailable).length,
-    unavailable: menuItems.filter(i => !i.isAvailable).length,
-    avgPrepTime: menuItems.reduce((sum, item) => sum + (item.preparationTime || 0), 0) / menuItems.length,
-    avgPopularity: menuItems.reduce((sum, item) => sum + (item.popularity || 0), 0) / menuItems.length,
+    available: menuItems.filter((i: MenuItem) => i.isAvailable).length,
+    unavailable: menuItems.filter((i: MenuItem) => !i.isAvailable).length,
+    avgPrepTime: menuItems.length > 0 ? Math.round(menuItems.reduce((sum: number, item: MenuItem) => sum + (item.preparationTime || 0), 0) / menuItems.length) : 0,
+    avgPopularity: menuItems.length > 0 ? Number((menuItems.reduce((sum: number, item: MenuItem) => sum + (item.popularity || 0), 0) / menuItems.length).toFixed(1)) : 0,
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Menu Management</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Manage your restaurant menu items and pricing
+            </p>
+          </div>
+        </div>
+        <div className="text-center py-12">
+          <p className="text-gray-500 dark:text-gray-400">Loading menu items...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -333,7 +577,7 @@ export default function MenuItemsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Popularity</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.avgPopularity.toFixed(1)}⭐</p>
+                <p className="text-3xl font-bold text-yellow-600">{typeof stats.avgPopularity === 'number' ? stats.avgPopularity.toFixed(1) : stats.avgPopularity}⭐</p>
               </div>
               <ShoppingBagIcon className="w-8 h-8 text-yellow-600" />
             </div>
@@ -356,10 +600,7 @@ export default function MenuItemsPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Categories' },
-                  { value: 'Appetizer', label: 'Appetizer' },
-                  { value: 'Main Course', label: 'Main Course' },
-                  { value: 'Dessert', label: 'Dessert' },
-                  { value: 'Beverage', label: 'Beverage' },
+                  ...categories.map((cat: any) => ({ value: cat.id, label: cat.name })),
                 ]}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
@@ -391,9 +632,9 @@ export default function MenuItemsPage() {
         selectable={true}
         pagination={{
           currentPage,
-          totalPages: Math.ceil(menuItems.length / itemsPerPage),
+          totalPages: Math.ceil(totalItems / itemsPerPage),
           itemsPerPage,
-          totalItems: menuItems.length,
+          totalItems: totalItems,
           onPageChange: setCurrentPage,
           onItemsPerPageChange: setItemsPerPage,
         }}
@@ -462,15 +703,31 @@ export default function MenuItemsPage() {
             {/* Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Ingredients */}
-              {selectedMenuItem.ingredients && (
+              {selectedMenuItem.ingredients && selectedMenuItem.ingredients.length > 0 && (
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white mb-3">Ingredients</h4>
                   <div className="flex flex-wrap gap-2">
-                    {selectedMenuItem.ingredients.map((ingredient, index) => (
-                      <Badge key={index} variant="secondary">
-                        {ingredient}
-                      </Badge>
-                    ))}
+                    {selectedMenuItem.ingredients.map((ingredient: any, index: number) => {
+                      // Ensure ingredient is a string
+                      let ingredientName: string;
+                      if (typeof ingredient === 'string') {
+                        ingredientName = ingredient;
+                      } else if (ingredient?.ingredientId?.name) {
+                        ingredientName = ingredient.ingredientId.name;
+                      } else if (ingredient?.name) {
+                        ingredientName = ingredient.name;
+                      } else if (ingredient?.quantity && ingredient?.unit) {
+                        ingredientName = `${ingredient.quantity} ${ingredient.unit}`;
+                      } else {
+                        ingredientName = 'Unknown';
+                      }
+                      
+                      return (
+                        <Badge key={index} variant="secondary">
+                          {ingredientName}
+                        </Badge>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -582,14 +839,236 @@ export default function MenuItemsPage() {
           setSelectedMenuItem(null);
         }}
         title={isEditModalOpen ? 'Edit Menu Item' : 'Create Menu Item'}
-        className="max-w-2xl"
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Menu item creation/editing functionality would be implemented here with full form fields for all menu item properties.
-          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Name *
+              </label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Menu item name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Category *
+              </label>
+              <Select
+                options={categories.map((cat: any) => ({ value: cat.id, label: cat.name }))}
+                value={formData.categoryId}
+                onChange={(value) => setFormData({ ...formData, categoryId: value })}
+                placeholder="Select category"
+              />
+            </div>
+          </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Menu item description"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Price *
+              </label>
+              <Input
+                type="number"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Prep Time (min)
+              </label>
+              <Input
+                type="number"
+                value={formData.preparationTime}
+                onChange={(e) => setFormData({ ...formData, preparationTime: Number(e.target.value) })}
+                placeholder="0"
+                min="0"
+              />
+            </div>
+            <div className="flex items-center pt-6">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.isAvailable}
+                  onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Available</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Ingredients
+            </label>
+            <div className="space-y-2">
+              {formData.ingredients.map((ingredient, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    value={ingredient}
+                    onChange={(e) => updateIngredient(index, e.target.value)}
+                    placeholder="Ingredient name"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => removeIngredient(index)}
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={addIngredient}
+              >
+                + Add Ingredient
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Allergens
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {formData.allergens.map((allergen) => (
+                <Badge key={allergen} variant="warning" className="flex items-center gap-1">
+                  {allergen}
+                  <button onClick={() => removeAllergen(allergen)}>
+                    <XMarkIcon className="w-3 h-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+            <Input
+              placeholder="Add allergen and press Enter"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const value = (e.target as HTMLInputElement).value.trim();
+                  if (value) {
+                    addAllergen(value);
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }
+              }}
+              className="mt-2"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Tags
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {formData.tags.map((tag) => (
+                <Badge key={tag} variant="info" className="flex items-center gap-1">
+                  {tag}
+                  <button onClick={() => removeTag(tag)}>
+                    <XMarkIcon className="w-3 h-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+            <Input
+              placeholder="Add tag and press Enter"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const value = (e.target as HTMLInputElement).value.trim();
+                  if (value) {
+                    addTag(value);
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }
+              }}
+              className="mt-2"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Calories
+              </label>
+              <Input
+                type="number"
+                value={formData.nutritionalInfo.calories}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  nutritionalInfo: { ...formData.nutritionalInfo, calories: Number(e.target.value) }
+                })}
+                min="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Protein (g)
+              </label>
+              <Input
+                type="number"
+                value={formData.nutritionalInfo.protein}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  nutritionalInfo: { ...formData.nutritionalInfo, protein: Number(e.target.value) }
+                })}
+                min="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Carbs (g)
+              </label>
+              <Input
+                type="number"
+                value={formData.nutritionalInfo.carbs}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  nutritionalInfo: { ...formData.nutritionalInfo, carbs: Number(e.target.value) }
+                })}
+                min="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Fat (g)
+              </label>
+              <Input
+                type="number"
+                value={formData.nutritionalInfo.fat}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  nutritionalInfo: { ...formData.nutritionalInfo, fat: Number(e.target.value) }
+                })}
+                min="0"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {
@@ -597,11 +1076,50 @@ export default function MenuItemsPage() {
                 setIsEditModalOpen(false);
                 setSelectedMenuItem(null);
               }}
+              disabled={isCreating || isUpdating}
             >
               Cancel
             </Button>
-            <Button>
-              {isEditModalOpen ? 'Update' : 'Create'} Menu Item
+            <Button
+              onClick={isEditModalOpen ? handleUpdateMenuItem : handleCreateMenuItem}
+              disabled={isCreating || isUpdating || !formData.name || !formData.price || !formData.categoryId}
+            >
+              {isCreating || isUpdating ? 'Saving...' : isEditModalOpen ? 'Update Menu Item' : 'Create Menu Item'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setItemToDelete('');
+        }}
+        title="Delete Menu Item"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete this menu item? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setItemToDelete('');
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteMenuItem}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
         </div>

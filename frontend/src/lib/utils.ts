@@ -12,8 +12,16 @@ export function formatCurrency(amount: number, currency: string = 'USD'): string
   }).format(amount);
 }
 
-export function formatDate(date: string | Date, format: string = 'PPP'): string {
+export function formatDate(date: string | Date | null | undefined, _format: string = 'PPP'): string {
+  if (!date) return 'N/A';
+  
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if date is valid
+  if (!dateObj || isNaN(dateObj.getTime())) {
+    return 'N/A';
+  }
+  
   return dateObj.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -21,8 +29,16 @@ export function formatDate(date: string | Date, format: string = 'PPP'): string 
   });
 }
 
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date | null | undefined): string {
+  if (!date) return 'N/A';
+  
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if date is valid
+  if (!dateObj || isNaN(dateObj.getTime())) {
+    return 'N/A';
+  }
+  
   return dateObj.toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',

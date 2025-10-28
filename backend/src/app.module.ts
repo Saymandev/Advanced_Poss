@@ -3,7 +3,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ScheduleModule } from '@nestjs/schedule';
+import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import * as redisStore from 'cache-manager-redis-store';
 
@@ -20,6 +20,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { CompanyModule } from './modules/company/company.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { DeliveryZonesModule } from './modules/delivery-zones/delivery-zones.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { IngredientsModule } from './modules/ingredients/ingredients.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
@@ -27,7 +28,11 @@ import { LoginActivityModule } from './modules/login-activity/login-activity.mod
 import { MenuItemsModule } from './modules/menu-items/menu-items.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { POSModule } from './modules/pos/pos.module';
+import { PublicModule } from './modules/public/public.module';
+import { QRCodesModule } from './modules/qr-codes/qr-codes.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { ScheduleModule } from './modules/schedule/schedule.module';
 import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
@@ -98,10 +103,11 @@ import { AppService } from './app.service';
     }),
 
     // Schedule (Cron jobs)
-    ScheduleModule.forRoot(),
+    NestScheduleModule.forRoot(),
 
     // Feature Modules
     AuthModule,
+    PublicModule,
     UsersModule,
     CompaniesModule,
     CompanyModule,
@@ -111,7 +117,9 @@ import { AppService } from './app.service';
     TablesModule,
     OrdersModule,
     PaymentsModule,
+    POSModule,
     CustomersModule,
+    DeliveryZonesModule,
     IngredientsModule,
     SuppliersModule,
     ExpensesModule,
@@ -121,6 +129,8 @@ import { AppService } from './app.service';
     SubscriptionPlansModule,
     BackupsModule,
     ReportsModule,
+    QRCodesModule,
+    ScheduleModule,
     KitchenModule,
     AiModule,
     WebsocketsModule,
