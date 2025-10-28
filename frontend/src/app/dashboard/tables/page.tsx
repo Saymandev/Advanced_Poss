@@ -7,11 +7,12 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { Table, useCreateTableMutation, useDeleteTableMutation, useGetTablesQuery, useUpdateTableMutation } from '@/lib/api/endpoints/tablesApi';
+import { Table, useCreateTableMutation, useDeleteTableMutation, useGetTablesQuery, useUpdateTableMutation, useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
 import { useAppSelector } from '@/lib/store';
 import {
   CheckCircleIcon,
   ClockIcon,
+  EyeIcon,
   PencilIcon,
   PlusIcon,
   TableCellsIcon,
@@ -19,7 +20,7 @@ import {
   UserGroupIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function TablesPage() {
@@ -38,89 +39,124 @@ export default function TablesPage() {
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
 
-  console.log('🔍 Tables Debug:', { branchId, user, companyContext });
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
-  const { data, isLoading, error, refetch } = useGetTablesQuery({
+  const { data: tablesResponse, isLoading, refetch } = useGetTablesQuery({
     branchId,
     status: statusFilter === 'all' ? undefined : statusFilter,
     page: currentPage,
     limit: itemsPerPage,
   }, { skip: !branchId });
 
-  console.log('📊 Tables API Response:', { data, isLoading, error, tablesCount: (data as any)?.tables?.length || (data as any)?.length || 0 });
-
-  // Extract tables from response - handle different response structures
-  const tables = (() => {
-    if (!data) return [];
-    // Handle nested response structures (backend wraps in { success, data })
-    if (Array.isArray(data)) return data;
+  // Extract tables from API response
+  const tables = useMemo(() => {
+    if (!tablesResponse) return [];
     
-    // Check for { success: true, data: [...] } structure
-    const responseData = (data as any)?.data;
-    if (Array.isArray(responseData)) {
-      console.log('✅ Extracted tables from data.data:', responseData.length);
-      return responseData;
+    const response = tablesResponse as any;
+    let items = [];
+    
+    if (response.data) {
+      items = response.data.tables || response.data.items || [];
+    } else if (Array.isArray(response)) {
+      items = response;
+    } else {
+      items = response.tables || response.items || [];
     }
     
-    // Check for { tables: [...] } structure
-    if (Array.isArray((data as any)?.tables)) {
-      console.log('✅ Extracted tables from data.tables:', (data as any).tables.length);
-      return (data as any).tables;
-    }
+    if (!Array.isArray(items)) return [];
     
-    console.warn('⚠️ Could not extract tables array. Data structure:', data);
-    return [];
-  })();
-  
-  console.log('🔍 Tables extracted:', { count: tables.length, firstTable: tables[0] });
+    return items.map((table: any) => ({
+      id: table._id || table.id,
+      number: table.tableNumber || table.number?.toString() || table.number || '',
+      capacity: table.capacity || 4,
+      status: table.status || 'available',
+      location: table.location,
+      qrCode: table.qrCode,
+      currentOrderId: table.currentOrderId || table.currentOrder?._id,
+      reservationId: table.reservationId || table.reservation?._id,
+      createdAt: table.createdAt || new Date().toISOString(),
+      updatedAt: table.updatedAt || new Date().toISOString(),
+    }));
+  }, [tablesResponse]);
 
-  const [createTable] = useCreateTableMutation();
-  const [updateTable] = useUpdateTableMutation();
+  const totalTables = useMemo(() => {
+    const response = tablesResponse as any;
+    if (response?.data?.total) return response.data.total;
+    if (response?.total) return response.total;
+    return tables.length;
+  }, [tablesResponse, tables.length]);
+
+  const [createTable, { isLoading: isCreating }] = useCreateTableMutation();
+  const [updateTable, { isLoading: isUpdating }] = useUpdateTableMutation();
   const [deleteTable] = useDeleteTableMutation();
+  const [updateTableStatus] = useUpdateTableStatusMutation();
 
   const [formData, setFormData] = useState<any>({
-    branchId: user?.branchId || '',
-    tableNumber: '1',
+    number: '1',
     capacity: 4,
+    location: '',
+    status: 'available' as const,
   });
 
   const resetForm = () => {
     setFormData({
-      branchId: user?.branchId || '',
-      tableNumber: '1',
+      number: '1',
       capacity: 4,
+      location: '',
+      status: 'available' as const,
     });
     setSelectedTable(null);
   };
 
+  useEffect(() => {
+    if (!isCreateModalOpen && !isEditModalOpen && !isViewModalOpen) {
+      resetForm();
+    }
+  }, [isCreateModalOpen, isEditModalOpen, isViewModalOpen]);
+
   const handleCreate = async () => {
+    if (!formData.number || !formData.capacity) {
+      toast.error('Table number and capacity are required');
+      return;
+    }
+
     try {
-      await createTable(formData).unwrap();
+      const payload = {
+        number: formData.number.toString(),
+        capacity: parseInt(formData.capacity) || 4,
+        location: formData.location || undefined,
+        status: formData.status || 'available',
+      } as any;
+      
+      await createTable(payload).unwrap();
       toast.success('Table created successfully');
       setIsCreateModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to create table');
+      toast.error(error?.data?.message || error?.message || 'Failed to create table');
     }
   };
 
   const handleEdit = async () => {
     if (!selectedTable) return;
+    if (!formData.number || !formData.capacity) {
+      toast.error('Table number and capacity are required');
+      return;
+    }
 
     try {
       await updateTable({
         id: selectedTable.id,
-        tableNumber: formData.tableNumber,
-        capacity: formData.capacity,
-        status: selectedTable.status,
+        number: formData.number.toString(),
+        capacity: parseInt(formData.capacity) || 4,
+        location: formData.location || undefined,
+        status: formData.status || selectedTable.status,
       } as any).unwrap();
       toast.success('Table updated successfully');
       setIsEditModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update table');
+      toast.error(error?.data?.message || error?.message || 'Failed to update table');
     }
   };
 
@@ -138,25 +174,30 @@ export default function TablesPage() {
 
   const handleStatusChange = async (table: Table, status: Table['status']) => {
     try {
-      await updateTable({
+      await updateTableStatus({
         id: table.id,
         status,
-      } as any).unwrap();
+      }).unwrap();
       toast.success(`Table ${table.number} is now ${status}`);
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update table status');
+      toast.error(error?.data?.message || error?.message || 'Failed to update table status');
     }
   };
 
   const openEditModal = (table: Table) => {
     setSelectedTable(table);
     setFormData({
-      branchId: user?.branchId || '',
-      tableNumber: (table as any).tableNumber || table.number?.toString() || '1',
-      capacity: table.capacity,
+      number: table.number?.toString() || '1',
+      capacity: table.capacity || 4,
+      location: table.location || '',
+      status: table.status || 'available',
     });
     setIsEditModalOpen(true);
+  };
+
+  const openViewModal = (table: Table) => {
+    setSelectedTable(table);
+    setIsViewModalOpen(true);
   };
 
   const getStatusBadge = (status: Table['status']) => {
@@ -266,12 +307,21 @@ export default function TablesPage() {
       title: 'Actions',
       render: (value: any, row: Table) => (
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openViewModal(row)}
+            title="View Details"
+          >
+            <EyeIcon className="w-4 h-4" />
+          </Button>
           {row.status === 'occupied' && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => handleStatusChange(row, 'available')}
               className="text-green-600 hover:text-green-700"
+              title="Mark as Available"
             >
               <CheckCircleIcon className="w-4 h-4" />
             </Button>
@@ -282,16 +332,18 @@ export default function TablesPage() {
               size="sm"
               onClick={() => handleStatusChange(row, 'needs_cleaning' as any)}
               className="text-blue-600 hover:text-blue-700"
+              title="Mark as Needs Cleaning"
             >
               <ClockIcon className="w-4 h-4" />
             </Button>
           )}
-          {(row as any).status === 'needs_cleaning' && (
+          {(row.status === 'needs_cleaning' || (row as any).status === 'needs_cleaning') && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => handleStatusChange(row, 'available')}
               className="text-green-600 hover:text-green-700"
+              title="Mark as Available"
             >
               <CheckCircleIcon className="w-4 h-4" />
             </Button>
@@ -300,6 +352,7 @@ export default function TablesPage() {
             variant="ghost"
             size="sm"
             onClick={() => openEditModal(row)}
+            title="Edit"
           >
             <PencilIcon className="w-4 h-4" />
           </Button>
@@ -308,6 +361,7 @@ export default function TablesPage() {
             size="sm"
             onClick={() => handleDelete(row)}
             className="text-red-600 hover:text-red-700"
+            title="Delete"
           >
             <TrashIcon className="w-4 h-4" />
           </Button>
@@ -317,20 +371,31 @@ export default function TablesPage() {
   ];
 
   // Filter tables based on search and status
-  const filteredTables = tables.filter((table: any) => {
-    const tableNum = (table.tableNumber || table.number || '').toString();
-    const matchesSearch = !searchQuery || tableNum.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || table.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredTables = useMemo(() => {
+    return tables.filter((table: any) => {
+      const tableNum = (table.number || '').toString();
+      const location = (table.location || '').toLowerCase();
+      const searchLower = searchQuery.toLowerCase();
+      
+      const matchesSearch = !searchQuery || 
+        tableNum.includes(searchLower) ||
+        location.includes(searchLower);
+      
+      const matchesStatus = statusFilter === 'all' || table.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [tables, searchQuery, statusFilter]);
 
-  const stats = {
-    total: filteredTables.length || tables.length || (data as any)?.total || 0,
-    available: filteredTables.filter((t: any) => t.status === 'available').length || 0,
-    occupied: filteredTables.filter((t: any) => t.status === 'occupied').length || 0,
-    reserved: filteredTables.filter((t: any) => t.status === 'reserved').length || 0,
-    cleaning: filteredTables.filter((t: any) => t.status === 'needs_cleaning').length || 0,
-  };
+  const stats = useMemo(() => {
+    return {
+      total: totalTables,
+      available: tables.filter(t => t.status === 'available').length,
+      occupied: tables.filter(t => t.status === 'occupied').length,
+      reserved: tables.filter(t => t.status === 'reserved').length,
+      cleaning: tables.filter(t => t.status === 'needs_cleaning').length,
+    };
+  }, [tables, totalTables]);
 
   return (
     <div className="space-y-6">
@@ -516,9 +581,9 @@ export default function TablesPage() {
         selectable={true}
         pagination={{
           currentPage,
-          totalPages: Math.ceil((filteredTables.length || (data as any)?.total || 0) / itemsPerPage),
+          totalPages: Math.ceil(totalTables / itemsPerPage),
           itemsPerPage,
-          totalItems: filteredTables.length || (data as any)?.total || 0,
+          totalItems: totalTables,
           onPageChange: setCurrentPage,
           onItemsPerPageChange: setItemsPerPage,
         }}
@@ -542,19 +607,29 @@ export default function TablesPage() {
       >
         <div className="space-y-4">
           <Input
-            label="Table Number"
-            type="number"
+            label="Table Number *"
+            type="text"
             value={formData.number}
-            onChange={(e) => setFormData({ ...formData, number: parseInt(e.target.value) || 0 })}
+            onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+            placeholder="e.g., 1, 2, A1, VIP-1"
             required
           />
 
           <Input
-            label="Seating Capacity"
+            label="Seating Capacity *"
             type="number"
             value={formData.capacity}
             onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
+            min={1}
+            max={50}
             required
+          />
+
+          <Input
+            label="Location"
+            value={formData.location}
+            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            placeholder="e.g., Indoor, Outdoor, Patio, VIP Section"
           />
 
           <div className="flex justify-end gap-3 pt-4">
@@ -567,11 +642,142 @@ export default function TablesPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>
-              Add Table
+            <Button onClick={handleCreate} disabled={isCreating || !formData.number || !formData.capacity}>
+              {isCreating ? 'Creating...' : 'Add Table'}
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* View Table Modal */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedTable(null);
+        }}
+        title="Table Details"
+      >
+        {selectedTable && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${
+                selectedTable.status === 'available' ? 'bg-green-100 dark:bg-green-900/30' :
+                selectedTable.status === 'occupied' ? 'bg-red-100 dark:bg-red-900/30' :
+                selectedTable.status === 'reserved' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
+                'bg-blue-100 dark:bg-blue-900/30'
+              }`}>
+                <TableCellsIcon className={`w-8 h-8 ${
+                  selectedTable.status === 'available' ? 'text-green-600 dark:text-green-400' :
+                  selectedTable.status === 'occupied' ? 'text-red-600 dark:text-red-400' :
+                  selectedTable.status === 'reserved' ? 'text-yellow-600 dark:text-yellow-400' :
+                  'text-blue-600 dark:text-blue-400'
+                }`} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Table {selectedTable.number}
+                </h3>
+                {getStatusBadge(selectedTable.status)}
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Capacity
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <UserGroupIcon className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-900 dark:text-white font-semibold">
+                      {selectedTable.capacity} people
+                    </span>
+                  </div>
+                </div>
+
+                {selectedTable.location && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Location
+                    </label>
+                    <p className="text-gray-900 dark:text-white">{selectedTable.location}</p>
+                  </div>
+                )}
+              </div>
+
+              {selectedTable.currentOrderId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Current Order
+                  </label>
+                  <Badge variant="info">
+                    Order #{selectedTable.currentOrderId.slice(-6)}
+                  </Badge>
+                </div>
+              )}
+
+              {selectedTable.reservationId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Reservation
+                  </label>
+                  <Badge variant="warning">Reserved</Badge>
+                </div>
+              )}
+
+              {selectedTable.qrCode && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    QR Code
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                    {selectedTable.qrCode}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Created At
+                  </label>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {new Date(selectedTable.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Updated At
+                  </label>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {new Date(selectedTable.updatedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  setSelectedTable(null);
+                }}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  openEditModal(selectedTable);
+                }}
+              >
+                Edit Table
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Edit Table Modal */}
@@ -586,25 +792,35 @@ export default function TablesPage() {
       >
         <div className="space-y-4">
           <Input
-            label="Table Number"
-            type="number"
+            label="Table Number *"
+            type="text"
             value={formData.number}
-            onChange={(e) => setFormData({ ...formData, number: parseInt(e.target.value) || 0 })}
+            onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+            placeholder="e.g., 1, 2, A1, VIP-1"
             required
           />
 
           <Input
-            label="Seating Capacity"
+            label="Seating Capacity *"
             type="number"
             value={formData.capacity}
             onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
+            min={1}
+            max={50}
             required
+          />
+
+          <Input
+            label="Location"
+            value={formData.location}
+            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            placeholder="e.g., Indoor, Outdoor, Patio, VIP Section"
           />
 
           {selectedTable && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Current Status
+                Status
               </label>
               <Select
                 options={[
@@ -612,9 +828,10 @@ export default function TablesPage() {
                   { value: 'occupied', label: 'Occupied' },
                   { value: 'reserved', label: 'Reserved' },
                   { value: 'needs_cleaning', label: 'Needs Cleaning' },
+                  { value: 'maintenance', label: 'Maintenance' },
                 ]}
-                value={selectedTable.status}
-                onChange={(value) => setSelectedTable({ ...selectedTable, status: value as Table['status'] })}
+                value={formData.status}
+                onChange={(value) => setFormData({ ...formData, status: value })}
               />
             </div>
           )}
@@ -629,8 +846,8 @@ export default function TablesPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleEdit}>
-              Update Table
+            <Button onClick={handleEdit} disabled={isUpdating || !formData.number || !formData.capacity}>
+              {isUpdating ? 'Updating...' : 'Update Table'}
             </Button>
           </div>
         </div>

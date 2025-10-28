@@ -7,45 +7,181 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
+import { InventoryItem, useAddStockMutation, useGetInventoryItemsQuery, useGetInventoryItemByIdQuery, useGetLowStockItemsQuery, useRemoveStockMutation } from '@/lib/api/endpoints/inventoryApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-    ArchiveBoxIcon,
-    BeakerIcon,
-    ExclamationTriangleIcon,
-    EyeIcon
+  ArchiveBoxIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+  BeakerIcon,
+  ExclamationTriangleIcon,
+  EyeIcon,
+  PlusIcon,
+  MinusIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 export default function StocksPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [selectedIngredient, setSelectedIngredient] = useState<any>(null);
+  const [isAdjustStockModalOpen, setIsAdjustStockModalOpen] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<InventoryItem | null>(null);
+  const [adjustmentQuantity, setAdjustmentQuantity] = useState<number>(0);
+  const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add');
+  const [adjustmentReason, setAdjustmentReason] = useState<string>('');
 
-  const { data, isLoading, refetch } = useGetInventoryItemsQuery({
-    branchId: user?.branchId,
+  const companyId = (user as any)?.companyId || 
+                    (companyContext as any)?.companyId;
+
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  const { data: ingredientsResponse, isLoading, refetch } = useGetInventoryItemsQuery({
+    branchId,
     search: searchQuery || undefined,
     category: categoryFilter === 'all' ? undefined : categoryFilter,
-    lowStock: stockFilter === 'low',
     page: currentPage,
     limit: itemsPerPage,
+  }, { skip: !branchId });
+
+  const { data: lowStockData } = useGetLowStockItemsQuery({ companyId }, { skip: !companyId });
+
+  const { data: selectedIngredientData } = useGetInventoryItemByIdQuery(selectedIngredient?.id || '', { 
+    skip: !selectedIngredient?.id 
   });
 
-  const openDetailsModal = (ingredient: any) => {
+  const [addStock, { isLoading: isAddingStock }] = useAddStockMutation();
+  const [removeStock, { isLoading: isRemovingStock }] = useRemoveStockMutation();
+
+  // Extract ingredients from API response
+  const ingredients = useMemo(() => {
+    if (!ingredientsResponse) return [];
+    return ingredientsResponse.items || [];
+  }, [ingredientsResponse]);
+
+  const totalIngredients = useMemo(() => {
+    return ingredientsResponse?.total || 0;
+  }, [ingredientsResponse]);
+
+  const lowStockItems = useMemo(() => {
+    return lowStockData || [];
+  }, [lowStockData]);
+
+  // Update selected ingredient when data is fetched
+  useEffect(() => {
+    if (selectedIngredientData && selectedIngredient) {
+      setSelectedIngredient(selectedIngredientData as InventoryItem);
+    }
+  }, [selectedIngredientData]);
+
+  // Filter ingredients by stock level
+  const filteredIngredients = useMemo(() => {
+    if (stockFilter === 'all') return ingredients;
+    if (stockFilter === 'low') return ingredients.filter(i => i.isLowStock);
+    if (stockFilter === 'out') return ingredients.filter(i => i.isOutOfStock);
+    return ingredients;
+  }, [ingredients, stockFilter]);
+
+  const openDetailsModal = (ingredient: InventoryItem) => {
     setSelectedIngredient(ingredient);
     setIsDetailsModalOpen(true);
   };
 
-  const getStockStatus = (ingredient: any) => {
+  const openAdjustStockModal = (ingredient: InventoryItem, type: 'add' | 'remove') => {
+    setSelectedIngredient(ingredient);
+    setAdjustmentType(type);
+    setAdjustmentQuantity(0);
+    setAdjustmentReason('');
+    setIsAdjustStockModalOpen(true);
+  };
+
+  const handleQuickAddStock = async (ingredient: InventoryItem) => {
+    try {
+      await addStock({ 
+        id: ingredient.id, 
+        quantity: 1 
+      }).unwrap();
+      toast.success('Stock added successfully');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to add stock');
+    }
+  };
+
+  const handleQuickRemoveStock = async (ingredient: InventoryItem) => {
     if (ingredient.currentStock <= 0) {
+      toast.error('Cannot remove stock from item with zero stock');
+      return;
+    }
+    try {
+      await removeStock({ 
+        id: ingredient.id, 
+        quantity: 1 
+      }).unwrap();
+      toast.success('Stock removed successfully');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to remove stock');
+    }
+  };
+
+  const handleAdjustStock = async () => {
+    if (!selectedIngredient) return;
+    
+    if (adjustmentQuantity <= 0) {
+      toast.error('Quantity must be greater than 0');
+      return;
+    }
+
+    if (adjustmentType === 'remove' && adjustmentQuantity > (selectedIngredient.currentStock || 0)) {
+      toast.error('Cannot remove more stock than available');
+      return;
+    }
+
+    try {
+      if (adjustmentType === 'add') {
+        await addStock({ 
+          id: selectedIngredient.id, 
+          quantity: adjustmentQuantity 
+        }).unwrap();
+        toast.success(`Added ${adjustmentQuantity} ${selectedIngredient.unit} successfully`);
+      } else {
+        await removeStock({ 
+          id: selectedIngredient.id, 
+          quantity: adjustmentQuantity 
+        }).unwrap();
+        toast.success(`Removed ${adjustmentQuantity} ${selectedIngredient.unit} successfully`);
+      }
+      setIsAdjustStockModalOpen(false);
+      setAdjustmentQuantity(0);
+      setAdjustmentReason('');
+      refetch();
+      if (isDetailsModalOpen) {
+        refetch();
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || `Failed to ${adjustmentType} stock`);
+    }
+  };
+
+  const getStockStatus = (ingredient: InventoryItem) => {
+    if (ingredient.isOutOfStock) {
       return { status: 'out', label: 'Out of Stock', variant: 'danger' as const };
-    } else if (ingredient.currentStock <= ingredient.minStock) {
+    } else if (ingredient.isLowStock) {
       return { status: 'low', label: 'Low Stock', variant: 'warning' as const };
     } else {
       return { status: 'good', label: 'In Stock', variant: 'success' as const };
@@ -73,13 +209,13 @@ export default function StocksPage() {
       key: 'quantity',
       title: 'Stock',
       align: 'right' as const,
-      render: (value: number, row: any) => (
+      render: (value: number, row: InventoryItem) => (
         <div className="text-right">
           <p className="font-semibold text-gray-900 dark:text-white">
-            {row.currentStock} {row.unit}
+            {row.currentStock || 0} {row.unit}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Min: {row.minStock} {row.unit}
+            Min: {row.minimumStock || row.minStock || 0} {row.unit}
           </p>
         </div>
       ),
@@ -88,16 +224,20 @@ export default function StocksPage() {
       key: 'costPerUnit',
       title: 'Cost',
       align: 'right' as const,
-      render: (value: number, row: any) => (
-        <div className="text-right">
-          <p className="font-semibold text-gray-900 dark:text-white">
-            {formatCurrency(row.unitPrice)}/{row.unit}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Total: {formatCurrency(row.unitPrice * row.currentStock)}
-          </p>
-        </div>
-      ),
+      render: (value: number, row: InventoryItem) => {
+        const unitCost = row.unitCost || row.unitPrice || 0;
+        const stock = row.currentStock || 0;
+        return (
+          <div className="text-right">
+            <p className="font-semibold text-gray-900 dark:text-white">
+              {formatCurrency(unitCost)}/{row.unit}
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Total: {formatCurrency(unitCost * stock)}
+            </p>
+          </div>
+        );
+      },
     },
     {
       key: 'expiryDate',
@@ -122,7 +262,7 @@ export default function StocksPage() {
     {
       key: 'status',
       title: 'Status',
-      render: (value: any, row: any) => {
+      render: (value: any, row: InventoryItem) => {
         const stockStatus = getStockStatus(row);
         return (
           <Badge variant={stockStatus.variant}>
@@ -134,11 +274,12 @@ export default function StocksPage() {
     {
       key: 'actions',
       title: 'Actions',
-      render: (value: any, row: any) => (
+      render: (value: any, row: InventoryItem) => (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => openDetailsModal(row)}
+          title="View Details"
         >
           <EyeIcon className="w-4 h-4" />
         </Button>
@@ -146,13 +287,15 @@ export default function StocksPage() {
     },
   ];
 
-  const stats = {
-    total: data?.total || 0,
-    inStock: data?.items?.filter(i => i.currentStock > i.minStock).length || 0,
-    lowStock: data?.items?.filter(i => i.currentStock > 0 && i.currentStock <= i.minStock).length || 0,
-    outOfStock: data?.items?.filter(i => i.currentStock <= 0).length || 0,
-    totalValue: data?.items?.reduce((sum, item) => sum + (item.unitPrice * item.currentStock), 0) || 0,
-  };
+  const stats = useMemo(() => {
+    return {
+      total: totalIngredients,
+      inStock: ingredients.filter(i => !i.isLowStock && !i.isOutOfStock).length,
+      lowStock: ingredients.filter(i => i.isLowStock && !i.isOutOfStock).length,
+      outOfStock: ingredients.filter(i => i.isOutOfStock).length,
+      totalValue: ingredients.reduce((sum, item) => sum + ((item.unitCost || item.unitPrice || 0) * (item.currentStock || 0)), 0),
+    };
+  }, [ingredients, totalIngredients]);
 
   return (
     <div className="space-y-6">
@@ -246,9 +389,9 @@ export default function StocksPage() {
                   { value: 'all', label: 'All Categories' },
                   { value: 'food', label: 'Food' },
                   { value: 'beverage', label: 'Beverage' },
-                  { value: 'alcohol', label: 'Alcohol' },
-                  { value: 'supplies', label: 'Supplies' },
+                  { value: 'packaging', label: 'Packaging' },
                   { value: 'cleaning', label: 'Cleaning' },
+                  { value: 'other', label: 'Other' },
                 ]}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
@@ -272,27 +415,37 @@ export default function StocksPage() {
       </Card>
 
       {/* Stock Table */}
-      <DataTable
-        data={data?.items || []}
-        columns={columns}
-        loading={isLoading}
-        searchable={false}
-        selectable={true}
-        pagination={{
-          currentPage,
-          totalPages: Math.ceil((data?.total || 0) / itemsPerPage),
-          itemsPerPage,
-          totalItems: data?.total || 0,
-          onPageChange: setCurrentPage,
-          onItemsPerPageChange: setItemsPerPage,
-        }}
-        exportable={true}
-        exportFilename="stock-levels"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} stock items as ${format}`);
-        }}
-        emptyMessage="No ingredients found."
-      />
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">Loading stock data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          data={filteredIngredients}
+          columns={columns}
+          loading={isLoading}
+          searchable={false}
+          selectable={true}
+          pagination={{
+            currentPage,
+            totalPages: Math.ceil(totalIngredients / itemsPerPage),
+            itemsPerPage,
+            totalItems: totalIngredients,
+            onPageChange: setCurrentPage,
+            onItemsPerPageChange: setItemsPerPage,
+          }}
+          exportable={true}
+          exportFilename="stock-levels"
+          onExport={(format, items) => {
+            toast.success(`Exporting ${items.length} stock items as ${format.toUpperCase()}`);
+          }}
+          emptyMessage="No stock items found."
+        />
+      )}
 
       {/* Stock Details Modal */}
       <Modal
@@ -320,10 +473,10 @@ export default function StocksPage() {
                  </Badge>
                  <div className="mt-2">
                    <p className="text-2xl font-bold text-primary-600">
-                     {selectedIngredient.currentStock} {selectedIngredient.unit}
+                     {selectedIngredient.currentStock || 0} {selectedIngredient.unit}
                    </p>
                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                     Min Stock: {selectedIngredient.minStock} {selectedIngredient.unit}
+                     Min Stock: {selectedIngredient.minimumStock || selectedIngredient.minStock || 0} {selectedIngredient.unit}
                    </p>
                  </div>
               </div>
@@ -337,19 +490,27 @@ export default function StocksPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Current Stock:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {selectedIngredient.currentStock} {selectedIngredient.unit}
+                      {selectedIngredient.currentStock || 0} {selectedIngredient.unit}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Min Stock Level:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {selectedIngredient.minStock} {selectedIngredient.unit}
+                      {selectedIngredient.minimumStock || selectedIngredient.minStock || 0} {selectedIngredient.unit}
                     </span>
                   </div>
+                  {selectedIngredient.maximumStock && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Max Stock Level:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {selectedIngredient.maximumStock} {selectedIngredient.unit}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Stock Value:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(selectedIngredient.unitPrice * selectedIngredient.currentStock)}
+                      {formatCurrency((selectedIngredient.unitCost || selectedIngredient.unitPrice || 0) * (selectedIngredient.currentStock || 0))}
                     </span>
                   </div>
                 </div>
@@ -361,18 +522,59 @@ export default function StocksPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Cost per Unit:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                       {formatCurrency(selectedIngredient.unitPrice)}
+                       {formatCurrency(selectedIngredient.unitCost || selectedIngredient.unitPrice || 0)}
                      </span>
                    </div>
                    <div className="flex justify-between">
                      <span className="text-gray-600 dark:text-gray-400">Total Cost:</span>
                      <span className="font-medium text-gray-900 dark:text-white">
-                       {formatCurrency(selectedIngredient.unitPrice * selectedIngredient.currentStock)}
+                       {formatCurrency((selectedIngredient.unitCost || selectedIngredient.unitPrice || 0) * (selectedIngredient.currentStock || 0))}
                      </span>
                    </div>
+                   {selectedIngredient.storageLocation && (
+                     <div className="flex justify-between">
+                       <span className="text-gray-600 dark:text-gray-400">Storage Location:</span>
+                       <span className="font-medium text-gray-900 dark:text-white">
+                         {selectedIngredient.storageLocation}
+                       </span>
+                     </div>
+                   )}
                 </div>
               </div>
             </div>
+
+            {/* Additional Information */}
+            {(selectedIngredient.sku || selectedIngredient.barcode || selectedIngredient.storageTemperature || selectedIngredient.shelfLife) && (
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Additional Information</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {selectedIngredient.sku && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">SKU:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{selectedIngredient.sku}</span>
+                    </div>
+                  )}
+                  {selectedIngredient.barcode && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Barcode:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{selectedIngredient.barcode}</span>
+                    </div>
+                  )}
+                  {selectedIngredient.storageTemperature && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Storage Temperature:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{selectedIngredient.storageTemperature}</span>
+                    </div>
+                  )}
+                  {selectedIngredient.shelfLife && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Shelf Life:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{selectedIngredient.shelfLife} days</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Expiry Information */}
             {selectedIngredient.expiryDate && (

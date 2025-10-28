@@ -7,52 +7,42 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import {
-    CreateScheduleRequest,
-    ScheduleShift,
-    UpdateScheduleRequest,
-    useCreateShiftMutation,
-    useDeleteShiftMutation,
-    useGetScheduleStatsQuery,
-    useGetShiftsQuery,
-    useUpdateShiftMutation,
-    useUpdateShiftStatusMutation
+  CreateScheduleRequest,
+  ScheduleShift,
+  UpdateScheduleRequest,
+  useCreateShiftMutation,
+  useDeleteShiftMutation,
+  useGetScheduleStatsQuery,
+  useGetShiftsQuery,
+  useUpdateShiftMutation,
+  useUpdateShiftStatusMutation
 } from '@/lib/api/endpoints/scheduleApi';
+import { Staff, useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
-// import { formatDateTime } from '@/lib/utils';
 import {
-    CalendarIcon,
-    CheckIcon,
-    ClockIcon,
-    EyeIcon,
-    PencilIcon,
-    PlusIcon,
-    TrashIcon,
-    UserIcon,
-    XMarkIcon,
+  CalendarIcon,
+  CheckIcon,
+  ClockIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
+  UserIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-interface Employee {
-  id: string;
-  name: string;
-  role: string;
-  email: string;
-  phone: string;
-  isActive: boolean;
-}
-
-// Mock employees data - in real app, this would come from users API
-const mockEmployees: Employee[] = [
-  { id: '1', name: 'John Doe', role: 'Manager', email: 'john@example.com', phone: '+1234567890', isActive: true },
-  { id: '2', name: 'Jane Smith', role: 'Chef', email: 'jane@example.com', phone: '+1234567891', isActive: true },
-  { id: '3', name: 'Mike Johnson', role: 'Waiter', email: 'mike@example.com', phone: '+1234567892', isActive: true },
-  { id: '4', name: 'Sarah Wilson', role: 'Cashier', email: 'sarah@example.com', phone: '+1234567893', isActive: true },
-  { id: '5', name: 'Tom Brown', role: 'Waiter', email: 'tom@example.com', phone: '+1234567894', isActive: false },
+const SHIFT_TYPES = [
+  { value: 'morning', label: 'Morning' },
+  { value: 'afternoon', label: 'Afternoon' },
+  { value: 'evening', label: 'Evening' },
+  { value: 'night', label: 'Night' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 export default function SchedulePage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -65,28 +55,48 @@ export default function SchedulePage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
 
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
   const [formData, setFormData] = useState<CreateScheduleRequest>({
-    employeeId: '',
+    userId: '',
+    branchId,
     date: '',
     startTime: '',
     endTime: '',
+    shiftType: 'custom',
+    position: '',
     notes: '',
   });
 
   // API calls
   const { data: shiftsData, isLoading } = useGetShiftsQuery({
-    branchId: user?.branchId || undefined,
+    branchId,
     status: statusFilter === 'all' ? undefined : statusFilter,
     startDate: dateFilter || undefined,
     endDate: dateFilter || undefined,
     search: searchQuery || undefined,
     page: currentPage,
     limit: itemsPerPage,
-  });
+  }, { skip: !branchId });
 
   const { data: statsData } = useGetScheduleStatsQuery({
-    branchId: user?.branchId || undefined,
-  });
+    branchId,
+  }, { skip: !branchId });
+
+  const { data: staffResponse } = useGetStaffQuery({
+    branchId,
+    page: 1,
+    limit: 100,
+  }, { skip: !branchId });
+
+  // Extract staff from API response
+  const staff = useMemo(() => {
+    if (!staffResponse) return [];
+    return staffResponse.staff || [];
+  }, [staffResponse]);
 
   const [createShift] = useCreateShiftMutation();
   const [updateShift] = useUpdateShiftMutation();
@@ -104,7 +114,7 @@ export default function SchedulePage() {
   };
 
   const handleCreate = async () => {
-    if (!formData.employeeId || !formData.date || !formData.startTime || !formData.endTime) {
+    if (!formData.userId || !formData.date || !formData.startTime || !formData.endTime || !formData.position) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -115,22 +125,24 @@ export default function SchedulePage() {
       setIsCreateModalOpen(false);
       resetForm();
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to create shift');
+      toast.error(error?.data?.message || error?.message || 'Failed to create shift');
     }
   };
 
   const handleEdit = async () => {
-    if (!selectedShift || !formData.employeeId || !formData.date || !formData.startTime || !formData.endTime) {
+    if (!selectedShift || !formData.userId || !formData.date || !formData.startTime || !formData.endTime || !formData.position) {
       toast.error('Please fill in all required fields');
       return;
     }
 
     try {
       const updateData: UpdateScheduleRequest = {
-        employeeId: formData.employeeId,
+        userId: formData.userId,
         date: formData.date,
         startTime: formData.startTime,
         endTime: formData.endTime,
+        shiftType: formData.shiftType,
+        position: formData.position,
         notes: formData.notes,
       };
 
@@ -140,7 +152,7 @@ export default function SchedulePage() {
       setSelectedShift(null);
       resetForm();
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to update shift');
+      toast.error(error?.data?.message || error?.message || 'Failed to update shift');
     }
   };
 
@@ -164,12 +176,22 @@ export default function SchedulePage() {
     }
   };
 
+  useEffect(() => {
+    if (!isCreateModalOpen && !isEditModalOpen) {
+      resetForm();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCreateModalOpen, isEditModalOpen]);
+
   const resetForm = () => {
     setFormData({
-      employeeId: '',
+      userId: '',
+      branchId,
       date: '',
       startTime: '',
       endTime: '',
+      shiftType: 'custom',
+      position: '',
       notes: '',
     });
   };
@@ -177,10 +199,13 @@ export default function SchedulePage() {
   const openEditModal = (shift: ScheduleShift) => {
     setSelectedShift(shift);
     setFormData({
-      employeeId: shift.employeeId,
-      date: shift.date,
+      userId: shift.userId,
+      branchId: shift.branchId || branchId,
+      date: shift.date.split('T')[0], // Extract date part
       startTime: shift.startTime,
       endTime: shift.endTime,
+      shiftType: shift.shiftType || 'custom',
+      position: shift.position || shift.role,
       notes: shift.notes || '',
     });
     setIsEditModalOpen(true);
@@ -192,20 +217,22 @@ export default function SchedulePage() {
   };
 
   const getStatusBadge = (status: ScheduleShift['status']) => {
-    const statusConfig = {
-      scheduled: { color: 'bg-blue-100 text-blue-800', icon: ClockIcon },
-      confirmed: { color: 'bg-green-100 text-green-800', icon: CheckIcon },
-      completed: { color: 'bg-gray-100 text-gray-800', icon: CheckIcon },
-      cancelled: { color: 'bg-red-100 text-red-800', icon: XMarkIcon },
+    const statusConfig: Record<string, { color: string; icon: any }> = {
+      scheduled: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: ClockIcon },
+      confirmed: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckIcon },
+      in_progress: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: ClockIcon },
+      completed: { color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400', icon: CheckIcon },
+      cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XMarkIcon },
+      no_show: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: XMarkIcon },
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status] || statusConfig.scheduled;
     const Icon = config.icon;
 
     return (
       <Badge className={`${config.color} flex items-center gap-1`}>
         <Icon className="h-3 w-3" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
       </Badge>
     );
   };
@@ -460,18 +487,54 @@ export default function SchedulePage() {
               Employee *
             </label>
             <select
-              value={formData.employeeId}
-              onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.userId}
+              onChange={(e) => {
+                const selectedStaff = staff.find(s => s.id === e.target.value);
+                setFormData({ 
+                  ...formData, 
+                  userId: e.target.value,
+                  position: selectedStaff?.role || formData.position,
+                });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
               required
             >
               <option value="">Select Employee</option>
-              {mockEmployees.filter(emp => emp.isActive).map((employee) => (
+              {staff.filter((emp: Staff) => emp.isActive).map((employee: Staff) => (
                 <option key={employee.id} value={employee.id}>
-                  {employee.name} ({employee.role})
+                  {employee.firstName} {employee.lastName} ({employee.role})
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Shift Type *
+              </label>
+              <select
+                value={formData.shiftType}
+                onChange={(e) => setFormData({ ...formData, shiftType: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                required
+              >
+                {SHIFT_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Position/Role *
+              </label>
+              <Input
+                value={formData.position}
+                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                placeholder="e.g., Waiter, Chef, Manager"
+                required
+              />
+            </div>
           </div>
 
           <div>
@@ -537,6 +600,7 @@ export default function SchedulePage() {
             </Button>
             <Button
               onClick={isCreateModalOpen ? handleCreate : handleEdit}
+              disabled={!formData.userId || !formData.date || !formData.startTime || !formData.endTime || !formData.position}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {isCreateModalOpen ? 'Schedule Shift' : 'Update Shift'}
@@ -562,7 +626,7 @@ export default function SchedulePage() {
                   Employee
                 </label>
                 <p className="text-gray-900 dark:text-white">{selectedShift.employeeName}</p>
-                <p className="text-sm text-gray-500">{selectedShift.role}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{selectedShift.position || selectedShift.role}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -583,12 +647,21 @@ export default function SchedulePage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Time
+                  Shift Type
                 </label>
-                <p className="text-gray-900 dark:text-white">
-                  {selectedShift.startTime} - {selectedShift.endTime}
-                </p>
+                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                  {selectedShift.shiftType ? selectedShift.shiftType.charAt(0).toUpperCase() + selectedShift.shiftType.slice(1) : 'Custom'}
+                </Badge>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Time
+              </label>
+              <p className="text-gray-900 dark:text-white">
+                {selectedShift.startTime} - {selectedShift.endTime}
+              </p>
             </div>
 
             {selectedShift.notes && (

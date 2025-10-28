@@ -36,17 +36,19 @@ export interface CreateStaffRequest {
   firstName: string;
   lastName: string;
   email: string;
-  phoneNumber: string;
+  phoneNumber?: string;
   role: 'owner' | 'manager' | 'chef' | 'waiter' | 'cashier';
+  password?: string;
+  pin?: string;
   department?: string;
   salary?: number;
   hourlyRate?: number;
-  emergencyContact: {
+  emergencyContact?: {
     name: string;
     relationship: string;
     phoneNumber: string;
   };
-  address: {
+  address?: {
     street: string;
     city: string;
     state: string;
@@ -56,6 +58,8 @@ export interface CreateStaffRequest {
   skills?: string[];
   certifications?: string[];
   notes?: string;
+  branchId?: string;
+  companyId?: string;
 }
 
 export interface UpdateStaffRequest extends Partial<CreateStaffRequest> {
@@ -99,35 +103,121 @@ export const staffApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getStaff: builder.query<{ staff: Staff[]; total: number }, any>({
       query: (params) => ({
-        url: '/staff',
+        url: '/users',
         params,
       }),
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        let items = [];
+        
+        if (data.users) {
+          items = data.users;
+        } else if (Array.isArray(data)) {
+          items = data;
+        } else {
+          items = data.items || [];
+        }
+        
+        // Filter out owners and super_admins for staff management
+        const staffItems = items.filter((item: any) => 
+          item.role && !['owner', 'super_admin'].includes(item.role)
+        );
+        
+        return {
+          staff: staffItems.map((user: any) => ({
+            id: user._id || user.id,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            email: user.email || '',
+            phoneNumber: user.phone || user.phoneNumber || '',
+            role: user.role || 'waiter',
+            employeeId: user.employeeId || '',
+            hireDate: user.joinedDate || user.createdAt || new Date().toISOString(),
+            salary: user.salary,
+            hourlyRate: user.hourlyRate,
+            isActive: user.isActive !== undefined ? user.isActive : true,
+            address: user.address,
+            emergencyContact: user.emergencyContact,
+            skills: user.skills || [],
+            certifications: user.certifications || [],
+            notes: user.notes,
+            createdAt: user.createdAt || new Date().toISOString(),
+            updatedAt: user.updatedAt || new Date().toISOString(),
+          }) as Staff),
+          total: data.total || staffItems.length,
+        };
+      },
       providesTags: ['Staff'],
     }),
     getStaffById: builder.query<Staff, string>({
-      query: (id) => `/staff/${id}`,
+      query: (id) => `/users/${id}`,
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          id: data._id || data.id,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          phoneNumber: data.phone || data.phoneNumber || '',
+          role: data.role || 'waiter',
+          employeeId: data.employeeId || '',
+          hireDate: data.joinedDate || data.createdAt || new Date().toISOString(),
+          salary: data.salary,
+          hourlyRate: data.hourlyRate,
+          isActive: data.isActive !== undefined ? data.isActive : true,
+          address: data.address,
+          emergencyContact: data.emergencyContact,
+          skills: data.skills || [],
+          certifications: data.certifications || [],
+          notes: data.notes,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+        } as Staff;
+      },
       providesTags: ['Staff'],
     }),
     createStaff: builder.mutation<Staff, CreateStaffRequest>({
-      query: (data) => ({
-        url: '/staff',
-        method: 'POST',
-        body: data,
-      }),
+      query: (data) => {
+        // Transform phoneNumber to phone for backend compatibility
+        const { phoneNumber, ...rest } = data;
+        return {
+          url: '/users',
+          method: 'POST',
+          body: {
+            ...rest,
+            phone: phoneNumber, // Backend expects 'phone', not 'phoneNumber'
+          },
+        };
+      },
       invalidatesTags: ['Staff'],
     }),
     updateStaff: builder.mutation<Staff, UpdateStaffRequest>({
-      query: ({ id, ...data }) => ({
-        url: `/staff/${id}`,
-        method: 'PATCH',
-        body: data,
-      }),
+      query: ({ id, ...data }) => {
+        // Transform phoneNumber to phone for backend compatibility
+        const { phoneNumber, ...rest } = data;
+        const body: any = { ...rest };
+        if (phoneNumber !== undefined) {
+          body.phone = phoneNumber;
+        }
+        return {
+          url: `/users/${id}`,
+          method: 'PATCH',
+          body,
+        };
+      },
       invalidatesTags: ['Staff'],
     }),
     deleteStaff: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/staff/${id}`,
+        url: `/users/${id}`,
         method: 'DELETE',
+      }),
+      invalidatesTags: ['Staff'],
+    }),
+    deactivateStaff: builder.mutation<Staff, string>({
+      query: (id) => ({
+        url: `/users/${id}/deactivate`,
+        method: 'PATCH',
       }),
       invalidatesTags: ['Staff'],
     }),
@@ -190,6 +280,7 @@ export const {
   useCreateStaffMutation,
   useUpdateStaffMutation,
   useDeleteStaffMutation,
+  useDeactivateStaffMutation,
   useGetAttendanceQuery,
   useCreateAttendanceMutation,
   useUpdateAttendanceMutation,

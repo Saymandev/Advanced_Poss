@@ -2,38 +2,48 @@ import { apiSlice } from '../apiSlice';
 
 export interface ScheduleShift {
   id: string;
-  employeeId: string;
+  userId: string;
+  employeeId?: string;
   employeeName: string;
   role: string;
+  position: string;
   date: string;
   startTime: string;
   endTime: string;
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  shiftType: 'morning' | 'afternoon' | 'evening' | 'night' | 'custom';
+  status: 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
   notes?: string;
+  branchId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateScheduleRequest {
-  employeeId: string;
+  userId: string;
+  branchId?: string;
   date: string;
   startTime: string;
   endTime: string;
+  shiftType: 'morning' | 'afternoon' | 'evening' | 'night' | 'custom';
+  position: string;
   notes?: string;
 }
 
 export interface UpdateScheduleRequest {
-  employeeId?: string;
+  userId?: string;
   date?: string;
   startTime?: string;
   endTime?: string;
+  shiftType?: 'morning' | 'afternoon' | 'evening' | 'night' | 'custom';
+  position?: string;
   notes?: string;
-  status?: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  status?: 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
 }
 
 export interface ScheduleFilters {
   branchId?: string;
-  employeeId?: string;
+  userId?: string;
+  employeeId?: string; // For compatibility
   status?: string;
   startDate?: string;
   endDate?: string;
@@ -46,16 +56,85 @@ export const scheduleApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Get all shifts
     getShifts: builder.query<{ shifts: ScheduleShift[]; total: number }, ScheduleFilters>({
-      query: (filters) => ({
-        url: '/schedule/shifts',
-        params: filters,
-      }),
+      query: (filters) => {
+        const params: any = { ...filters };
+        // Convert employeeId to userId for backend compatibility
+        if (params.employeeId && !params.userId) {
+          params.userId = params.employeeId;
+          delete params.employeeId;
+        }
+        return {
+          url: '/schedule/shifts',
+          params,
+        };
+      },
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        let items = [];
+        
+        if (data.shifts) {
+          items = data.shifts;
+        } else if (Array.isArray(data)) {
+          items = data;
+        } else {
+          items = data.items || [];
+        }
+        
+        return {
+          shifts: items.map((shift: any) => {
+            const user = shift.userId || {};
+            return {
+              id: shift._id || shift.id,
+              userId: shift.userId?._id || shift.userId || '',
+              employeeId: shift.userId?.employeeId || user.employeeId,
+              employeeName: shift.userId?.firstName && shift.userId?.lastName
+                ? `${shift.userId.firstName} ${shift.userId.lastName}`
+                : user?.name || 'Unknown',
+              role: shift.userId?.role || user?.role || shift.position || '',
+              position: shift.position || shift.userId?.role || '',
+              date: shift.date || new Date().toISOString(),
+              startTime: shift.time?.start || shift.startTime || '09:00',
+              endTime: shift.time?.end || shift.endTime || '17:00',
+              shiftType: shift.shiftType || 'custom',
+              status: shift.status || 'scheduled',
+              notes: shift.notes,
+              branchId: shift.branchId?._id || shift.branchId || '',
+              createdAt: shift.createdAt || new Date().toISOString(),
+              updatedAt: shift.updatedAt || new Date().toISOString(),
+            } as ScheduleShift;
+          }),
+          total: data.total || items.length,
+        };
+      },
       providesTags: ['Schedule'],
     }),
 
     // Get shift by ID
     getShift: builder.query<ScheduleShift, string>({
       query: (id) => `/schedule/shifts/${id}`,
+      transformResponse: (response: any) => {
+        const shift = response.data || response;
+        const user = shift.userId || {};
+        return {
+          id: shift._id || shift.id,
+          userId: shift.userId?._id || shift.userId || '',
+          employeeId: shift.userId?.employeeId || user.employeeId,
+          employeeName: shift.userId?.firstName && shift.userId?.lastName
+            ? `${shift.userId.firstName} ${shift.userId.lastName}`
+            : user?.name || 'Unknown',
+          role: shift.userId?.role || user?.role || shift.position || '',
+          position: shift.position || shift.userId?.role || '',
+          date: shift.date || new Date().toISOString(),
+          startTime: shift.time?.start || shift.startTime || '09:00',
+          endTime: shift.time?.end || shift.endTime || '17:00',
+          shiftType: shift.shiftType || 'custom',
+          status: shift.status || 'scheduled',
+          notes: shift.notes,
+          branchId: shift.branchId?._id || shift.branchId || '',
+          createdAt: shift.createdAt || new Date().toISOString(),
+          updatedAt: shift.updatedAt || new Date().toISOString(),
+        } as ScheduleShift;
+      },
       providesTags: (result, error, id) => [{ type: 'Schedule', id }],
     }),
 
@@ -64,18 +143,45 @@ export const scheduleApi = apiSlice.injectEndpoints({
       query: (data) => ({
         url: '/schedule/shifts',
         method: 'POST',
-        body: data,
+        body: {
+          userId: data.userId,
+          branchId: data.branchId,
+          date: data.date,
+          shiftType: data.shiftType || 'custom',
+          position: data.position,
+          time: {
+            start: data.startTime,
+            end: data.endTime,
+          },
+          notes: data.notes,
+          status: 'scheduled',
+        },
       }),
       invalidatesTags: ['Schedule'],
     }),
 
     // Update shift
     updateShift: builder.mutation<ScheduleShift, { id: string; data: UpdateScheduleRequest }>({
-      query: ({ id, data }) => ({
-        url: `/schedule/shifts/${id}`,
-        method: 'PUT',
-        body: data,
-      }),
+      query: ({ id, data }) => {
+        const body: any = {};
+        if (data.userId) body.userId = data.userId;
+        if (data.date) body.date = data.date;
+        if (data.shiftType) body.shiftType = data.shiftType;
+        if (data.position) body.position = data.position;
+        if (data.startTime || data.endTime) {
+          body.time = {};
+          if (data.startTime) body.time.start = data.startTime;
+          if (data.endTime) body.time.end = data.endTime;
+        }
+        if (data.notes !== undefined) body.notes = data.notes;
+        if (data.status) body.status = data.status;
+        
+        return {
+          url: `/schedule/shifts/${id}`,
+          method: 'PUT',
+          body,
+        };
+      },
       invalidatesTags: (result, error, { id }) => [{ type: 'Schedule', id }, 'Schedule'],
     }),
 
@@ -138,6 +244,17 @@ export const scheduleApi = apiSlice.injectEndpoints({
         url: '/schedule/stats',
         params,
       }),
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          totalShifts: data.totalShifts || 0,
+          confirmedShifts: data.confirmedShifts || 0,
+          scheduledShifts: data.scheduledShifts || 0,
+          completedShifts: data.completedShifts || 0,
+          cancelledShifts: data.cancelledShifts || 0,
+          upcomingShifts: data.upcomingShifts || 0,
+        };
+      },
       providesTags: ['Schedule'],
     }),
 

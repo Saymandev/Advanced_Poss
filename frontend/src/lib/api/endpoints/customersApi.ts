@@ -84,10 +84,39 @@ export const customersApi = apiSlice.injectEndpoints({
         url: '/customers',
         params,
       }),
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          customers: data.customers || data.items || data || [],
+          total: data.total || (Array.isArray(data) ? data.length : 0),
+        };
+      },
       providesTags: ['Customer'],
     }),
     getCustomerById: builder.query<Customer, string>({
       query: (id) => `/customers/${id}`,
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          id: data._id || data.id,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          phoneNumber: data.phone || data.phoneNumber || '',
+          dateOfBirth: data.dateOfBirth,
+          address: data.address,
+          loyaltyPoints: data.loyaltyPoints || 0,
+          tier: data.loyaltyTier || data.tier || 'bronze',
+          totalOrders: data.totalOrders || 0,
+          totalSpent: data.totalSpent || 0,
+          lastOrderDate: data.lastOrderDate,
+          preferences: data.preferences,
+          notes: data.notes,
+          isActive: data.isActive !== undefined ? data.isActive : true,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+        } as Customer;
+      },
       providesTags: ['Customer'],
     }),
     createCustomer: builder.mutation<Customer, CreateCustomerRequest>({
@@ -115,10 +144,24 @@ export const customersApi = apiSlice.injectEndpoints({
     }),
     getCustomerOrders: builder.query<{ orders: CustomerOrder[]; total: number }, string>({
       query: (customerId) => `/customers/${customerId}/orders`,
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          orders: data.orders || data.items || data || [],
+          total: data.total || (Array.isArray(data) ? data.length : 0),
+        };
+      },
       providesTags: ['Customer', 'Order'],
     }),
     getCustomerLoyaltyHistory: builder.query<{ transactions: LoyaltyTransaction[]; total: number }, string>({
       query: (customerId) => `/customers/${customerId}/loyalty`,
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          transactions: data.transactions || data.items || data || [],
+          total: data.total || (Array.isArray(data) ? data.length : 0),
+        };
+      },
       providesTags: ['Customer'],
     }),
     updateLoyaltyPoints: builder.mutation<Customer, { 

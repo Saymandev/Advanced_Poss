@@ -7,24 +7,26 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { InventoryItem, useAdjustStockMutation, useCreateInventoryItemMutation, useDeleteInventoryItemMutation, useGetInventoryItemsQuery, useUpdateInventoryItemMutation } from '@/lib/api/endpoints/inventoryApi';
+import { InventoryItem, useAddStockMutation, useCreateInventoryItemMutation, useDeleteInventoryItemMutation, useGetInventoryItemsQuery, useRemoveStockMutation, useUpdateInventoryItemMutation } from '@/lib/api/endpoints/inventoryApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
   ArchiveBoxIcon,
   BeakerIcon,
   ExclamationTriangleIcon,
+  EyeIcon,
   PencilIcon,
   PlusIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function IngredientsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isAdjustStockModalOpen, setIsAdjustStockModalOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<InventoryItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,31 +35,62 @@ export default function IngredientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const { data, isLoading, refetch } = useGetInventoryItemsQuery({
-    branchId: user?.branchId,
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  const companyId = (user as any)?.companyId || 
+                    (companyContext as any)?.companyId;
+
+  const { data: ingredientsResponse, isLoading } = useGetInventoryItemsQuery({
+    branchId,
     search: searchQuery || undefined,
     category: categoryFilter === 'all' ? undefined : categoryFilter,
-    lowStock: stockFilter === 'low',
     page: currentPage,
     limit: itemsPerPage,
-  });
+  }, { skip: !branchId });
 
-  const [createIngredient] = useCreateInventoryItemMutation();
-  const [updateIngredient] = useUpdateInventoryItemMutation();
+  const [createIngredient, { isLoading: isCreating }] = useCreateInventoryItemMutation();
+  const [updateIngredient, { isLoading: isUpdating }] = useUpdateInventoryItemMutation();
   const [deleteIngredient] = useDeleteInventoryItemMutation();
-  const [adjustStock] = useAdjustStockMutation();
+  const [addStock] = useAddStockMutation();
+  const [removeStock] = useRemoveStockMutation();
+
+  // Extract ingredients from API response
+  const ingredients = useMemo(() => {
+    if (!ingredientsResponse) return [];
+    return ingredientsResponse.items || [];
+  }, [ingredientsResponse]);
+
+  const totalIngredients = useMemo(() => {
+    return ingredientsResponse?.total || 0;
+  }, [ingredientsResponse]);
+
+  // Filter ingredients by stock level
+  const filteredIngredients = useMemo(() => {
+    if (stockFilter === 'all') return ingredients;
+    if (stockFilter === 'low') return ingredients.filter(i => i.isLowStock);
+    if (stockFilter === 'out') return ingredients.filter(i => i.isOutOfStock);
+    return ingredients;
+  }, [ingredients, stockFilter]);
 
   const [formData, setFormData] = useState<any>({
     name: '',
     description: '',
     currentStock: 0,
-    minStock: 10,
-    maxStock: 100,
-    unit: 'pieces',
-    unitPrice: 0,
+    minimumStock: 10,
+    maximumStock: 100,
+    unit: 'pcs',
+    unitCost: 0,
     category: 'food',
-    supplierId: '',
-    expiryDate: '',
+    preferredSupplierId: '',
+    storageLocation: '',
+    storageTemperature: '',
+    shelfLife: '',
+    sku: '',
+    barcode: '',
+    notes: '',
   });
 
   const [stockAdjustment, setStockAdjustment] = useState({
@@ -65,18 +98,29 @@ export default function IngredientsPage() {
     reason: '',
   });
 
+  useEffect(() => {
+    if (!isCreateModalOpen && !isEditModalOpen) {
+      resetForm();
+    }
+  }, [isCreateModalOpen, isEditModalOpen]);
+
   const resetForm = () => {
     setFormData({
       name: '',
       description: '',
       currentStock: 0,
-      minStock: 10,
-      maxStock: 100,
-      unit: 'pieces',
-      unitPrice: 0,
+      minimumStock: 10,
+      maximumStock: 100,
+      unit: 'pcs',
+      unitCost: 0,
       category: 'food',
-      supplierId: '',
-      expiryDate: '',
+      preferredSupplierId: '',
+      storageLocation: '',
+      storageTemperature: '',
+      shelfLife: '',
+      sku: '',
+      barcode: '',
+      notes: '',
     });
     setSelectedIngredient(null);
   };
@@ -89,31 +133,50 @@ export default function IngredientsPage() {
   };
 
   const handleCreate = async () => {
+    if (!formData.name || !formData.category || !formData.unit || formData.unitCost <= 0) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (!companyId) {
+      toast.error('Company ID is missing');
+      return;
+    }
+
     try {
       await createIngredient({
-        companyId: user?.companyId || '',
-        branchId: user?.branchId,
+        companyId,
+        branchId,
         name: formData.name,
         description: formData.description,
         category: formData.category,
         unit: formData.unit,
-        currentStock: formData.currentStock,
-        minimumStock: formData.minStock,
-        maximumStock: formData.maxStock,
-        unitCost: formData.unitPrice,
-        preferredSupplierId: formData.supplierId || undefined,
+        currentStock: formData.currentStock || 0,
+        minimumStock: formData.minimumStock || 0,
+        maximumStock: formData.maximumStock,
+        unitCost: formData.unitCost,
+        preferredSupplierId: formData.preferredSupplierId || undefined,
+        storageLocation: formData.storageLocation || undefined,
+        storageTemperature: formData.storageTemperature || undefined,
+        shelfLife: formData.shelfLife ? parseInt(formData.shelfLife) : undefined,
+        sku: formData.sku || undefined,
+        barcode: formData.barcode || undefined,
+        notes: formData.notes || undefined,
       } as any).unwrap();
       toast.success('Ingredient created successfully');
       setIsCreateModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to create ingredient');
+      toast.error(error?.data?.message || error?.message || 'Failed to create ingredient');
     }
   };
 
   const handleEdit = async () => {
     if (!selectedIngredient) return;
+    if (!formData.name || !formData.category || !formData.unit || formData.unitCost <= 0) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
     try {
       await updateIngredient({
@@ -123,47 +186,70 @@ export default function IngredientsPage() {
         category: formData.category,
         unit: formData.unit,
         currentStock: formData.currentStock,
-        minimumStock: formData.minStock,
-        maximumStock: formData.maxStock,
-        unitCost: formData.unitPrice,
-        preferredSupplierId: formData.supplierId || undefined,
+        minStock: formData.minimumStock,
+        maxStock: formData.maximumStock,
+        unitPrice: formData.unitCost,
+        preferredSupplierId: formData.preferredSupplierId || undefined,
+        storageLocation: formData.storageLocation || undefined,
+        storageTemperature: formData.storageTemperature || undefined,
+        shelfLife: formData.shelfLife ? parseInt(formData.shelfLife) : undefined,
+        sku: formData.sku || undefined,
+        barcode: formData.barcode || undefined,
+        notes: formData.notes || undefined,
       } as any).unwrap();
       toast.success('Ingredient updated successfully');
       setIsEditModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update ingredient');
+      toast.error(error?.data?.message || error?.message || 'Failed to update ingredient');
     }
   };
 
   const handleDelete = async (ingredient: InventoryItem) => {
-    if (!confirm(`Are you sure you want to delete "${ingredient.name}"?`)) return;
+    if (!confirm(`Are you sure you want to delete "${ingredient.name}"? This action cannot be undone.`)) return;
 
     try {
       await deleteIngredient(ingredient.id).unwrap();
       toast.success('Ingredient deleted successfully');
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to delete ingredient');
+      toast.error(error?.data?.message || error?.message || 'Failed to delete ingredient');
     }
   };
 
   const handleAdjustStock = async () => {
     if (!selectedIngredient) return;
+    if (!stockAdjustment.change || stockAdjustment.change === 0) {
+      toast.error('Please enter a valid quantity');
+      return;
+    }
 
     try {
-      await adjustStock({
-        inventoryItemId: selectedIngredient.id,
-        ...stockAdjustment,
-      } as any).unwrap();
+      const adjustmentType = stockAdjustment.change >= 0 ? 'add' : 'remove';
+      const quantity = Math.abs(stockAdjustment.change);
+      
+      if (adjustmentType === 'add') {
+        await addStock({
+          id: selectedIngredient.id,
+          quantity,
+        }).unwrap();
+      } else {
+        await removeStock({
+          id: selectedIngredient.id,
+          quantity,
+        }).unwrap();
+      }
+
       toast.success('Stock adjusted successfully');
       setIsAdjustStockModalOpen(false);
       resetStockAdjustment();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to adjust stock');
+      toast.error(error?.data?.message || error?.message || 'Failed to adjust stock');
     }
+  };
+
+  const openViewModal = (ingredient: InventoryItem) => {
+    setSelectedIngredient(ingredient);
+    setIsViewModalOpen(true);
   };
 
   const openEditModal = (ingredient: InventoryItem) => {
@@ -172,13 +258,18 @@ export default function IngredientsPage() {
       name: ingredient.name,
       description: ingredient.description || '',
       currentStock: ingredient.currentStock,
-      minStock: ingredient.minStock,
-      maxStock: ingredient.maxStock,
+      minimumStock: ingredient.minimumStock || ingredient.minStock,
+      maximumStock: ingredient.maximumStock || ingredient.maxStock,
       unit: ingredient.unit,
-      unitPrice: ingredient.unitPrice,
+      unitCost: ingredient.unitCost || ingredient.unitPrice,
       category: ingredient.category,
-      supplierId: ingredient.supplier?.id || '',
-      expiryDate: ingredient.expiryDate || '',
+      preferredSupplierId: ingredient.preferredSupplierId || '',
+      storageLocation: ingredient.storageLocation || '',
+      storageTemperature: ingredient.storageTemperature || '',
+      shelfLife: ingredient.shelfLife || '',
+      sku: ingredient.sku || '',
+      barcode: ingredient.barcode || '',
+      notes: ingredient.notes || '',
     });
     setIsEditModalOpen(true);
   };
@@ -225,10 +316,10 @@ export default function IngredientsPage() {
       render: (value: number, row: any) => (
         <div className="text-right">
           <p className="font-semibold text-gray-900 dark:text-white">
-            {value} {row.unit}
+            {value || 0} {row.unit}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Min: {row.minStock} {row.unit}
+            Min: {row.minimumStock || row.minStock || 0} {row.unit}
           </p>
         </div>
       ),
@@ -237,16 +328,20 @@ export default function IngredientsPage() {
       key: 'unitPrice',
       title: 'Cost',
       align: 'right' as const,
-      render: (value: number, row: any) => (
-        <div className="text-right">
-          <p className="font-semibold text-gray-900 dark:text-white">
-            {formatCurrency(value)}/{row.unit}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Total: {formatCurrency(value * row.currentStock)}
-          </p>
-        </div>
-      ),
+      render: (value: number, row: any) => {
+        const unitCost = row.unitCost || value || 0;
+        const stock = row.currentStock || 0;
+        return (
+          <div className="text-right">
+            <p className="font-semibold text-gray-900 dark:text-white">
+              {formatCurrency(unitCost)}/{row.unit}
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Total: {formatCurrency(unitCost * stock)}
+            </p>
+          </div>
+        );
+      },
     },
     {
       key: 'category',
@@ -297,8 +392,17 @@ export default function IngredientsPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => openViewModal(row)}
+            title="View Details"
+          >
+            <EyeIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => openAdjustStockModal(row)}
             className="text-blue-600 hover:text-blue-700"
+            title="Adjust Stock"
           >
             <ArchiveBoxIcon className="w-4 h-4" />
           </Button>
@@ -306,6 +410,7 @@ export default function IngredientsPage() {
             variant="ghost"
             size="sm"
             onClick={() => openEditModal(row)}
+            title="Edit"
           >
             <PencilIcon className="w-4 h-4" />
           </Button>
@@ -314,6 +419,7 @@ export default function IngredientsPage() {
             size="sm"
             onClick={() => handleDelete(row)}
             className="text-red-600 hover:text-red-700"
+            title="Delete"
           >
             <TrashIcon className="w-4 h-4" />
           </Button>
@@ -322,13 +428,15 @@ export default function IngredientsPage() {
     },
   ];
 
-  const stats = {
-    total: data?.total || 0,
-    inStock: data?.items?.filter((i: any) => i.currentStock > i.minStock).length || 0,
-    lowStock: data?.items?.filter((i: any) => i.currentStock > 0 && i.currentStock <= i.minStock).length || 0,
-    outOfStock: data?.items?.filter((i: any) => i.currentStock <= 0).length || 0,
-    totalValue: data?.items?.reduce((sum: number, item: any) => sum + (item.unitPrice * item.currentStock), 0) || 0,
-  };
+  const stats = useMemo(() => {
+    return {
+      total: totalIngredients,
+      inStock: ingredients.filter(i => !i.isLowStock && !i.isOutOfStock).length,
+      lowStock: ingredients.filter(i => i.isLowStock && !i.isOutOfStock).length,
+      outOfStock: ingredients.filter(i => i.isOutOfStock).length,
+      totalValue: ingredients.reduce((sum, item) => sum + ((item.unitCost || item.unitPrice || 0) * (item.currentStock || 0)), 0),
+    };
+  }, [ingredients, totalIngredients]);
 
   return (
     <div className="space-y-6">
@@ -426,9 +534,9 @@ export default function IngredientsPage() {
                   { value: 'all', label: 'All Categories' },
                   { value: 'food', label: 'Food' },
                   { value: 'beverage', label: 'Beverage' },
-                  { value: 'alcohol', label: 'Alcohol' },
-                  { value: 'supplies', label: 'Supplies' },
+                  { value: 'packaging', label: 'Packaging' },
                   { value: 'cleaning', label: 'Cleaning' },
+                  { value: 'other', label: 'Other' },
                 ]}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
@@ -452,27 +560,38 @@ export default function IngredientsPage() {
       </Card>
 
       {/* Ingredients Table */}
-      <DataTable
-        data={data?.items || []}
-        columns={columns}
-        loading={isLoading}
-        searchable={false}
-        selectable={true}
-        pagination={{
-          currentPage,
-          totalPages: Math.ceil((data?.total || 0) / itemsPerPage),
-          itemsPerPage,
-          totalItems: data?.total || 0,
-          onPageChange: setCurrentPage,
-          onItemsPerPageChange: setItemsPerPage,
-        }}
-        exportable={true}
-        exportFilename="inventory"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} ingredients as ${format}`);
-        }}
-        emptyMessage="No ingredients found. Add your first ingredient to get started."
-      />
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">Loading ingredients...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          data={filteredIngredients}
+          columns={columns}
+          loading={isLoading}
+          searchable={false}
+          selectable={true}
+          pagination={{
+            currentPage,
+            totalPages: Math.ceil(totalIngredients / itemsPerPage),
+            itemsPerPage,
+            totalItems: totalIngredients,
+            onPageChange: setCurrentPage,
+            onItemsPerPageChange: setItemsPerPage,
+          }}
+          exportable={true}
+          exportFilename="ingredients"
+          onExport={(format, items) => {
+            console.log(`Exporting ${items.length} ingredients as ${format}`);
+            toast.success(`Exporting ${items.length} ingredients as ${format.toUpperCase()}`);
+          }}
+          emptyMessage="No ingredients found. Add your first ingredient to get started."
+        />
+      )}
 
       {/* Create Ingredient Modal */}
       <Modal
@@ -497,9 +616,9 @@ export default function IngredientsPage() {
               options={[
                 { value: 'food', label: 'Food' },
                 { value: 'beverage', label: 'Beverage' },
-                { value: 'alcohol', label: 'Alcohol' },
-                { value: 'supplies', label: 'Supplies' },
+                { value: 'packaging', label: 'Packaging' },
                 { value: 'cleaning', label: 'Cleaning' },
+                { value: 'other', label: 'Other' },
               ]}
               value={formData.category}
               onChange={(value) => setFormData({ ...formData, category: value })}
@@ -524,49 +643,92 @@ export default function IngredientsPage() {
               label="Current Stock"
               type="number"
               value={formData.currentStock}
-              onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setFormData({ ...formData, currentStock: parseFloat(e.target.value) || 0 })}
               required
             />
             <Select
               label="Unit"
               options={[
-                { value: 'pieces', label: 'Pieces' },
+                { value: 'pcs', label: 'Pieces' },
                 { value: 'kg', label: 'Kilograms' },
                 { value: 'g', label: 'Grams' },
                 { value: 'l', label: 'Liters' },
                 { value: 'ml', label: 'Milliliters' },
-                { value: 'cups', label: 'Cups' },
-                { value: 'tbsp', label: 'Tablespoons' },
-                { value: 'tsp', label: 'Teaspoons' },
-                { value: 'boxes', label: 'Boxes' },
-                { value: 'bottles', label: 'Bottles' },
+                { value: 'box', label: 'Box' },
+                { value: 'pack', label: 'Pack' },
+                { value: 'bottle', label: 'Bottle' },
+                { value: 'can', label: 'Can' },
               ]}
               value={formData.unit}
               onChange={(value) => setFormData({ ...formData, unit: value })}
             />
             <Input
-              label="Min Stock Level"
+              label="Minimum Stock"
               type="number"
-              value={formData.minStock}
-              onChange={(e) => setFormData({ ...formData, minStockLevel: parseInt(e.target.value) || 0 })}
+              value={formData.minimumStock}
+              onChange={(e) => setFormData({ ...formData, minimumStock: parseFloat(e.target.value) || 0 })}
               required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              label="Maximum Stock (Optional)"
+              type="number"
+              value={formData.maximumStock}
+              onChange={(e) => setFormData({ ...formData, maximumStock: parseFloat(e.target.value) || undefined })}
+            />
+            <Input
+              label="Cost per Unit"
+              type="number"
+              step="0.01"
+              value={formData.unitCost}
+              onChange={(e) => setFormData({ ...formData, unitCost: parseFloat(e.target.value) || 0 })}
+              required
+            />
+            <Input
+              label="Shelf Life (days, Optional)"
+              type="number"
+              value={formData.shelfLife}
+              onChange={(e) => setFormData({ ...formData, shelfLife: parseInt(e.target.value) || undefined })}
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Cost per Unit"
-              type="number"
-              step="0.01"
-              value={formData.unitPrice}
-              onChange={(e) => setFormData({ ...formData, costPerUnit: parseFloat(e.target.value) || 0 })}
-              required
+              label="SKU (Optional)"
+              value={formData.sku}
+              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
             />
             <Input
-              label="Expiry Date (Optional)"
-              type="date"
-              value={formData.expiryDate}
-              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+              label="Barcode (Optional)"
+              value={formData.barcode}
+              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Storage Location (Optional)"
+              value={formData.storageLocation}
+              onChange={(e) => setFormData({ ...formData, storageLocation: e.target.value })}
+            />
+            <Input
+              label="Storage Temperature (Optional)"
+              value={formData.storageTemperature}
+              onChange={(e) => setFormData({ ...formData, storageTemperature: e.target.value })}
+              placeholder="e.g., 2-8°C"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Notes (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="input w-full"
+              placeholder="Additional notes about this ingredient..."
             />
           </div>
 
@@ -580,8 +742,8 @@ export default function IngredientsPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>
-              Add Ingredient
+            <Button onClick={handleCreate} disabled={isCreating}>
+              {isCreating ? 'Creating...' : 'Add Ingredient'}
             </Button>
           </div>
         </div>
@@ -610,9 +772,9 @@ export default function IngredientsPage() {
               options={[
                 { value: 'food', label: 'Food' },
                 { value: 'beverage', label: 'Beverage' },
-                { value: 'alcohol', label: 'Alcohol' },
-                { value: 'supplies', label: 'Supplies' },
+                { value: 'packaging', label: 'Packaging' },
                 { value: 'cleaning', label: 'Cleaning' },
+                { value: 'other', label: 'Other' },
               ]}
               value={formData.category}
               onChange={(value) => setFormData({ ...formData, category: value })}
@@ -637,49 +799,91 @@ export default function IngredientsPage() {
               label="Current Stock"
               type="number"
               value={formData.currentStock}
-              onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setFormData({ ...formData, currentStock: parseFloat(e.target.value) || 0 })}
               required
             />
             <Select
               label="Unit"
               options={[
-                { value: 'pieces', label: 'Pieces' },
+                { value: 'pcs', label: 'Pieces' },
                 { value: 'kg', label: 'Kilograms' },
                 { value: 'g', label: 'Grams' },
                 { value: 'l', label: 'Liters' },
                 { value: 'ml', label: 'Milliliters' },
-                { value: 'cups', label: 'Cups' },
-                { value: 'tbsp', label: 'Tablespoons' },
-                { value: 'tsp', label: 'Teaspoons' },
-                { value: 'boxes', label: 'Boxes' },
-                { value: 'bottles', label: 'Bottles' },
+                { value: 'box', label: 'Box' },
+                { value: 'pack', label: 'Pack' },
+                { value: 'bottle', label: 'Bottle' },
+                { value: 'can', label: 'Can' },
               ]}
               value={formData.unit}
               onChange={(value) => setFormData({ ...formData, unit: value })}
             />
             <Input
-              label="Min Stock Level"
+              label="Minimum Stock"
               type="number"
-              value={formData.minStock}
-              onChange={(e) => setFormData({ ...formData, minStockLevel: parseInt(e.target.value) || 0 })}
+              value={formData.minimumStock}
+              onChange={(e) => setFormData({ ...formData, minimumStock: parseFloat(e.target.value) || 0 })}
               required
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              label="Maximum Stock (Optional)"
+              type="number"
+              value={formData.maximumStock}
+              onChange={(e) => setFormData({ ...formData, maximumStock: parseFloat(e.target.value) || undefined })}
+            />
             <Input
               label="Cost per Unit"
               type="number"
               step="0.01"
-              value={formData.unitPrice}
-              onChange={(e) => setFormData({ ...formData, costPerUnit: parseFloat(e.target.value) || 0 })}
+              value={formData.unitCost}
+              onChange={(e) => setFormData({ ...formData, unitCost: parseFloat(e.target.value) || 0 })}
               required
             />
             <Input
-              label="Expiry Date (Optional)"
-              type="date"
-              value={formData.expiryDate}
-              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+              label="Shelf Life (days, Optional)"
+              type="number"
+              value={formData.shelfLife}
+              onChange={(e) => setFormData({ ...formData, shelfLife: parseInt(e.target.value) || undefined })}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="SKU (Optional)"
+              value={formData.sku}
+              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+            />
+            <Input
+              label="Barcode (Optional)"
+              value={formData.barcode}
+              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Storage Location (Optional)"
+              value={formData.storageLocation}
+              onChange={(e) => setFormData({ ...formData, storageLocation: e.target.value })}
+            />
+            <Input
+              label="Storage Temperature (Optional)"
+              value={formData.storageTemperature}
+              onChange={(e) => setFormData({ ...formData, storageTemperature: e.target.value })}
+              placeholder="e.g., 2-8°C"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Notes (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="input w-full"
+              placeholder="Additional notes about this ingredient..."
             />
           </div>
 
@@ -693,11 +897,148 @@ export default function IngredientsPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleEdit}>
-              Update Ingredient
+            <Button onClick={handleEdit} disabled={isUpdating}>
+              {isUpdating ? 'Updating...' : 'Update Ingredient'}
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* View Ingredient Modal */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedIngredient(null);
+        }}
+        title="Ingredient Details"
+        className="max-w-2xl"
+      >
+        {selectedIngredient && (
+          <div className="space-y-6">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <BeakerIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">
+                  {selectedIngredient.name}
+                </h3>
+                <Badge variant="secondary" className="capitalize mb-2">
+                  {selectedIngredient.category}
+                </Badge>
+                {selectedIngredient.description && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {selectedIngredient.description}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Stock</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {selectedIngredient.currentStock} {selectedIngredient.unit}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum Stock</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {selectedIngredient.minimumStock || selectedIngredient.minStock} {selectedIngredient.unit}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Unit Cost</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {formatCurrency(selectedIngredient.unitCost || selectedIngredient.unitPrice)}/{selectedIngredient.unit}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Value</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {formatCurrency((selectedIngredient.unitCost || selectedIngredient.unitPrice || 0) * (selectedIngredient.currentStock || 0))}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Status</p>
+                <Badge variant={selectedIngredient.isOutOfStock ? 'danger' : selectedIngredient.isLowStock ? 'warning' : 'success'}>
+                  {selectedIngredient.isOutOfStock ? 'Out of Stock' : selectedIngredient.isLowStock ? 'Low Stock' : 'In Stock'}
+                </Badge>
+              </div>
+              {selectedIngredient.maximumStock && (
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Maximum Stock</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {selectedIngredient.maximumStock} {selectedIngredient.unit}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {(selectedIngredient.sku || selectedIngredient.barcode || selectedIngredient.storageLocation || selectedIngredient.storageTemperature || selectedIngredient.shelfLife) && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Additional Information</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {selectedIngredient.sku && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">SKU:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedIngredient.sku}</span>
+                    </div>
+                  )}
+                  {selectedIngredient.barcode && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Barcode:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedIngredient.barcode}</span>
+                    </div>
+                  )}
+                  {selectedIngredient.storageLocation && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Storage Location:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedIngredient.storageLocation}</span>
+                    </div>
+                  )}
+                  {selectedIngredient.storageTemperature && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Storage Temperature:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedIngredient.storageTemperature}</span>
+                    </div>
+                  )}
+                  {selectedIngredient.shelfLife && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Shelf Life:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedIngredient.shelfLife} days</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {selectedIngredient.notes && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Notes</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedIngredient.notes}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="secondary"
+                onClick={() => setIsViewModalOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  openEditModal(selectedIngredient);
+                }}
+              >
+                Edit Ingredient
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Adjust Stock Modal */}
@@ -766,26 +1107,20 @@ export default function IngredientsPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Reason
+                Reason (Optional)
               </label>
-              <Select
-                options={[
-                  { value: 'purchase', label: 'Purchase/Delivery' },
-                  { value: 'usage', label: 'Used in Production' },
-                  { value: 'waste', label: 'Waste/Spoilage' },
-                  { value: 'adjustment', label: 'Inventory Adjustment' },
-                  { value: 'return', label: 'Return to Supplier' },
-                  { value: 'other', label: 'Other' },
-                ]}
+              <textarea
+                rows={2}
                 value={stockAdjustment.reason}
-                onChange={(value) => setStockAdjustment({ ...stockAdjustment, reason: value })}
-                placeholder="Select reason"
+                onChange={(e) => setStockAdjustment({ ...stockAdjustment, reason: e.target.value })}
+                className="input w-full"
+                placeholder="Enter reason for stock adjustment..."
               />
             </div>
 
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
               <p className="text-sm text-blue-800 dark:text-blue-400 text-center">
-                New stock level will be: {selectedIngredient.currentStock + stockAdjustment.change} {selectedIngredient.unit}
+                New stock level will be: {Math.max(0, selectedIngredient.currentStock + stockAdjustment.change)} {selectedIngredient.unit}
               </p>
             </div>
 

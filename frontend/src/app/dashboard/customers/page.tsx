@@ -7,9 +7,11 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { CreateCustomerRequest, Customer, useCreateCustomerMutation, useDeleteCustomerMutation, useGetCustomersQuery, useUpdateCustomerMutation } from '@/lib/api/endpoints/customersApi';
+import { CreateCustomerRequest, Customer, useCreateCustomerMutation, useDeleteCustomerMutation, useGetCustomerByIdQuery, useGetCustomerLoyaltyHistoryQuery, useGetCustomerOrdersQuery, useGetCustomersQuery, useUpdateCustomerMutation, useUpdateLoyaltyPointsMutation } from '@/lib/api/endpoints/customersApi';
 import { useAppSelector } from '@/lib/store';
+import { formatCurrency } from '@/lib/utils';
 import {
+  EyeIcon,
   GiftIcon,
   PencilIcon,
   PhoneIcon,
@@ -20,7 +22,7 @@ import {
   UserIcon,
   UsersIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 const LOYALTY_TIERS = [
@@ -34,24 +36,117 @@ export default function CustomersPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isLoyaltyModalOpen, setIsLoyaltyModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState('all');
+  const [loyaltyPointsChange, setLoyaltyPointsChange] = useState(0);
+  const [loyaltyReason, setLoyaltyReason] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const { data, isLoading, refetch } = useGetCustomersQuery({
-    branchId: user?.branchId || undefined,
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  const { data: customersResponse, isLoading } = useGetCustomersQuery({
+    branchId,
     search: searchQuery || undefined,
-    tier: tierFilter === 'all' ? undefined : tierFilter,
     page: currentPage,
     limit: itemsPerPage,
+  }, { skip: !branchId });
+
+  const { data: selectedCustomerData } = useGetCustomerByIdQuery(selectedCustomerId, {
+    skip: !selectedCustomerId || !isViewModalOpen,
   });
 
-  const [createCustomer] = useCreateCustomerMutation();
-  const [updateCustomer] = useUpdateCustomerMutation();
+  const { data: customerOrdersData } = useGetCustomerOrdersQuery(selectedCustomerId, {
+    skip: !selectedCustomerId || !isViewModalOpen,
+  });
+
+  const { data: loyaltyHistoryData } = useGetCustomerLoyaltyHistoryQuery(selectedCustomerId, {
+    skip: !selectedCustomerId || !isLoyaltyModalOpen,
+  });
+
+  const [createCustomer, { isLoading: isCreating }] = useCreateCustomerMutation();
+  const [updateCustomer, { isLoading: isUpdating }] = useUpdateCustomerMutation();
   const [deleteCustomer] = useDeleteCustomerMutation();
+  const [updateLoyaltyPoints] = useUpdateLoyaltyPointsMutation();
+
+  // Extract customers from API response
+  const customers = useMemo(() => {
+    if (!customersResponse) return [];
+    
+    const response = customersResponse as any;
+    let items = [];
+    
+    if (response.data) {
+      items = response.data.customers || response.data.items || [];
+    } else if (Array.isArray(response)) {
+      items = response;
+    } else {
+      items = response.customers || response.items || [];
+    }
+    
+    if (!Array.isArray(items)) return [];
+    
+    return items.map((customer: any) => ({
+      id: customer._id || customer.id,
+      firstName: customer.firstName || '',
+      lastName: customer.lastName || '',
+      email: customer.email || '',
+      phoneNumber: customer.phone || customer.phoneNumber || '',
+      dateOfBirth: customer.dateOfBirth,
+      address: customer.address,
+      loyaltyPoints: customer.loyaltyPoints || 0,
+      tier: customer.loyaltyTier || customer.tier || 'bronze',
+      totalOrders: customer.totalOrders || 0,
+      totalSpent: customer.totalSpent || 0,
+      lastOrderDate: customer.lastOrderDate,
+      preferences: customer.preferences,
+      notes: customer.notes,
+      isActive: customer.isActive !== undefined ? customer.isActive : true,
+      isVIP: customer.isVIP || false,
+      createdAt: customer.createdAt || new Date().toISOString(),
+      updatedAt: customer.updatedAt || new Date().toISOString(),
+    }));
+  }, [customersResponse]);
+
+  const totalCustomers = useMemo(() => {
+    const response = customersResponse as any;
+    if (response?.data?.total) return response.data.total;
+    if (response?.total) return response.total;
+    return customers.length;
+  }, [customersResponse, customers.length]);
+
+  // Update selected customer when data loads
+  useEffect(() => {
+    if (selectedCustomerData && selectedCustomerId) {
+      const customerData = selectedCustomerData as any;
+      setSelectedCustomer({
+        id: customerData._id || customerData.id,
+        firstName: customerData.firstName || '',
+        lastName: customerData.lastName || '',
+        email: customerData.email || '',
+        phoneNumber: customerData.phone || customerData.phoneNumber || '',
+        dateOfBirth: customerData.dateOfBirth,
+        address: customerData.address,
+        loyaltyPoints: customerData.loyaltyPoints || 0,
+        tier: customerData.loyaltyTier || customerData.tier || 'bronze',
+        totalOrders: customerData.totalOrders || 0,
+        totalSpent: customerData.totalSpent || 0,
+        lastOrderDate: customerData.lastOrderDate,
+        preferences: customerData.preferences,
+        notes: customerData.notes,
+        isActive: customerData.isActive !== undefined ? customerData.isActive : true,
+        createdAt: customerData.createdAt || new Date().toISOString(),
+        updatedAt: customerData.updatedAt || new Date().toISOString(),
+      } as Customer);
+    }
+  }, [selectedCustomerData, selectedCustomerId]);
 
   const [formData, setFormData] = useState<CreateCustomerRequest>({
     firstName: '',
@@ -59,6 +154,12 @@ export default function CustomersPage() {
     email: '',
     phoneNumber: '',
   });
+
+  useEffect(() => {
+    if (!isCreateModalOpen && !isEditModalOpen) {
+      resetForm();
+    }
+  }, [isCreateModalOpen, isEditModalOpen]);
 
   const resetForm = () => {
     setFormData({
@@ -68,22 +169,35 @@ export default function CustomersPage() {
       phoneNumber: '',
     });
     setSelectedCustomer(null);
+    setSelectedCustomerId('');
   };
 
   const handleCreate = async () => {
+    if (!formData.firstName || !formData.lastName || !formData.email) {
+      toast.error('First name, last name, and email are required');
+      return;
+    }
+
     try {
-      await createCustomer(formData).unwrap();
+      const payload = {
+        ...formData,
+        branchId,
+      } as any;
+      await createCustomer(payload).unwrap();
       toast.success('Customer created successfully');
       setIsCreateModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to create customer');
+      toast.error(error?.data?.message || error?.message || 'Failed to create customer');
     }
   };
 
   const handleEdit = async () => {
     if (!selectedCustomer) return;
+    if (!formData.firstName || !formData.lastName || !formData.email) {
+      toast.error('First name, last name, and email are required');
+      return;
+    }
 
     try {
       await updateCustomer({
@@ -96,36 +210,64 @@ export default function CustomersPage() {
       toast.success('Customer updated successfully');
       setIsEditModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update customer');
+      toast.error(error?.data?.message || error?.message || 'Failed to update customer');
     }
   };
 
   const handleDelete = async (customer: Customer) => {
-    if (!confirm(`Are you sure you want to delete "${customer.firstName} ${customer.lastName}"?`)) return;
+    if (!confirm(`Are you sure you want to delete "${customer.firstName} ${customer.lastName}"? This action cannot be undone.`)) return;
 
     try {
       await deleteCustomer(customer.id).unwrap();
       toast.success('Customer deleted successfully');
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to delete customer');
+      toast.error(error?.data?.message || error?.message || 'Failed to delete customer');
     }
   };
 
-  const handleLoyaltyAdjustment = async (customerId: string, points: number, reason: string) => {
+  const handleLoyaltyAdjustment = async () => {
+    if (!selectedCustomer) return;
+    if (!loyaltyPointsChange || !loyaltyReason.trim()) {
+      toast.error('Please enter points and reason');
+      return;
+    }
+
     try {
-      await updateCustomer({
-        id: customerId,
-        loyaltyPoints: points,
-      } as any).unwrap();
+      await updateLoyaltyPoints({
+        customerId: selectedCustomer.id,
+        points: Math.abs(loyaltyPointsChange),
+        type: loyaltyPointsChange > 0 ? 'add' : 'subtract',
+        description: loyaltyReason,
+      }).unwrap();
+      toast.success(`Loyalty points ${loyaltyPointsChange >= 0 ? 'added' : 'deducted'} successfully`);
+      setIsLoyaltyModalOpen(false);
+      setLoyaltyPointsChange(0);
+      setLoyaltyReason('');
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to adjust loyalty points');
+    }
+  };
+
+  const handleQuickLoyaltyAdjustment = async (customerId: string, points: number, reason: string) => {
+    try {
+      await updateLoyaltyPoints({
+        customerId,
+        points: Math.abs(points),
+        type: points > 0 ? 'add' : 'subtract',
+        description: reason,
+      }).unwrap();
       toast.success(`Loyalty points ${points >= 0 ? 'added' : 'deducted'} successfully`);
       setIsLoyaltyModalOpen(false);
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to adjust loyalty points');
+      toast.error(error?.data?.message || error?.message || 'Failed to adjust loyalty points');
     }
+  };
+
+  const openViewModal = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setSelectedCustomerId(customer.id);
+    setIsViewModalOpen(true);
   };
 
   const openEditModal = (customer: Customer) => {
@@ -141,6 +283,9 @@ export default function CustomersPage() {
 
   const openLoyaltyModal = (customer: Customer) => {
     setSelectedCustomer(customer);
+    setSelectedCustomerId(customer.id);
+    setLoyaltyPointsChange(0);
+    setLoyaltyReason('');
     setIsLoyaltyModalOpen(true);
   };
 
@@ -190,29 +335,43 @@ export default function CustomersPage() {
       title: 'Loyalty Points',
       sortable: true,
       align: 'right' as const,
-      render: (value: number) => (
-        <div className="text-right">
-          <p className="font-semibold text-gray-900 dark:text-white">{value.toLocaleString()}</p>
-          <div className="flex items-center gap-1 justify-end">
-            <StarIcon className="w-4 h-4 text-yellow-500" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {getLoyaltyTier(value).label}
-            </span>
+      render: (value: number) => {
+        const points = value || 0;
+        const tier = getLoyaltyTier(points);
+        return (
+          <div className="text-right">
+            <p className="font-semibold text-gray-900 dark:text-white">{points.toLocaleString()}</p>
+            <div className="flex items-center gap-1 justify-end">
+              <StarIcon className="w-4 h-4 text-yellow-500" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {tier.label}
+              </span>
+            </div>
           </div>
-        </div>
+        );
+      },
+    },
+    {
+      key: 'totalSpent',
+      title: 'Total Spent',
+      sortable: true,
+      align: 'right' as const,
+      render: (value: number) => (
+        <span className="font-semibold text-gray-900 dark:text-white">
+          {formatCurrency(value || 0)}
+        </span>
       ),
     },
     {
-      key: 'tier',
-      title: 'Tier',
-      render: (value: string) => {
-        const tier = LOYALTY_TIERS.find(t => t.value === value);
-        return (
-          <Badge className={tier?.color}>
-            {tier?.label || value}
-          </Badge>
-        );
-      },
+      key: 'totalOrders',
+      title: 'Orders',
+      sortable: true,
+      align: 'center' as const,
+      render: (value: number) => (
+        <Badge variant="secondary">
+          {value || 0}
+        </Badge>
+      ),
     },
     {
       key: 'createdAt',
@@ -231,8 +390,17 @@ export default function CustomersPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => openViewModal(row)}
+            title="View Details"
+          >
+            <EyeIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => openLoyaltyModal(row)}
             className="text-purple-600 hover:text-purple-700"
+            title="Manage Loyalty"
           >
             <TrophyIcon className="w-4 h-4" />
           </Button>
@@ -240,6 +408,7 @@ export default function CustomersPage() {
             variant="ghost"
             size="sm"
             onClick={() => openEditModal(row)}
+            title="Edit"
           >
             <PencilIcon className="w-4 h-4" />
           </Button>
@@ -248,6 +417,7 @@ export default function CustomersPage() {
             size="sm"
             onClick={() => handleDelete(row)}
             className="text-red-600 hover:text-red-700"
+            title="Delete"
           >
             <TrashIcon className="w-4 h-4" />
           </Button>
@@ -256,13 +426,21 @@ export default function CustomersPage() {
     },
   ];
 
-  const stats = {
-    total: data?.total || 0,
-    bronze: data?.customers?.filter(c => getLoyaltyTier(c.loyaltyPoints).value === 'bronze').length || 0,
-    silver: data?.customers?.filter(c => getLoyaltyTier(c.loyaltyPoints).value === 'silver').length || 0,
-    gold: data?.customers?.filter(c => getLoyaltyTier(c.loyaltyPoints).value === 'gold').length || 0,
-    platinum: data?.customers?.filter(c => getLoyaltyTier(c.loyaltyPoints).value === 'platinum').length || 0,
-  };
+  // Filter customers by tier
+  const filteredCustomers = useMemo(() => {
+    if (tierFilter === 'all') return customers;
+    return customers.filter(c => getLoyaltyTier(c.loyaltyPoints || 0).value === tierFilter);
+  }, [customers, tierFilter]);
+
+  const stats = useMemo(() => {
+    return {
+      total: totalCustomers,
+      bronze: customers.filter(c => getLoyaltyTier(c.loyaltyPoints || 0).value === 'bronze').length,
+      silver: customers.filter(c => getLoyaltyTier(c.loyaltyPoints || 0).value === 'silver').length,
+      gold: customers.filter(c => getLoyaltyTier(c.loyaltyPoints || 0).value === 'gold').length,
+      platinum: customers.filter(c => getLoyaltyTier(c.loyaltyPoints || 0).value === 'platinum').length,
+    };
+  }, [customers, totalCustomers]);
 
   return (
     <div className="space-y-6">
@@ -384,27 +562,38 @@ export default function CustomersPage() {
       </Card>
 
       {/* Customers Table */}
-      <DataTable
-        data={data?.customers || []}
-        columns={columns}
-        loading={isLoading}
-        searchable={false}
-        selectable={true}
-        pagination={{
-          currentPage,
-          totalPages: Math.ceil((data?.total || 0) / itemsPerPage),
-          itemsPerPage,
-          totalItems: data?.total || 0,
-          onPageChange: setCurrentPage,
-          onItemsPerPageChange: setItemsPerPage,
-        }}
-        exportable={true}
-        exportFilename="customers"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} customers as ${format}`);
-        }}
-        emptyMessage="No customers found. Add your first customer to get started."
-      />
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">Loading customers...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          data={filteredCustomers}
+          columns={columns}
+          loading={isLoading}
+          searchable={false}
+          selectable={true}
+          pagination={{
+            currentPage,
+            totalPages: Math.ceil(totalCustomers / itemsPerPage),
+            itemsPerPage,
+            totalItems: totalCustomers,
+            onPageChange: setCurrentPage,
+            onItemsPerPageChange: setItemsPerPage,
+          }}
+          exportable={true}
+          exportFilename="customers"
+          onExport={(format, items) => {
+            console.log(`Exporting ${items.length} customers as ${format}`);
+            toast.success(`Exporting ${items.length} customers as ${format.toUpperCase()}`);
+          }}
+          emptyMessage="No customers found. Add your first customer to get started."
+        />
+      )}
 
       {/* Create Customer Modal */}
       <Modal
@@ -456,11 +645,207 @@ export default function CustomersPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>
-              Add Customer
+            <Button onClick={handleCreate} disabled={isCreating || !formData.firstName || !formData.lastName || !formData.email}>
+              {isCreating ? 'Creating...' : 'Add Customer'}
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* View Customer Modal */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedCustomerId('');
+        }}
+        title="Customer Details"
+        className="max-w-4xl"
+      >
+        {selectedCustomer && (
+          <div className="space-y-6">
+            {/* Customer Info */}
+            <div className="border-b pb-6">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                  <UserIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {selectedCustomer.firstName} {selectedCustomer.lastName}
+                    </h3>
+                    <Badge className={getLoyaltyTier(selectedCustomer.loyaltyPoints || 0).color}>
+                      {getLoyaltyTier(selectedCustomer.loyaltyPoints || 0).label}
+                    </Badge>
+                    {selectedCustomer.isActive === false && (
+                      <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                        Inactive
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{selectedCustomer.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{selectedCustomer.phoneNumber || 'Not provided'}</p>
+                    </div>
+                    {selectedCustomer.address && (
+                      <div className="col-span-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Address</p>
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {selectedCustomer.address.street}, {selectedCustomer.address.city}, {selectedCustomer.address.state} {selectedCustomer.address.zipCode}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCustomer.totalOrders || 0}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Spent</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(selectedCustomer.totalSpent || 0)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Loyalty Points</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCustomer.loyaltyPoints?.toLocaleString() || 0}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Average Order</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {selectedCustomer.totalOrders > 0 ? formatCurrency((selectedCustomer.totalSpent || 0) / selectedCustomer.totalOrders) : formatCurrency(0)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Orders */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Orders</h4>
+              {customerOrdersData ? (
+                <div className="space-y-2">
+                  {(customerOrdersData as any)?.orders?.length > 0 ? (
+                    ((customerOrdersData as any).orders || []).slice(0, 5).map((order: any) => (
+                      <div key={order.id || order._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            Order #{order.orderNumber || order.order_id || 'N/A'}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(order.total || 0)}</p>
+                          <Badge variant="secondary">{order.status || 'N/A'}</Badge>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400 text-center py-4">No orders yet</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-4">Loading orders...</p>
+              )}
+            </div>
+
+            {/* Preferences */}
+            {(selectedCustomer.preferences?.favoriteItems?.length || selectedCustomer.preferences?.allergies?.length || selectedCustomer.preferences?.dietaryRestrictions?.length) && (
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Preferences</h4>
+                <div className="space-y-3">
+                  {selectedCustomer.preferences?.favoriteItems?.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Favorite Items</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCustomer.preferences.favoriteItems.map((item: string, idx: number) => (
+                          <Badge key={idx} variant="secondary">{item}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedCustomer.preferences?.allergies?.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Allergies</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCustomer.preferences.allergies.map((allergy: string, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">{allergy}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedCustomer.preferences?.dietaryRestrictions?.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Dietary Restrictions</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCustomer.preferences.dietaryRestrictions.map((restriction: string, idx: number) => (
+                          <Badge key={idx} variant="secondary">{restriction}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            {selectedCustomer.notes && (
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Notes</h4>
+                <p className="text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">{selectedCustomer.notes}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  setSelectedCustomerId('');
+                }}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  openLoyaltyModal(selectedCustomer);
+                }}
+                className="text-purple-600 hover:text-purple-700"
+              >
+                <TrophyIcon className="w-4 h-4 mr-2" />
+                Manage Loyalty
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  openEditModal(selectedCustomer);
+                }}
+              >
+                <PencilIcon className="w-4 h-4 mr-2" />
+                Edit Customer
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Edit Customer Modal */}
@@ -513,8 +898,8 @@ export default function CustomersPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleEdit}>
-              Update Customer
+            <Button onClick={handleEdit} disabled={isUpdating || !formData.firstName || !formData.lastName || !formData.email}>
+              {isUpdating ? 'Updating...' : 'Update Customer'}
             </Button>
           </div>
         </div>
@@ -568,30 +953,80 @@ export default function CustomersPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Points Adjustment
                 </label>
-                <div className="flex gap-2">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="number"
+                      label="Points Amount"
+                      value={loyaltyPointsChange.toString()}
+                      onChange={(e) => setLoyaltyPointsChange(parseInt(e.target.value) || 0)}
+                      placeholder="e.g., 100 or -50"
+                    />
+                    <Input
+                      label="Reason"
+                      value={loyaltyReason}
+                      onChange={(e) => setLoyaltyReason(e.target.value)}
+                      placeholder="e.g., Bonus points, Reward, Redemption"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleQuickLoyaltyAdjustment(selectedCustomer.id, 100, 'Bonus points')}
+                      className="flex-1"
+                    >
+                      +100 Points
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleQuickLoyaltyAdjustment(selectedCustomer.id, 500, 'Reward')}
+                      className="flex-1"
+                    >
+                      +500 Points
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleQuickLoyaltyAdjustment(selectedCustomer.id, -50, 'Redemption')}
+                      className="flex-1 text-red-600 hover:text-red-700"
+                    >
+                      -50 Points
+                    </Button>
+                  </div>
                   <Button
-                    variant="secondary"
-                    onClick={() => handleLoyaltyAdjustment(selectedCustomer.id, 100, 'Bonus points')}
-                    className="flex-1"
+                    onClick={handleLoyaltyAdjustment}
+                    className="w-full"
+                    disabled={!loyaltyPointsChange || !loyaltyReason.trim()}
                   >
-                    +100 Points
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleLoyaltyAdjustment(selectedCustomer.id, 500, 'Reward')}
-                    className="flex-1"
-                  >
-                    +500 Points
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleLoyaltyAdjustment(selectedCustomer.id, -50, 'Redemption')}
-                    className="flex-1 text-red-600 hover:text-red-700"
-                  >
-                    -50 Points
+                    Apply Adjustment
                   </Button>
                 </div>
               </div>
+
+              {/* Loyalty History */}
+              {loyaltyHistoryData && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Recent Transactions</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {(loyaltyHistoryData as any)?.transactions?.length > 0 ? (
+                      ((loyaltyHistoryData as any).transactions || []).slice(0, 5).map((transaction: any, idx: number) => (
+                        <div key={transaction.id || transaction._id || idx} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{transaction.description || 'N/A'}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {transaction.createdAt ? new Date(transaction.createdAt).toLocaleDateString() : 'N/A'}
+                            </p>
+                          </div>
+                          <Badge className={transaction.type === 'earned' || transaction.type === 'adjusted' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}>
+                            {transaction.type === 'earned' || transaction.type === 'adjusted' ? '+' : '-'}{transaction.points || 0}
+                          </Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 dark:text-gray-400 text-center py-2 text-sm">No loyalty transactions</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-400">

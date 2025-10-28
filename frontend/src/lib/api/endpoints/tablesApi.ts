@@ -4,7 +4,7 @@ export interface Table {
   id: string;
   number: string;
   capacity: number;
-  status: 'available' | 'occupied' | 'reserved' | 'maintenance';
+  status: 'available' | 'occupied' | 'reserved' | 'maintenance' | 'needs_cleaning';
   location?: string;
   qrCode?: string;
   currentOrderId?: string;

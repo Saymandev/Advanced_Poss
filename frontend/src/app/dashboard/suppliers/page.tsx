@@ -7,117 +7,225 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { CreateSupplierRequest, Supplier, useCreateSupplierMutation, useDeleteSupplierMutation, useGetSuppliersQuery, useToggleSupplierStatusMutation, useUpdateSupplierMutation } from '@/lib/api/endpoints/suppliersApi';
+import { Supplier, useActivateSupplierMutation, useCreateSupplierMutation, useDeactivateSupplierMutation, useDeleteSupplierMutation, useGetSuppliersQuery, useGetSupplierStatsQuery, useMakeSupplierPreferredMutation, useRemoveSupplierPreferredMutation, useUpdateSupplierMutation } from '@/lib/api/endpoints/suppliersApi';
 import { useAppSelector } from '@/lib/store';
+import { formatCurrency } from '@/lib/utils';
 import {
-    BuildingOfficeIcon,
-    EnvelopeIcon,
-    MapPinIcon,
-    PencilIcon,
-    PhoneIcon,
-    PlusIcon,
-    PowerIcon,
-    StarIcon,
-    TrashIcon,
-    TruckIcon
+  BuildingOfficeIcon,
+  CheckBadgeIcon,
+  EnvelopeIcon,
+  EyeIcon,
+  MapPinIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  PowerIcon,
+  StarIcon,
+  TrashIcon,
+  TruckIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
-import toast from 'react-hot-toast';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 export default function SuppliersPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const { data, isLoading, refetch } = useGetSuppliersQuery({
-    branchId: user?.branchId || undefined,
+  const companyId = (user as any)?.companyId || 
+                    (companyContext as any)?.companyId;
+
+  const { data: suppliersResponse, isLoading } = useGetSuppliersQuery({
+    companyId,
     search: searchQuery || undefined,
     isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
+    type: typeFilter === 'all' ? undefined : typeFilter,
     rating: ratingFilter === 'all' ? undefined : parseInt(ratingFilter),
     page: currentPage,
     limit: itemsPerPage,
-  });
+  }, { skip: !companyId });
 
-  const [createSupplier] = useCreateSupplierMutation();
-  const [updateSupplier] = useUpdateSupplierMutation();
+  const { data: supplierStats } = useGetSupplierStatsQuery(companyId || '', { skip: !companyId });
+
+  const [createSupplier, { isLoading: isCreating }] = useCreateSupplierMutation();
+  const [updateSupplier, { isLoading: isUpdating }] = useUpdateSupplierMutation();
   const [deleteSupplier] = useDeleteSupplierMutation();
-  const [toggleSupplierStatus] = useToggleSupplierStatusMutation();
+  const [activateSupplier] = useActivateSupplierMutation();
+  const [deactivateSupplier] = useDeactivateSupplierMutation();
+  const [makePreferred] = useMakeSupplierPreferredMutation();
+  const [removePreferred] = useRemoveSupplierPreferredMutation();
 
-  const [formData, setFormData] = useState<CreateSupplierRequest>({
+  // Extract suppliers from API response
+  const suppliers = useMemo(() => {
+    if (!suppliersResponse) return [];
+    return suppliersResponse.suppliers || [];
+  }, [suppliersResponse]);
+
+  const totalSuppliers = useMemo(() => {
+    return suppliersResponse?.total || 0;
+  }, [suppliersResponse]);
+
+  const [formData, setFormData] = useState<any>({
     name: '',
+    description: '',
+    type: 'food',
     contactPerson: '',
     email: '',
-    phoneNumber: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: 'US',
+    phone: '',
+    alternatePhone: '',
     website: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: 'USA',
+    },
     taxId: '',
-    paymentTerms: 'Net 30',
-    leadTime: 7,
-    minimumOrder: 100,
-    rating: 5,
+    registrationNumber: '',
+    paymentTerms: 'net-30',
+    creditLimit: 0,
+    productCategories: [],
+    certifications: [],
     notes: '',
-    branchId: user?.branchId || '',
+    tags: [],
   });
+
+  useEffect(() => {
+    if (!isCreateModalOpen && !isEditModalOpen) {
+      resetForm();
+    }
+  }, [isCreateModalOpen, isEditModalOpen]);
 
   const resetForm = () => {
     setFormData({
       name: '',
+      description: '',
+      type: 'food',
       contactPerson: '',
       email: '',
-      phoneNumber: '',
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: 'US',
+      phone: '',
+      alternatePhone: '',
       website: '',
+      address: {
+        street: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        country: 'USA',
+      },
       taxId: '',
-      paymentTerms: 'Net 30',
-      leadTime: 7,
-      minimumOrder: 100,
-      rating: 5,
+      registrationNumber: '',
+      paymentTerms: 'net-30',
+      creditLimit: 0,
+      productCategories: [],
+      certifications: [],
       notes: '',
-      branchId: user?.branchId || '',
+      tags: [],
     });
     setSelectedSupplier(null);
   };
 
   const handleCreate = async () => {
+    if (!formData.name || !formData.contactPerson || !formData.email || !formData.phone) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (!companyId) {
+      toast.error('Company ID is missing');
+      return;
+    }
+
+    if (!formData.address.street || !formData.address.city || !formData.address.state) {
+      toast.error('Please fill in complete address');
+      return;
+    }
+
     try {
-      await createSupplier(formData).unwrap();
+      await createSupplier({
+        companyId,
+        name: formData.name,
+        description: formData.description || undefined,
+        type: formData.type,
+        contactPerson: formData.contactPerson,
+        email: formData.email,
+        phone: formData.phone,
+        alternatePhone: formData.alternatePhone || undefined,
+        website: formData.website || undefined,
+        address: {
+          street: formData.address.street,
+          city: formData.address.city,
+          state: formData.address.state,
+          zipCode: formData.address.zipCode,
+          country: formData.address.country,
+        },
+        taxId: formData.taxId || undefined,
+        registrationNumber: formData.registrationNumber || undefined,
+        paymentTerms: formData.paymentTerms,
+        creditLimit: formData.creditLimit || undefined,
+        productCategories: formData.productCategories || undefined,
+        certifications: formData.certifications || undefined,
+        notes: formData.notes || undefined,
+        tags: formData.tags || undefined,
+      } as any).unwrap();
       toast.success('Supplier created successfully');
       setIsCreateModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to create supplier');
+      toast.error(error?.data?.message || error?.message || 'Failed to create supplier');
     }
   };
 
   const handleEdit = async () => {
     if (!selectedSupplier) return;
+    if (!formData.name || !formData.contactPerson || !formData.email || !formData.phone) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
     try {
       await updateSupplier({
         id: selectedSupplier.id,
-        data: formData,
+        data: {
+          name: formData.name,
+          description: formData.description || undefined,
+          type: formData.type,
+          contactPerson: formData.contactPerson,
+          email: formData.email,
+          phone: formData.phone,
+          alternatePhone: formData.alternatePhone || undefined,
+          website: formData.website || undefined,
+          address: {
+            street: formData.address.street,
+            city: formData.address.city,
+            state: formData.address.state,
+            zipCode: formData.address.zipCode,
+            country: formData.address.country,
+          },
+          taxId: formData.taxId || undefined,
+          registrationNumber: formData.registrationNumber || undefined,
+          paymentTerms: formData.paymentTerms,
+          creditLimit: formData.creditLimit || undefined,
+          productCategories: formData.productCategories || undefined,
+          certifications: formData.certifications || undefined,
+          notes: formData.notes || undefined,
+          tags: formData.tags || undefined,
+        } as any,
       }).unwrap();
       toast.success('Supplier updated successfully');
       setIsEditModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update supplier');
+      toast.error(error?.data?.message || error?.message || 'Failed to update supplier');
     }
   };
 
@@ -127,7 +235,6 @@ export default function SuppliersPage() {
     try {
       await deleteSupplier(supplier.id).unwrap();
       toast.success('Supplier deleted successfully');
-      refetch();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to delete supplier');
     }
@@ -135,34 +242,63 @@ export default function SuppliersPage() {
 
   const handleToggleStatus = async (supplier: Supplier) => {
     try {
-      await toggleSupplierStatus(supplier.id).unwrap();
-      toast.success(`Supplier ${supplier.isActive ? 'deactivated' : 'activated'} successfully`);
-      refetch();
+      if (supplier.isActive) {
+        await deactivateSupplier(supplier.id).unwrap();
+        toast.success('Supplier deactivated successfully');
+      } else {
+        await activateSupplier(supplier.id).unwrap();
+        toast.success('Supplier activated successfully');
+      }
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to toggle supplier status');
+      toast.error(error?.data?.message || error?.message || 'Failed to toggle supplier status');
     }
+  };
+
+  const handleTogglePreferred = async (supplier: Supplier) => {
+    try {
+      if (supplier.isPreferred) {
+        await removePreferred(supplier.id).unwrap();
+        toast.success('Removed from preferred suppliers');
+      } else {
+        await makePreferred(supplier.id).unwrap();
+        toast.success('Added to preferred suppliers');
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to toggle preferred status');
+    }
+  };
+
+  const openViewModal = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setIsViewModalOpen(true);
   };
 
   const openEditModal = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
     setFormData({
       name: supplier.name,
+      description: supplier.description || '',
+      type: supplier.type,
       contactPerson: supplier.contactPerson,
       email: supplier.email,
-      phoneNumber: supplier.phoneNumber,
-      address: supplier.address,
-      city: supplier.city,
-      state: supplier.state,
-      zipCode: supplier.zipCode,
-      country: supplier.country,
+      phone: supplier.phone || supplier.phoneNumber || '',
+      alternatePhone: supplier.alternatePhone || '',
       website: supplier.website || '',
+      address: supplier.address || {
+        street: supplier.city || '',
+        city: supplier.city || '',
+        state: supplier.state || '',
+        zipCode: supplier.zipCode || '',
+        country: supplier.country || 'USA',
+      },
       taxId: supplier.taxId || '',
+      registrationNumber: supplier.registrationNumber || '',
       paymentTerms: supplier.paymentTerms,
-      leadTime: supplier.leadTime,
-      minimumOrder: supplier.minimumOrder,
-      rating: supplier.rating,
+      creditLimit: supplier.creditLimit || 0,
+      productCategories: supplier.productCategories || [],
+      certifications: supplier.certifications || [],
       notes: supplier.notes || '',
-      branchId: supplier.branchId,
+      tags: supplier.tags || [],
     });
     setIsEditModalOpen(true);
   };
@@ -204,22 +340,34 @@ export default function SuppliersPage() {
           </div>
           <div className="flex items-center gap-2">
             <PhoneIcon className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">{row.phoneNumber}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{row.phone || row.phoneNumber}</span>
           </div>
         </div>
       ),
     },
     {
+      key: 'type',
+      title: 'Type',
+      render: (value: string) => (
+        <Badge variant="secondary" className="capitalize">
+          {value}
+        </Badge>
+      ),
+    },
+    {
       key: 'address',
       title: 'Location',
-      render: (value: string, row: Supplier) => (
-        <div className="flex items-center gap-2">
-          <MapPinIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {value}, {row.city}, {row.state}
-          </span>
-        </div>
-      ),
+      render: (value: any, row: Supplier) => {
+        const address = row.address || { city: row.city, state: row.state, country: row.country };
+        return (
+          <div className="flex items-center gap-2">
+            <MapPinIcon className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {address.city}, {address.state}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'rating',
@@ -237,17 +385,33 @@ export default function SuppliersPage() {
     {
       key: 'paymentTerms',
       title: 'Payment Terms',
-      render: (value: string) => (
-        <Badge variant="secondary">{value}</Badge>
-      ),
+      render: (value: string) => {
+        const termsMap: { [key: string]: string } = {
+          'net-7': 'Net 7',
+          'net-15': 'Net 15',
+          'net-30': 'Net 30',
+          'net-60': 'Net 60',
+          'cod': 'COD',
+          'prepaid': 'Prepaid',
+        };
+        return <Badge variant="secondary">{termsMap[value] || value}</Badge>;
+      },
     },
     {
       key: 'isActive',
       title: 'Status',
-      render: (value: boolean) => (
-        <Badge variant={value ? 'success' : 'danger'}>
-          {value ? 'Active' : 'Inactive'}
-        </Badge>
+      render: (value: boolean, row: Supplier) => (
+        <div className="flex flex-col gap-1">
+          <Badge variant={value ? 'success' : 'danger'}>
+            {value ? 'Active' : 'Inactive'}
+          </Badge>
+          {row.isPreferred && (
+            <Badge variant="warning" className="text-xs">
+              <CheckBadgeIcon className="w-3 h-3 mr-1" />
+              Preferred
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -258,15 +422,34 @@ export default function SuppliersPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => openViewModal(row)}
+            title="View Details"
+          >
+            <EyeIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => openEditModal(row)}
+            title="Edit"
           >
             <PencilIcon className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => handleTogglePreferred(row)}
+            className={row.isPreferred ? 'text-yellow-600 hover:text-yellow-700' : 'text-gray-600 hover:text-gray-700'}
+            title={row.isPreferred ? 'Remove Preferred' : 'Make Preferred'}
+          >
+            <CheckBadgeIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => handleToggleStatus(row)}
             className={row.isActive ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+            title={row.isActive ? 'Deactivate' : 'Activate'}
           >
             <PowerIcon className="w-4 h-4" />
           </Button>
@@ -275,6 +458,7 @@ export default function SuppliersPage() {
             size="sm"
             onClick={() => handleDelete(row)}
             className="text-red-600 hover:text-red-700"
+            title="Delete"
           >
             <TrashIcon className="w-4 h-4" />
           </Button>
@@ -283,12 +467,22 @@ export default function SuppliersPage() {
     },
   ];
 
-  const stats = {
-    total: data?.total || 0,
-    active: data?.suppliers?.filter(s => s.isActive).length || 0,
-    topRated: data?.suppliers?.filter(s => s.rating >= 4).length || 0,
-    avgRating: data?.suppliers?.length ? (data.suppliers.reduce((sum, s) => sum + s.rating, 0) / data.suppliers.length).toFixed(1) : '0',
-  };
+  const stats = useMemo(() => {
+    if (supplierStats) {
+      return {
+        total: supplierStats.total || totalSuppliers,
+        active: supplierStats.active || suppliers.filter(s => s.isActive).length,
+        topRated: supplierStats.topRated || suppliers.filter(s => s.rating >= 4).length,
+        avgRating: supplierStats.avgRating || (suppliers.length ? (suppliers.reduce((sum, s) => sum + s.rating, 0) / suppliers.length).toFixed(1) : '0'),
+      };
+    }
+    return {
+      total: totalSuppliers,
+      active: suppliers.filter(s => s.isActive).length,
+      topRated: suppliers.filter(s => s.rating >= 4).length,
+      avgRating: suppliers.length ? (suppliers.reduce((sum, s) => sum + s.rating, 0) / suppliers.length).toFixed(1) : '0',
+    };
+  }, [suppliers, totalSuppliers, supplierStats]);
 
   return (
     <div className="space-y-6">
@@ -371,6 +565,22 @@ export default function SuppliersPage() {
             <div className="w-full sm:w-48">
               <Select
                 options={[
+                  { value: 'all', label: 'All Types' },
+                  { value: 'food', label: 'Food' },
+                  { value: 'beverage', label: 'Beverage' },
+                  { value: 'equipment', label: 'Equipment' },
+                  { value: 'packaging', label: 'Packaging' },
+                  { value: 'service', label: 'Service' },
+                  { value: 'other', label: 'Other' },
+                ]}
+                value={typeFilter}
+                onChange={setTypeFilter}
+                placeholder="Filter by type"
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <Select
+                options={[
                   { value: 'all', label: 'All Status' },
                   { value: 'active', label: 'Active' },
                   { value: 'inactive', label: 'Inactive' },
@@ -398,27 +608,37 @@ export default function SuppliersPage() {
       </Card>
 
       {/* Suppliers Table */}
-      <DataTable
-        data={data?.suppliers || []}
-        columns={columns}
-        loading={isLoading}
-        searchable={false}
-        selectable={true}
-        pagination={{
-          currentPage,
-          totalPages: Math.ceil((data?.total || 0) / itemsPerPage),
-          itemsPerPage,
-          totalItems: data?.total || 0,
-          onPageChange: setCurrentPage,
-          onItemsPerPageChange: setItemsPerPage,
-        }}
-        exportable={true}
-        exportFilename="suppliers"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} suppliers as ${format}`);
-        }}
-        emptyMessage="No suppliers found. Add your first supplier to get started."
-      />
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">Loading suppliers...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          data={suppliers}
+          columns={columns}
+          loading={isLoading}
+          searchable={false}
+          selectable={true}
+          pagination={{
+            currentPage,
+            totalPages: Math.ceil(totalSuppliers / itemsPerPage),
+            itemsPerPage,
+            totalItems: totalSuppliers,
+            onPageChange: setCurrentPage,
+            onItemsPerPageChange: setItemsPerPage,
+          }}
+          exportable={true}
+          exportFilename="suppliers"
+          onExport={(format, items) => {
+            toast.success(`Exporting ${items.length} suppliers as ${format.toUpperCase()}`);
+          }}
+          emptyMessage="No suppliers found. Add your first supplier to get started."
+        />
+      )}
 
       {/* Create Supplier Modal */}
       <Modal
@@ -438,15 +658,41 @@ export default function SuppliersPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
+            <Select
+              label="Type"
+              options={[
+                { value: 'food', label: 'Food' },
+                { value: 'beverage', label: 'Beverage' },
+                { value: 'equipment', label: 'Equipment' },
+                { value: 'packaging', label: 'Packaging' },
+                { value: 'service', label: 'Service' },
+                { value: 'other', label: 'Other' },
+              ]}
+              value={formData.type}
+              onChange={(value) => setFormData({ ...formData, type: value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Description (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="input w-full"
+              placeholder="Brief description of the supplier..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Contact Person"
               value={formData.contactPerson}
               onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
               required
             />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Email"
               type="email"
@@ -454,60 +700,71 @@ export default function SuppliersPage() {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Phone Number"
-              value={formData.phoneNumber}
-              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               required
+            />
+            <Input
+              label="Alternate Phone (Optional)"
+              value={formData.alternatePhone}
+              onChange={(e) => setFormData({ ...formData, alternatePhone: e.target.value })}
             />
           </div>
 
           <Input
-            label="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            label="Street Address"
+            value={formData.address.street}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              address: { ...formData.address, street: e.target.value } 
+            })}
             required
           />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
               label="City"
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              value={formData.address.city}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, city: e.target.value } 
+              })}
               required
             />
             <Input
               label="State"
-              value={formData.state}
-              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+              value={formData.address.state}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, state: e.target.value } 
+              })}
               required
             />
             <Input
               label="ZIP Code"
-              value={formData.zipCode}
-              onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+              value={formData.address.zipCode}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, zipCode: e.target.value } 
+              })}
               required
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
+            <Input
               label="Country"
-              options={[
-                { value: 'US', label: 'United States' },
-                { value: 'CA', label: 'Canada' },
-                { value: 'MX', label: 'Mexico' },
-                { value: 'UK', label: 'United Kingdom' },
-                { value: 'DE', label: 'Germany' },
-                { value: 'FR', label: 'France' },
-                { value: 'IT', label: 'Italy' },
-                { value: 'ES', label: 'Spain' },
-                { value: 'CN', label: 'China' },
-                { value: 'JP', label: 'Japan' },
-                { value: 'IN', label: 'India' },
-              ]}
-              value={formData.country}
-              onChange={(value) => setFormData({ ...formData, country: value })}
+              value={formData.address.country}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, country: e.target.value } 
+              })}
+              required
             />
             <Input
               label="Website (Optional)"
@@ -523,51 +780,35 @@ export default function SuppliersPage() {
               value={formData.taxId}
               onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
             />
+            <Input
+              label="Registration Number (Optional)"
+              value={formData.registrationNumber}
+              onChange={(e) => setFormData({ ...formData, registrationNumber: e.target.value })}
+            />
             <Select
               label="Payment Terms"
               options={[
-                { value: 'Net 15', label: 'Net 15' },
-                { value: 'Net 30', label: 'Net 30' },
-                { value: 'Net 45', label: 'Net 45' },
-                { value: 'Net 60', label: 'Net 60' },
-                { value: 'Cash on Delivery', label: 'Cash on Delivery' },
-                { value: 'Prepaid', label: 'Prepaid' },
+                { value: 'net-7', label: 'Net 7' },
+                { value: 'net-15', label: 'Net 15' },
+                { value: 'net-30', label: 'Net 30' },
+                { value: 'net-60', label: 'Net 60' },
+                { value: 'cod', label: 'Cash on Delivery' },
+                { value: 'prepaid', label: 'Prepaid' },
               ]}
               value={formData.paymentTerms}
               onChange={(value) => setFormData({ ...formData, paymentTerms: value })}
             />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Rating (1-5)
-              </label>
-              <Select
-                options={[
-                  { value: '5', label: '⭐⭐⭐⭐⭐ Excellent' },
-                  { value: '4', label: '⭐⭐⭐⭐ Very Good' },
-                  { value: '3', label: '⭐⭐⭐ Good' },
-                  { value: '2', label: '⭐⭐ Fair' },
-                  { value: '1', label: '⭐ Poor' },
-                ]}
-                value={formData.rating.toString()}
-                onChange={(value) => setFormData({ ...formData, rating: parseInt(value) })}
-              />
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Credit Limit (Optional)
+            </label>
             <Input
-              label="Lead Time (days)"
               type="number"
-              value={formData.leadTime}
-              onChange={(e) => setFormData({ ...formData, leadTime: parseInt(e.target.value) || 0 })}
-              required
-            />
-            <Input
-              label="Minimum Order ($)"
-              type="number"
-              value={formData.minimumOrder}
-              onChange={(e) => setFormData({ ...formData, minimumOrder: parseFloat(e.target.value) || 0 })}
-              required
+              value={formData.creditLimit}
+              onChange={(e) => setFormData({ ...formData, creditLimit: parseFloat(e.target.value) || 0 })}
+              placeholder="0"
             />
           </div>
 
@@ -594,8 +835,8 @@ export default function SuppliersPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>
-              Add Supplier
+            <Button onClick={handleCreate} disabled={isCreating}>
+              {isCreating ? 'Creating...' : 'Add Supplier'}
             </Button>
           </div>
         </div>
@@ -619,15 +860,41 @@ export default function SuppliersPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
+            <Select
+              label="Type"
+              options={[
+                { value: 'food', label: 'Food' },
+                { value: 'beverage', label: 'Beverage' },
+                { value: 'equipment', label: 'Equipment' },
+                { value: 'packaging', label: 'Packaging' },
+                { value: 'service', label: 'Service' },
+                { value: 'other', label: 'Other' },
+              ]}
+              value={formData.type}
+              onChange={(value) => setFormData({ ...formData, type: value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Description (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="input w-full"
+              placeholder="Brief description of the supplier..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Contact Person"
               value={formData.contactPerson}
               onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
               required
             />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Email"
               type="email"
@@ -635,60 +902,71 @@ export default function SuppliersPage() {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Phone Number"
-              value={formData.phoneNumber}
-              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               required
+            />
+            <Input
+              label="Alternate Phone (Optional)"
+              value={formData.alternatePhone}
+              onChange={(e) => setFormData({ ...formData, alternatePhone: e.target.value })}
             />
           </div>
 
           <Input
-            label="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            label="Street Address"
+            value={formData.address.street}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              address: { ...formData.address, street: e.target.value } 
+            })}
             required
           />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
               label="City"
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              value={formData.address.city}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, city: e.target.value } 
+              })}
               required
             />
             <Input
               label="State"
-              value={formData.state}
-              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+              value={formData.address.state}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, state: e.target.value } 
+              })}
               required
             />
             <Input
               label="ZIP Code"
-              value={formData.zipCode}
-              onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+              value={formData.address.zipCode}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, zipCode: e.target.value } 
+              })}
               required
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
+            <Input
               label="Country"
-              options={[
-                { value: 'US', label: 'United States' },
-                { value: 'CA', label: 'Canada' },
-                { value: 'MX', label: 'Mexico' },
-                { value: 'UK', label: 'United Kingdom' },
-                { value: 'DE', label: 'Germany' },
-                { value: 'FR', label: 'France' },
-                { value: 'IT', label: 'Italy' },
-                { value: 'ES', label: 'Spain' },
-                { value: 'CN', label: 'China' },
-                { value: 'JP', label: 'Japan' },
-                { value: 'IN', label: 'India' },
-              ]}
-              value={formData.country}
-              onChange={(value) => setFormData({ ...formData, country: value })}
+              value={formData.address.country}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, country: e.target.value } 
+              })}
+              required
             />
             <Input
               label="Website (Optional)"
@@ -704,51 +982,35 @@ export default function SuppliersPage() {
               value={formData.taxId}
               onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
             />
+            <Input
+              label="Registration Number (Optional)"
+              value={formData.registrationNumber}
+              onChange={(e) => setFormData({ ...formData, registrationNumber: e.target.value })}
+            />
             <Select
               label="Payment Terms"
               options={[
-                { value: 'Net 15', label: 'Net 15' },
-                { value: 'Net 30', label: 'Net 30' },
-                { value: 'Net 45', label: 'Net 45' },
-                { value: 'Net 60', label: 'Net 60' },
-                { value: 'Cash on Delivery', label: 'Cash on Delivery' },
-                { value: 'Prepaid', label: 'Prepaid' },
+                { value: 'net-7', label: 'Net 7' },
+                { value: 'net-15', label: 'Net 15' },
+                { value: 'net-30', label: 'Net 30' },
+                { value: 'net-60', label: 'Net 60' },
+                { value: 'cod', label: 'Cash on Delivery' },
+                { value: 'prepaid', label: 'Prepaid' },
               ]}
               value={formData.paymentTerms}
               onChange={(value) => setFormData({ ...formData, paymentTerms: value })}
             />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Rating (1-5)
-              </label>
-              <Select
-                options={[
-                  { value: '5', label: '⭐⭐⭐⭐⭐ Excellent' },
-                  { value: '4', label: '⭐⭐⭐⭐ Very Good' },
-                  { value: '3', label: '⭐⭐⭐ Good' },
-                  { value: '2', label: '⭐⭐ Fair' },
-                  { value: '1', label: '⭐ Poor' },
-                ]}
-                value={formData.rating.toString()}
-                onChange={(value) => setFormData({ ...formData, rating: parseInt(value) })}
-              />
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Credit Limit (Optional)
+            </label>
             <Input
-              label="Lead Time (days)"
               type="number"
-              value={formData.leadTime}
-              onChange={(e) => setFormData({ ...formData, leadTime: parseInt(e.target.value) || 0 })}
-              required
-            />
-            <Input
-              label="Minimum Order ($)"
-              type="number"
-              value={formData.minimumOrder}
-              onChange={(e) => setFormData({ ...formData, minimumOrder: parseFloat(e.target.value) || 0 })}
-              required
+              value={formData.creditLimit}
+              onChange={(e) => setFormData({ ...formData, creditLimit: parseFloat(e.target.value) || 0 })}
+              placeholder="0"
             />
           </div>
 
@@ -775,11 +1037,206 @@ export default function SuppliersPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleEdit}>
-              Update Supplier
+            <Button onClick={handleEdit} disabled={isUpdating}>
+              {isUpdating ? 'Updating...' : 'Update Supplier'}
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* View Supplier Modal */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedSupplier(null);
+        }}
+        title="Supplier Details"
+        className="max-w-3xl"
+      >
+        {selectedSupplier && (
+          <div className="space-y-6">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <TruckIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {selectedSupplier.name}
+                  </h3>
+                  {selectedSupplier.isPreferred && (
+                    <Badge variant="warning">
+                      <CheckBadgeIcon className="w-3 h-3 mr-1" />
+                      Preferred
+                    </Badge>
+                  )}
+                  <Badge variant={selectedSupplier.isActive ? 'success' : 'danger'}>
+                    {selectedSupplier.isActive ? 'Active' : 'Inactive'}
+                  </Badge>
+                </div>
+                {selectedSupplier.code && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Code: {selectedSupplier.code}
+                  </p>
+                )}
+                {selectedSupplier.description && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    {selectedSupplier.description}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Contact Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <EnvelopeIcon className="w-4 h-4 text-gray-400" />
+                    <span className="text-gray-600 dark:text-gray-400">{selectedSupplier.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <PhoneIcon className="w-4 h-4 text-gray-400" />
+                    <span className="text-gray-600 dark:text-gray-400">{selectedSupplier.phone || selectedSupplier.phoneNumber}</span>
+                  </div>
+                  {selectedSupplier.alternatePhone && (
+                    <div className="flex items-center gap-2">
+                      <PhoneIcon className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600 dark:text-gray-400">{selectedSupplier.alternatePhone}</span>
+                    </div>
+                  )}
+                  {selectedSupplier.website && (
+                    <div className="flex items-center gap-2">
+                      <BuildingOfficeIcon className="w-4 h-4 text-gray-400" />
+                      <a href={selectedSupplier.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        {selectedSupplier.website}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Address</h4>
+                <div className="flex items-start gap-2 text-sm">
+                  <MapPinIcon className="w-4 h-4 text-gray-400 mt-1" />
+                  <div className="text-gray-600 dark:text-gray-400">
+                    <p>{selectedSupplier.address?.street || ''}</p>
+                    <p>{selectedSupplier.address?.city}, {selectedSupplier.address?.state} {selectedSupplier.address?.zipCode}</p>
+                    <p>{selectedSupplier.address?.country}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Type</p>
+                <Badge variant="secondary" className="capitalize">{selectedSupplier.type}</Badge>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Payment Terms</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {selectedSupplier.paymentTerms === 'net-7' ? 'Net 7' :
+                   selectedSupplier.paymentTerms === 'net-15' ? 'Net 15' :
+                   selectedSupplier.paymentTerms === 'net-30' ? 'Net 30' :
+                   selectedSupplier.paymentTerms === 'net-60' ? 'Net 60' :
+                   selectedSupplier.paymentTerms === 'cod' ? 'COD' :
+                   selectedSupplier.paymentTerms === 'prepaid' ? 'Prepaid' :
+                   selectedSupplier.paymentTerms}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Rating</p>
+                <div className="flex items-center gap-1">
+                  {renderStars(selectedSupplier.rating)}
+                  <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
+                    ({selectedSupplier.rating})
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {(selectedSupplier.taxId || selectedSupplier.registrationNumber || selectedSupplier.creditLimit) && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Business Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  {selectedSupplier.taxId && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Tax ID:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedSupplier.taxId}</span>
+                    </div>
+                  )}
+                  {selectedSupplier.registrationNumber && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Registration #:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedSupplier.registrationNumber}</span>
+                    </div>
+                  )}
+                  {selectedSupplier.creditLimit && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Credit Limit:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{formatCurrency(selectedSupplier.creditLimit)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(selectedSupplier.productCategories?.length || selectedSupplier.certifications?.length) && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Categories & Certifications</h4>
+                <div className="space-y-3">
+                  {selectedSupplier.productCategories && selectedSupplier.productCategories.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Product Categories:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedSupplier.productCategories.map((cat, idx) => (
+                          <Badge key={idx} variant="secondary">{cat}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedSupplier.certifications && selectedSupplier.certifications.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Certifications:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedSupplier.certifications.map((cert, idx) => (
+                          <Badge key={idx} variant="warning">{cert}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {selectedSupplier.notes && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Notes</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedSupplier.notes}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="secondary"
+                onClick={() => setIsViewModalOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  openEditModal(selectedSupplier);
+                }}
+              >
+                Edit Supplier
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

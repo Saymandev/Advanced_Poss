@@ -4,13 +4,16 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import {
+  KitchenOrder,
   useCancelKitchenOrderMutation,
   useCompleteKitchenOrderItemMutation,
   useCompleteKitchenOrderMutation,
+  useGetKitchenDelayedOrdersQuery,
   useGetKitchenPendingOrdersQuery,
   useGetKitchenPreparingOrdersQuery,
   useGetKitchenReadyOrdersQuery,
   useGetKitchenStatsQuery,
+  useGetKitchenUrgentOrdersQuery,
   useMarkKitchenOrderUrgentMutation,
   useStartKitchenOrderItemMutation,
   useStartKitchenOrderMutation
@@ -23,114 +26,116 @@ import {
   FireIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-interface KitchenOrder {
-  id: string;
-  orderNumber: string;
-  tableNumber: number;
-  customerName?: string;
-  status: 'pending' | 'preparing' | 'ready' | 'served';
-  priority: 'normal' | 'high' | 'urgent';
-  items: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    notes?: string;
-    status: 'pending' | 'preparing' | 'ready';
-    preparationTime?: number;
-  }>;
-  createdAt: string;
-  estimatedReadyTime?: string;
-  specialInstructions?: string;
-}
-
-// Mock data for kitchen display (removed - using real API)
-const _mockKitchenOrders: KitchenOrder[] = [
-  {
-    id: '1',
-    orderNumber: 'ORD-2024-001',
-    tableNumber: 5,
-    customerName: 'John Doe',
-    status: 'preparing',
-    priority: 'normal',
-    items: [
-      {
-        id: '1',
-        name: 'Grilled Salmon',
-        quantity: 1,
-        notes: 'Medium rare',
-        status: 'preparing',
-        preparationTime: 15,
-      },
-      {
-        id: '2',
-        name: 'Caesar Salad',
-        quantity: 1,
-        status: 'ready',
-        preparationTime: 8,
-      },
-    ],
-    createdAt: '2024-01-20T18:30:00Z',
-    estimatedReadyTime: '2024-01-20T18:45:00Z',
-    specialInstructions: 'Customer has nut allergy',
-  },
-  {
-    id: '2',
-    orderNumber: 'ORD-2024-002',
-    tableNumber: 8,
-    customerName: 'Jane Smith',
-    status: 'pending',
-    priority: 'high',
-    items: [
-      {
-        id: '3',
-        name: 'Chicken Parmesan',
-        quantity: 1,
-        status: 'pending',
-        preparationTime: 20,
-      },
-      {
-        id: '4',
-        name: 'Garlic Bread',
-        quantity: 1,
-        status: 'pending',
-        preparationTime: 5,
-      },
-    ],
-    createdAt: '2024-01-20T18:35:00Z',
-    estimatedReadyTime: '2024-01-20T18:55:00Z',
-  },
-  {
-    id: '3',
-    orderNumber: 'ORD-2024-003',
-    tableNumber: 12,
-    status: 'ready',
-    priority: 'normal',
-    items: [
-      {
-        id: '5',
-        name: 'Margherita Pizza',
-        quantity: 1,
-        status: 'ready',
-        preparationTime: 12,
-      },
-    ],
-    createdAt: '2024-01-20T18:20:00Z',
-    estimatedReadyTime: '2024-01-20T18:32:00Z',
-  },
-];
-
 export default function KitchenPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [selectedOrder, setSelectedOrder] = useState<KitchenOrder | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // API calls
-  const { data: kitchenStats, isLoading: statsLoading } = useGetKitchenStatsQuery(user?.branchId || '');
-  const { data: pendingOrders = [], isLoading: pendingLoading } = useGetKitchenPendingOrdersQuery(user?.branchId || '');
-  const { data: preparingOrders = [], isLoading: preparingLoading } = useGetKitchenPreparingOrdersQuery(user?.branchId || '');
-  const { data: readyOrders = [], isLoading: readyLoading } = useGetKitchenReadyOrdersQuery(user?.branchId || '');
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  // Update time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // API calls with polling for real-time updates
+  const { data: statsResponse, isLoading: statsLoading } = useGetKitchenStatsQuery(branchId || '', {
+    skip: !branchId,
+    pollingInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const { data: pendingResponse, isLoading: pendingLoading, refetch: refetchPending } = useGetKitchenPendingOrdersQuery(branchId || '', {
+    skip: !branchId,
+    pollingInterval: 10000, // Refresh every 10 seconds
+  });
+
+  const { data: preparingResponse, isLoading: preparingLoading, refetch: refetchPreparing } = useGetKitchenPreparingOrdersQuery(branchId || '', {
+    skip: !branchId,
+    pollingInterval: 10000,
+  });
+
+  const { data: readyResponse, isLoading: readyLoading, refetch: refetchReady } = useGetKitchenReadyOrdersQuery(branchId || '', {
+    skip: !branchId,
+    pollingInterval: 10000,
+  });
+
+  const { data: urgentResponse } = useGetKitchenUrgentOrdersQuery(branchId || '', {
+    skip: !branchId,
+    pollingInterval: 15000,
+  });
+
+  const { data: delayedResponse } = useGetKitchenDelayedOrdersQuery(branchId || '', {
+    skip: !branchId,
+    pollingInterval: 20000,
+  });
+
+  // Refetch function
+  const refetchAll = useCallback(() => {
+    if (!branchId) return;
+    refetchPending();
+    refetchPreparing();
+    refetchReady();
+  }, [branchId, refetchPending, refetchPreparing, refetchReady]);
+
+  // Auto-refresh orders every 30 seconds
+  useEffect(() => {
+    if (!branchId) return;
+    const interval = setInterval(() => {
+      refetchAll();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [branchId, refetchAll]);
+
+  // Extract data from API responses
+  const kitchenStats = useMemo(() => {
+    if (!statsResponse) return null;
+    const response = statsResponse as any;
+    return response.data || response;
+  }, [statsResponse]);
+
+  const pendingOrders = useMemo(() => {
+    if (!pendingResponse) return [];
+    const response = pendingResponse as any;
+    const items = response.data || (Array.isArray(response) ? response : []);
+    return Array.isArray(items) ? items : [];
+  }, [pendingResponse]);
+
+  const preparingOrders = useMemo(() => {
+    if (!preparingResponse) return [];
+    const response = preparingResponse as any;
+    const items = response.data || (Array.isArray(response) ? response : []);
+    return Array.isArray(items) ? items : [];
+  }, [preparingResponse]);
+
+  const readyOrders = useMemo(() => {
+    if (!readyResponse) return [];
+    const response = readyResponse as any;
+    const items = response.data || (Array.isArray(response) ? response : []);
+    return Array.isArray(items) ? items : [];
+  }, [readyResponse]);
+
+  const urgentOrders = useMemo(() => {
+    if (!urgentResponse) return [];
+    const response = urgentResponse as any;
+    const items = response.data || (Array.isArray(response) ? response : []);
+    return Array.isArray(items) ? items : [];
+  }, [urgentResponse]);
+
+  const delayedOrders = useMemo(() => {
+    if (!delayedResponse) return [];
+    const response = delayedResponse as any;
+    const items = response.data || (Array.isArray(response) ? response : []);
+    return Array.isArray(items) ? items : [];
+  }, [delayedResponse]);
 
   // Mutations
   const [startOrder] = useStartKitchenOrderMutation();
@@ -145,44 +150,52 @@ export default function KitchenPage() {
       if (newStatus === 'preparing') {
         await startItem({ id: orderId, itemId }).unwrap();
         toast.success('Item preparation started');
+        refetchAll();
       } else if (newStatus === 'ready') {
         await completeItem({ id: orderId, itemId }).unwrap();
         toast.success('Item completed');
+        refetchAll();
       }
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update item status');
+      toast.error(error?.data?.message || error?.message || 'Failed to update item status');
     }
   };
 
-  const handleOrderStatusChange = async (orderId: string, newStatus: KitchenOrder['status']) => {
+  const handleOrderStatusChange = async (orderId: string, newStatus: 'pending' | 'preparing' | 'ready' | 'completed') => {
     try {
       if (newStatus === 'preparing') {
         await startOrder(orderId).unwrap();
         toast.success('Order preparation started');
-      } else if (newStatus === 'ready') {
+        refetchAll();
+      } else if (newStatus === 'ready' || newStatus === 'completed') {
         await completeOrder(orderId).unwrap();
-        toast.success('Order completed');
+        toast.success(newStatus === 'ready' ? 'Order marked as ready' : 'Order completed');
+        refetchAll();
       }
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update order status');
+      toast.error(error?.data?.message || error?.message || 'Failed to update order status');
     }
   };
 
-  const _handleMarkUrgent = async (orderId: string) => {
+  const handleMarkUrgent = async (orderId: string) => {
+    if (!confirm('Mark this order as urgent?')) return;
     try {
       await markUrgent(orderId).unwrap();
       toast.success('Order marked as urgent');
+      refetchAll();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to mark order as urgent');
+      toast.error(error?.data?.message || error?.message || 'Failed to mark order as urgent');
     }
   };
 
-  const _handleCancelOrder = async (orderId: string) => {
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm('Are you sure you want to cancel this order?')) return;
     try {
       await cancelOrder(orderId).unwrap();
       toast.success('Order cancelled');
+      refetchAll();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to cancel order');
+      toast.error(error?.data?.message || error?.message || 'Failed to cancel order');
     }
   };
 
@@ -249,8 +262,22 @@ export default function KitchenPage() {
           <div className="text-right">
             <p className="text-sm text-gray-600 dark:text-gray-400">Current Time</p>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">
-              {new Date().toLocaleTimeString()}
+              {currentTime.toLocaleTimeString()}
             </p>
+            {(urgentOrders.length > 0 || delayedOrders.length > 0) && (
+              <div className="mt-2 flex gap-2">
+                {urgentOrders.length > 0 && (
+                  <Badge variant="danger" className="text-xs">
+                    {urgentOrders.length} Urgent
+                  </Badge>
+                )}
+                {delayedOrders.length > 0 && (
+                  <Badge variant="warning" className="text-xs">
+                    {delayedOrders.length} Delayed
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -305,7 +332,7 @@ export default function KitchenPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Prep Time</p>
                 <p className="text-3xl font-bold text-purple-600">
-                  {isLoading ? '...' : `${kitchenStats?.avgPrepTime || 0} min`}
+                  {isLoading ? '...' : `${Math.round(kitchenStats?.avgPrepTime || 0)} min`}
                 </p>
               </div>
               <ClockIcon className="w-8 h-8 text-purple-600" />
@@ -336,18 +363,29 @@ export default function KitchenPage() {
                 <p className="text-gray-600 dark:text-gray-400">No pending orders</p>
               </div>
             ) : (
-              pendingOrders.map((order) => (
-              <div key={order.id} className="border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 bg-yellow-50 dark:bg-yellow-900/20">
+              pendingOrders.map((order: any) => (
+              <div 
+                key={order.id || order._id} 
+                className={`border rounded-lg p-4 ${
+                  order.priority === 'urgent' 
+                    ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
+                    : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
+                }`}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
-                      Order #{order.orderNumber}
+                      Order #{order.orderNumber || order.order_id}
                     </h3>
                     {getPriorityBadge(order.priority)}
+                    {order.priority === 'urgent' && (
+                      <FireIcon className="w-5 h-5 text-red-600 animate-pulse" />
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Table {order.tableNumber}
+                      {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
+                       order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
                       {formatDateTime(order.createdAt)}
@@ -356,21 +394,26 @@ export default function KitchenPage() {
                 </div>
 
                 <div className="space-y-2 mb-3">
-                  {order.items.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between">
+                  {(order.items || []).map((item: any) => (
+                    <div key={item.id || item._id} className="flex items-center justify-between">
                       <div className="flex-1">
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {item.quantity}x {item.name}
+                          {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
                         </p>
                         {item.notes && (
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             Note: {item.notes}
                           </p>
                         )}
+                        {item.prepTime && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Prep: {item.prepTime} min
+                          </p>
+                        )}
                       </div>
                       <Button
                         size="sm"
-                        onClick={() => handleItemStatusChange(order.id, item.id, 'preparing')}
+                        onClick={() => handleItemStatusChange(order.id || order._id, item.id || item._id, 'preparing')}
                         className="ml-2"
                       >
                         Start
@@ -385,12 +428,33 @@ export default function KitchenPage() {
                   </div>
                 )}
 
-                <Button
-                  onClick={() => handleOrderStatusChange(order.id, 'preparing')}
-                  className="w-full"
-                >
-                  Start Preparing
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => handleOrderStatusChange(order.id || order._id, 'preparing')}
+                    className="flex-1"
+                  >
+                    Start Preparing
+                  </Button>
+                  {order.priority !== 'urgent' && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleMarkUrgent(order.id || order._id)}
+                      title="Mark as Urgent"
+                    >
+                      <FireIcon className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCancelOrder(order.id || order._id)}
+                    className="text-red-600"
+                    title="Cancel Order"
+                  >
+                    <XCircleIcon className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             ))
             )}
@@ -417,18 +481,26 @@ export default function KitchenPage() {
                 <p className="text-gray-600 dark:text-gray-400">No orders being prepared</p>
               </div>
             ) : (
-              preparingOrders.map((order) => (
-              <div key={order.id} className="border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
+              preparingOrders.map((order: any) => (
+              <div 
+                key={order.id || order._id} 
+                className={`border rounded-lg p-4 ${
+                  order.priority === 'urgent' 
+                    ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' 
+                    : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
+                }`}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
-                      Order #{order.orderNumber}
+                      Order #{order.orderNumber || order.order_id}
                     </h3>
                     {getPriorityBadge(order.priority)}
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Table {order.tableNumber}
+                      {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
+                       order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
                       Est: {order.estimatedTime ? `${order.estimatedTime} min` : 'TBD'}
@@ -437,11 +509,11 @@ export default function KitchenPage() {
                 </div>
 
                 <div className="space-y-2 mb-3">
-                  {order.items.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between">
+                  {(order.items || []).map((item: any) => (
+                    <div key={item.id || item._id} className="flex items-center justify-between">
                       <div className="flex-1">
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {item.quantity}x {item.name}
+                          {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
                         </p>
                         {item.notes && (
                           <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -455,7 +527,7 @@ export default function KitchenPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleItemStatusChange(order.id, item.id, 'ready')}
+                            onClick={() => handleItemStatusChange(order.id || order._id, item.id || item._id, 'ready')}
                           >
                             <CheckCircleIcon className="w-4 h-4" />
                           </Button>
@@ -469,18 +541,21 @@ export default function KitchenPage() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => handleOrderStatusChange(order.id, 'pending')}
-                    className="flex-1"
-                  >
-                    Back to Pending
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => handleOrderStatusChange(order.id, 'ready')}
+                    onClick={() => handleOrderStatusChange(order.id || order._id, 'ready')}
                     className="flex-1"
                   >
                     Mark Ready
                   </Button>
+                  {order.priority !== 'urgent' && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleMarkUrgent(order.id || order._id)}
+                      title="Mark as Urgent"
+                    >
+                      <FireIcon className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))
@@ -508,31 +583,32 @@ export default function KitchenPage() {
                 <p className="text-gray-600 dark:text-gray-400">No orders ready for service</p>
               </div>
             ) : (
-              readyOrders.map((order) => (
-              <div key={order.id} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
+              readyOrders.map((order: any) => (
+              <div key={order.id || order._id} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
-                      Order #{order.orderNumber}
+                      Order #{order.orderNumber || order.order_id}
                     </h3>
                     {getPriorityBadge(order.priority)}
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Table {order.tableNumber}
+                      {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
+                       order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
-                      Ready since: {formatDateTime(order.updatedAt)}
+                      Ready since: {formatDateTime(order.updatedAt || order.createdAt)}
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-2 mb-3">
-                  {order.items.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between">
+                  {(order.items || []).map((item: any) => (
+                    <div key={item.id || item._id} className="flex items-center justify-between">
                       <div className="flex-1">
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {item.quantity}x {item.name}
+                          {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
                         </p>
                         {item.notes && (
                           <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -548,7 +624,7 @@ export default function KitchenPage() {
                 </div>
 
                 <Button
-                  onClick={() => handleOrderStatusChange(order.id, 'served')}
+                  onClick={() => handleOrderStatusChange(order.id || order._id, 'completed')}
                   className="w-full"
                 >
                   Mark as Served
@@ -589,9 +665,9 @@ export default function KitchenPage() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Customer:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {selectedOrder.customerName || 'Walk-in'}
+                      <span className="text-gray-600 dark:text-gray-400">Order Type:</span>
+                      <span className="font-medium text-gray-900 dark:text-white capitalize">
+                        {selectedOrder.orderType || 'Dine-in'}
                       </span>
                     </div>
                     <div className="flex justify-between">

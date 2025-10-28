@@ -7,8 +7,9 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { CreateStaffRequest, Staff, useCreateStaffMutation, useDeactivateStaffMutation, useDeleteStaffMutation, useGetStaffByIdQuery, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
-import { formatDateTime } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
   CalendarIcon,
   CurrencyDollarIcon,
@@ -17,171 +18,246 @@ import {
   PencilIcon,
   PhoneIcon,
   PlusIcon,
+  TrashIcon,
   UserIcon,
-  UsersIcon
+  UsersIcon,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-interface Staff {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
-  role: string;
-  pin: string;
-  isActive: boolean;
-  hireDate: string;
-  salary?: number;
-  address?: string;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  shiftSchedule?: {
-    monday?: string;
-    tuesday?: string;
-    wednesday?: string;
-    thursday?: string;
-    friday?: string;
-    saturday?: string;
-    sunday?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Mock data for demonstration
-const mockStaff: Staff[] = [
-  {
-    id: '1',
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    email: 'sarah.johnson@restaurant.com',
-    phoneNumber: '+1 (555) 123-4567',
-    role: 'Manager',
-    pin: '1234',
-    isActive: true,
-    hireDate: '2023-06-15',
-    salary: 55000,
-    address: '123 Main St, Anytown, ST 12345',
-    emergencyContactName: 'Mike Johnson',
-    emergencyContactPhone: '+1 (555) 987-6543',
-    shiftSchedule: {
-      monday: '9:00-17:00',
-      tuesday: '9:00-17:00',
-      wednesday: '9:00-17:00',
-      thursday: '9:00-17:00',
-      friday: '9:00-17:00',
-      saturday: 'OFF',
-      sunday: 'OFF',
-    },
-    createdAt: '2023-06-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: '2',
-    firstName: 'Carlos',
-    lastName: 'Rodriguez',
-    email: 'carlos.rodriguez@restaurant.com',
-    phoneNumber: '+1 (555) 234-5678',
-    role: 'Chef',
-    pin: '5678',
-    isActive: true,
-    hireDate: '2023-08-20',
-    salary: 48000,
-    shiftSchedule: {
-      monday: '14:00-22:00',
-      tuesday: '14:00-22:00',
-      wednesday: 'OFF',
-      thursday: '14:00-22:00',
-      friday: '14:00-22:00',
-      saturday: '14:00-22:00',
-      sunday: 'OFF',
-    },
-    createdAt: '2023-08-20T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: '3',
-    firstName: 'Emma',
-    lastName: 'Davis',
-    email: 'emma.davis@restaurant.com',
-    phoneNumber: '+1 (555) 345-6789',
-    role: 'Waiter',
-    pin: '9012',
-    isActive: true,
-    hireDate: '2023-11-10',
-    salary: 32000,
-    shiftSchedule: {
-      monday: '17:00-23:00',
-      tuesday: 'OFF',
-      wednesday: '17:00-23:00',
-      thursday: '17:00-23:00',
-      friday: '17:00-23:00',
-      saturday: '17:00-23:00',
-      sunday: '17:00-23:00',
-    },
-    createdAt: '2023-11-10T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: '4',
-    firstName: 'Alex',
-    lastName: 'Chen',
-    email: 'alex.chen@restaurant.com',
-    phoneNumber: '+1 (555) 456-7890',
-    role: 'Cashier',
-    pin: '3456',
-    isActive: false,
-    hireDate: '2023-09-05',
-    salary: 28000,
-    createdAt: '2023-09-05T10:00:00Z',
-    updatedAt: '2024-01-10T10:00:00Z',
-  },
+const ROLE_OPTIONS = [
+  { value: 'manager', label: 'Manager' },
+  { value: 'chef', label: 'Chef' },
+  { value: 'waiter', label: 'Waiter' },
+  { value: 'cashier', label: 'Cashier' },
 ];
 
 export default function StaffPage() {
-  const { user } = useAppSelector((state) => state.auth);
-  const [staff, setStaff] = useState<Staff[]>(mockStaff);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+  const [selectedStaffId, setSelectedStaffId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const handleStatusToggle = (staffId: string) => {
-    setStaff(prev => prev.map(member =>
-      member.id === staffId
-        ? { ...member, isActive: !member.isActive, updatedAt: new Date().toISOString() }
-        : member
-    ));
-    toast.success('Staff status updated');
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  const companyId = (user as any)?.companyId || 
+                    (companyContext as any)?.companyId;
+
+  const { data: staffResponse, isLoading } = useGetStaffQuery({
+    branchId,
+    search: searchQuery || undefined,
+    role: roleFilter !== 'all' ? roleFilter : undefined,
+    page: currentPage,
+    limit: itemsPerPage,
+  }, { skip: !branchId });
+
+  const { data: selectedStaffData } = useGetStaffByIdQuery(selectedStaffId, {
+    skip: !selectedStaffId || !isViewModalOpen,
+  });
+
+  const [createStaff, { isLoading: isCreating }] = useCreateStaffMutation();
+  const [updateStaff, { isLoading: isUpdating }] = useUpdateStaffMutation();
+  const [deleteStaff] = useDeleteStaffMutation();
+  const [deactivateStaff] = useDeactivateStaffMutation();
+
+  // Extract staff from API response
+  const staff = useMemo(() => {
+    if (!staffResponse) return [];
+    return staffResponse.staff || [];
+  }, [staffResponse]);
+
+  const totalStaff = useMemo(() => {
+    return staffResponse?.total || 0;
+  }, [staffResponse]);
+
+  const [formData, setFormData] = useState<Partial<CreateStaffRequest>>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    role: 'waiter',
+    password: '',
+    pin: '',
+    salary: undefined,
+  });
+
+  useEffect(() => {
+    if (!isCreateModalOpen && !isEditModalOpen) {
+      resetForm();
+    }
+  }, [isCreateModalOpen, isEditModalOpen]);
+
+  useEffect(() => {
+    if (selectedStaffData && selectedStaffId && isEditModalOpen) {
+      setFormData({
+        firstName: selectedStaffData.firstName,
+        lastName: selectedStaffData.lastName,
+        email: selectedStaffData.email,
+        phoneNumber: selectedStaffData.phoneNumber,
+        role: selectedStaffData.role,
+        salary: selectedStaffData.salary,
+        pin: '',
+        password: '',
+      });
+    }
+  }, [selectedStaffData, selectedStaffId, isEditModalOpen]);
+
+  const resetForm = () => {
+    setFormData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      role: 'waiter',
+      password: '',
+      pin: '',
+      salary: undefined,
+    });
+    setSelectedStaffId('');
   };
 
-  const openEditModal = (member: Staff) => {
-    setSelectedStaff(member);
-    setIsEditModalOpen(true);
+  const handleCreate = async () => {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const payload = {
+        ...formData,
+        branchId,
+        companyId,
+        role: formData.role || 'waiter',
+      } as any;
+      await createStaff(payload).unwrap();
+      toast.success('Staff member created successfully');
+      setIsCreateModalOpen(false);
+      resetForm();
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to create staff member');
+    }
   };
 
-  const openViewModal = (member: Staff) => {
-    setSelectedStaff(member);
+  const handleUpdate = async () => {
+    if (!selectedStaffId || !formData.firstName || !formData.lastName || !formData.email) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const payload: any = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        role: formData.role,
+      };
+
+      // Only include phoneNumber if it has a value
+      if (formData.phoneNumber) {
+        payload.phoneNumber = formData.phoneNumber;
+      }
+
+      // Only include password if user provided a new one
+      if (formData.password && formData.password.trim()) {
+        payload.password = formData.password;
+      }
+
+      // Only include PIN if user provided a new one
+      if (formData.pin && formData.pin.trim()) {
+        payload.pin = formData.pin;
+      }
+
+      // Include salary if set
+      if (formData.salary !== undefined && formData.salary !== null) {
+        payload.salary = formData.salary;
+      }
+
+      await updateStaff({ id: selectedStaffId, ...payload }).unwrap();
+      toast.success('Staff member updated successfully');
+      setIsEditModalOpen(false);
+      resetForm();
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to update staff member');
+    }
+  };
+
+  const handleDelete = async (staffId: string, staffName: string) => {
+    if (!confirm(`Are you sure you want to delete "${staffName}"? This action cannot be undone.`)) return;
+
+    try {
+      await deleteStaff(staffId).unwrap();
+      toast.success('Staff member deleted successfully');
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to delete staff member');
+    }
+  };
+
+  const handleToggleStatus = async (staff: Staff) => {
+    try {
+      await deactivateStaff(staff.id).unwrap();
+      toast.success(`Staff member ${staff.isActive ? 'deactivated' : 'activated'} successfully`);
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to update staff status');
+    }
+  };
+
+  const openViewModal = (staff: Staff) => {
+    setSelectedStaffId(staff.id);
     setIsViewModalOpen(true);
   };
 
-  const getRoleBadge = (role: string) => {
-    const colors = {
-      'Manager': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-      'Chef': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-      'Waiter': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      'Cashier': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-      'Bartender': 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
-    };
-    return colors[role as keyof typeof colors] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+  const openEditModal = (staff: Staff) => {
+    setSelectedStaffId(staff.id);
+    setIsEditModalOpen(true);
   };
+
+  const getRoleBadge = (role: string) => {
+    const colors: Record<string, string> = {
+      'manager': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+      'chef': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+      'waiter': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+      'cashier': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      'owner': 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+    };
+    return colors[role.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+  };
+
+  const getRoleLabel = (role: string) => {
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
+
+  // Filter staff by role and status
+  const filteredStaff = useMemo(() => {
+    let filtered = staff;
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(s => 
+        statusFilter === 'active' ? s.isActive : !s.isActive
+      );
+    }
+
+    return filtered;
+  }, [staff, statusFilter]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    return {
+      total: totalStaff,
+      active: staff.filter(s => s.isActive).length,
+      inactive: staff.filter(s => !s.isActive).length,
+      managers: staff.filter(s => s.role === 'manager').length,
+      totalPayroll: staff.filter(s => s.isActive && s.salary).reduce((sum, s) => sum + (s.salary || 0), 0),
+    };
+  }, [staff, totalStaff]);
 
   const columns = [
     {
@@ -207,19 +283,17 @@ export default function StaffPage() {
       title: 'Role',
       render: (value: string) => (
         <Badge className={getRoleBadge(value)}>
-          {value}
+          {getRoleLabel(value)}
         </Badge>
       ),
     },
     {
       key: 'phoneNumber',
       title: 'Contact',
-      render: (value: string, row: Staff) => (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <PhoneIcon className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">{value}</span>
-          </div>
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <PhoneIcon className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-600 dark:text-gray-400">{value || 'Not provided'}</span>
         </div>
       ),
     },
@@ -230,7 +304,7 @@ export default function StaffPage() {
         <div className="flex items-center gap-2">
           <CalendarIcon className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {new Date(value).toLocaleDateString()}
+            {value ? new Date(value).toLocaleDateString() : 'N/A'}
           </span>
         </div>
       ),
@@ -242,7 +316,7 @@ export default function StaffPage() {
       render: (value: number) => (
         <div className="text-right">
           <p className="font-semibold text-gray-900 dark:text-white">
-            {value ? `$${value.toLocaleString()}` : 'Not set'}
+            {value ? formatCurrency(value) : 'Not set'}
           </p>
         </div>
       ),
@@ -265,6 +339,7 @@ export default function StaffPage() {
             variant="ghost"
             size="sm"
             onClick={() => openViewModal(row)}
+            title="View Details"
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
@@ -272,29 +347,32 @@ export default function StaffPage() {
             variant="ghost"
             size="sm"
             onClick={() => openEditModal(row)}
+            title="Edit"
           >
             <PencilIcon className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleStatusToggle(row.id)}
+            onClick={() => handleToggleStatus(row)}
             className={row.isActive ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+            title={row.isActive ? 'Deactivate' : 'Activate'}
           >
             {row.isActive ? 'Deactivate' : 'Activate'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDelete(row.id, `${row.firstName} ${row.lastName}`)}
+            className="text-red-600 hover:text-red-700"
+            title="Delete"
+          >
+            <TrashIcon className="w-4 h-4" />
           </Button>
         </div>
       ),
     },
   ];
-
-  const stats = {
-    total: staff.length,
-    active: staff.filter(s => s.isActive).length,
-    inactive: staff.filter(s => !s.isActive).length,
-    managers: staff.filter(s => s.role === 'Manager').length,
-    totalPayroll: staff.filter(s => s.isActive && s.salary).reduce((sum, s) => sum + (s.salary || 0), 0),
-  };
 
   return (
     <div className="space-y-6">
@@ -368,7 +446,7 @@ export default function StaffPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Monthly Payroll</p>
                 <p className="text-3xl font-bold text-yellow-600">
-                  ${stats.totalPayroll.toLocaleString()}
+                  {formatCurrency(stats.totalPayroll)}
                 </p>
               </div>
               <CurrencyDollarIcon className="w-8 h-8 text-yellow-600" />
@@ -392,11 +470,7 @@ export default function StaffPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Roles' },
-                  { value: 'Manager', label: 'Manager' },
-                  { value: 'Chef', label: 'Chef' },
-                  { value: 'Waiter', label: 'Waiter' },
-                  { value: 'Cashier', label: 'Cashier' },
-                  { value: 'Bartender', label: 'Bartender' },
+                  ...ROLE_OPTIONS,
                 ]}
                 value={roleFilter}
                 onChange={setRoleFilter}
@@ -420,41 +494,51 @@ export default function StaffPage() {
       </Card>
 
       {/* Staff Table */}
-      <DataTable
-        data={staff}
-        columns={columns}
-        loading={false}
-        searchable={false}
-        selectable={true}
-        pagination={{
-          currentPage,
-          totalPages: Math.ceil(staff.length / itemsPerPage),
-          itemsPerPage,
-          totalItems: staff.length,
-          onPageChange: setCurrentPage,
-          onItemsPerPageChange: setItemsPerPage,
-        }}
-        exportable={true}
-        exportFilename="staff"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} staff members as ${format}`);
-        }}
-        emptyMessage="No staff members found."
-      />
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">Loading staff members...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          data={filteredStaff}
+          columns={columns}
+          loading={isLoading}
+          searchable={false}
+          selectable={true}
+          pagination={{
+            currentPage,
+            totalPages: Math.ceil(totalStaff / itemsPerPage),
+            itemsPerPage,
+            totalItems: totalStaff,
+            onPageChange: setCurrentPage,
+            onItemsPerPageChange: setItemsPerPage,
+          }}
+          exportable={true}
+          exportFilename="staff"
+          onExport={(format, items) => {
+            console.log(`Exporting ${items.length} staff members as ${format}`);
+            toast.success(`Exporting ${items.length} staff members as ${format.toUpperCase()}`);
+          }}
+          emptyMessage="No staff members found. Add your first staff member to get started."
+        />
+      )}
 
-      {/* Staff Details Modal */}
+      {/* View Staff Modal */}
       <Modal
         isOpen={isViewModalOpen}
         onClose={() => {
           setIsViewModalOpen(false);
-          setSelectedStaff(null);
+          setSelectedStaffId('');
         }}
         title="Staff Member Details"
         className="max-w-4xl"
       >
-        {selectedStaff && (
+        {selectedStaffData && (
           <div className="space-y-6">
-            {/* Header */}
             <div className="flex items-start gap-6">
               <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
                 <UserIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
@@ -463,127 +547,93 @@ export default function StaffPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      {selectedStaff.firstName} {selectedStaff.lastName}
+                      {selectedStaffData.firstName} {selectedStaffData.lastName}
                     </h3>
-                    <Badge className={`${getRoleBadge(selectedStaff.role)} mt-2`}>
-                      {selectedStaff.role}
+                    <Badge className={`${getRoleBadge(selectedStaffData.role)} mt-2`}>
+                      {getRoleLabel(selectedStaffData.role)}
                     </Badge>
                   </div>
-                  <Badge variant={selectedStaff.isActive ? 'success' : 'danger'}>
-                    {selectedStaff.isActive ? 'Active' : 'Inactive'}
+                  <Badge variant={selectedStaffData.isActive ? 'success' : 'danger'}>
+                    {selectedStaffData.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div className="flex items-center gap-2">
                     <EnvelopeIcon className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">{selectedStaff.email}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{selectedStaffData.email}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <PhoneIcon className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">{selectedStaff.phoneNumber}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{selectedStaffData.phoneNumber || 'Not provided'}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Employment Information</h4>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">PIN:</span>
-                    <span className="font-mono text-gray-900 dark:text-white">****</span>
-                  </div>
+                  {selectedStaffData.employeeId && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Employee ID:</span>
+                      <span className="font-mono text-gray-900 dark:text-white">{selectedStaffData.employeeId}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Hire Date:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {new Date(selectedStaff.hireDate).toLocaleDateString()}
+                      {selectedStaffData.hireDate ? new Date(selectedStaffData.hireDate).toLocaleDateString() : 'N/A'}
                     </span>
                   </div>
-                  {selectedStaff.salary && (
+                  {selectedStaffData.salary && (
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Salary:</span>
                       <span className="font-medium text-gray-900 dark:text-white">
-                        ${selectedStaff.salary.toLocaleString()}
+                        {formatCurrency(selectedStaffData.salary)}
                       </span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div>
-                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Emergency Contact</h4>
-                <div className="space-y-2 text-sm">
-                  {selectedStaff.emergencyContactName && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Name:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {selectedStaff.emergencyContactName}
-                      </span>
-                    </div>
-                  )}
-                  {selectedStaff.emergencyContactPhone && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Phone:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {selectedStaff.emergencyContactPhone}
-                      </span>
-                    </div>
-                  )}
+              {selectedStaffData.address && (
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">Address</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {typeof selectedStaffData.address === 'string' 
+                      ? selectedStaffData.address 
+                      : `${selectedStaffData.address.street || ''}, ${selectedStaffData.address.city || ''}, ${selectedStaffData.address.state || ''} ${selectedStaffData.address.zipCode || ''}`
+                    }
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Shift Schedule */}
-            {selectedStaff.shiftSchedule && (
-              <div>
-                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Shift Schedule</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {Object.entries(selectedStaff.shiftSchedule).map(([day, hours]) => (
-                    <div key={day} className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                        {day}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {hours || 'OFF'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Address */}
-            {selectedStaff.address && (
-              <div>
-                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Address</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedStaff.address}</p>
-              </div>
-            )}
-
-            {/* Timestamps */}
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                Joined: {formatDateTime(selectedStaff.createdAt)}
+                Joined: {formatDateTime(selectedStaffData.createdAt)}
                 <br />
-                Last updated: {formatDateTime(selectedStaff.updatedAt)}
+                Last updated: {formatDateTime(selectedStaffData.updatedAt)}
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsViewModalOpen(false);
-                  setSelectedStaff(null);
+                  setSelectedStaffId('');
                 }}
               >
                 Close
               </Button>
-              <Button onClick={() => openEditModal(selectedStaff)}>
+              <Button onClick={() => {
+                setIsViewModalOpen(false);
+                openEditModal(selectedStaffData);
+              }}>
+                <PencilIcon className="w-4 h-4 mr-2" />
                 Edit Staff
               </Button>
             </div>
@@ -597,15 +647,96 @@ export default function StaffPage() {
         onClose={() => {
           setIsCreateModalOpen(false);
           setIsEditModalOpen(false);
-          setSelectedStaff(null);
+          resetForm();
         }}
         title={isEditModalOpen ? 'Edit Staff Member' : 'Add Staff Member'}
         className="max-w-2xl"
       >
         <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Staff creation/editing functionality would be implemented here with comprehensive form fields for all staff information.
-          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="First Name"
+              value={formData.firstName || ''}
+              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+              required
+            />
+            <Input
+              label="Last Name"
+              value={formData.lastName || ''}
+              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+              required
+            />
+          </div>
+
+          <Input
+            label="Email"
+            type="email"
+            value={formData.email || ''}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            required
+          />
+
+          <Input
+            label="Phone Number"
+            value={formData.phoneNumber || ''}
+            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Role"
+              options={ROLE_OPTIONS}
+              value={formData.role || 'waiter'}
+              onChange={(value) => setFormData({ ...formData, role: value as any })}
+            />
+            <Input
+              label="Salary (Optional)"
+              type="number"
+              value={formData.salary?.toString() || ''}
+              onChange={(e) => setFormData({ ...formData, salary: e.target.value ? parseFloat(e.target.value) : undefined })}
+            />
+          </div>
+
+          {isCreateModalOpen && (
+            <>
+              <Input
+                label="Password"
+                type="password"
+                value={formData.password || ''}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required={isCreateModalOpen}
+                placeholder="Min 8 characters with uppercase, lowercase, number and special character"
+              />
+              <Input
+                label="PIN (Optional, 6 digits)"
+                type="text"
+                maxLength={6}
+                value={formData.pin || ''}
+                onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '') })}
+                placeholder="6 digit PIN"
+              />
+            </>
+          )}
+
+          {isEditModalOpen && (
+            <div className="space-y-4">
+              <Input
+                label="New Password (Optional)"
+                type="password"
+                value={formData.password || ''}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="Leave empty to keep current password"
+              />
+              <Input
+                label="New PIN (Optional, 6 digits)"
+                type="text"
+                maxLength={6}
+                value={formData.pin || ''}
+                onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '') })}
+                placeholder="Leave empty to keep current PIN"
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <Button
@@ -613,13 +744,16 @@ export default function StaffPage() {
               onClick={() => {
                 setIsCreateModalOpen(false);
                 setIsEditModalOpen(false);
-                setSelectedStaff(null);
+                resetForm();
               }}
             >
               Cancel
             </Button>
-            <Button>
-              {isEditModalOpen ? 'Update' : 'Add'} Staff Member
+            <Button
+              onClick={isEditModalOpen ? handleUpdate : handleCreate}
+              disabled={isCreating || isUpdating || !formData.firstName || !formData.lastName || !formData.email || (isCreateModalOpen && !formData.password)}
+            >
+              {isCreating || isUpdating ? 'Saving...' : isEditModalOpen ? 'Update' : 'Add'} Staff Member
             </Button>
           </div>
         </div>
