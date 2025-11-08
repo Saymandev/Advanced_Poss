@@ -162,6 +162,7 @@ async function createCompletePOSData() {
     
     for (let i = 1; i <= 5; i++) {
       const orderData = {
+        orderType: 'dine-in' as const,
         tableId: (table as any)._id.toString(),
         items: [{
           menuItemId: (menuItem as any)._id.toString(),

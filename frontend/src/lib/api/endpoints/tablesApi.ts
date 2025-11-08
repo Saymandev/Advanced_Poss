@@ -14,10 +14,10 @@ export interface Table {
 }
 
 export interface CreateTableRequest {
-  number: string;
+  branchId: string;
+  tableNumber: string;
   capacity: number;
   location?: string;
-  status?: 'available' | 'occupied' | 'reserved' | 'maintenance';
 }
 
 export interface UpdateTableRequest extends Partial<CreateTableRequest> {
@@ -55,10 +55,59 @@ export const tablesApi = apiSlice.injectEndpoints({
         url: '/tables',
         params,
       }),
-      providesTags: ['Table'],
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        let items = [];
+        
+        // Handle array response
+        if (Array.isArray(data)) {
+          items = data;
+        } else if (data.tables) {
+          items = data.tables;
+        } else if (data.items) {
+          items = data.items;
+        }
+        
+        return {
+          tables: items.map((table: any) => ({
+            id: table._id || table.id,
+            number: table.tableNumber || table.number || '',
+            tableNumber: table.tableNumber || table.number || '',
+            capacity: table.capacity || 0,
+            status: table.status || 'available',
+            location: table.location,
+            qrCode: table.qrCode,
+            currentOrderId: table.currentOrderId,
+            reservationId: table.reservationId,
+            createdAt: table.createdAt || new Date().toISOString(),
+            updatedAt: table.updatedAt || new Date().toISOString(),
+          })) as Table[],
+          total: data.total || items.length,
+        };
+      },
+      providesTags: (result) =>
+        result?.tables
+          ? [...result.tables.map(({ id }) => ({ type: 'Table' as const, id })), 'Table']
+          : ['Table'],
     }),
     getTableById: builder.query<Table, string>({
       query: (id) => `/tables/${id}`,
+      transformResponse: (response: any) => {
+        const table = response.data || response;
+        return {
+          id: table._id || table.id,
+          number: table.tableNumber || table.number || '',
+          tableNumber: table.tableNumber || table.number || '',
+          capacity: table.capacity || 0,
+          status: table.status || 'available',
+          location: table.location,
+          qrCode: table.qrCode,
+          currentOrderId: table.currentOrderId,
+          reservationId: table.reservationId,
+          createdAt: table.createdAt || new Date().toISOString(),
+          updatedAt: table.updatedAt || new Date().toISOString(),
+        } as Table;
+      },
       providesTags: ['Table'],
     }),
     createTable: builder.mutation<Table, CreateTableRequest>({

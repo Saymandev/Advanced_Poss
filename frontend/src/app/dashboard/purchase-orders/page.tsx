@@ -8,19 +8,19 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
-import { CreatePurchaseOrderRequest, PurchaseOrder, useApprovePurchaseOrderMutation, useCreatePurchaseOrderMutation, useDeletePurchaseOrderMutation, useGetPurchaseOrdersQuery, useReceivePurchaseOrderMutation, useUpdatePurchaseOrderMutation } from '@/lib/api/endpoints/purchaseOrdersApi';
+import { CreatePurchaseOrderRequest, PurchaseOrder, useApprovePurchaseOrderMutation, useCancelPurchaseOrderMutation, useCreatePurchaseOrderMutation, useGetPurchaseOrdersQuery, useReceivePurchaseOrderMutation } from '@/lib/api/endpoints/purchaseOrdersApi';
 import { useGetSuppliersQuery } from '@/lib/api/endpoints/suppliersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    CheckCircleIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    CurrencyDollarIcon,
-    EyeIcon,
-    PlusIcon,
-    TruckIcon,
-    XCircleIcon
+  CheckCircleIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  EyeIcon,
+  PlusIcon,
+  TruckIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -28,11 +28,12 @@ import toast from 'react-hot-toast';
 export default function PurchaseOrdersPage() {
   const { user } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
+  const [receivedQuantities, setReceivedQuantities] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
@@ -48,14 +49,13 @@ export default function PurchaseOrdersPage() {
     limit: itemsPerPage,
   });
 
-  const { data: suppliers } = useGetSuppliersQuery({ branchId: user?.branchId || undefined });
+  const { data: suppliers } = useGetSuppliersQuery({ companyId: user?.companyId || undefined });
   const { data: ingredients } = useGetInventoryItemsQuery({ branchId: user?.branchId || undefined });
 
   const [createOrder] = useCreatePurchaseOrderMutation();
-  const [updateOrder] = useUpdatePurchaseOrderMutation();
-  const [deleteOrder] = useDeletePurchaseOrderMutation();
   const [approveOrder] = useApprovePurchaseOrderMutation();
   const [receiveOrder] = useReceivePurchaseOrderMutation();
+  const [cancelOrder] = useCancelPurchaseOrderMutation();
 
   const [formData, setFormData] = useState<CreatePurchaseOrderRequest>({
     supplierId: '',
@@ -157,9 +157,27 @@ export default function PurchaseOrdersPage() {
       toast.success('Purchase order received successfully');
       setIsReceiveModalOpen(false);
       setSelectedOrder(null);
+      setReceivedQuantities({});
       refetch();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to receive purchase order');
+    }
+  };
+
+  const handleCancel = async (reason: string) => {
+    if (!selectedOrder) return;
+
+    try {
+      await cancelOrder({
+        id: selectedOrder.id,
+        reason,
+      }).unwrap();
+      toast.success('Purchase order cancelled successfully');
+      setIsCancelModalOpen(false);
+      setSelectedOrder(null);
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to cancel purchase order');
     }
   };
 
@@ -276,11 +294,27 @@ export default function PurchaseOrdersPage() {
               size="sm"
               onClick={() => {
                 setSelectedOrder(row);
+                setReceivedQuantities({});
                 setIsReceiveModalOpen(true);
               }}
               className="text-blue-600 hover:text-blue-700"
+              title="Receive Order"
             >
               <TruckIcon className="w-4 h-4" />
+            </Button>
+          )}
+          {row.status !== 'cancelled' && row.status !== 'received' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedOrder(row);
+                setIsCancelModalOpen(true);
+              }}
+              className="text-red-600 hover:text-red-700"
+              title="Cancel Order"
+            >
+              <XCircleIcon className="w-4 h-4" />
             </Button>
           )}
         </div>
@@ -830,6 +864,7 @@ export default function PurchaseOrdersPage() {
         onClose={() => {
           setIsReceiveModalOpen(false);
           setSelectedOrder(null);
+          setReceivedQuantities({});
         }}
         title="Receive Purchase Order"
         className="max-w-4xl"
@@ -854,10 +889,14 @@ export default function PurchaseOrdersPage() {
                   <Input
                     type="number"
                     placeholder="Received"
-                    defaultValue={item.receivedQuantity || item.quantity}
-                    className="w-24"
+                    value={receivedQuantities[item.id] ?? (item.receivedQuantity || item.quantity)}
+                    onChange={(e) => setReceivedQuantities({
+                      ...receivedQuantities,
+                      [item.id]: Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.quantity)),
+                    })}
+                    className="w-32"
                   />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[80px]">
                     / {item.quantity} {item.ingredient.unit}
                   </span>
                 </div>
@@ -871,22 +910,95 @@ export default function PurchaseOrdersPage() {
               onClick={() => {
                 setIsReceiveModalOpen(false);
                 setSelectedOrder(null);
+                setReceivedQuantities({});
               }}
             >
               Cancel
             </Button>
             <Button
               onClick={() => {
-                // Handle receive logic here
                 const receivedItems = selectedOrder?.items.map(item => ({
                   itemId: item.id,
-                  receivedQuantity: item.quantity, // In real app, get from form
+                  receivedQuantity: receivedQuantities[item.id] ?? item.quantity,
                 })) || [];
                 handleReceive(receivedItems);
               }}
               className="bg-blue-600 hover:bg-blue-700"
             >
               Confirm Receipt
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Cancel Order Modal */}
+      <Modal
+        isOpen={isCancelModalOpen}
+        onClose={() => {
+          setIsCancelModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        title="Cancel Purchase Order"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to cancel this purchase order? This action cannot be undone.
+          </p>
+
+          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
+            <h4 className="font-medium text-red-800 dark:text-red-400 mb-2">Order Details</h4>
+            <div className="text-sm space-y-1">
+              <div className="flex justify-between">
+                <span>Order #:</span>
+                <span className="font-medium">{selectedOrder?.orderNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Supplier:</span>
+                <span className="font-medium">{selectedOrder?.supplier.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Amount:</span>
+                <span className="font-medium">{formatCurrency(selectedOrder?.totalAmount || 0)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Cancellation Reason (Required)
+            </label>
+            <textarea
+              id="cancel-reason"
+              rows={3}
+              className="input w-full"
+              placeholder="Please provide a reason for cancellation..."
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsCancelModalOpen(false);
+                setSelectedOrder(null);
+              }}
+            >
+              Keep Order
+            </Button>
+            <Button
+              onClick={() => {
+                const reasonInput = document.getElementById('cancel-reason') as HTMLTextAreaElement;
+                const reason = reasonInput?.value || 'No reason provided';
+                if (reason.trim()) {
+                  handleCancel(reason);
+                } else {
+                  toast.error('Please provide a cancellation reason');
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Cancel Order
             </Button>
           </div>
         </div>

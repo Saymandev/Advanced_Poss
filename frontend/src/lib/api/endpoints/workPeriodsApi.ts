@@ -2,14 +2,22 @@ import { apiSlice } from '../apiSlice';
 
 export interface WorkPeriod {
   id: string;
-  name: string;
+  serial: number;
   startTime: string;
-  endTime: string;
-  isActive: boolean;
-  branchId: string;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
+  endTime?: string;
+  startedBy: string;
+  endedBy?: string;
+  duration?: string;
+  openingBalance: number;
+  closingBalance?: number;
+  status: 'active' | 'completed';
+  companyId: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // Additional fields that may come from backend
+  totalSales?: number;
+  totalExpenses?: number;
+  expectedClosingBalance?: number;
 }
 
 export interface CreateWorkPeriodRequest {
@@ -43,10 +51,18 @@ export interface WorkPeriodStats {
 
 export const workPeriodsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getWorkPeriods: builder.query<{ workPeriods: WorkPeriod[]; total: number }, any>({
+    getWorkPeriods: builder.query<{ workPeriods: WorkPeriod[]; total: number }, { 
+      branchId?: string;
+      status?: string;
+      page?: number;
+      limit?: number;
+    }>({
       query: (params) => ({
         url: '/work-periods',
-        params,
+        params: {
+          ...params,
+          // Backend will use companyId from JWT, but we pass branchId if needed for future filtering
+        },
       }),
       providesTags: ['WorkPeriod'],
     }),
@@ -93,15 +109,8 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['WorkPeriod'],
     }),
-    getWorkPeriodStats: builder.query<WorkPeriodStats, { 
-      workPeriodId: string; 
-      startDate?: string; 
-      endDate?: string 
-    }>({
-      query: ({ workPeriodId, ...params }) => ({
-        url: `/work-periods/${workPeriodId}/stats`,
-        params,
-      }),
+    getWorkPeriodSalesSummary: builder.query<any, string>({
+      query: (id) => `/work-periods/${id}/sales-summary`,
       providesTags: ['WorkPeriod'],
     }),
     getCurrentWorkPeriod: builder.query<WorkPeriod | null, void>({
@@ -119,6 +128,6 @@ export const {
   useDeleteWorkPeriodMutation,
   useStartWorkPeriodMutation,
   useEndWorkPeriodMutation,
-  useGetWorkPeriodStatsQuery,
+  useGetWorkPeriodSalesSummaryQuery,
   useGetCurrentWorkPeriodQuery,
 } = workPeriodsApi;

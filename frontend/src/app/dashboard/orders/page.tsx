@@ -11,12 +11,12 @@ import { useDeleteOrderMutation, useGetOrderByIdQuery, useGetOrdersQuery, useUpd
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ClockIcon,
-    EyeIcon,
-    PlusIcon,
-    PrinterIcon,
-    ShoppingCartIcon,
-    UserIcon
+  ClockIcon,
+  EyeIcon,
+  PlusIcon,
+  PrinterIcon,
+  ShoppingCartIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';

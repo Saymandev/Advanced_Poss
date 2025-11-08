@@ -15,12 +15,12 @@ async function testFindCompany() {
     
     console.log('Result:', JSON.stringify(result, null, 2));
     
-    if (result.found) {
+    if (result.found && 'companyName' in result) {
       console.log('✅ Company found successfully!');
       console.log(`   Company: ${result.companyName}`);
-      console.log(`   Branches: ${result.branches?.length || 0}`);
+      console.log(`   Branches: ${result.branches?.length || 0}`);       
     } else {
-      console.log('❌ Company not found:', result.message);
+      console.log('❌ Company not found:', 'message' in result ? result.message : 'Unknown error');
     }
 
   } catch (error) {

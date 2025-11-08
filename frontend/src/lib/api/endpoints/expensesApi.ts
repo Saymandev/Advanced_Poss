@@ -7,7 +7,8 @@ export interface Expense {
   amount: number;
   category: 'food' | 'supplies' | 'utilities' | 'rent' | 'staff' | 'marketing' | 'maintenance' | 'other';
   paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'check';
-  vendor?: string;
+  vendorName?: string;
+  invoiceNumber?: string;
   receiptUrl?: string;
   date: string;
   isRecurring: boolean;
@@ -25,7 +26,8 @@ export interface CreateExpenseRequest {
   amount: number;
   category: 'food' | 'supplies' | 'utilities' | 'rent' | 'staff' | 'marketing' | 'maintenance' | 'other';
   paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'check';
-  vendor?: string;
+  vendorName?: string;
+  invoiceNumber?: string;
   receiptUrl?: string;
   date: string;
   isRecurring?: boolean;

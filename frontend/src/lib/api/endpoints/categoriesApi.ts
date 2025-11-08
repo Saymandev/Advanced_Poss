@@ -32,18 +32,108 @@ export const categoriesApi = apiSlice.injectEndpoints({
         url: '/categories',
         params,
       }),
-      providesTags: ['Category'],
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        let items = [];
+        
+        // Handle array response
+        if (Array.isArray(data)) {
+          items = data;
+        } else if (data.categories) {
+          items = data.categories;
+        } else if (data.items) {
+          items = data.items;
+        }
+        
+        return {
+          categories: items.map((cat: any) => ({
+            id: cat._id || cat.id,
+            name: cat.name,
+            description: cat.description,
+            icon: cat.icon,
+            color: cat.color,
+            sortOrder: cat.sortOrder,
+            isActive: cat.isActive !== undefined ? cat.isActive : true,
+            type: cat.type,
+            companyId: cat.companyId || cat.company?.id || cat.company?._id,
+            branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+            createdAt: cat.createdAt || new Date().toISOString(),
+            updatedAt: cat.updatedAt || new Date().toISOString(),
+          })) as Category[],
+          total: data.total || items.length,
+        };
+      },
+      providesTags: (result) =>
+        result?.categories
+          ? [
+              ...result.categories.map(({ id }) => ({ type: 'Category' as const, id })),
+              'Category',
+            ]
+          : ['Category'],
     }),
     getCategoryById: builder.query<Category, string>({
       query: (id) => `/categories/${id}`,
+      transformResponse: (response: any) => {
+        const cat = response.data || response;
+        return {
+          id: cat._id || cat.id,
+          name: cat.name,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          sortOrder: cat.sortOrder,
+          isActive: cat.isActive !== undefined ? cat.isActive : true,
+          type: cat.type,
+          companyId: cat.companyId || cat.company?.id || cat.company?._id,
+          branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          createdAt: cat.createdAt || new Date().toISOString(),
+          updatedAt: cat.updatedAt || new Date().toISOString(),
+        } as Category;
+      },
       providesTags: ['Category'],
     }),
     getCategoriesByCompany: builder.query<Category[], string>({
       query: (companyId) => `/categories/company/${companyId}`,
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        const items = Array.isArray(data) ? data : (data.categories || data.items || []);
+        return items.map((cat: any) => ({
+          id: cat._id || cat.id,
+          name: cat.name,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          sortOrder: cat.sortOrder,
+          isActive: cat.isActive !== undefined ? cat.isActive : true,
+          type: cat.type,
+          companyId: cat.companyId || cat.company?.id || cat.company?._id,
+          branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          createdAt: cat.createdAt || new Date().toISOString(),
+          updatedAt: cat.updatedAt || new Date().toISOString(),
+        })) as Category[];
+      },
       providesTags: ['Category'],
     }),
     getCategoriesByBranch: builder.query<Category[], string>({
       query: (branchId) => `/categories/branch/${branchId}`,
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        const items = Array.isArray(data) ? data : (data.categories || data.items || []);
+        return items.map((cat: any) => ({
+          id: cat._id || cat.id,
+          name: cat.name,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          sortOrder: cat.sortOrder,
+          isActive: cat.isActive !== undefined ? cat.isActive : true,
+          type: cat.type,
+          companyId: cat.companyId || cat.company?.id || cat.company?._id,
+          branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          createdAt: cat.createdAt || new Date().toISOString(),
+          updatedAt: cat.updatedAt || new Date().toISOString(),
+        })) as Category[];
+      },
       providesTags: ['Category'],
     }),
     createCategory: builder.mutation<Category, CreateCategoryRequest>({

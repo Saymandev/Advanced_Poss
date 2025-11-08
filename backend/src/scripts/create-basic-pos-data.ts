@@ -15,6 +15,7 @@ async function createBasicPOSData() {
     
     for (let i = 1; i <= 10; i++) {
       const orderData = {
+        orderType: 'dine-in' as const,
         tableId: new Types.ObjectId().toString(),
         items: [{
           menuItemId: new Types.ObjectId().toString(),

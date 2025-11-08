@@ -7,18 +7,16 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { InventoryItem, useAddStockMutation, useGetInventoryItemsQuery, useGetInventoryItemByIdQuery, useGetLowStockItemsQuery, useRemoveStockMutation } from '@/lib/api/endpoints/inventoryApi';
+import { InventoryItem, useAddStockMutation, useGetInventoryItemByIdQuery, useGetInventoryItemsQuery, useGetLowStockItemsQuery, useRemoveStockMutation } from '@/lib/api/endpoints/inventoryApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
   ArchiveBoxIcon,
-  ArrowDownIcon,
-  ArrowUpIcon,
   BeakerIcon,
   ExclamationTriangleIcon,
   EyeIcon,
-  PlusIcon,
-  MinusIcon
+  MinusIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
@@ -39,11 +37,6 @@ export default function StocksPage() {
 
   const companyId = (user as any)?.companyId || 
                     (companyContext as any)?.companyId;
-
-  const branchId = (user as any)?.branchId || 
-                   (companyContext as any)?.branchId || 
-                   (companyContext as any)?.branches?.[0]?._id ||
-                   (companyContext as any)?.branches?.[0]?.id;
 
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
@@ -86,7 +79,7 @@ export default function StocksPage() {
     if (selectedIngredientData && selectedIngredient) {
       setSelectedIngredient(selectedIngredientData as InventoryItem);
     }
-  }, [selectedIngredientData]);
+  }, [selectedIngredientData, selectedIngredient]);
 
   // Filter ingredients by stock level
   const filteredIngredients = useMemo(() => {
@@ -107,36 +100,6 @@ export default function StocksPage() {
     setAdjustmentQuantity(0);
     setAdjustmentReason('');
     setIsAdjustStockModalOpen(true);
-  };
-
-  const handleQuickAddStock = async (ingredient: InventoryItem) => {
-    try {
-      await addStock({ 
-        id: ingredient.id, 
-        quantity: 1 
-      }).unwrap();
-      toast.success('Stock added successfully');
-      refetch();
-    } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to add stock');
-    }
-  };
-
-  const handleQuickRemoveStock = async (ingredient: InventoryItem) => {
-    if (ingredient.currentStock <= 0) {
-      toast.error('Cannot remove stock from item with zero stock');
-      return;
-    }
-    try {
-      await removeStock({ 
-        id: ingredient.id, 
-        quantity: 1 
-      }).unwrap();
-      toast.success('Stock removed successfully');
-      refetch();
-    } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to remove stock');
-    }
   };
 
   const handleAdjustStock = async () => {
@@ -275,14 +238,35 @@ export default function StocksPage() {
       key: 'actions',
       title: 'Actions',
       render: (value: any, row: InventoryItem) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => openDetailsModal(row)}
-          title="View Details"
-        >
-          <EyeIcon className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openDetailsModal(row)}
+            title="View Details"
+          >
+            <EyeIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openAdjustStockModal(row, 'add')}
+            title="Add Stock"
+            className="text-green-600 hover:text-green-700"
+          >
+            <PlusIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openAdjustStockModal(row, 'remove')}
+            title="Remove Stock"
+            className="text-red-600 hover:text-red-700"
+            disabled={!row.currentStock || row.currentStock <= 0}
+          >
+            <MinusIcon className="w-4 h-4" />
+          </Button>
+        </div>
       ),
     },
   ];
@@ -308,6 +292,35 @@ export default function StocksPage() {
           </p>
         </div>
       </div>
+
+      {/* Low Stock Alert Banner */}
+      {lowStockItems.length > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <ExclamationTriangleIcon className="w-6 h-6 text-yellow-600" />
+                <div>
+                  <p className="font-semibold text-yellow-900 dark:text-yellow-200">
+                    Low Stock Alert: {lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''} need restocking
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    {lowStockItems.slice(0, 3).map(item => item.name).join(', ')}
+                    {lowStockItems.length > 3 && ' and more...'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setStockFilter('low')}
+              >
+                View Low Stock
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
@@ -614,6 +627,120 @@ export default function StocksPage() {
                 }}
               >
                 Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsDetailsModalOpen(false);
+                  openAdjustStockModal(selectedIngredient, 'add');
+                }}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <PlusIcon className="w-4 h-4 mr-2" />
+                Add Stock
+              </Button>
+              {selectedIngredient.currentStock > 0 && (
+                <Button
+                  onClick={() => {
+                    setIsDetailsModalOpen(false);
+                    openAdjustStockModal(selectedIngredient, 'remove');
+                  }}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <MinusIcon className="w-4 h-4 mr-2" />
+                  Remove Stock
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Adjust Stock Modal */}
+      <Modal
+        isOpen={isAdjustStockModalOpen}
+        onClose={() => {
+          setIsAdjustStockModalOpen(false);
+          setAdjustmentQuantity(0);
+          setAdjustmentReason('');
+        }}
+        title={adjustmentType === 'add' ? 'Add Stock' : 'Remove Stock'}
+        className="max-w-md"
+      >
+        {selectedIngredient && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Ingredient</p>
+              <p className="font-semibold text-gray-900 dark:text-white">{selectedIngredient.name}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                Current Stock: <span className="font-medium">{selectedIngredient.currentStock || 0} {selectedIngredient.unit}</span>
+              </p>
+              {selectedIngredient.minimumStock && (
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Minimum Stock: <span className="font-medium">{selectedIngredient.minimumStock} {selectedIngredient.unit}</span>
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Quantity ({selectedIngredient.unit})
+              </label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={adjustmentQuantity || ''}
+                onChange={(e) => setAdjustmentQuantity(parseFloat(e.target.value) || 0)}
+                placeholder="Enter quantity"
+                required
+              />
+              {adjustmentType === 'remove' && adjustmentQuantity > (selectedIngredient.currentStock || 0) && (
+                <p className="text-red-600 text-sm mt-1">
+                  Cannot remove more than {selectedIngredient.currentStock} {selectedIngredient.unit}
+                </p>
+              )}
+              {adjustmentType === 'add' && (
+                <p className="text-gray-500 text-sm mt-1">
+                  New stock will be: {((selectedIngredient.currentStock || 0) + adjustmentQuantity).toFixed(2)} {selectedIngredient.unit}
+                </p>
+              )}
+              {adjustmentType === 'remove' && (
+                <p className="text-gray-500 text-sm mt-1">
+                  New stock will be: {Math.max(0, (selectedIngredient.currentStock || 0) - adjustmentQuantity).toFixed(2)} {selectedIngredient.unit}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Reason (Optional)
+              </label>
+              <textarea
+                rows={3}
+                value={adjustmentReason}
+                onChange={(e) => setAdjustmentReason(e.target.value)}
+                className="input w-full"
+                placeholder={`Reason for ${adjustmentType === 'add' ? 'adding' : 'removing'} stock...`}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsAdjustStockModalOpen(false);
+                  setAdjustmentQuantity(0);
+                  setAdjustmentReason('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAdjustStock}
+                disabled={adjustmentQuantity <= 0 || isAddingStock || isRemovingStock || (adjustmentType === 'remove' && adjustmentQuantity > (selectedIngredient.currentStock || 0))}
+                className={adjustmentType === 'add' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+              >
+                {isAddingStock || isRemovingStock ? 'Processing...' : adjustmentType === 'add' ? 'Add Stock' : 'Remove Stock'}
               </Button>
             </div>
           </div>

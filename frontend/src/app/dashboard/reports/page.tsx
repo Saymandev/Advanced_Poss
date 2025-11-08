@@ -1,7 +1,14 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { useGetDashboardQuery } from '@/lib/api/endpoints/reportsApi';
+import { Select } from '@/components/ui/Select';
+import {
+  useExportReportMutation,
+  useGetDashboardQuery,
+  useGetSalesAnalyticsQuery,
+  useGetTopSellingItemsQuery
+} from '@/lib/api/endpoints/reportsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -13,6 +20,7 @@ import {
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import {
   Bar,
   BarChart,
@@ -32,51 +40,81 @@ const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'
 
 export default function ReportsPage() {
   const { user } = useAppSelector((state) => state.auth);
-  const [selectedPeriod, setSelectedPeriod] = useState('7d');
-  const { data, isLoading } = useGetDashboardQuery({ branchId: user?.branchId || undefined });
+  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  
+  const { data: dashboardData, isLoading: isLoadingDashboard } = useGetDashboardQuery({ 
+    branchId: user?.branchId || undefined, 
+    companyId: user?.companyId || undefined
+  });
 
-  // Mock data for charts
-  const salesData = [
-    { name: 'Mon', sales: 2400, orders: 24 },
-    { name: 'Tue', sales: 1398, orders: 18 },
-    { name: 'Wed', sales: 9800, orders: 45 },
-    { name: 'Thu', sales: 3908, orders: 32 },
-    { name: 'Fri', sales: 4800, orders: 38 },
-    { name: 'Sat', sales: 3800, orders: 29 },
-    { name: 'Sun', sales: 4300, orders: 35 },
+  const { data: salesAnalytics, isLoading: isLoadingAnalytics } = useGetSalesAnalyticsQuery({
+    branchId: user?.branchId || undefined,
+    period: selectedPeriod as 'day' | 'week' | 'month' | 'year',
+  });
+
+  const { data: topSellingItems, isLoading: isLoadingTopItems } = useGetTopSellingItemsQuery({
+    branchId: user?.branchId || undefined,
+    limit: 5,
+  });
+
+  const [exportReport, { isLoading: isExporting }] = useExportReportMutation();
+
+  // Transform real API data for charts
+  const salesData = salesAnalytics?.salesByDay?.map((item: any) => ({
+    name: item.day || item.date?.split('T')[0] || 'N/A',
+    sales: item.sales || 0,
+    orders: item.orders || 0,
+  })) || Array.from({ length: 7 }, (_, i) => ({
+    name: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
+    sales: 0,
+    orders: 0,
+  }));
+
+  const categoryData = salesAnalytics?.salesByCategory?.map((item, index) => ({
+    name: item.category || 'Unknown',
+    value: item.percentage || 0,
+    color: COLORS[index % COLORS.length],
+  })) || [
+    { name: 'No Data', value: 100, color: '#6b7280' },
   ];
 
-  const categoryData = [
-    { name: 'Main Course', value: 45, color: '#0ea5e9' },
-    { name: 'Appetizers', value: 25, color: '#8b5cf6' },
-    { name: 'Beverages', value: 20, color: '#f59e0b' },
-    { name: 'Desserts', value: 10, color: '#10b981' },
-  ];
+  const hourlyData = salesAnalytics?.salesByHour?.map((item: any) => ({
+    hour: item.hour >= 12 ? `${item.hour > 12 ? item.hour - 12 : item.hour} PM` : `${item.hour || 0} AM`,
+    orders: item.orders || 0,
+    sales: item.sales || 0,
+  })) || Array.from({ length: 12 }, (_, i) => ({
+    hour: `${i + 8} ${i + 8 >= 12 ? 'PM' : 'AM'}`,
+    orders: 0,
+    sales: 0,
+  }));
 
-  const hourlyData = [
-    { hour: '9 AM', orders: 5 },
-    { hour: '10 AM', orders: 8 },
-    { hour: '11 AM', orders: 12 },
-    { hour: '12 PM', orders: 18 },
-    { hour: '1 PM', orders: 22 },
-    { hour: '2 PM', orders: 20 },
-    { hour: '3 PM', orders: 15 },
-    { hour: '4 PM', orders: 10 },
-    { hour: '5 PM', orders: 8 },
-    { hour: '6 PM', orders: 25 },
-    { hour: '7 PM', orders: 35 },
-    { hour: '8 PM', orders: 28 },
-    { hour: '9 PM', orders: 18 },
-    { hour: '10 PM', orders: 12 },
-  ];
+  const topItems = topSellingItems?.map((item, index) => ({
+    name: item.name || 'Unknown Item',
+    orders: item.quantity || 0,
+    revenue: item.revenue || 0,
+    avgRevenue: item.quantity ? item.revenue / item.quantity : 0,
+    index,
+  })) || [];
 
-  const topItems = [
-    { name: 'Grilled Salmon', orders: 45, revenue: 1125 },
-    { name: 'Caesar Salad', orders: 38, revenue: 494 },
-    { name: 'Chicken Parmesan', orders: 32, revenue: 608 },
-    { name: 'House Wine', orders: 28, revenue: 252 },
-    { name: 'Chocolate Cake', orders: 25, revenue: 225 },
-  ];
+  const isLoading = isLoadingDashboard || isLoadingAnalytics || isLoadingTopItems;
+
+  const handleExport = async (type: 'sales' | 'inventory' | 'customers' | 'staff', format: 'pdf' | 'excel' | 'csv') => {
+    try {
+      const result = await exportReport({
+        type,
+        format,
+        params: {
+          branchId: user?.branchId,
+          companyId: user?.companyId,
+          period: selectedPeriod,
+        },
+      }).unwrap();
+      window.open(result.downloadUrl, '_blank');
+      toast.success(`Report exported as ${format.toUpperCase()}`);
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to export report');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -97,16 +135,24 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <select
+          <Select
+            options={[
+              { value: 'day', label: 'Today' },
+              { value: 'week', label: 'Last 7 Days' },
+              { value: 'month', label: 'Last 30 Days' },
+              { value: 'year', label: 'Last Year' },
+            ]}
             value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="input w-32"
+            onChange={(value) => setSelectedPeriod(value)}
+          />
+          <Button
+            onClick={() => handleExport('sales', 'pdf')}
+            variant="secondary"
+            disabled={isExporting}
           >
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-            <option value="90d">Last 90 days</option>
-            <option value="1y">Last year</option>
-          </select>
+            <ChartBarIcon className="w-4 h-4 mr-2" />
+            {isExporting ? 'Exporting...' : 'Export Report'}
+          </Button>
         </div>
       </div>
 
@@ -118,7 +164,7 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                 <p className="text-3xl font-bold text-green-600">
-                  {formatCurrency(data?.todaySales ? data.todaySales * 7 : 0)}
+                  {formatCurrency(dashboardData?.todaySales || salesAnalytics?.totalSales || 0)}
                 </p>
                 <div className="flex items-center gap-1 mt-2">
                   <ArrowTrendingUpIcon className="w-4 h-4 text-green-600" />
@@ -137,7 +183,7 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
                 <p className="text-3xl font-bold text-blue-600">
-                  {data?.todayOrders ? data.todayOrders * 7 : 0}
+                  {dashboardData?.todayOrders || salesAnalytics?.totalOrders || 0}
                 </p>
                 <div className="flex items-center gap-1 mt-2">
                   <ArrowTrendingUpIcon className="w-4 h-4 text-blue-600" />
@@ -156,7 +202,7 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                 <p className="text-3xl font-bold text-purple-600">
-                  {formatCurrency(data?.todaySales && data?.todayOrders ? (data.todaySales * 7) / (data.todayOrders * 7) : 0)}
+                  {formatCurrency(salesAnalytics?.averageOrderValue || 0)}
                 </p>
                 <div className="flex items-center gap-1 mt-2">
                   <ArrowTrendingUpIcon className="w-4 h-4 text-purple-600" />
@@ -270,36 +316,42 @@ export default function ReportsPage() {
             <CardTitle>Top Selling Items</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topItems.map((item, index) => (
-                <div key={item.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                      index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                      index === 1 ? 'bg-gray-100 text-gray-800' :
-                      index === 2 ? 'bg-orange-100 text-orange-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {index + 1}
+            {topItems.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 dark:text-gray-400">No data available</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {topItems.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        item.index === 0 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                        item.index === 1 ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' :
+                        item.index === 2 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                        'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}>
+                        {item.index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {item.orders} orders
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(item.revenue)}
+                      </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {item.orders} orders
+                        Avg: {formatCurrency(item.avgRevenue)}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {formatCurrency(item.revenue)}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Avg: {formatCurrency(item.revenue / item.orders)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

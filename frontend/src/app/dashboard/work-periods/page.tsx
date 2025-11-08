@@ -7,7 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { CreateWorkPeriodRequest, useEndWorkPeriodMutation, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
+import { useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -34,50 +34,57 @@ export default function WorkPeriodsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const { data, isLoading, refetch } = useGetWorkPeriodsQuery({
-    branchId: user?.branchId,
+    branchId: user?.branchId || undefined,
     status: statusFilter === 'all' ? undefined : statusFilter,
-    startDate: dateRange.start || undefined,
-    endDate: dateRange.end || undefined,
-    search: searchQuery || undefined,
     page: currentPage,
     limit: itemsPerPage,
   });
 
+  const { data: activePeriod } = useGetCurrentWorkPeriodQuery();
+
   const [startWorkPeriod] = useStartWorkPeriodMutation();
   const [endWorkPeriod] = useEndWorkPeriodMutation();
 
-  const [openFormData, setOpenFormData] = useState<CreateWorkPeriodRequest>({
-    name: '',
-    startTime: new Date().toISOString(),
-    endTime: new Date().toISOString(),
-    branchId: user?.branchId || '',
+  const [openFormData, setOpenFormData] = useState({
+    openingBalance: 0,
+    pin: '',
   });
 
   const [closeFormData, setCloseFormData] = useState({
-    endCash: 0,
+    actualClosingBalance: 0,
+    note: '',
+    pin: '',
   });
 
   const resetForms = () => {
     setOpenFormData({
-      name: '',
-      startTime: new Date().toISOString(),
-      endTime: new Date().toISOString(),
-      branchId: user?.branchId || '',
+      openingBalance: 0,
+      pin: '',
     });
     setCloseFormData({
-      endCash: 0,
+      actualClosingBalance: 0,
+      note: '',
+      pin: '',
     });
     setSelectedWorkPeriod(null);
   };
 
   const handleOpen = async () => {
-    if (!openFormData.name.trim()) {
-      toast.error('Work period name is required');
+    if (!openFormData.openingBalance || openFormData.openingBalance < 0) {
+      toast.error('Opening balance is required and must be positive');
+      return;
+    }
+
+    if (!openFormData.pin || openFormData.pin.length < 6) {
+      toast.error('PIN must be at least 6 digits');
       return;
     }
 
     try {
-      await startWorkPeriod(openFormData as any).unwrap();
+      await startWorkPeriod({
+        openingBalance: openFormData.openingBalance,
+        pin: openFormData.pin,
+      }).unwrap();
       toast.success('Work period opened successfully');
       setIsOpenModalOpen(false);
       resetForms();
@@ -90,13 +97,23 @@ export default function WorkPeriodsPage() {
   const handleClose = async () => {
     if (!selectedWorkPeriod) return;
 
-    if (closeFormData.endCash < 0) {
-      toast.error('Ending cash cannot be negative');
+    if (!closeFormData.actualClosingBalance || closeFormData.actualClosingBalance < 0) {
+      toast.error('Closing balance is required and must be positive');
+      return;
+    }
+
+    if (!closeFormData.pin || closeFormData.pin.length < 6) {
+      toast.error('PIN must be at least 6 digits');
       return;
     }
 
     try {
-      await endWorkPeriod(selectedWorkPeriod.id).unwrap();
+      await endWorkPeriod({
+        id: selectedWorkPeriod.id,
+        actualClosingBalance: closeFormData.actualClosingBalance,
+        note: closeFormData.note || undefined,
+        pin: closeFormData.pin,
+      }).unwrap();
       toast.success('Work period closed successfully');
       setIsCloseModalOpen(false);
       resetForms();
@@ -111,10 +128,10 @@ export default function WorkPeriodsPage() {
     setIsViewModalOpen(true);
   };
 
-  const getStatusBadge = (isActive: boolean) => {
-    return isActive 
+  const getStatusBadge = (status: string) => {
+    return status === 'active'
       ? <Badge variant="success">Active</Badge>
-      : <Badge variant="secondary">Inactive</Badge>;
+      : <Badge variant="secondary">Completed</Badge>;
   };
 
   const columns = [
@@ -122,7 +139,7 @@ export default function WorkPeriodsPage() {
       key: 'startTime',
       title: 'Start Time',
       sortable: true,
-      render: (value: string, row: WorkPeriod) => (
+      render: (value: string) => (
         <div className="flex items-center gap-2">
           <ClockIcon className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -132,18 +149,18 @@ export default function WorkPeriodsPage() {
       ),
     },
     {
-      key: 'isActive',
+      key: 'status',
       title: 'Status',
-      render: (value: boolean) => getStatusBadge(value),
+      render: (value: string) => getStatusBadge(value),
     },
     {
-      key: 'createdBy',
-      title: 'Created By',
+      key: 'startedBy',
+      title: 'Started By',
       render: (value: string) => (
         <div className="flex items-center gap-2">
           <UserIcon className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            User {value.slice(-6)}
+            User {value?.slice(-6) || 'N/A'}
           </span>
         </div>
       ),
@@ -173,26 +190,26 @@ export default function WorkPeriodsPage() {
       ),
     },
     {
-      key: 'totalExpenses',
-      title: 'Total Expenses',
+      key: 'openingBalance',
+      title: 'Opening Balance',
       align: 'right' as const,
       render: (value: number) => (
         <div className="text-right">
-          <p className="font-semibold text-red-600">
-            -{formatCurrency(value)}
+          <p className="font-semibold text-gray-900 dark:text-white">
+            {formatCurrency(value)}
           </p>
         </div>
       ),
     },
     {
-      key: 'userId',
-      title: 'Opened By',
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <UserIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            User {value.slice(-6)}
-          </span>
+      key: 'closingBalance',
+      title: 'Closing Balance',
+      align: 'right' as const,
+      render: (value: number | undefined) => (
+        <div className="text-right">
+          <p className="font-semibold text-gray-900 dark:text-white">
+            {value ? formatCurrency(value) : '-'}
+          </p>
         </div>
       ),
     },
@@ -208,7 +225,7 @@ export default function WorkPeriodsPage() {
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
-          {(row as any).status === 'open' && (
+          {row.status === 'active' && (
             <Button
               variant="ghost"
               size="sm"
@@ -228,14 +245,12 @@ export default function WorkPeriodsPage() {
 
   const stats = {
     total: data?.total || 0,
-    open: data?.workPeriods?.filter(wp => (wp as any).status === 'open').length || 0,
-    closed: data?.workPeriods?.filter(wp => (wp as any).status === 'closed').length || 0,
-    totalSales: data?.workPeriods?.reduce((sum, wp) => sum + ((wp as any).totalSales || 0), 0) || 0,
-    totalExpenses: data?.workPeriods?.reduce((sum, wp) => sum + ((wp as any).totalExpenses || 0), 0) || 0,
+    open: data?.workPeriods?.filter(wp => wp.status === 'active').length || 0,
+    closed: data?.workPeriods?.filter(wp => wp.status === 'completed').length || 0,
   };
 
-  // Check if there's an open work period
-  const currentOpenPeriod = data?.workPeriods?.find(wp => (wp as any).status === 'open');
+  // Use active period from query or find in list
+  const currentOpenPeriod = activePeriod || data?.workPeriods?.find(wp => wp.status === 'active');
 
   return (
     <div className="space-y-6">
@@ -269,7 +284,7 @@ export default function WorkPeriodsPage() {
                     Work Period Active
                   </h3>
                   <p className="text-sm text-green-700 dark:text-green-300">
-                    Started: {formatDateTime(currentOpenPeriod.startTime)} • Starting Cash: {formatCurrency((currentOpenPeriod as any).startCash || 0)}
+                    Started: {formatDateTime(currentOpenPeriod.startTime)} • Opening Balance: {formatCurrency(currentOpenPeriod.openingBalance || 0)}
                   </p>
                 </div>
               </div>
@@ -330,10 +345,10 @@ export default function WorkPeriodsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Sales</p>
-                <p className="text-3xl font-bold text-green-600">{formatCurrency(stats.totalSales)}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Active Periods</p>
+                <p className="text-3xl font-bold text-green-600">{stats.open}</p>
               </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-green-600" />
+              <PlayIcon className="w-8 h-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
@@ -342,10 +357,12 @@ export default function WorkPeriodsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</p>
-                <p className="text-3xl font-bold text-red-600">{formatCurrency(stats.totalExpenses)}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {formatCurrency(data?.workPeriods?.reduce((sum, wp) => sum + (wp.openingBalance || 0), 0) || 0)}
+                </p>
               </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-red-600" />
+              <CurrencyDollarIcon className="w-8 h-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
@@ -429,18 +446,29 @@ export default function WorkPeriodsPage() {
       >
         <div className="space-y-4">
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-            <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">Starting Cash</h4>
+            <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">Opening Balance</h4>
             <p className="text-sm text-blue-700 dark:text-blue-300">
               Enter the amount of cash you're starting with for this work period.
             </p>
           </div>
 
           <Input
-            label="Work Period Name"
-            type="text"
-            value={openFormData.name}
-            onChange={(e) => setOpenFormData({ ...openFormData, name: e.target.value })}
-            placeholder="Enter work period name"
+            label="Opening Balance *"
+            type="number"
+            step="0.01"
+            value={openFormData.openingBalance}
+            onChange={(e) => setOpenFormData({ ...openFormData, openingBalance: parseFloat(e.target.value) || 0 })}
+            placeholder="0.00"
+            required
+          />
+
+          <Input
+            label="PIN *"
+            type="password"
+            value={openFormData.pin}
+            onChange={(e) => setOpenFormData({ ...openFormData, pin: e.target.value })}
+            placeholder="Enter your 6-digit PIN"
+            maxLength={6}
             required
           />
 
@@ -483,44 +511,55 @@ export default function WorkPeriodsPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Starting Cash:</span>
+                  <span className="text-gray-600 dark:text-gray-400">Opening Balance:</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {formatCurrency((selectedWorkPeriod as any).startCash)}
+                    {formatCurrency(selectedWorkPeriod.openingBalance)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Total Sales:</span>
-                  <span className="font-medium text-green-600">
-                    {formatCurrency((selectedWorkPeriod as any).totalSales)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Total Expenses:</span>
-                  <span className="font-medium text-red-600">
-                    {formatCurrency((selectedWorkPeriod as any).totalExpenses)}
-                  </span>
-                </div>
+                {selectedWorkPeriod.closingBalance && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Closing Balance:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(selectedWorkPeriod.closingBalance)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           <Input
-            label="Ending Cash Amount"
+            label="Actual Closing Balance *"
             type="number"
             step="0.01"
-            value={closeFormData.endCash}
-            onChange={(e) => setCloseFormData({ endCash: parseFloat(e.target.value) || 0 })}
+            value={closeFormData.actualClosingBalance}
+            onChange={(e) => setCloseFormData({ ...closeFormData, actualClosingBalance: parseFloat(e.target.value) || 0 })}
             placeholder="0.00"
             required
           />
 
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
-            <p className="text-sm text-yellow-800 dark:text-yellow-400">
-              💡 Expected ending cash should be: {formatCurrency(
-                ((selectedWorkPeriod as any)?.startCash || 0) + ((selectedWorkPeriod as any)?.totalSales || 0) - ((selectedWorkPeriod as any)?.totalExpenses || 0)
-              )}
-            </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Note (Optional)
+            </label>
+            <textarea
+              value={closeFormData.note}
+              onChange={(e) => setCloseFormData({ ...closeFormData, note: e.target.value })}
+              placeholder="Add any notes about closing the period..."
+              rows={3}
+              className="input"
+            />
           </div>
+
+          <Input
+            label="PIN *"
+            type="password"
+            value={closeFormData.pin}
+            onChange={(e) => setCloseFormData({ ...closeFormData, pin: e.target.value })}
+            placeholder="Enter your 6-digit PIN"
+            maxLength={6}
+            required
+          />
 
           <div className="flex justify-end gap-3 pt-4">
             <Button

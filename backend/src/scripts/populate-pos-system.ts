@@ -229,6 +229,7 @@ async function populatePOSSystem() {
       const total = subtotal + tax;
 
       const orderData = {
+        orderType: 'dine-in' as const,
         tableId: randomTable._id.toString(),
         items: randomItems,
         totalAmount: total,

@@ -24,18 +24,31 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 const EXPENSE_CATEGORIES = [
-  'Food & Beverages',
-  'Supplies',
-  'Utilities',
-  'Rent',
-  'Marketing',
-  'Maintenance',
-  'Equipment',
-  'Salaries',
-  'Insurance',
-  'Taxes',
-  'Transportation',
-  'Miscellaneous',
+  { value: 'ingredient', label: 'Ingredients' },
+  { value: 'utility', label: 'Utilities' },
+  { value: 'rent', label: 'Rent' },
+  { value: 'salary', label: 'Salaries' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'equipment', label: 'Equipment' },
+  { value: 'transport', label: 'Transportation' },
+  { value: 'other', label: 'Other' },
+];
+
+const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+  { value: 'bank-transfer', label: 'Bank Transfer' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'online', label: 'Online' },
+  { value: 'other', label: 'Other' },
+];
+
+const RECURRING_FREQUENCIES = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
 ];
 
 export default function ExpensesPage() {
@@ -71,6 +84,11 @@ export default function ExpensesPage() {
     category: 'other',
     date: new Date().toISOString().split('T')[0],
     paymentMethod: 'cash',
+    vendorName: '',
+    invoiceNumber: '',
+    notes: '',
+    isRecurring: false,
+    recurringFrequency: 'monthly',
   });
 
   const resetForm = () => {
@@ -81,18 +99,60 @@ export default function ExpensesPage() {
       category: 'other',
       date: new Date().toISOString().split('T')[0],
       paymentMethod: 'cash',
+      vendorName: '',
+      invoiceNumber: '',
+      notes: '',
+      isRecurring: false,
+      recurringFrequency: 'monthly',
     });
     setSelectedExpense(null);
   };
 
+  // const handleApprove = async (expense: Expense, approved: boolean) => {
+  //   try {
+  //     await approveExpense({
+  //       id: expense.id,
+  //       approved,
+  //       notes: approved ? 'Approved' : 'Rejected',
+  //     }).unwrap();
+  //     toast.success(`Expense ${approved ? 'approved' : 'rejected'} successfully`);
+  //     refetch();
+  //   } catch (error: any) {
+  //     toast.error(error.data?.message || 'Failed to update expense status');
+  //   }
+  // };
+
   const handleCreate = async () => {
-    if (!formData.description || !formData.category || formData.amount <= 0) {
+    if (!formData.title || !formData.category || formData.amount <= 0 || !formData.date) {
       toast.error('Please fill in all required fields');
       return;
     }
 
+    if (!user?.branchId || !user?.companyId) {
+      toast.error('Branch or Company ID is missing');
+      return;
+    }
+
     try {
-      await createExpense(formData).unwrap();
+      const payload: any = {
+        ...formData,
+        branchId: user.branchId,
+        companyId: user.companyId,
+        createdBy: user.id,
+      };
+
+      // Only include optional fields if they have values
+      if (formData.vendorName) {
+        payload.vendorName = formData.vendorName;
+      }
+      if (formData.invoiceNumber) {
+        payload.invoiceNumber = formData.invoiceNumber;
+      }
+      if (formData.notes) {
+        payload.notes = formData.notes;
+      }
+
+      await createExpense(payload).unwrap();
       toast.success('Expense created successfully');
       setIsCreateModalOpen(false);
       resetForm();
@@ -150,27 +210,45 @@ export default function ExpensesPage() {
   };
 
   const getCategoryBadge = (category: string) => {
-    const colors = {
-      'Food & Beverages': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-      'Supplies': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      'Utilities': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      'Rent': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-      'Marketing': 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
-      'Maintenance': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-      'Equipment': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
-      'Salaries': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-      'Insurance': 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
-      'Taxes': 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-      'Transportation': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400',
-      'Miscellaneous': 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400',
+    const colors: Record<string, string> = {
+      'ingredient': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      'utility': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+      'rent': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+      'salary': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+      'maintenance': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+      'marketing': 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
+      'equipment': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+      'transport': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400',
+      'other': 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
     };
-    return colors[category as keyof typeof colors] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+    return colors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+  };
+
+  const getCategoryLabel = (category: string) => {
+    const cat = EXPENSE_CATEGORIES.find(c => c.value === category);
+    return cat?.label || category;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const colors: Record<string, any> = {
+      'pending': { variant: 'warning', label: 'Pending' },
+      'approved': { variant: 'success', label: 'Approved' },
+      'rejected': { variant: 'danger', label: 'Rejected' },
+      'paid': { variant: 'info', label: 'Paid' },
+    };
+    const statusInfo = colors[status] || { variant: 'secondary', label: status };
+    return <Badge variant={statusInfo.variant as any}>{statusInfo.label}</Badge>;
   };
 
   const columns = [
     {
-      key: 'description',
-      title: 'Description',
+      key: 'status',
+      title: 'Status',
+      render: (value: string) => getStatusBadge(value),
+    },
+    {
+      key: 'title',
+      title: 'Expense',
       sortable: true,
       render: (value: string, row: Expense) => (
         <div className="flex items-center gap-3">
@@ -179,7 +257,10 @@ export default function ExpensesPage() {
           </div>
           <div>
             <p className="font-medium text-gray-900 dark:text-white">{value}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{row.category}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{getCategoryLabel(row.category)}</p>
+            {row.vendorName && (
+              <p className="text-xs text-gray-400">{row.vendorName}</p>
+            )}
           </div>
         </div>
       ),
@@ -354,7 +435,7 @@ export default function ExpensesPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Categories' },
-                  ...EXPENSE_CATEGORIES.map(cat => ({ value: cat, label: cat })),
+                  ...EXPENSE_CATEGORIES,
                 ]}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
@@ -412,42 +493,112 @@ export default function ExpensesPage() {
           resetForm();
         }}
         title="Add New Expense"
-        className="max-w-2xl"
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
-          <Input
-            label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="e.g., Office supplies, Marketing materials"
-          />
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Amount"
+              label="Title *"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="e.g., Office supplies"
+              required
+            />
+            <Input
+              label="Amount *"
               type="number"
               step="0.01"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
               placeholder="0.00"
+              required
+            />
+          </div>
+
+          <Input
+            label="Description"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="Additional details about this expense"
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Category *"
+              options={EXPENSE_CATEGORIES}
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value as any })}
+              placeholder="Select expense category"
             />
             <Input
-              label="Date"
+              label="Date *"
               type="date"
               value={formData.date}
               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              required
             />
           </div>
 
           <Select
-            label="Category"
-            options={EXPENSE_CATEGORIES.map(cat => ({ value: cat, label: cat }))}
-            value={formData.category}
-            onChange={(value) => setFormData({ ...formData, category: value as any })}
-            placeholder="Select expense category"
+            label="Payment Method"
+            options={PAYMENT_METHODS}
+            value={formData.paymentMethod}
+            onChange={(value) => setFormData({ ...formData, paymentMethod: value as any })}
+            placeholder="Select payment method"
           />
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Vendor Name"
+              value={formData.vendorName}
+              onChange={(e) => setFormData({ ...formData, vendorName: e.target.value })}
+              placeholder="e.g., ABC Supplies"
+            />
+            <Input
+              label="Invoice Number"
+              value={formData.invoiceNumber}
+              onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+              placeholder="e.g., INV-2024-001"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isRecurring"
+              checked={formData.isRecurring}
+              onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <label htmlFor="isRecurring" className="text-sm text-gray-600 dark:text-gray-400">
+              This is a recurring expense
+            </label>
+          </div>
+
+          {formData.isRecurring && (
+            <Select
+              label="Recurring Frequency"
+              options={RECURRING_FREQUENCIES}
+              value={formData.recurringFrequency}
+              onChange={(value) => setFormData({ ...formData, recurringFrequency: value as any })}
+              placeholder="Select frequency"
+            />
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Additional notes..."
+              rows={3}
+              className="input"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {
@@ -472,9 +623,26 @@ export default function ExpensesPage() {
           resetForm();
         }}
         title="Edit Expense"
-        className="max-w-2xl"
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Title *"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              required
+            />
+            <Input
+              label="Amount *"
+              type="number"
+              step="0.01"
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+              required
+            />
+          </div>
+
           <Input
             label="Description"
             value={formData.description}
@@ -482,29 +650,76 @@ export default function ExpensesPage() {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Amount"
-              type="number"
-              step="0.01"
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+            <Select
+              label="Category *"
+              options={EXPENSE_CATEGORIES}
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value as any })}
             />
             <Input
-              label="Date"
+              label="Date *"
               type="date"
               value={formData.date}
               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              required
             />
           </div>
 
           <Select
-            label="Category"
-            options={EXPENSE_CATEGORIES.map(cat => ({ value: cat, label: cat }))}
-            value={formData.category}
-            onChange={(value) => setFormData({ ...formData, category: value as any })}
+            label="Payment Method"
+            options={PAYMENT_METHODS}
+            value={formData.paymentMethod}
+            onChange={(value) => setFormData({ ...formData, paymentMethod: value as any })}
           />
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Vendor Name"
+              value={formData.vendorName}
+              onChange={(e) => setFormData({ ...formData, vendorName: e.target.value })}
+            />
+            <Input
+              label="Invoice Number"
+              value={formData.invoiceNumber}
+              onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isRecurring-edit"
+              checked={formData.isRecurring}
+              onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <label htmlFor="isRecurring-edit" className="text-sm text-gray-600 dark:text-gray-400">
+              This is a recurring expense
+            </label>
+          </div>
+
+          {formData.isRecurring && (
+            <Select
+              label="Recurring Frequency"
+              options={RECURRING_FREQUENCIES}
+              value={formData.recurringFrequency}
+              onChange={(value) => setFormData({ ...formData, recurringFrequency: value as any })}
+            />
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+              className="input"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {

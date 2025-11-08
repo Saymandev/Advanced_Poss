@@ -17,24 +17,36 @@ export default function DashboardLayout({
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  // Ensure component is mounted on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check if auth state is being restored
   useEffect(() => {
+    if (!mounted) return;
+    
     const timer = setTimeout(() => {
       setIsInitializing(false);
     }, 1000); // Give time for auth restoration
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [mounted]);
 
   useEffect(() => {
-    if (!isInitializing && !isAuthenticated) {
+    if (!mounted || isInitializing) return;
+    
+    if (!isAuthenticated) {
       router.push('/auth/login');
     }
-  }, [isAuthenticated, isInitializing, router]);
+  }, [isAuthenticated, isInitializing, mounted, router]);
 
   // Listen for sidebar state changes
   useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    
     const handleSidebarToggle = (event: CustomEvent) => {
       setSidebarCollapsed(event.detail.collapsed);
     };
@@ -43,20 +55,22 @@ export default function DashboardLayout({
     return () => {
       window.removeEventListener('sidebar-toggle', handleSidebarToggle as EventListener);
     };
-  }, []);
+  }, [mounted]);
 
-  // Show skeleton while initializing or if not authenticated
-  if (isInitializing || !isAuthenticated || !user) {
+  // Show skeleton while mounting, initializing or if not authenticated
+  // During SSR, always return skeleton to avoid hydration mismatch
+  if (!mounted || isInitializing || !isAuthenticated || !user) {
     return <DashboardSkeleton />;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900" suppressHydrationWarning>
       <Sidebar />
       <div 
         className={`transition-all duration-300 ${
           sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
         }`}
+        suppressHydrationWarning
       >
         {/* Fixed Topbar */}
         <div 
@@ -73,7 +87,7 @@ export default function DashboardLayout({
         </div>
         
         {/* Main content with top padding to account for fixed navbar */}
-        <main className="pt-0 py-6">
+        <main className="pt-0 py-6" suppressHydrationWarning>
           <div className="mx-auto w-full px-4">
             {children}
           </div>

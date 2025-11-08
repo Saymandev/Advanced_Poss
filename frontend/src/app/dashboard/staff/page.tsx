@@ -88,6 +88,13 @@ export default function StaffPage() {
     password: '',
     pin: '',
     salary: undefined,
+    hourlyRate: undefined,
+    department: '',
+    emergencyContact: undefined,
+    address: undefined,
+    skills: [],
+    certifications: [],
+    notes: '',
   });
 
   useEffect(() => {
@@ -105,6 +112,13 @@ export default function StaffPage() {
         phoneNumber: selectedStaffData.phoneNumber,
         role: selectedStaffData.role,
         salary: selectedStaffData.salary,
+        hourlyRate: selectedStaffData.hourlyRate,
+        department: selectedStaffData.department,
+        emergencyContact: selectedStaffData.emergencyContact,
+        address: selectedStaffData.address,
+        skills: selectedStaffData.skills || [],
+        certifications: selectedStaffData.certifications || [],
+        notes: selectedStaffData.notes,
         pin: '',
         password: '',
       });
@@ -121,6 +135,13 @@ export default function StaffPage() {
       password: '',
       pin: '',
       salary: undefined,
+      hourlyRate: undefined,
+      department: '',
+      emergencyContact: undefined,
+      address: undefined,
+      skills: [],
+      certifications: [],
+      notes: '',
     });
     setSelectedStaffId('');
   };
@@ -131,13 +152,50 @@ export default function StaffPage() {
       return;
     }
 
+    if (!companyId || !branchId) {
+      toast.error('Company or Branch ID is missing');
+      return;
+    }
+
     try {
-      const payload = {
-        ...formData,
+      const payload: any = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        role: formData.role || 'waiter',
+        password: formData.password,
+        pin: formData.pin || undefined,
         branchId,
         companyId,
-        role: formData.role || 'waiter',
-      } as any;
+      };
+
+      // Add optional fields
+      if (formData.salary !== undefined && formData.salary !== null) {
+        payload.salary = formData.salary;
+      }
+      if (formData.hourlyRate !== undefined && formData.hourlyRate !== null) {
+        payload.hourlyRate = formData.hourlyRate;
+      }
+      if (formData.department) {
+        payload.department = formData.department;
+      }
+      if (formData.emergencyContact) {
+        payload.emergencyContact = formData.emergencyContact;
+      }
+      if (formData.address) {
+        payload.address = formData.address;
+      }
+      if (formData.skills && formData.skills.length > 0) {
+        payload.skills = formData.skills;
+      }
+      if (formData.certifications && formData.certifications.length > 0) {
+        payload.certifications = formData.certifications;
+      }
+      if (formData.notes) {
+        payload.notes = formData.notes;
+      }
+
       await createStaff(payload).unwrap();
       toast.success('Staff member created successfully');
       setIsCreateModalOpen(false);
@@ -181,6 +239,41 @@ export default function StaffPage() {
         payload.salary = formData.salary;
       }
 
+      // Include hourly rate if set
+      if (formData.hourlyRate !== undefined && formData.hourlyRate !== null) {
+        payload.hourlyRate = formData.hourlyRate;
+      }
+
+      // Include department if set
+      if (formData.department) {
+        payload.department = formData.department;
+      }
+
+      // Include emergency contact if set
+      if (formData.emergencyContact) {
+        payload.emergencyContact = formData.emergencyContact;
+      }
+
+      // Include address if set
+      if (formData.address) {
+        payload.address = formData.address;
+      }
+
+      // Include skills if set
+      if (formData.skills && formData.skills.length > 0) {
+        payload.skills = formData.skills;
+      }
+
+      // Include certifications if set
+      if (formData.certifications && formData.certifications.length > 0) {
+        payload.certifications = formData.certifications;
+      }
+
+      // Include notes if set
+      if (formData.notes) {
+        payload.notes = formData.notes;
+      }
+
       await updateStaff({ id: selectedStaffId, ...payload }).unwrap();
       toast.success('Staff member updated successfully');
       setIsEditModalOpen(false);
@@ -203,8 +296,18 @@ export default function StaffPage() {
 
   const handleToggleStatus = async (staff: Staff) => {
     try {
-      await deactivateStaff(staff.id).unwrap();
-      toast.success(`Staff member ${staff.isActive ? 'deactivated' : 'activated'} successfully`);
+      if (staff.isActive) {
+        // Deactivate
+        await deactivateStaff(staff.id).unwrap();
+        toast.success('Staff member deactivated successfully');
+      } else {
+        // Activate by updating isActive status
+        await updateStaff({ 
+          id: staff.id, 
+          isActive: true 
+        } as any).unwrap();
+        toast.success('Staff member activated successfully');
+      }
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to update staff status');
     }
@@ -587,11 +690,25 @@ export default function StaffPage() {
                       {selectedStaffData.hireDate ? new Date(selectedStaffData.hireDate).toLocaleDateString() : 'N/A'}
                     </span>
                   </div>
+                  {selectedStaffData.department && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Department:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{selectedStaffData.department}</span>
+                    </div>
+                  )}
                   {selectedStaffData.salary && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Salary:</span>
+                      <span className="text-gray-600 dark:text-gray-400">Monthly Salary:</span>
                       <span className="font-medium text-gray-900 dark:text-white">
                         {formatCurrency(selectedStaffData.salary)}
+                      </span>
+                    </div>
+                  )}
+                  {selectedStaffData.hourlyRate && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Hourly Rate:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {formatCurrency(selectedStaffData.hourlyRate)}/hr
                       </span>
                     </div>
                   )}
@@ -601,15 +718,80 @@ export default function StaffPage() {
               {selectedStaffData.address && (
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white mb-3">Address</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {typeof selectedStaffData.address === 'string' 
-                      ? selectedStaffData.address 
-                      : `${selectedStaffData.address.street || ''}, ${selectedStaffData.address.city || ''}, ${selectedStaffData.address.state || ''} ${selectedStaffData.address.zipCode || ''}`
-                    }
-                  </p>
+                  <div className="space-y-2 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {typeof selectedStaffData.address === 'string' 
+                        ? selectedStaffData.address 
+                        : `${selectedStaffData.address.street || ''}, ${selectedStaffData.address.city || ''}, ${selectedStaffData.address.state || ''} ${selectedStaffData.address.zipCode || ''}, ${selectedStaffData.address.country || ''}`
+                      }
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
+
+            {/* Emergency Contact */}
+            {selectedStaffData.emergencyContact && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Emergency Contact</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Name:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                      {selectedStaffData.emergencyContact.name}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Relationship:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                      {selectedStaffData.emergencyContact.relationship}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Phone:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                      {selectedStaffData.emergencyContact.phoneNumber}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Skills & Certifications */}
+            {(selectedStaffData.skills?.length || selectedStaffData.certifications?.length) && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {selectedStaffData.skills && selectedStaffData.skills.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-gray-900 dark:text-white mb-3">Skills</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedStaffData.skills.map((skill, idx) => (
+                          <Badge key={idx} variant="secondary">{skill}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedStaffData.certifications && selectedStaffData.certifications.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-gray-900 dark:text-white mb-3">Certifications</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedStaffData.certifications.map((cert, idx) => (
+                          <Badge key={idx} variant="warning">{cert}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            {selectedStaffData.notes && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Notes</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedStaffData.notes}</p>
+              </div>
+            )}
 
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -650,7 +832,7 @@ export default function StaffPage() {
           resetForm();
         }}
         title={isEditModalOpen ? 'Edit Staff Member' : 'Add Staff Member'}
-        className="max-w-2xl"
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -690,10 +872,27 @@ export default function StaffPage() {
               onChange={(value) => setFormData({ ...formData, role: value as any })}
             />
             <Input
-              label="Salary (Optional)"
+              label="Department (Optional)"
+              value={formData.department || ''}
+              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+              placeholder="e.g., Kitchen, Front of House"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Monthly Salary (Optional)"
               type="number"
               value={formData.salary?.toString() || ''}
               onChange={(e) => setFormData({ ...formData, salary: e.target.value ? parseFloat(e.target.value) : undefined })}
+              placeholder="Monthly salary amount"
+            />
+            <Input
+              label="Hourly Rate (Optional)"
+              type="number"
+              value={formData.hourlyRate?.toString() || ''}
+              onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value ? parseFloat(e.target.value) : undefined })}
+              placeholder="Per hour rate"
             />
           </div>
 
@@ -737,6 +936,159 @@ export default function StaffPage() {
               />
             </div>
           )}
+
+          {/* Emergency Contact Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3">Emergency Contact (Optional)</h4>
+            <div className="grid grid-cols-3 gap-4">
+              <Input
+                label="Contact Name"
+                value={formData.emergencyContact?.name || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  emergencyContact: {
+                    ...formData.emergencyContact,
+                    name: e.target.value,
+                    relationship: formData.emergencyContact?.relationship || '',
+                    phoneNumber: formData.emergencyContact?.phoneNumber || '',
+                  } as any,
+                })}
+                placeholder="Name"
+              />
+              <Input
+                label="Relationship"
+                value={formData.emergencyContact?.relationship || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  emergencyContact: {
+                    ...formData.emergencyContact,
+                    name: formData.emergencyContact?.name || '',
+                    relationship: e.target.value,
+                    phoneNumber: formData.emergencyContact?.phoneNumber || '',
+                  } as any,
+                })}
+                placeholder="e.g., Spouse, Parent"
+              />
+              <Input
+                label="Phone Number"
+                value={formData.emergencyContact?.phoneNumber || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  emergencyContact: {
+                    ...formData.emergencyContact,
+                    name: formData.emergencyContact?.name || '',
+                    relationship: formData.emergencyContact?.relationship || '',
+                    phoneNumber: e.target.value,
+                  } as any,
+                })}
+                placeholder="Phone"
+              />
+            </div>
+          </div>
+
+          {/* Address Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3">Address (Optional)</h4>
+            <Input
+              label="Street Address"
+              value={typeof formData.address === 'object' ? formData.address?.street || '' : ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                address: {
+                  ...(typeof formData.address === 'object' ? formData.address : {}),
+                  street: e.target.value,
+                  city: typeof formData.address === 'object' ? formData.address?.city || '' : '',
+                  state: typeof formData.address === 'object' ? formData.address?.state || '' : '',
+                  zipCode: typeof formData.address === 'object' ? formData.address?.zipCode || '' : '',
+                  country: typeof formData.address === 'object' ? formData.address?.country || 'USA' : 'USA',
+                } as any,
+              })}
+              placeholder="Street"
+              className="mb-2"
+            />
+            <div className="grid grid-cols-2 gap-4 mb-2">
+              <Input
+                label="City"
+                value={typeof formData.address === 'object' ? formData.address?.city || '' : ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  address: {
+                    ...(typeof formData.address === 'object' ? formData.address : {}),
+                    street: typeof formData.address === 'object' ? formData.address?.street || '' : '',
+                    city: e.target.value,
+                    state: typeof formData.address === 'object' ? formData.address?.state || '' : '',
+                    zipCode: typeof formData.address === 'object' ? formData.address?.zipCode || '' : '',
+                    country: typeof formData.address === 'object' ? formData.address?.country || 'USA' : 'USA',
+                  } as any,
+                })}
+                placeholder="City"
+              />
+              <Input
+                label="State"
+                value={typeof formData.address === 'object' ? formData.address?.state || '' : ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  address: {
+                    ...(typeof formData.address === 'object' ? formData.address : {}),
+                    street: typeof formData.address === 'object' ? formData.address?.street || '' : '',
+                    city: typeof formData.address === 'object' ? formData.address?.city || '' : '',
+                    state: e.target.value,
+                    zipCode: typeof formData.address === 'object' ? formData.address?.zipCode || '' : '',
+                    country: typeof formData.address === 'object' ? formData.address?.country || 'USA' : 'USA',
+                  } as any,
+                })}
+                placeholder="State"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="ZIP Code"
+                value={typeof formData.address === 'object' ? formData.address?.zipCode || '' : ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  address: {
+                    ...(typeof formData.address === 'object' ? formData.address : {}),
+                    street: typeof formData.address === 'object' ? formData.address?.street || '' : '',
+                    city: typeof formData.address === 'object' ? formData.address?.city || '' : '',
+                    state: typeof formData.address === 'object' ? formData.address?.state || '' : '',
+                    zipCode: e.target.value,
+                    country: typeof formData.address === 'object' ? formData.address?.country || 'USA' : 'USA',
+                  } as any,
+                })}
+                placeholder="ZIP Code"
+              />
+              <Input
+                label="Country"
+                value={typeof formData.address === 'object' ? formData.address?.country || 'USA' : 'USA'}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  address: {
+                    ...(typeof formData.address === 'object' ? formData.address : {}),
+                    street: typeof formData.address === 'object' ? formData.address?.street || '' : '',
+                    city: typeof formData.address === 'object' ? formData.address?.city || '' : '',
+                    state: typeof formData.address === 'object' ? formData.address?.state || '' : '',
+                    zipCode: typeof formData.address === 'object' ? formData.address?.zipCode || '' : '',
+                    country: e.target.value,
+                  } as any,
+                })}
+                placeholder="Country"
+              />
+            </div>
+          </div>
+
+          {/* Notes Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Notes (Optional)
+            </label>
+            <textarea
+              rows={3}
+              value={formData.notes || ''}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="input w-full"
+              placeholder="Additional notes about this staff member..."
+            />
+          </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button

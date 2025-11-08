@@ -12,14 +12,15 @@ import { useGetTablesQuery } from '@/lib/api/endpoints/tablesApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-    ChartBarIcon,
-    EyeIcon,
-    LinkIcon,
-    PlusIcon,
-    QrCodeIcon,
-    TableCellsIcon,
-    TrashIcon
+  ChartBarIcon,
+  EyeIcon,
+  LinkIcon,
+  PlusIcon,
+  QrCodeIcon,
+  TableCellsIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
+import Image from 'next/image';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -38,10 +39,19 @@ export default function QRCodesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [tableFilter, setTableFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const { data: qrCodesData, isLoading, refetch } = useGetQRCodesQuery({
     branchId: user?.branchId || undefined,
-    tableNumber: tableFilter === 'all' ? undefined : parseInt(tableFilter),
+    tableNumber: tableFilter === 'all' || !tableFilter ? undefined : parseInt(tableFilter),
+  });
+
+  // Filter QR codes by type and search
+  const filteredQRCodes = (qrCodesData || []).filter((qr) => {
+    if (typeFilter !== 'all' && qr.menuType !== typeFilter) return false;
+    if (searchQuery && !qr.tableNumber?.toString().includes(searchQuery)) return false;
+    return true;
   });
 
   const { data: tables } = useGetTablesQuery({ branchId: user?.branchId || undefined });
@@ -123,6 +133,28 @@ export default function QRCodesPage() {
   };
 
   const columns = [
+    {
+      key: 'qrCodeImage',
+      title: 'QR Code',
+      render: (value: string) => (
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-white border border-gray-200 dark:border-gray-700 rounded flex items-center justify-center">
+            {value ? (
+              <Image 
+                src={value} 
+                alt="QR Code" 
+                width={48}
+                height={48}
+                className="w-full h-full object-contain"
+                unoptimized
+              />
+            ) : (
+              <QrCodeIcon className="w-6 h-6 text-gray-400" />
+            )}
+          </div>
+        </div>
+      ),
+    },
     {
       key: 'tableNumber',
       title: 'Table',
@@ -206,11 +238,13 @@ export default function QRCodesPage() {
     },
   ];
 
+  const qrCodes = qrCodesData || [];
+  
   const stats = {
-    total: qrCodesData?.length || 0,
-    active: qrCodesData?.filter(qr => qr.isActive).length || 0,
-    totalScans: qrCodesData?.reduce((sum, qr) => sum + qr.scanCount, 0) || 0,
-    avgScans: qrCodesData?.length ? (qrCodesData.reduce((sum, qr) => sum + qr.scanCount, 0) / qrCodesData.length).toFixed(1) : '0',
+    total: qrCodes.length,
+    active: qrCodes.filter(qr => qr.isActive).length,
+    totalScans: qrCodes.reduce((sum, qr) => sum + (qr.scanCount || 0), 0),
+    avgScans: qrCodes.length ? (qrCodes.reduce((sum, qr) => sum + (qr.scanCount || 0), 0) / qrCodes.length).toFixed(1) : '0',
   };
 
   return (
@@ -324,17 +358,25 @@ export default function QRCodesPage() {
         </CardHeader>
         <CardContent>
           <DataTable
-            data={qrCodesData || []}
+            data={filteredQRCodes}
             columns={columns}
             loading={isLoading}
             searchable={false}
             selectable={true}
+            pagination={{
+              currentPage,
+              totalPages: Math.ceil(filteredQRCodes.length / itemsPerPage),
+              itemsPerPage,
+              totalItems: filteredQRCodes.length,
+              onPageChange: setCurrentPage,
+              onItemsPerPageChange: setItemsPerPage,
+            }}
             exportable={true}
             exportFilename="qr-codes"
             onExport={(format, items) => {
               console.log(`Exporting ${items.length} QR codes as ${format}`);
             }}
-            emptyMessage="No QR codes generated yet. Create your first QR code to enable contactless menu access."
+            emptyMessage="No QR codes found. Create your first QR code to enable contactless menu access."
           />
         </CardContent>
       </Card>
@@ -444,10 +486,32 @@ export default function QRCodesPage() {
             {/* QR Code Display */}
             <div className="text-center">
               <div className="inline-block p-4 bg-white border-2 border-gray-200 dark:border-gray-700 rounded-lg">
-                <div className="w-32 h-32 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center">
-                  <QrCodeIcon className="w-16 h-16 text-gray-400" />
-                </div>
+                {selectedQR.qrCodeImage ? (
+                  <div className="w-48 h-48 mx-auto relative">
+                    <Image 
+                      src={selectedQR.qrCodeImage} 
+                      alt="QR Code" 
+                      width={192}
+                      height={192}
+                      className="w-full h-full object-contain"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="w-48 h-48 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center">
+                    <QrCodeIcon className="w-24 h-24 text-gray-400" />
+                  </div>
+                )}
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">QR Code Preview</p>
+              </div>
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Menu URL:</p>
+                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                  <LinkIcon className="w-4 h-4 text-gray-400" />
+                  <code className="text-xs text-gray-700 dark:text-gray-300 break-all flex-1 text-left">
+                    {selectedQR.url}
+                  </code>
+                </div>
               </div>
             </div>
 

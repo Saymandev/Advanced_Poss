@@ -1,7 +1,8 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { MenuItemsService } from '../menu-items/menu-items.service';
+import { TablesService } from '../tables/tables.service';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
 import { POSOrderFiltersDto, POSStatsFiltersDto } from './dto/pos-filters.dto';
 import { UpdatePOSSettingsDto } from './dto/pos-settings.dto';
@@ -20,6 +21,8 @@ export class POSService {
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
     private receiptService: ReceiptService,
     private menuItemsService: MenuItemsService,
+    @Inject(forwardRef(() => TablesService))
+    private tablesService: TablesService,
   ) {}
 
   // Generate unique order number
@@ -46,17 +49,30 @@ export class POSService {
   async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string): Promise<POSOrder> {
     const orderNumber = await this.generateOrderNumber(branchId);
 
-    const orderData = {
+    const orderData: any = {
       ...createOrderDto,
       orderNumber,
       branchId: new Types.ObjectId(branchId),
       userId: new Types.ObjectId(userId),
-      tableId: new Types.ObjectId(createOrderDto.tableId),
       items: createOrderDto.items.map(item => ({
         ...item,
         menuItemId: new Types.ObjectId(item.menuItemId),
       })),
     };
+
+    if (createOrderDto.tableId) {
+      orderData.tableId = new Types.ObjectId(createOrderDto.tableId);
+    } else {
+      delete orderData.tableId;
+    }
+
+    if (createOrderDto.deliveryDetails) {
+      orderData.deliveryDetails = { ...createOrderDto.deliveryDetails };
+    }
+
+    if (createOrderDto.takeawayDetails) {
+      orderData.takeawayDetails = { ...createOrderDto.takeawayDetails };
+    }
 
     const order = new this.posOrderModel(orderData);
     return order.save();
@@ -72,6 +88,10 @@ export class POSService {
 
     if (filters.status) {
       query.status = filters.status;
+    }
+
+    if (filters.orderType) {
+      query.orderType = filters.orderType;
     }
 
     if (filters.startDate || filters.endDate) {
@@ -99,8 +119,8 @@ export class POSService {
     const [orders, total] = await Promise.all([
       this.posOrderModel
         .find(query)
-        .populate('tableId', 'number capacity')
-        .populate('userId', 'name email')
+        .populate('tableId', 'tableNumber capacity')
+        .populate('userId', 'firstName lastName email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -115,8 +135,9 @@ export class POSService {
   async getOrderById(id: string): Promise<POSOrder> {
     const order = await this.posOrderModel
       .findById(id)
-      .populate('tableId', 'number capacity')
-      .populate('userId', 'name email')
+      .populate('tableId', 'tableNumber number capacity')
+      .populate('userId', 'firstName lastName name email')
+      .populate('items.menuItemId', 'name description price')
       .populate('paymentId')
       .exec();
 
@@ -226,6 +247,10 @@ export class POSService {
 
     if (filters.branchId) {
       matchQuery.branchId = new Types.ObjectId(filters.branchId);
+    }
+
+    if (filters.orderType) {
+      matchQuery.orderType = filters.orderType;
     }
 
     if (filters.startDate || filters.endDate) {
@@ -442,12 +467,52 @@ export class POSService {
     const remainingTotal = remainingItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
 
     // Create new order for split items
-    const splitOrderData = {
-      tableId: originalOrder.tableId.toString(),
-      items: itemsToSplit,
+    const deliveryDetails = originalOrder.deliveryDetails
+      ? {
+          contactName: originalOrder.deliveryDetails.contactName,
+          contactPhone: originalOrder.deliveryDetails.contactPhone,
+          addressLine1: originalOrder.deliveryDetails.addressLine1,
+          addressLine2: originalOrder.deliveryDetails.addressLine2,
+          city: originalOrder.deliveryDetails.city,
+          state: originalOrder.deliveryDetails.state,
+          postalCode: originalOrder.deliveryDetails.postalCode,
+          instructions: originalOrder.deliveryDetails.instructions,
+          assignedDriver: originalOrder.deliveryDetails.assignedDriver,
+        }
+      : undefined;
+
+    const takeawayDetails = originalOrder.takeawayDetails
+      ? {
+          contactName: originalOrder.takeawayDetails.contactName,
+          contactPhone: originalOrder.takeawayDetails.contactPhone,
+          instructions: originalOrder.takeawayDetails.instructions,
+          assignedDriver: originalOrder.takeawayDetails.assignedDriver,
+        }
+      : undefined;
+
+    const splitOrderData: CreatePOSOrderDto = {
+      orderType: (originalOrder.orderType as any) || 'dine-in',
+      ...(originalOrder.tableId ? { tableId: originalOrder.tableId.toString() } : {}),
+      ...(originalOrder.orderType === 'delivery'
+        ? {
+            deliveryFee: originalOrder.deliveryFee || 0,
+            deliveryDetails,
+          }
+        : {}),
+      ...(originalOrder.orderType === 'takeaway'
+        ? {
+            takeawayDetails,
+          }
+        : {}),
+      items: itemsToSplit.map((item) => ({
+        menuItemId: item.menuItemId?.toString?.() ?? item.menuItemId,
+        quantity: item.quantity,
+        price: item.price,
+        notes: item.notes,
+      })),
       customerInfo: originalOrder.customerInfo,
       totalAmount: splitTotal,
-      status: 'pending' as const,
+      status: 'pending',
       paymentMethod: originalOrder.paymentMethod,
       notes: `Split from order ${originalOrder.orderNumber}`,
     };
@@ -533,14 +598,15 @@ export class POSService {
 
   // Get available tables (integrate with real table service)
   async getAvailableTables(branchId: string): Promise<any[]> {
-    // This should integrate with the TablesModule
-    // For now, we'll create a more realistic implementation
+    // Get all tables from the branch using TablesService
+    const allTables = await this.tablesService.findAll({ branchId });
+    
+    // Get active orders for today to determine occupied tables
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Get active orders for today
     const activeOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
       createdAt: { $gte: today, $lt: tomorrow },
@@ -549,22 +615,22 @@ export class POSService {
 
     const occupiedTableIds = activeOrders.map(order => order.tableId.toString());
 
-    // Mock table data - in real implementation, this would come from TablesModule
-    const allTables = [
-      { id: '1', number: '1', capacity: 4, status: 'available' },
-      { id: '2', number: '2', capacity: 2, status: 'available' },
-      { id: '3', number: '3', capacity: 6, status: 'available' },
-      { id: '4', number: '4', capacity: 4, status: 'available' },
-      { id: '5', number: '5', capacity: 8, status: 'available' },
-      { id: '6', number: '6', capacity: 2, status: 'available' },
-    ];
+    // Transform tables to include occupation status
+    return allTables.map((table: any) => {
+      const tableId = table._id?.toString() || table.id;
+      const isOccupied = occupiedTableIds.includes(tableId);
+      const currentOrder = activeOrders.find(order => order.tableId.toString() === tableId);
 
-    return allTables.map(table => ({
-      ...table,
-      status: occupiedTableIds.includes(table.id) ? 'occupied' : 'available',
-      currentOrderId: occupiedTableIds.includes(table.id) ? 
-        activeOrders.find(order => order.tableId.toString() === table.id)?._id : undefined,
-    }));
+      return {
+        id: tableId,
+        number: table.tableNumber || table.number || '',
+        tableNumber: table.tableNumber || table.number || '',
+        capacity: table.capacity || 0,
+        status: isOccupied ? 'occupied' : (table.status || 'available'),
+        currentOrderId: currentOrder?._id?.toString(),
+        location: table.location,
+      };
+    });
   }
 
   // Get POS menu items (integrate with real menu service)

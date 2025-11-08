@@ -1,25 +1,35 @@
 'use client';
 
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { DataTable } from '@/components/ui/DataTable';
+import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
+import { Staff, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
+import { useAppSelector } from '@/lib/store';
 import {
-    BellIcon,
-    BuildingStorefrontIcon,
-    CalculatorIcon,
-    ChartBarIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    CogIcon,
-    CurrencyDollarIcon,
-    ReceiptPercentIcon,
-    ShieldCheckIcon,
-    ShoppingBagIcon,
-    TableCellsIcon,
-    TruckIcon,
-    UserGroupIcon,
-    UsersIcon
+  BellIcon,
+  BuildingStorefrontIcon,
+  CalculatorIcon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  CogIcon,
+  CurrencyDollarIcon,
+  EyeIcon,
+  PencilIcon,
+  ReceiptPercentIcon,
+  ShieldCheckIcon,
+  ShoppingBagIcon,
+  TableCellsIcon,
+  TruckIcon,
+  UserGroupIcon,
+  UsersIcon
 } from '@heroicons/react/24/outline';
+import { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 
 interface Feature {
   id: string;
@@ -141,6 +151,36 @@ const roleAccess: RoleAccess[] = [
 ];
 
 export default function RoleAccessPage() {
+  const { user } = useAppSelector((state) => state.auth);
+  const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [newRole, setNewRole] = useState<string>('');
+  
+  // Get all staff members
+  const { data: staffData, isLoading, refetch } = useGetStaffQuery({ 
+    branchId: user?.branchId || undefined 
+  });
+  const [updateStaff] = useUpdateStaffMutation();
+
+  const staff = useMemo(() => staffData?.staff || [], [staffData?.staff]);
+
+  // Filter staff by selected role
+  const filteredStaff = useMemo(() => {
+    if (selectedRole === 'all') return staff;
+    return staff.filter((s: Staff) => s.role === selectedRole);
+  }, [staff, selectedRole]);
+
+  // Count staff by role
+  const roleCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    roleAccess.forEach((role) => {
+      counts[role.role] = staff.filter((s: Staff) => s.role === role.role && s.isActive).length;
+    });
+    return counts;
+  }, [staff]);
+
   const getFeatureById = (id: string) => features.find(f => f.id === id);
 
   const getFeaturesByCategory = (category: string) => {
@@ -148,6 +188,108 @@ export default function RoleAccessPage() {
   };
 
   const categories = Array.from(new Set(features.map(f => f.category)));
+
+  const handleViewStaff = (staffMember: Staff) => {
+    setSelectedStaff(staffMember);
+    setIsViewModalOpen(true);
+  };
+
+  const handleChangeRole = (staffMember: Staff) => {
+    setSelectedStaff(staffMember);
+    setNewRole(staffMember.role);
+    setIsRoleModalOpen(true);
+  };
+
+  const handleUpdateRole = async () => {
+    if (!selectedStaff || !newRole) return;
+
+    try {
+      await updateStaff({
+        id: selectedStaff.id,
+        role: newRole as any,
+      }).unwrap();
+      toast.success(`Role updated successfully`);
+      setIsRoleModalOpen(false);
+      setSelectedStaff(null);
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update role');
+    }
+  };
+
+  const staffColumns = [
+    {
+      key: 'name',
+      title: 'Staff Member',
+      render: (value: string, row: Staff) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+            <UsersIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+          </div>
+          <div>
+            <p className="font-medium text-gray-900 dark:text-white">
+              {row.firstName} {row.lastName}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{row.email}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'role',
+      title: 'Current Role',
+      render: (value: string) => {
+        const role = roleAccess.find(r => r.role === value);
+        return (
+          <Badge className={role?.color || 'bg-gray-100 text-gray-800'}>
+            {role?.name || value}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'department',
+      title: 'Department',
+      render: (value: string) => (
+        <span className="text-sm text-gray-600 dark:text-gray-400">
+          {value || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'isActive',
+      title: 'Status',
+      render: (value: boolean) => (
+        <Badge variant={value ? 'success' : 'danger'}>
+          {value ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      title: 'Actions',
+      render: (value: any, row: Staff) => (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleViewStaff(row)}
+          >
+            <EyeIcon className="w-4 h-4" />
+          </Button>
+          {(user?.role === 'super_admin' || user?.role === 'owner') && row.isActive && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleChangeRole(row)}
+            >
+              <PencilIcon className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -166,15 +308,21 @@ export default function RoleAccessPage() {
         {roleAccess.map((role) => (
           <Card key={role.role} className="hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${role.color}`}>
-                  <UsersIcon className="w-5 h-5" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${role.color}`}>
+                    <UsersIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{role.name}</h3>
+                    <Badge variant="secondary" className="text-xs">
+                      {role.features.length} features
+                    </Badge>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">{role.name}</h3>
-                  <Badge variant="secondary" className="text-xs">
-                    {role.features.length} features
-                  </Badge>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-primary-600">{roleCounts[role.role] || 0}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Active Users</p>
                 </div>
               </div>
 
@@ -198,6 +346,36 @@ export default function RoleAccessPage() {
           </Card>
         ))}
       </div>
+
+      {/* Staff Management Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Staff Members by Role</CardTitle>
+            <div className="w-48">
+              <Select
+                options={[
+                  { value: 'all', label: 'All Roles' },
+                  ...roleAccess.map(r => ({ value: r.role, label: r.name }))
+                ]}
+                value={selectedRole}
+                onChange={setSelectedRole}
+                placeholder="Filter by role"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            data={filteredStaff}
+            columns={staffColumns}
+            loading={isLoading}
+            searchable={true}
+            selectable={false}
+            emptyMessage="No staff members found. Create staff members to assign roles."
+          />
+        </CardContent>
+      </Card>
 
       {/* Detailed Feature Matrix */}
       <Card>
@@ -280,10 +458,13 @@ export default function RoleAccessPage() {
                 {role.name}
               </h3>
               <p className="text-2xl font-bold text-primary-600 mb-2">
-                {role.features.length}
+                {roleCounts[role.role] || 0}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Features
+                Active Users
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                {role.features.length} features
               </p>
             </CardContent>
           </Card>
@@ -352,6 +533,166 @@ export default function RoleAccessPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* View Staff Modal */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedStaff(null);
+        }}
+        title="Staff Details"
+        className="max-w-2xl"
+      >
+        {selectedStaff && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                <UsersIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  {selectedStaff.firstName} {selectedStaff.lastName}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedStaff.email}</p>
+                <Badge className={roleAccess.find(r => r.role === selectedStaff.role)?.color || 'bg-gray-100 text-gray-800'} variant="default">
+                  {roleAccess.find(r => r.role === selectedStaff.role)?.name || selectedStaff.role}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Role Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Role:</span>{' '}
+                    <span className="text-gray-900 dark:text-white">
+                      {roleAccess.find(r => r.role === selectedStaff.role)?.name || selectedStaff.role}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Features Access:</span>{' '}
+                    <span className="text-gray-900 dark:text-white">
+                      {roleAccess.find(r => r.role === selectedStaff.role)?.features.length || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Access Categories</h4>
+                <div className="space-y-1">
+                  {categories.map((category) => {
+                    const categoryFeatures = getFeaturesByCategory(category);
+                    const role = roleAccess.find(r => r.role === selectedStaff.role);
+                    const accessibleFeatures = categoryFeatures.filter(f => role?.features.includes(f.id));
+                    
+                    if (accessibleFeatures.length === 0) return null;
+
+                    return (
+                      <div key={category} className="text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">{category}:</span>{' '}
+                        <span className="text-gray-900 dark:text-white">
+                          {accessibleFeatures.length}/{categoryFeatures.length}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <h4 className="font-medium text-gray-900 dark:text-white mb-3">Available Features</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {roleAccess
+                  .find(r => r.role === selectedStaff.role)
+                  ?.features.map((featureId) => {
+                    const feature = getFeatureById(featureId);
+                    if (!feature) return null;
+                    return (
+                      <div key={featureId} className="flex items-center gap-2 text-sm">
+                        <Badge variant="success" className="text-xs">✓</Badge>
+                        <span className="text-gray-700 dark:text-gray-300">{feature.name}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Change Role Modal */}
+      <Modal
+        isOpen={isRoleModalOpen}
+        onClose={() => {
+          setIsRoleModalOpen(false);
+          setSelectedStaff(null);
+          setNewRole('');
+        }}
+        title="Change Role"
+        className="max-w-md"
+      >
+        {selectedStaff && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Change role for <strong>{selectedStaff.firstName} {selectedStaff.lastName}</strong>
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
+                Current role: {roleAccess.find(r => r.role === selectedStaff.role)?.name || selectedStaff.role}
+              </p>
+            </div>
+
+            <Select
+              label="New Role"
+              options={roleAccess.map(role => ({
+                value: role.role,
+                label: role.name
+              }))}
+              value={newRole}
+              onChange={setNewRole}
+            />
+
+            {newRole && newRole !== selectedStaff.role && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
+                  Role Change Summary
+                </p>
+                <div className="space-y-1 text-xs text-blue-800 dark:text-blue-400">
+                  <p>
+                    <strong>Current:</strong> {roleAccess.find(r => r.role === selectedStaff.role)?.features.length || 0} features
+                  </p>
+                  <p>
+                    <strong>New:</strong> {roleAccess.find(r => r.role === newRole)?.features.length || 0} features
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsRoleModalOpen(false);
+                  setSelectedStaff(null);
+                  setNewRole('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateRole}
+                disabled={!newRole || newRole === selectedStaff.role}
+              >
+                Update Role
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -41,31 +41,50 @@ export default function TablesPage() {
 
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
-  const { data: tablesResponse, isLoading, refetch } = useGetTablesQuery({
+  console.log('🔍 Tables Page - branchId:', branchId, 'user:', user);
+
+  const { data: tablesResponse, isLoading, error, refetch } = useGetTablesQuery({
     branchId,
     status: statusFilter === 'all' ? undefined : statusFilter,
     page: currentPage,
     limit: itemsPerPage,
   }, { skip: !branchId });
 
+  console.log('🔍 Tables Query State:', { isLoading, error, tablesResponse });
+
   // Extract tables from API response
   const tables = useMemo(() => {
-    if (!tablesResponse) return [];
+    if (!tablesResponse) {
+      console.log('🔍 Tables Response: No data received');
+      return [];
+    }
     
     const response = tablesResponse as any;
+    console.log('🔍 Tables API Response:', response);
+    
     let items = [];
     
-    if (response.data) {
-      items = response.data.tables || response.data.items || [];
-    } else if (Array.isArray(response)) {
+    // Handle different response structures
+    if (Array.isArray(response)) {
       items = response;
+    } else if (response.data) {
+      if (Array.isArray(response.data)) {
+        items = response.data;
+      } else {
+        items = response.data.tables || response.data.items || [];
+      }
     } else {
       items = response.tables || response.items || [];
     }
     
-    if (!Array.isArray(items)) return [];
+    console.log('🔍 Extracted items:', items);
     
-    return items.map((table: any) => ({
+    if (!Array.isArray(items)) {
+      console.log('⚠️ Items is not an array:', items);
+      return [];
+    }
+    
+    const transformed = items.map((table: any) => ({
       id: table._id || table.id,
       number: table.tableNumber || table.number?.toString() || table.number || '',
       capacity: table.capacity || 4,
@@ -77,6 +96,9 @@ export default function TablesPage() {
       createdAt: table.createdAt || new Date().toISOString(),
       updatedAt: table.updatedAt || new Date().toISOString(),
     }));
+    
+    console.log('🔍 Transformed tables:', transformed);
+    return transformed;
   }, [tablesResponse]);
 
   const totalTables = useMemo(() => {
@@ -120,18 +142,25 @@ export default function TablesPage() {
       return;
     }
 
+    if (!branchId) {
+      toast.error('Branch ID is required. Please ensure you are logged in with a valid branch.');
+      return;
+    }
+
     try {
       const payload = {
-        number: formData.number.toString(),
+        branchId: branchId.toString(),
+        tableNumber: formData.number.toString(),
         capacity: parseInt(formData.capacity) || 4,
         location: formData.location || undefined,
-        status: formData.status || 'available',
-      } as any;
+      };
       
-      await createTable(payload).unwrap();
+      await createTable(payload as any).unwrap();
       toast.success('Table created successfully');
       setIsCreateModalOpen(false);
       resetForm();
+      // Refetch tables to show the new one
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to create table');
     }
@@ -145,14 +174,24 @@ export default function TablesPage() {
     }
 
     try {
+      // Update table details (excluding status)
       await updateTable({
         id: selectedTable.id,
-        number: formData.number.toString(),
+        tableNumber: formData.number.toString(),
         capacity: parseInt(formData.capacity) || 4,
         location: formData.location || undefined,
-        status: formData.status || selectedTable.status,
       } as any).unwrap();
+      
+      // Update status separately if it changed
+      if (formData.status && formData.status !== selectedTable.status) {
+        await updateTableStatus({
+          id: selectedTable.id,
+          status: formData.status,
+        }).unwrap();
+      }
+      
       toast.success('Table updated successfully');
+      refetch();
       setIsEditModalOpen(false);
       resetForm();
     } catch (error: any) {

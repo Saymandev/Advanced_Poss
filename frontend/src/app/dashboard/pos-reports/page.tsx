@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useGetPOSOrdersQuery, useGetPOSStatsQuery } from '@/lib/api/endpoints/posApi';
+import { useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSStatsQuery } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -23,35 +24,109 @@ import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
+type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'cancelled';
+type OrderTypeFilter = 'all' | 'dine-in' | 'delivery' | 'takeaway';
+type QuickRange = 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'custom';
+
+const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
+
+const computeDateRange = (range: QuickRange): { start: string; end: string } => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(today);
+
+  switch (range) {
+    case 'today': {
+      return {
+        start: formatDateInput(end),
+        end: formatDateInput(end),
+      };
+    }
+    case 'yesterday': {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 1);
+      return {
+        start: formatDateInput(start),
+        end: formatDateInput(start),
+      };
+    }
+    case 'last30': {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      return {
+        start: formatDateInput(start),
+        end: formatDateInput(end),
+      };
+    }
+    case 'thisMonth': {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      return {
+        start: formatDateInput(start),
+        end: formatDateInput(end),
+      };
+    }
+    case 'last7':
+    default: {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 6);
+      return {
+        start: formatDateInput(start),
+        end: formatDateInput(end),
+      };
+    }
+  }
+};
+
+const QUICK_RANGE_OPTIONS: Array<{ label: string; value: QuickRange }> = [
+  { label: 'Today', value: 'today' },
+  { label: 'Yesterday', value: 'yesterday' },
+  { label: 'Last 7 Days', value: 'last7' },
+  { label: 'Last 30 Days', value: 'last30' },
+  { label: 'This Month', value: 'thisMonth' },
+];
+
 export default function POSReportsPage() {
   const { user } = useAppSelector((state) => state.auth);
-  const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
-  });
+  const [activeQuickRange, setActiveQuickRange] = useState<QuickRange>('last7');
+  const [dateRange, setDateRange] = useState(() => computeDateRange('last7'));
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderTypeFilter>('all');
 
-  // API calls
-  const { data: statsData, isLoading: statsLoading, error: statsError } = useGetPOSStatsQuery({
+  const statsParams = {
     branchId: user?.branchId || undefined,
     startDate: dateRange.start,
     endDate: dateRange.end,
-  });
+    ...(orderTypeFilter !== 'all' ? { orderType: orderTypeFilter } : {}),
+  } as const;
 
-  const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useGetPOSOrdersQuery({
+  const ordersParams = {
     branchId: user?.branchId || undefined,
     startDate: dateRange.start,
     endDate: dateRange.end,
     page: currentPage,
     limit: itemsPerPage,
-  });
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+    ...(orderTypeFilter !== 'all' ? { orderType: orderTypeFilter } : {}),
+  } as const;
 
-  // Extract stats from API response - handle different response formats
+  // API calls
+  const { data: statsData, isLoading: statsLoading, error: statsError } = useGetPOSStatsQuery(statsParams);
+
+  const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useGetPOSOrdersQuery(ordersParams);
+
+  // Fetch full order details when viewing
+  const { data: orderDetails, isLoading: orderDetailsLoading } = useGetPOSOrderQuery(
+    selectedOrderId || '',
+    { skip: !selectedOrderId }
+  );
+
+  // Extract stats from API response (already transformed by API layer)
   const stats = useMemo(() => {
-    const data = statsData as any;
-    const extracted = data?.data || data || {};
-    
+    const extracted = (statsData as any) || {};
     return {
       totalOrders: extracted?.totalOrders ?? 0,
       totalRevenue: extracted?.totalRevenue ?? 0,
@@ -62,22 +137,44 @@ export default function POSReportsPage() {
     };
   }, [statsData]);
 
-  // Extract orders from API response
+  // Extract orders from API response (already transformed by API layer)
   const orders = useMemo(() => {
-    const data = ordersData as any;
-    const extracted = data?.data || data;
+    const items = (ordersData as any)?.orders || [];
     
-    if (Array.isArray(extracted)) {
-      return extracted;
-    }
-    
-    return extracted?.orders || [];
+    // Transform orders to ensure proper structure
+    const transformed = items.map((order: any) => {
+      // Handle populated tableId - backend populates with { id, capacity, tableNumber? }
+      const tableId = order.tableId;
+      let tableNumber = 'N/A';
+      
+      if (typeof tableId === 'object' && tableId) {
+        // Try to get table number from populated object
+        tableNumber = tableId.tableNumber || tableId.number || tableId.id || 'N/A';
+      } else if (tableId) {
+        // If it's a string ID, use it as is
+        tableNumber = tableId;
+      }
+      
+      const transformedOrder = {
+        id: order._id || order.id,
+        orderNumber: order.orderNumber || order.order_number || 'N/A',
+        tableId: tableNumber,
+        tableIdObj: tableId, // Keep original for reference
+        totalAmount: order.totalAmount || order.total_amount || order.total || 0,
+        status: order.status || 'pending',
+        paymentMethod: order.paymentMethod || order.payment_method || null,
+        createdAt: order.createdAt || order.created_at || order.date,
+        items: order.items || [],
+        customerInfo: order.customerInfo || order.customer_info,
+        orderType: order.orderType || 'unknown',
+      };
+      return transformedOrder;
+    });
+    return transformed;
   }, [ordersData]);
   
   const totalOrders = useMemo(() => {
-    const data = ordersData as any;
-    const extracted = data?.data || data;
-    return extracted?.total || orders.length;
+    return (ordersData as any)?.total || orders.length;
   }, [ordersData, orders.length]);
   
   // Calculate percentage changes (comparing current period to previous period)
@@ -149,70 +246,90 @@ export default function POSReportsPage() {
     {
       key: 'orderNumber',
       title: 'Order #',
-      render: (order: any) => (
-        <div className="font-mono text-sm">{order.orderNumber}</div>
+      render: (value: any, row: any) => (
+        <div className="font-mono text-sm">{row?.orderNumber || value || 'N/A'}</div>
       ),
     },
     {
       key: 'tableId',
       title: 'Table',
-      render: (order: any) => (
-                <Badge className="bg-blue-100 text-blue-800">
-                  Table {order.tableId?.number || order.tableId || 'N/A'}
-                </Badge>
-      ),
+      render: (value: any, row: any) => {
+        // row contains the full order object with tableId (already transformed)
+        const tableNumber = row?.tableId || value || 'N/A';
+        return (
+          <Badge className="bg-blue-100 text-blue-800">
+            Table {tableNumber}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'orderType',
+      title: 'Order Type',
+      render: (value: any, row: any) => {
+        const orderType = (row?.orderType || value || 'unknown') as string;
+        const config: Record<string, { label: string; className: string }> = {
+          'dine-in': { label: 'Dine-In', className: 'bg-sky-100 text-sky-800' },
+          delivery: { label: 'Delivery', className: 'bg-emerald-100 text-emerald-800' },
+          takeaway: { label: 'Takeaway', className: 'bg-purple-100 text-purple-800' },
+          unknown: { label: 'Unknown', className: 'bg-gray-200 text-gray-700' },
+        };
+        const { label, className } = config[orderType] || config.unknown;
+        return <Badge className={className}>{label}</Badge>;
+      },
     },
     {
       key: 'totalAmount',
       title: 'Amount',
-      render: (order: any) => (
+      render: (value: any, row: any) => (
         <div className="font-semibold text-green-600">
-          {formatCurrency(order.totalAmount)}
+          {formatCurrency(row?.totalAmount || value || 0)}
         </div>
       ),
     },
     {
       key: 'status',
       title: 'Status',
-      render: (order: any) => {
+      render: (value: any, row: any) => {
+        const status = row?.status || value || 'pending';
         const statusConfig = {
           pending: { color: 'bg-yellow-100 text-yellow-800', text: 'Pending' },
           paid: { color: 'bg-green-100 text-green-800', text: 'Paid' },
           cancelled: { color: 'bg-red-100 text-red-800', text: 'Cancelled' },
         };
-        const config = statusConfig[order.status as keyof typeof statusConfig] || statusConfig.pending;
+        const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
         return <Badge className={config.color}>{config.text}</Badge>;
       },
     },
     {
       key: 'paymentMethod',
       title: 'Payment',
-      render: (order: any) => (
+      render: (value: any, row: any) => (
         <div className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-          {order.paymentMethod || 'N/A'}
+          {row?.paymentMethod || value || 'N/A'}
         </div>
       ),
     },
     {
       key: 'createdAt',
       title: 'Date',
-      render: (order: any) => (
+      render: (value: any, row: any) => (
         <div className="text-sm text-gray-600 dark:text-gray-400">
-          {formatDateTime(order.createdAt)}
+          {row?.createdAt ? formatDateTime(row.createdAt) : (value ? formatDateTime(value) : 'N/A')}
         </div>
       ),
     },
     {
       key: 'actions',
       title: 'Actions',
-      render: (order: any) => (
+      render: (value: any, row: any) => (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => {
-            // View order details
-            console.log('View order:', order.id);
-            toast.success(`Viewing order ${order.orderNumber}`);
+            if (!row?.id) return;
+            setSelectedOrderId(row.id);
+            setIsOrderModalOpen(true);
           }}
           className="h-8 w-8 p-0"
         >
@@ -241,6 +358,7 @@ export default function POSReportsPage() {
     
     // Group orders by date
     const grouped = orders.reduce((acc: any, order: any) => {
+      if (!order || !order.createdAt) return acc;
       const date = new Date(order.createdAt).toISOString().split('T')[0];
       if (!acc[date]) {
         acc[date] = { date, revenue: 0, orders: 0 };
@@ -264,6 +382,7 @@ export default function POSReportsPage() {
     }
     
     const breakdown = orders.reduce((acc: any, order: any) => {
+      if (!order) return acc;
       const method = order.paymentMethod || 'unknown';
       if (!acc[method]) {
         acc[method] = { method, count: 0, revenue: 0 };
@@ -277,6 +396,22 @@ export default function POSReportsPage() {
     
     return Object.values(breakdown);
   }, [orders]);
+
+  const handleQuickRange = (range: QuickRange) => {
+    setActiveQuickRange(range);
+    setDateRange(computeDateRange(range));
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = (status: OrderStatusFilter) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleOrderTypeChange = (orderType: OrderTypeFilter) => {
+    setOrderTypeFilter(orderType);
+    setCurrentPage(1);
+  };
 
   // Error handling
   if (statsError || ordersError) {
@@ -328,7 +463,7 @@ export default function POSReportsPage() {
 
       {/* Date Range Filter */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-6 space-y-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -337,7 +472,11 @@ export default function POSReportsPage() {
               <Input
                 type="date"
                 value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                onChange={(e) => {
+                  setActiveQuickRange('custom');
+                  setDateRange({ ...dateRange, start: e.target.value });
+                  setCurrentPage(1);
+                }}
               />
             </div>
             <div>
@@ -347,7 +486,11 @@ export default function POSReportsPage() {
               <Input
                 type="date"
                 value={dateRange.end}
-                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                onChange={(e) => {
+                  setActiveQuickRange('custom');
+                  setDateRange({ ...dateRange, end: e.target.value });
+                  setCurrentPage(1);
+                }}
               />
             </div>
             <div className="flex items-end">
@@ -358,6 +501,55 @@ export default function POSReportsPage() {
                 <ChartBarIcon className="h-4 w-4" />
                 Refresh
               </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {QUICK_RANGE_OPTIONS.map(({ label, value }) => {
+              const isActive = activeQuickRange === value;
+              return (
+                <Button
+                  key={value}
+                  variant={isActive ? 'primary' : 'secondary'}
+                  onClick={() => handleQuickRange(value)}
+                  className={isActive ? '' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'}
+                >
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Order Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => handleStatusChange(e.target.value as OrderStatusFilter)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="all">All</option>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Order Type
+              </label>
+              <select
+                value={orderTypeFilter}
+                onChange={(e) => handleOrderTypeChange(e.target.value as OrderTypeFilter)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="all">All</option>
+                <option value="dine-in">Dine-In</option>
+                <option value="delivery">Delivery</option>
+                <option value="takeaway">Takeaway</option>
+              </select>
             </div>
           </div>
         </CardContent>
@@ -530,7 +722,7 @@ export default function POSReportsPage() {
             </div>
           ) : (
             <DataTable
-              data={orders}
+              data={orders || []}
               columns={columns}
               loading={ordersLoading}
               pagination={{
@@ -594,6 +786,205 @@ export default function POSReportsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Order Details Modal */}
+      <Modal
+        isOpen={isOrderModalOpen}
+        onClose={() => {
+          setIsOrderModalOpen(false);
+          setSelectedOrderId(null);
+        }}
+        title={`Order Details - ${orderDetails?.orderNumber || selectedOrderId || 'N/A'}`}
+        size="lg"
+      >
+        {orderDetailsLoading ? (
+          <div className="py-8 text-center">
+            <Skeleton className="h-20 w-full mb-4" />
+            <Skeleton className="h-20 w-full mb-4" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : orderDetails ? (
+          <div className="space-y-6">
+            {/* Order Header */}
+            <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Order Number</p>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {orderDetails.orderNumber || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
+                <Badge className={
+                  orderDetails.status === 'paid' ? 'bg-green-100 text-green-800' :
+                  orderDetails.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }>
+                  {orderDetails.status?.toUpperCase() || 'N/A'}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Table</p>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {(() => {
+                    const table = orderDetails.tableId;
+                    if (!table) return 'N/A';
+                    if (typeof table === 'object' && table !== null) {
+                      return `Table ${(table as any).tableNumber || (table as any).number || 'N/A'}`;
+                    }
+                    return `Table ${table}`;
+                  })()}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Payment Method</p>
+                <p className="font-semibold text-gray-900 dark:text-white capitalize">
+                  {orderDetails.paymentMethod || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Order Type</p>
+                <p className="font-semibold text-gray-900 dark:text-white capitalize">
+                  {orderDetails.orderType ? orderDetails.orderType.replace('-', ' ') : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Created At</p>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {orderDetails.createdAt ? formatDateTime(orderDetails.createdAt) : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
+                <p className="font-semibold text-green-600 text-lg">
+                  {formatCurrency(orderDetails.totalAmount || 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Customer Info */}
+            {orderDetails.customerInfo && (
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Customer Information</h3>
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <div className="grid grid-cols-3 gap-4">
+                    {orderDetails.customerInfo.name && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Name</p>
+                        <p className="font-medium">{orderDetails.customerInfo.name}</p>
+                      </div>
+                    )}
+                    {orderDetails.customerInfo.phone && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                        <p className="font-medium">{orderDetails.customerInfo.phone}</p>
+                      </div>
+                    )}
+                    {orderDetails.customerInfo.email && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                        <p className="font-medium">{orderDetails.customerInfo.email}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Order Items */}
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Order Items</h3>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Item</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Quantity</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Price</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {orderDetails.items && orderDetails.items.length > 0 ? (
+                      orderDetails.items.map((item: any, index: number) => {
+                        // Handle menuItemId - it might be an ObjectId string, populated object, or null
+                        let itemName = 'Unknown Item';
+                        if (item.name) {
+                          itemName = item.name;
+                        } else if (item.menuItemId) {
+                          if (typeof item.menuItemId === 'object' && item.menuItemId !== null) {
+                            itemName = item.menuItemId.name || 'Unknown Item';
+                          } else if (typeof item.menuItemId === 'string') {
+                            // If it's just an ID, we can't get the name without additional API call
+                            // For now, show the ID or try to fetch name later
+                            itemName = `Item ${item.menuItemId.slice(-6)}`;
+                          }
+                        }
+                        
+                        return (
+                          <tr key={index}>
+                            <td className="px-4 py-3">
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {itemName}
+                                </p>
+                                {item.notes && (
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                    Note: {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-900 dark:text-white">
+                              {item.quantity || 0}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-900 dark:text-white">
+                              {formatCurrency(item.price || 0)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                              {formatCurrency((item.price || 0) * (item.quantity || 0))}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                          No items found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <td colSpan={3} className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                        Total:
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-lg text-green-600">
+                        {formatCurrency(orderDetails.totalAmount || 0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {orderDetails.notes && (
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Notes</h3>
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{orderDetails.notes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+            <p>Order not found</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

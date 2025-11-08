@@ -6,11 +6,24 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useCancelPrintJobMutation, useCreatePrinterMutation, useDeletePrinterMutation, useGetPrintersQuery, useGetPrintQueueQuery, useTestPrinterMutation, useUpdatePrinterMutation } from '@/lib/api/endpoints/posApi';
+import {
+  useCancelPrintJobMutation,
+  useCreatePrinterMutation,
+  useDeletePrinterMutation,
+  useGetPrintersQuery,
+  useGetPrinterStatusQuery,
+  useGetPrintQueueQuery,
+  useTestPrinterMutation,
+  useUpdatePrinterMutation
+} from '@/lib/api/endpoints/posApi';
+import { UserRole } from '@/lib/enums/user-role.enum';
+import { useAppSelector } from '@/lib/store';
 import {
   CheckCircleIcon,
   ClockIcon,
+  ExclamationCircleIcon,
   ExclamationTriangleIcon,
+  InformationCircleIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
@@ -19,10 +32,13 @@ import {
   TrashIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function PrinterManagementPage() {
+  const { user } = useAppSelector((state) => state.auth);
+  const hasManagePermission = [UserRole.OWNER, UserRole.MANAGER].includes((user?.role as UserRole) ?? UserRole.CASHIER);
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
@@ -30,9 +46,16 @@ export default function PrinterManagementPage() {
   const [selectedPrinter, setSelectedPrinter] = useState<string>('');
   const [printerToEdit, setPrinterToEdit] = useState<any>(null);
   const [printerToDelete, setPrinterToDelete] = useState<string>('');
+  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+  const [jobToView, setJobToView] = useState<any>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const { data: printers, isLoading: printersLoading, refetch: refetchPrinters } = useGetPrintersQuery();
+  const printerList = useMemo(() => (Array.isArray(printers) ? printers : []), [printers]);
   const { data: printQueue, isLoading: queueLoading, refetch: refetchQueue } = useGetPrintQueueQuery();
+  const { data: selectedStatus } = useGetPrinterStatusQuery(selectedPrinter, {
+    skip: !selectedPrinter,
+  });
   const [testPrinter, { isLoading: testing }] = useTestPrinterMutation();
   const [cancelPrintJob] = useCancelPrintJobMutation();
   const [createPrinter, { isLoading: isCreating }] = useCreatePrinterMutation();
@@ -52,10 +75,10 @@ export default function PrinterManagementPage() {
     autoPrint: false,
     description: '',
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Reset form when modal opens/closes
-  useEffect(() => {
-    if (!isAddModalOpen && !isEditModalOpen) {
+  const resetForm = () => {
+    setFormErrors({});
       setFormData({
         name: '',
         type: 'thermal',
@@ -70,8 +93,7 @@ export default function PrinterManagementPage() {
         description: '',
       });
       setPrinterToEdit(null);
-    }
-  }, [isAddModalOpen, isEditModalOpen]);
+  };
 
   // Populate form when editing
   useEffect(() => {
@@ -93,10 +115,28 @@ export default function PrinterManagementPage() {
   }, [isEditModalOpen, printerToEdit]);
 
   const handleAddPrinter = async () => {
+    if (!hasManagePermission) {
+      toast.error('Only owners and managers can add printers.');
+      return;
+    }
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Printer name is required.';
+    if (formData.width < 40 || formData.width > 210) errors.width = 'Width must be between 40 and 210 mm.';
+    if (formData.height < 40 || formData.height > 210) errors.height = 'Height must be between 40 and 210 mm.';
+    if (formData.type === 'network' && !formData.networkUrl.trim()) errors.networkUrl = 'Network URL required for network printers.';
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Fix highlighted fields before saving.');
+      return;
+    }
     try {
-      await createPrinter(formData).unwrap();
+      await createPrinter({
+        ...formData,
+        name: formData.name.trim(),
+      }).unwrap();
       toast.success('Printer added successfully');
       setIsAddModalOpen(false);
+      resetForm();
       refetchPrinters();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to add printer');
@@ -104,15 +144,28 @@ export default function PrinterManagementPage() {
   };
 
   const handleUpdatePrinter = async () => {
+    if (!hasManagePermission) {
+      toast.error('Only owners and managers can edit printers.');
+      return;
+    }
     if (!printerToEdit?.name) return;
-    
+    const errors: Record<string, string> = {};
+    if (formData.width < 40 || formData.width > 210) errors.width = 'Width must be between 40 and 210 mm.';
+    if (formData.height < 40 || formData.height > 210) errors.height = 'Height must be between 40 and 210 mm.';
+    if (formData.type === 'network' && !formData.networkUrl.trim()) errors.networkUrl = 'Network URL required for network printers.';
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Fix highlighted fields before saving.');
+      return;
+    }
     try {
       await updatePrinter({
         name: printerToEdit.name,
-        data: formData,
+        data: { ...formData },
       }).unwrap();
       toast.success('Printer updated successfully');
       setIsEditModalOpen(false);
+      resetForm();
       refetchPrinters();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to update printer');
@@ -120,8 +173,11 @@ export default function PrinterManagementPage() {
   };
 
   const handleDeletePrinter = async () => {
+    if (!hasManagePermission) {
+      toast.error('Only owners and managers can delete printers.');
+      return;
+    }
     if (!printerToDelete) return;
-    
     try {
       await deletePrinter(printerToDelete).unwrap();
       toast.success('Printer deleted successfully');
@@ -166,12 +222,73 @@ export default function PrinterManagementPage() {
     }
   };
 
-  const handleEditPrinter = (printer: any) => {
+  const handleViewJob = (job: any) => {
+    setJobToView(job);
+    setIsJobModalOpen(true);
+  };
+
+  const handleRetryJob = async (job: any) => {
+    if (!hasManagePermission) {
+      toast.error('Only owners and managers can retry print jobs.');
+      return;
+    }
+    if (!job?.printerName) {
+      toast.error('Unknown printer for this job.');
+      return;
+    }
+    setIsRetrying(true);
+    try {
+      const result = await testPrinter({ printerName: job.printerName }).unwrap();
+      if (result.success) {
+        toast.success(result.message || 'Retry sent to printer');
+        refetchQueue();
+      } else {
+        toast.error(result.message || 'Retry failed');
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Error retrying print job');
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const handleOpenAddModal = () => {
+    if (!hasManagePermission) {
+      toast.error('Only owners and managers can add printers.');
+      return;
+    }
+    resetForm();
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenEditModal = (printer: any) => {
+    if (!hasManagePermission) {
+      toast.error('Only owners and managers can edit printers.');
+      return;
+    }
     setPrinterToEdit(printer);
+    setFormErrors({});
+    setFormData({
+      name: printer.name || '',
+      type: printer.type || 'thermal',
+      width: printer.width || 80,
+      height: printer.height || 100,
+      networkUrl: printer.networkUrl || '',
+      driver: printer.driver || '',
+      enabled: printer.enabled ?? true,
+      copies: printer.copies || 1,
+      priority: printer.priority || 'normal',
+      autoPrint: printer.autoPrint ?? false,
+      description: printer.description || '',
+    });
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteClick = (printerName: string) => {
+  const handleOpenDeleteModal = (printerName: string) => {
+    if (!hasManagePermission) {
+      toast.error('Only owners and managers can delete printers.');
+      return;
+    }
     setPrinterToDelete(printerName);
     setIsDeleteModalOpen(true);
   };
@@ -231,16 +348,24 @@ export default function PrinterManagementPage() {
         </div>
         <div className="flex gap-2">
           <Button
-            onClick={() => setIsTestModalOpen(true)}
+            onClick={() => {
+              if (!hasManagePermission) {
+                toast.error('Only owners and managers can test printers.');
+                return;
+              }
+              setIsTestModalOpen(true);
+            }}
             variant="secondary"
             className="flex items-center gap-2"
+            disabled={!hasManagePermission || printerList.length === 0}
           >
             <PlayIcon className="w-4 h-4" />
             Test Printer
           </Button>
           <Button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="flex items-center gap-2"
+            disabled={!hasManagePermission}
           >
             <PlusIcon className="w-4 h-4" />
             Add Printer
@@ -249,8 +374,28 @@ export default function PrinterManagementPage() {
       </div>
 
       {/* Printers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {printers?.map((printer) => (
+      {!printers || printers.length === 0 ? (
+        <Card className="p-12">
+          <div className="text-center">
+            <PrinterIcon className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No Printers Found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Get started by adding your first printer
+            </p>
+            <Button
+              onClick={handleOpenAddModal}
+              className="flex items-center gap-2 mx-auto"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Add Printer
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {printers.map((printer) => (
           <Card key={printer.name} className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -281,12 +426,12 @@ export default function PrinterManagementPage() {
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Width:</span>
-                <span className="font-medium">{printer.width}mm</span>
+                <span className="font-medium">{printer.width || 'N/A'}mm</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Type:</span>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${getPrinterTypeColor(printer.type)}`}>
-                  {printer.type.toUpperCase()}
+                <span className={`px-2 py-1 rounded text-xs font-medium ${getPrinterTypeColor(printer.type || 'thermal')}`}>
+                  {(printer.type || 'Unknown').toUpperCase()}
                 </span>
               </div>
             </div>
@@ -297,9 +442,14 @@ export default function PrinterManagementPage() {
                 variant="secondary"
                 className="flex-1"
                 onClick={() => {
+                  if (!hasManagePermission) {
+                    toast.error('Only owners and managers can test printers.');
+                    return;
+                  }
                   setSelectedPrinter(printer.name);
                   setIsTestModalOpen(true);
                 }}
+                disabled={!hasManagePermission}
               >
                 <PlayIcon className="w-4 h-4 mr-1" />
                 Test
@@ -308,7 +458,8 @@ export default function PrinterManagementPage() {
                 size="sm"
                 variant="secondary"
                 className="flex-1"
-                onClick={() => handleEditPrinter(printer)}
+                onClick={() => handleOpenEditModal(printer)}
+                disabled={!hasManagePermission}
               >
                 <PencilIcon className="w-4 h-4 mr-1" />
                 Edit
@@ -317,15 +468,17 @@ export default function PrinterManagementPage() {
                 size="sm"
                 variant="secondary"
                 className="flex-1"
-                onClick={() => handleDeleteClick(printer.name)}
+                onClick={() => handleOpenDeleteModal(printer.name)}
+                disabled={!hasManagePermission}
               >
                 <TrashIcon className="w-4 h-4 mr-1 text-red-600" />
                 Delete
               </Button>
             </div>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Print Queue */}
       <Card className="p-6">
@@ -346,7 +499,7 @@ export default function PrinterManagementPage() {
               <Skeleton key={i} className="h-16" />
             ))}
           </div>
-        ) : printQueue && printQueue.length > 0 ? (
+        ) : printQueue && Array.isArray(printQueue) && printQueue.length > 0 ? (
           <div className="space-y-3">
             {printQueue.map((job) => (
               <div
@@ -356,15 +509,32 @@ export default function PrinterManagementPage() {
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">
-                      {job.printerName}
+                      {job.printerName || 'Unknown Printer'}
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {new Date(job.createdAt).toLocaleString()}
+                      {job.createdAt ? new Date(job.createdAt).toLocaleString() : 'N/A'}
                     </p>
                   </div>
                   {getStatusBadge(job.status)}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleViewJob(job)}
+                  >
+                    Details
+                  </Button>
+                  {job.status === 'failed' && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleRetryJob(job)}
+                      disabled={isRetrying}
+                    >
+                      {isRetrying ? 'Retrying...' : 'Retry'}
+                    </Button>
+                  )}
                   {job.status === 'pending' && (
                     <Button
                       size="sm"
@@ -410,7 +580,7 @@ export default function PrinterManagementPage() {
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Choose a printer...</option>
-              {printers?.map((printer) => (
+              {printerList.map((printer) => (
                 <option key={printer.name} value={printer.name}>
                   {printer.name} ({printer.type})
                 </option>
@@ -418,6 +588,34 @@ export default function PrinterManagementPage() {
             </select>
           </div>
 
+          {selectedPrinter && (
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3 text-sm">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-gray-600 dark:text-gray-400">Online</span>
+                <Badge variant={selectedStatus?.isOnline ? 'success' : 'danger'} className="text-xs">
+                  {selectedStatus?.isOnline ? 'Online' : 'Offline'}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-gray-600 dark:text-gray-400">Queue Length</span>
+                <span className="font-medium text-gray-900 dark:text-white">{selectedStatus?.queueLength ?? 'N/A'}</span>
+              </div>
+              {selectedStatus?.lastPrinted && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Last Printed</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {new Date(selectedStatus.lastPrinted).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {!selectedStatus && (
+                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  <InformationCircleIcon className="h-4 w-4" />
+                  Status unavailable; printer may be offline or not reporting.
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <Button
@@ -442,6 +640,7 @@ export default function PrinterManagementPage() {
         onClose={() => {
           setIsAddModalOpen(false);
           setIsEditModalOpen(false);
+          resetForm();
         }}
         title={isEditModalOpen ? 'Edit Printer' : 'Add New Printer'}
       >
@@ -452,10 +651,19 @@ export default function PrinterManagementPage() {
             </label>
             <Input 
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                setFormErrors((prev) => ({ ...prev, name: '' }));
+              }}
               placeholder="Enter printer name..."
               disabled={isEditModalOpen}
             />
+            {formErrors.name && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                <ExclamationCircleIcon className="h-4 w-4" />
+                {formErrors.name}
+              </p>
+            )}
           </div>
 
           <div>
@@ -482,11 +690,20 @@ export default function PrinterManagementPage() {
               <Input 
                 type="number" 
                 value={formData.width}
-                onChange={(e) => setFormData({ ...formData, width: Number(e.target.value) })}
+                onChange={(e) => {
+                  setFormData({ ...formData, width: Number(e.target.value) });
+                  setFormErrors((prev) => ({ ...prev, width: '' }));
+                }}
                 placeholder="80"
                 min="10"
                 max="1000"
               />
+              {formErrors.width && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                  <ExclamationCircleIcon className="h-4 w-4" />
+                  {formErrors.width}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -495,11 +712,20 @@ export default function PrinterManagementPage() {
               <Input 
                 type="number" 
                 value={formData.height}
-                onChange={(e) => setFormData({ ...formData, height: Number(e.target.value) })}
+                onChange={(e) => {
+                  setFormData({ ...formData, height: Number(e.target.value) });
+                  setFormErrors((prev) => ({ ...prev, height: '' }));
+                }}
                 placeholder="100"
                 min="10"
                 max="1000"
               />
+              {formErrors.height && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                  <ExclamationCircleIcon className="h-4 w-4" />
+                  {formErrors.height}
+                </p>
+              )}
             </div>
           </div>
 
@@ -510,9 +736,18 @@ export default function PrinterManagementPage() {
               </label>
               <Input 
                 value={formData.networkUrl}
-                onChange={(e) => setFormData({ ...formData, networkUrl: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, networkUrl: e.target.value });
+                  setFormErrors((prev) => ({ ...prev, networkUrl: '' }));
+                }}
                 placeholder="http://192.168.1.100:9100"
               />
+              {formErrors.networkUrl && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                  <ExclamationCircleIcon className="h-4 w-4" />
+                  {formErrors.networkUrl}
+                </p>
+              )}
             </div>
           )}
 
@@ -646,6 +881,71 @@ export default function PrinterManagementPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Print Job Details Modal */}
+      <Modal
+        isOpen={isJobModalOpen}
+        onClose={() => {
+          setIsJobModalOpen(false);
+          setJobToView(null);
+        }}
+        title={`Print Job Details${jobToView?.id ? ` – ${jobToView.id}` : ''}`}
+      >
+        {jobToView ? (
+          <div className="space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-gray-600 dark:text-gray-400">Printer</p>
+                <p className="font-medium text-gray-900 dark:text-white">{jobToView.printerName || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-gray-600 dark:text-gray-400">Status</p>
+                <div className="mt-1">{getStatusBadge(jobToView.status)}</div>
+              </div>
+              <div>
+                <p className="text-gray-600 dark:text-gray-400">Created At</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {jobToView.createdAt ? new Date(jobToView.createdAt).toLocaleString() : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-600 dark:text-gray-400">Completed At</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {jobToView.completedAt ? new Date(jobToView.completedAt).toLocaleString() : '—'}
+                </p>
+              </div>
+            </div>
+
+            {jobToView.error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-700/60 p-3 text-red-600 dark:text-red-200 flex items-start gap-2">
+                <ExclamationTriangleIcon className="h-4 w-4" />
+                <span>{jobToView.error}</span>
+              </div>
+            )}
+
+            <div>
+              <p className="text-gray-600 dark:text-gray-400 mb-1">Content</p>
+              <pre className="bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap text-xs text-gray-800 dark:text-gray-200">
+{jobToView.content || 'No content available'}
+              </pre>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsJobModalOpen(false);
+                  setJobToView(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-600 dark:text-gray-300">No job selected.</div>
+        )}
       </Modal>
     </div>
   );

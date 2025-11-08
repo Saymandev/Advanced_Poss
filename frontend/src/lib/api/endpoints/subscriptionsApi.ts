@@ -20,6 +20,13 @@ export interface SubscriptionPlan {
     maxUsers: number;
     maxBranches: number;
   };
+  limits?: {
+    maxBranches: number;
+    maxUsers: number;
+    storageGB: number;
+    maxTables?: number;
+    maxMenuItems?: number;
+  };
   isActive: boolean;
   isPopular?: boolean;
   sortOrder?: number;

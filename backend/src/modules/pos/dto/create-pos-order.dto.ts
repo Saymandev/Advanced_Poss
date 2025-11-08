@@ -1,5 +1,16 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import {
+    IsArray,
+    IsEnum,
+    IsNotEmpty,
+    IsNumber,
+    IsObject,
+    IsOptional,
+    IsString,
+    Min,
+    ValidateIf,
+    ValidateNested,
+} from 'class-validator';
 
 export class POSOrderItemDto {
   @IsNotEmpty()
@@ -35,10 +46,72 @@ export class CustomerInfoDto {
   email?: string;
 }
 
+export class DeliveryDetailsDto {
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  addressLine1?: string;
+
+  @IsOptional()
+  @IsString()
+  addressLine2?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  instructions?: string;
+
+  @IsOptional()
+  @IsString()
+  assignedDriver?: string;
+}
+
 export class CreatePOSOrderDto {
   @IsNotEmpty()
+  @IsEnum(['dine-in', 'delivery', 'takeaway'])
+  orderType: 'dine-in' | 'delivery' | 'takeaway';
+
+  @ValidateIf((o) => o.orderType === 'dine-in')
+  @IsNotEmpty()
   @IsString()
-  tableId: string;
+  tableId?: string;
+
+  @ValidateIf((o) => o.orderType === 'delivery')
+  @IsNumber()
+  @Min(0)
+  deliveryFee?: number;
+
+  @ValidateIf((o) => o.orderType === 'delivery')
+  @IsNotEmpty()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => DeliveryDetailsDto)
+  deliveryDetails?: DeliveryDetailsDto;
+
+  @ValidateIf((o) => o.orderType === 'takeaway')
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => DeliveryDetailsDto)
+  takeawayDetails?: DeliveryDetailsDto;
 
   @IsArray()
   @ValidateNested({ each: true })

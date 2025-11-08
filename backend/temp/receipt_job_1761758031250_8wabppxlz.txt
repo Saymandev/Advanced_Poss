@@ -1,0 +1,5 @@
+=== PRINTER TEST ===
+Date: 10/29/2025, 11:13:51 PM
+Printer: Thermal Receipt Printer
+Status: Working
+==================

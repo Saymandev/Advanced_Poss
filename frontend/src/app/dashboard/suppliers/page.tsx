@@ -93,6 +93,13 @@ export default function SuppliersPage() {
     registrationNumber: '',
     paymentTerms: 'net-30',
     creditLimit: 0,
+    bankDetails: {
+      bankName: '',
+      accountNumber: '',
+      accountName: '',
+      ifscCode: '',
+      swiftCode: '',
+    },
     productCategories: [],
     certifications: [],
     notes: '',
@@ -126,6 +133,13 @@ export default function SuppliersPage() {
       registrationNumber: '',
       paymentTerms: 'net-30',
       creditLimit: 0,
+      bankDetails: {
+        bankName: '',
+        accountNumber: '',
+        accountName: '',
+        ifscCode: '',
+        swiftCode: '',
+      },
       productCategories: [],
       certifications: [],
       notes: '',
@@ -172,6 +186,7 @@ export default function SuppliersPage() {
         registrationNumber: formData.registrationNumber || undefined,
         paymentTerms: formData.paymentTerms,
         creditLimit: formData.creditLimit || undefined,
+        bankDetails: formData.bankDetails?.bankName ? formData.bankDetails : undefined,
         productCategories: formData.productCategories || undefined,
         certifications: formData.certifications || undefined,
         notes: formData.notes || undefined,
@@ -215,6 +230,7 @@ export default function SuppliersPage() {
           registrationNumber: formData.registrationNumber || undefined,
           paymentTerms: formData.paymentTerms,
           creditLimit: formData.creditLimit || undefined,
+          bankDetails: formData.bankDetails?.bankName ? formData.bankDetails : undefined,
           productCategories: formData.productCategories || undefined,
           certifications: formData.certifications || undefined,
           notes: formData.notes || undefined,
@@ -295,6 +311,13 @@ export default function SuppliersPage() {
       registrationNumber: supplier.registrationNumber || '',
       paymentTerms: supplier.paymentTerms,
       creditLimit: supplier.creditLimit || 0,
+      bankDetails: supplier.bankDetails || {
+        bankName: '',
+        accountNumber: '',
+        accountName: '',
+        ifscCode: '',
+        swiftCode: '',
+      },
       productCategories: supplier.productCategories || [],
       certifications: supplier.certifications || [],
       notes: supplier.notes || '',
@@ -812,6 +835,120 @@ export default function SuppliersPage() {
             />
           </div>
 
+          {/* Bank Details Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3">Bank Details (Optional)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              <Input
+                label="Bank Name"
+                value={formData.bankDetails?.bankName || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  bankDetails: {
+                    ...formData.bankDetails,
+                    bankName: e.target.value,
+                    accountNumber: formData.bankDetails?.accountNumber || '',
+                    accountName: formData.bankDetails?.accountName || '',
+                    ifscCode: formData.bankDetails?.ifscCode || '',
+                    swiftCode: formData.bankDetails?.swiftCode || '',
+                  } as any,
+                })}
+              />
+              <Input
+                label="Account Number"
+                value={formData.bankDetails?.accountNumber || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  bankDetails: {
+                    ...formData.bankDetails,
+                    bankName: formData.bankDetails?.bankName || '',
+                    accountNumber: e.target.value,
+                    accountName: formData.bankDetails?.accountName || '',
+                    ifscCode: formData.bankDetails?.ifscCode || '',
+                    swiftCode: formData.bankDetails?.swiftCode || '',
+                  } as any,
+                })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              <Input
+                label="Account Name"
+                value={formData.bankDetails?.accountName || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  bankDetails: {
+                    ...formData.bankDetails,
+                    bankName: formData.bankDetails?.bankName || '',
+                    accountNumber: formData.bankDetails?.accountNumber || '',
+                    accountName: e.target.value,
+                    ifscCode: formData.bankDetails?.ifscCode || '',
+                    swiftCode: formData.bankDetails?.swiftCode || '',
+                  } as any,
+                })}
+              />
+              <Input
+                label="IFSC/SWIFT Code"
+                value={formData.bankDetails?.ifscCode || formData.bankDetails?.swiftCode || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  bankDetails: {
+                    ...formData.bankDetails,
+                    bankName: formData.bankDetails?.bankName || '',
+                    accountNumber: formData.bankDetails?.accountNumber || '',
+                    accountName: formData.bankDetails?.accountName || '',
+                    ifscCode: e.target.value,
+                    swiftCode: e.target.value,
+                  } as any,
+                })}
+              />
+            </div>
+          </div>
+
+          {/* Product Categories */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Product Categories (Optional, comma-separated)
+            </label>
+            <Input
+              value={Array.isArray(formData.productCategories) ? formData.productCategories.join(', ') : formData.productCategories || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                productCategories: e.target.value ? e.target.value.split(',').map(c => c.trim()).filter(c => c) : [],
+              })}
+              placeholder="e.g., Vegetables, Fruits, Dairy"
+            />
+          </div>
+
+          {/* Certifications */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Certifications (Optional, comma-separated)
+            </label>
+            <Input
+              value={Array.isArray(formData.certifications) ? formData.certifications.join(', ') : formData.certifications || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                certifications: e.target.value ? e.target.value.split(',').map(c => c.trim()).filter(c => c) : [],
+              })}
+              placeholder="e.g., ISO-9001, HACCP, Organic"
+            />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Tags (Optional, comma-separated)
+            </label>
+            <Input
+              value={Array.isArray(formData.tags) ? formData.tags.join(', ') : formData.tags || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                tags: e.target.value ? e.target.value.split(',').map(t => t.trim()).filter(t => t) : [],
+              })}
+              placeholder="e.g., preferred, local, reliable"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Notes (Optional)
@@ -850,7 +987,7 @@ export default function SuppliersPage() {
           resetForm();
         }}
         title="Edit Supplier"
-        className="max-w-2xl"
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1014,6 +1151,120 @@ export default function SuppliersPage() {
             />
           </div>
 
+          {/* Bank Details Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3">Bank Details (Optional)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              <Input
+                label="Bank Name"
+                value={formData.bankDetails?.bankName || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  bankDetails: {
+                    ...formData.bankDetails,
+                    bankName: e.target.value,
+                    accountNumber: formData.bankDetails?.accountNumber || '',
+                    accountName: formData.bankDetails?.accountName || '',
+                    ifscCode: formData.bankDetails?.ifscCode || '',
+                    swiftCode: formData.bankDetails?.swiftCode || '',
+                  } as any,
+                })}
+              />
+              <Input
+                label="Account Number"
+                value={formData.bankDetails?.accountNumber || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  bankDetails: {
+                    ...formData.bankDetails,
+                    bankName: formData.bankDetails?.bankName || '',
+                    accountNumber: e.target.value,
+                    accountName: formData.bankDetails?.accountName || '',
+                    ifscCode: formData.bankDetails?.ifscCode || '',
+                    swiftCode: formData.bankDetails?.swiftCode || '',
+                  } as any,
+                })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              <Input
+                label="Account Name"
+                value={formData.bankDetails?.accountName || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  bankDetails: {
+                    ...formData.bankDetails,
+                    bankName: formData.bankDetails?.bankName || '',
+                    accountNumber: formData.bankDetails?.accountNumber || '',
+                    accountName: e.target.value,
+                    ifscCode: formData.bankDetails?.ifscCode || '',
+                    swiftCode: formData.bankDetails?.swiftCode || '',
+                  } as any,
+                })}
+              />
+              <Input
+                label="IFSC/SWIFT Code"
+                value={formData.bankDetails?.ifscCode || formData.bankDetails?.swiftCode || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  bankDetails: {
+                    ...formData.bankDetails,
+                    bankName: formData.bankDetails?.bankName || '',
+                    accountNumber: formData.bankDetails?.accountNumber || '',
+                    accountName: formData.bankDetails?.accountName || '',
+                    ifscCode: e.target.value,
+                    swiftCode: e.target.value,
+                  } as any,
+                })}
+              />
+            </div>
+          </div>
+
+          {/* Product Categories */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Product Categories (Optional, comma-separated)
+            </label>
+            <Input
+              value={Array.isArray(formData.productCategories) ? formData.productCategories.join(', ') : formData.productCategories || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                productCategories: e.target.value ? e.target.value.split(',').map(c => c.trim()).filter(c => c) : [],
+              })}
+              placeholder="e.g., Vegetables, Fruits, Dairy"
+            />
+          </div>
+
+          {/* Certifications */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Certifications (Optional, comma-separated)
+            </label>
+            <Input
+              value={Array.isArray(formData.certifications) ? formData.certifications.join(', ') : formData.certifications || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                certifications: e.target.value ? e.target.value.split(',').map(c => c.trim()).filter(c => c) : [],
+              })}
+              placeholder="e.g., ISO-9001, HACCP, Organic"
+            />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Tags (Optional, comma-separated)
+            </label>
+            <Input
+              value={Array.isArray(formData.tags) ? formData.tags.join(', ') : formData.tags || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                tags: e.target.value ? e.target.value.split(',').map(t => t.trim()).filter(t => t) : [],
+              })}
+              placeholder="e.g., preferred, local, reliable"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Notes (Optional)
@@ -1158,10 +1409,10 @@ export default function SuppliersPage() {
               </div>
             </div>
 
-            {(selectedSupplier.taxId || selectedSupplier.registrationNumber || selectedSupplier.creditLimit) && (
+            {(selectedSupplier.taxId || selectedSupplier.registrationNumber || selectedSupplier.creditLimit || selectedSupplier.currentBalance) && (
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Business Details</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   {selectedSupplier.taxId && (
                     <div>
                       <span className="text-gray-600 dark:text-gray-400">Tax ID:</span>
@@ -1178,6 +1429,90 @@ export default function SuppliersPage() {
                     <div>
                       <span className="text-gray-600 dark:text-gray-400">Credit Limit:</span>
                       <span className="ml-2 text-gray-900 dark:text-white font-medium">{formatCurrency(selectedSupplier.creditLimit)}</span>
+                    </div>
+                  )}
+                  {selectedSupplier.currentBalance !== undefined && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Current Balance:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{formatCurrency(selectedSupplier.currentBalance)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Bank Details */}
+            {selectedSupplier.bankDetails && selectedSupplier.bankDetails.bankName && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Bank Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Bank Name:</span>
+                    <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedSupplier.bankDetails.bankName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Account Number:</span>
+                    <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedSupplier.bankDetails.accountNumber}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Account Name:</span>
+                    <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedSupplier.bankDetails.accountName}</span>
+                  </div>
+                  {(selectedSupplier.bankDetails.ifscCode || selectedSupplier.bankDetails.swiftCode) && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">IFSC/SWIFT:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">
+                        {selectedSupplier.bankDetails.ifscCode || selectedSupplier.bankDetails.swiftCode}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Performance Metrics */}
+            {(selectedSupplier.totalOrders || selectedSupplier.totalPurchases || selectedSupplier.onTimeDeliveryRate || selectedSupplier.qualityScore) && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Performance Metrics</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  {selectedSupplier.totalOrders !== undefined && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Total Orders:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedSupplier.totalOrders}</span>
+                    </div>
+                  )}
+                  {selectedSupplier.totalPurchases !== undefined && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Total Purchases:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{formatCurrency(selectedSupplier.totalPurchases || 0)}</span>
+                    </div>
+                  )}
+                  {selectedSupplier.onTimeDeliveryRate !== undefined && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">On-Time Delivery Rate:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedSupplier.onTimeDeliveryRate}%</span>
+                    </div>
+                  )}
+                  {selectedSupplier.qualityScore !== undefined && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Quality Score:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedSupplier.qualityScore}/10</span>
+                    </div>
+                  )}
+                  {selectedSupplier.lastOrderDate && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Last Order:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">
+                        {new Date(selectedSupplier.lastOrderDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {selectedSupplier.firstOrderDate && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">First Order:</span>
+                      <span className="ml-2 text-gray-900 dark:text-white font-medium">
+                        {new Date(selectedSupplier.firstOrderDate).toLocaleDateString()}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1212,6 +1547,18 @@ export default function SuppliersPage() {
               </div>
             )}
 
+            {/* Tags */}
+            {selectedSupplier.tags && selectedSupplier.tags.length > 0 && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Tags</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedSupplier.tags.map((tag, idx) => (
+                    <Badge key={idx} variant="secondary">{tag}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {selectedSupplier.notes && (
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-2">Notes</h4>
@@ -1232,6 +1579,7 @@ export default function SuppliersPage() {
                   openEditModal(selectedSupplier);
                 }}
               >
+                <PencilIcon className="w-4 h-4 mr-2" />
                 Edit Supplier
               </Button>
             </div>

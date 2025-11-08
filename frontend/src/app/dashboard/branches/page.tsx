@@ -7,36 +7,24 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { Branch, CreateBranchRequest, useCreateBranchMutation, useDeleteBranchMutation, useGetBranchesQuery, useToggleBranchStatusMutation, useUpdateBranchMutation } from '@/lib/api/endpoints/branchesApi';
+import { Branch, useCreateBranchMutation, useDeleteBranchMutation, useGetBranchesQuery, useToggleBranchStatusMutation, useUpdateBranchMutation } from '@/lib/api/endpoints/branchesApi';
+import { Staff, useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-    BuildingOfficeIcon,
-    ClockIcon,
-    EnvelopeIcon,
-    EyeIcon,
-    MapPinIcon,
-    PencilIcon,
-    PhoneIcon,
-    PlusIcon,
-    PowerIcon,
-    TrashIcon
+  BuildingOfficeIcon,
+  ClockIcon,
+  EnvelopeIcon,
+  EyeIcon,
+  MapPinIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  PowerIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-
-const TIMEZONES = [
-  { value: 'UTC', label: 'UTC' },
-  { value: 'America/New_York', label: 'Eastern Time (ET)' },
-  { value: 'America/Chicago', label: 'Central Time (CT)' },
-  { value: 'America/Denver', label: 'Mountain Time (MT)' },
-  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
-  { value: 'Europe/London', label: 'London (GMT)' },
-  { value: 'Europe/Paris', label: 'Paris (CET)' },
-  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
-  { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
-  { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
-];
 
 export default function BranchesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
@@ -62,43 +50,84 @@ export default function BranchesPage() {
   const [deleteBranch] = useDeleteBranchMutation();
   const [toggleBranchStatus] = useToggleBranchStatusMutation();
 
-  const [formData, setFormData] = useState<CreateBranchRequest>({
+  // Get staff for manager selection
+  const { data: staffData } = useGetStaffQuery({ branchId: user?.branchId || undefined });
+  
+  const managers = staffData?.staff?.filter((s: Staff) => s.role === 'manager' && s.isActive) || [];
+
+  const [formData, setFormData] = useState({
     name: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: 'US',
-    phoneNumber: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      country: 'US',
+      zipCode: '',
+    },
+    phone: '',
     email: '',
     managerId: '',
-    openingTime: '09:00',
-    closingTime: '21:00',
-    timezone: 'America/New_York',
+    openingHours: [
+      { day: 'monday', open: '09:00', close: '21:00', isClosed: false },
+      { day: 'tuesday', open: '09:00', close: '21:00', isClosed: false },
+      { day: 'wednesday', open: '09:00', close: '21:00', isClosed: false },
+      { day: 'thursday', open: '09:00', close: '21:00', isClosed: false },
+      { day: 'friday', open: '09:00', close: '21:00', isClosed: false },
+      { day: 'saturday', open: '09:00', close: '21:00', isClosed: false },
+      { day: 'sunday', open: '09:00', close: '21:00', isClosed: false },
+    ],
+    totalTables: 0,
+    totalSeats: 0,
     companyId: companyContext?.companyId || '',
   });
 
   const resetForm = () => {
     setFormData({
       name: '',
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: 'US',
-      phoneNumber: '',
+      address: {
+        street: '',
+        city: '',
+        state: '',
+        country: 'US',
+        zipCode: '',
+      },
+      phone: '',
       email: '',
       managerId: '',
-      openingTime: '09:00',
-      closingTime: '21:00',
-      timezone: 'America/New_York',
+      openingHours: [
+        { day: 'monday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'tuesday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'wednesday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'thursday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'friday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'saturday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'sunday', open: '09:00', close: '21:00', isClosed: false },
+      ],
+      totalTables: 0,
+      totalSeats: 0,
       companyId: companyContext?.companyId || '',
     });
   };
 
   const handleCreate = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Branch name is required');
+      return;
+    }
+    if (!formData.address.street.trim() || !formData.address.city.trim() || !formData.address.country.trim()) {
+      toast.error('Address information is required');
+      return;
+    }
+    if (!companyContext?.companyId) {
+      toast.error('Company ID is required');
+      return;
+    }
+
     try {
-      await createBranch(formData).unwrap();
+      await createBranch({
+        ...formData,
+        companyId: companyContext.companyId,
+      } as any).unwrap();
       toast.success('Branch created successfully');
       setIsCreateModalOpen(false);
       resetForm();
@@ -114,7 +143,16 @@ export default function BranchesPage() {
     try {
       await updateBranch({
         id: selectedBranch.id,
-        data: formData,
+        data: {
+          name: formData.name,
+          address: formData.address,
+          phone: formData.phone || undefined,
+          email: formData.email || undefined,
+          managerId: formData.managerId || undefined,
+          openingHours: formData.openingHours,
+          totalTables: formData.totalTables || undefined,
+          totalSeats: formData.totalSeats || undefined,
+        },
       }).unwrap();
       toast.success('Branch updated successfully');
       setIsEditModalOpen(false);
@@ -150,19 +188,34 @@ export default function BranchesPage() {
 
   const openEditModal = (branch: Branch) => {
     setSelectedBranch(branch);
+    // Handle both old and new address structures
+    const address = typeof branch.address === 'object' && branch.address !== null && 'street' in branch.address
+      ? branch.address
+      : {
+          street: typeof branch.address === 'string' ? branch.address : '',
+          city: branch.city || '',
+          state: branch.state || '',
+          country: branch.country || 'US',
+          zipCode: branch.zipCode || '',
+        };
+
     setFormData({
       name: branch.name,
-      address: branch.address,
-      city: branch.city,
-      state: branch.state,
-      zipCode: branch.zipCode,
-      country: branch.country,
-      phoneNumber: branch.phoneNumber,
-      email: branch.email,
+      address: address as any,
+      phone: branch.phoneNumber || '',
+      email: branch.email || '',
       managerId: branch.managerId || '',
-      openingTime: branch.openingTime,
-      closingTime: branch.closingTime,
-      timezone: branch.timezone,
+      openingHours: (branch as any).openingHours || [
+        { day: 'monday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'tuesday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'wednesday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'thursday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'friday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'saturday', open: '09:00', close: '21:00', isClosed: false },
+        { day: 'sunday', open: '09:00', close: '21:00', isClosed: false },
+      ],
+      totalTables: (branch as any).totalTables || 0,
+      totalSeats: (branch as any).totalSeats || 0,
       companyId: branch.companyId,
     });
     setIsEditModalOpen(true);
@@ -178,29 +231,46 @@ export default function BranchesPage() {
       key: 'name',
       title: 'Branch Name',
       sortable: true,
-      render: (value: string, row: Branch) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-            <BuildingOfficeIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+      render: (value: string, row: Branch) => {
+        const address = typeof row.address === 'object' && row.address !== null && 'city' in row.address
+          ? row.address
+          : { city: row.city || '', state: row.state || '' };
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+              <BuildingOfficeIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900 dark:text-white">{value}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {address.city}{address.state ? `, ${address.state}` : ''}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-medium text-gray-900 dark:text-white">{value}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{row.city}, {row.state}</p>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'address',
       title: 'Address',
-      render: (value: string, row: Branch) => (
-        <div className="flex items-center gap-2">
-          <MapPinIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {value}, {row.city}, {row.state} {row.zipCode}
-          </span>
-        </div>
-      ),
+      render: (value: any, row: Branch) => {
+        const address = typeof row.address === 'object' && row.address !== null && 'street' in row.address
+          ? row.address
+          : {
+              street: typeof row.address === 'string' ? row.address : '',
+              city: row.city || '',
+              state: row.state || '',
+              zipCode: row.zipCode || '',
+            };
+        return (
+          <div className="flex items-center gap-2">
+            <MapPinIcon className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {address.street}, {address.city}{address.state ? `, ${address.state}` : ''} {address.zipCode || ''}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'phoneNumber',
@@ -209,26 +279,43 @@ export default function BranchesPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <PhoneIcon className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">{value}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {value || (row as any).phone || 'N/A'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <EnvelopeIcon className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">{row.email}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{row.email || 'N/A'}</span>
           </div>
         </div>
       ),
     },
     {
-      key: 'openingTime',
+      key: 'openingHours',
       title: 'Hours',
-      render: (value: string, row: Branch) => (
-        <div className="flex items-center gap-2">
-          <ClockIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {value} - {row.closingTime}
-          </span>
-        </div>
-      ),
+      render: (value: any, row: Branch) => {
+        const branchWithHours = row as any;
+        if (branchWithHours.openingHours && Array.isArray(branchWithHours.openingHours) && branchWithHours.openingHours.length > 0) {
+          const firstDay = branchWithHours.openingHours[0];
+          return (
+            <div className="flex items-center gap-2">
+              <ClockIcon className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {firstDay.open} - {firstDay.close}
+              </span>
+            </div>
+          );
+        }
+        // Fallback to old structure
+        return (
+          <div className="flex items-center gap-2">
+            <ClockIcon className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {branchWithHours.openingTime || '09:00'} - {branchWithHours.closingTime || '21:00'}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'isActive',
@@ -398,7 +485,7 @@ export default function BranchesPage() {
           resetForm();
         }}
         title="Create New Branch"
-        className="max-w-2xl"
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -411,17 +498,19 @@ export default function BranchesPage() {
             />
             <Input
               label="Phone Number"
-              value={formData.phoneNumber}
-              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               placeholder="(555) 123-4567"
-              required
             />
           </div>
 
           <Input
-            label="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            label="Street Address"
+            value={formData.address.street}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              address: { ...formData.address, street: e.target.value }
+            })}
             placeholder="123 Main Street"
             required
           />
@@ -429,24 +518,31 @@ export default function BranchesPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
               label="City"
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              value={formData.address.city}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, city: e.target.value }
+              })}
               placeholder="New York"
               required
             />
             <Input
               label="State"
-              value={formData.state}
-              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+              value={formData.address.state}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, state: e.target.value }
+              })}
               placeholder="NY"
-              required
             />
             <Input
               label="ZIP Code"
-              value={formData.zipCode}
-              onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+              value={formData.address.zipCode}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, zipCode: e.target.value }
+              })}
               placeholder="10001"
-              required
             />
           </div>
 
@@ -457,7 +553,6 @@ export default function BranchesPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="branch@restaurant.com"
-              required
             />
             <Select
               label="Country"
@@ -467,34 +562,96 @@ export default function BranchesPage() {
                 { value: 'UK', label: 'United Kingdom' },
                 { value: 'AU', label: 'Australia' },
               ]}
-              value={formData.country}
-              onChange={(value) => setFormData({ ...formData, country: value })}
+              value={formData.address.country}
+              onChange={(value) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, country: value }
+              })}
             />
           </div>
+
+          {managers.length > 0 && (
+            <Select
+              label="Manager (Optional)"
+              options={[
+                { value: '', label: 'No Manager' },
+                ...managers.map((m: Staff) => ({ 
+                  value: m.id, 
+                  label: `${m.firstName} ${m.lastName}` 
+                }))
+              ]}
+              value={formData.managerId}
+              onChange={(value) => setFormData({ ...formData, managerId: value })}
+            />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Opening Time"
-              type="time"
-              value={formData.openingTime}
-              onChange={(e) => setFormData({ ...formData, openingTime: e.target.value })}
-              required
+              label="Total Tables"
+              type="number"
+              value={formData.totalTables}
+              onChange={(e) => setFormData({ ...formData, totalTables: parseInt(e.target.value) || 0 })}
+              placeholder="0"
             />
             <Input
-              label="Closing Time"
-              type="time"
-              value={formData.closingTime}
-              onChange={(e) => setFormData({ ...formData, closingTime: e.target.value })}
-              required
+              label="Total Seats"
+              type="number"
+              value={formData.totalSeats}
+              onChange={(e) => setFormData({ ...formData, totalSeats: parseInt(e.target.value) || 0 })}
+              placeholder="0"
             />
           </div>
 
-          <Select
-            label="Timezone"
-            options={TIMEZONES}
-            value={formData.timezone}
-            onChange={(value) => setFormData({ ...formData, timezone: value })}
-          />
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3">Opening Hours</h4>
+            <div className="space-y-2">
+              {formData.openingHours.map((day, index) => (
+                <div key={day.day} className="flex items-center gap-2">
+                  <div className="w-24 text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                    {day.day}
+                  </div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={!day.isClosed}
+                      onChange={(e) => {
+                        const updated = [...formData.openingHours];
+                        updated[index] = { ...day, isClosed: !e.target.checked };
+                        setFormData({ ...formData, openingHours: updated });
+                      }}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Open</span>
+                  </label>
+                  {!day.isClosed && (
+                    <>
+                      <Input
+                        type="time"
+                        value={day.open}
+                        onChange={(e) => {
+                          const updated = [...formData.openingHours];
+                          updated[index] = { ...day, open: e.target.value };
+                          setFormData({ ...formData, openingHours: updated });
+                        }}
+                        className="flex-1"
+                      />
+                      <span className="text-gray-400">to</span>
+                      <Input
+                        type="time"
+                        value={day.close}
+                        onChange={(e) => {
+                          const updated = [...formData.openingHours];
+                          updated[index] = { ...day, close: e.target.value };
+                          setFormData({ ...formData, openingHours: updated });
+                        }}
+                        className="flex-1"
+                      />
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button
@@ -522,7 +679,7 @@ export default function BranchesPage() {
           resetForm();
         }}
         title="Edit Branch"
-        className="max-w-2xl"
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -535,17 +692,19 @@ export default function BranchesPage() {
             />
             <Input
               label="Phone Number"
-              value={formData.phoneNumber}
-              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               placeholder="(555) 123-4567"
-              required
             />
           </div>
 
           <Input
-            label="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            label="Street Address"
+            value={formData.address.street}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              address: { ...formData.address, street: e.target.value }
+            })}
             placeholder="123 Main Street"
             required
           />
@@ -553,24 +712,31 @@ export default function BranchesPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
               label="City"
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              value={formData.address.city}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, city: e.target.value }
+              })}
               placeholder="New York"
               required
             />
             <Input
               label="State"
-              value={formData.state}
-              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+              value={formData.address.state}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, state: e.target.value }
+              })}
               placeholder="NY"
-              required
             />
             <Input
               label="ZIP Code"
-              value={formData.zipCode}
-              onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+              value={formData.address.zipCode}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, zipCode: e.target.value }
+              })}
               placeholder="10001"
-              required
             />
           </div>
 
@@ -581,7 +747,6 @@ export default function BranchesPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="branch@restaurant.com"
-              required
             />
             <Select
               label="Country"
@@ -591,34 +756,96 @@ export default function BranchesPage() {
                 { value: 'UK', label: 'United Kingdom' },
                 { value: 'AU', label: 'Australia' },
               ]}
-              value={formData.country}
-              onChange={(value) => setFormData({ ...formData, country: value })}
+              value={formData.address.country}
+              onChange={(value) => setFormData({ 
+                ...formData, 
+                address: { ...formData.address, country: value }
+              })}
             />
           </div>
+
+          {managers.length > 0 && (
+            <Select
+              label="Manager (Optional)"
+              options={[
+                { value: '', label: 'No Manager' },
+                ...managers.map((m: Staff) => ({ 
+                  value: m.id, 
+                  label: `${m.firstName} ${m.lastName}` 
+                }))
+              ]}
+              value={formData.managerId}
+              onChange={(value) => setFormData({ ...formData, managerId: value })}
+            />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Opening Time"
-              type="time"
-              value={formData.openingTime}
-              onChange={(e) => setFormData({ ...formData, openingTime: e.target.value })}
-              required
+              label="Total Tables"
+              type="number"
+              value={formData.totalTables}
+              onChange={(e) => setFormData({ ...formData, totalTables: parseInt(e.target.value) || 0 })}
+              placeholder="0"
             />
             <Input
-              label="Closing Time"
-              type="time"
-              value={formData.closingTime}
-              onChange={(e) => setFormData({ ...formData, closingTime: e.target.value })}
-              required
+              label="Total Seats"
+              type="number"
+              value={formData.totalSeats}
+              onChange={(e) => setFormData({ ...formData, totalSeats: parseInt(e.target.value) || 0 })}
+              placeholder="0"
             />
           </div>
 
-          <Select
-            label="Timezone"
-            options={TIMEZONES}
-            value={formData.timezone}
-            onChange={(value) => setFormData({ ...formData, timezone: value })}
-          />
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3">Opening Hours</h4>
+            <div className="space-y-2">
+              {formData.openingHours.map((day, index) => (
+                <div key={day.day} className="flex items-center gap-2">
+                  <div className="w-24 text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                    {day.day}
+                  </div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={!day.isClosed}
+                      onChange={(e) => {
+                        const updated = [...formData.openingHours];
+                        updated[index] = { ...day, isClosed: !e.target.checked };
+                        setFormData({ ...formData, openingHours: updated });
+                      }}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Open</span>
+                  </label>
+                  {!day.isClosed && (
+                    <>
+                      <Input
+                        type="time"
+                        value={day.open}
+                        onChange={(e) => {
+                          const updated = [...formData.openingHours];
+                          updated[index] = { ...day, open: e.target.value };
+                          setFormData({ ...formData, openingHours: updated });
+                        }}
+                        className="flex-1"
+                      />
+                      <span className="text-gray-400">to</span>
+                      <Input
+                        type="time"
+                        value={day.close}
+                        onChange={(e) => {
+                          const updated = [...formData.openingHours];
+                          updated[index] = { ...day, close: e.target.value };
+                          setFormData({ ...formData, openingHours: updated });
+                        }}
+                        className="flex-1"
+                      />
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button
@@ -672,19 +899,21 @@ export default function BranchesPage() {
                     <div className="flex items-center gap-2">
                       <MapPinIcon className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {selectedBranch.address}, {selectedBranch.city}, {selectedBranch.state} {selectedBranch.zipCode}
+                        {typeof selectedBranch.address === 'object' && selectedBranch.address !== null
+                          ? `${selectedBranch.address.street}, ${selectedBranch.address.city}${selectedBranch.address.state ? `, ${selectedBranch.address.state}` : ''} ${selectedBranch.address.zipCode || ''}`
+                          : `${selectedBranch.address || ''}${selectedBranch.city ? `, ${selectedBranch.city}` : ''}${selectedBranch.state ? `, ${selectedBranch.state}` : ''} ${selectedBranch.zipCode || ''}`}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <PhoneIcon className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {selectedBranch.phoneNumber}
+                        {selectedBranch.phoneNumber || (selectedBranch as any).phone || 'N/A'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <EnvelopeIcon className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {selectedBranch.email}
+                        {selectedBranch.email || 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -695,15 +924,46 @@ export default function BranchesPage() {
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white mb-2">Operating Hours</h4>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <ClockIcon className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {selectedBranch.openingTime} - {selectedBranch.closingTime}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Timezone: {selectedBranch.timezone}
-                    </div>
+                    {(selectedBranch as any).openingHours && Array.isArray((selectedBranch as any).openingHours) && (selectedBranch as any).openingHours.length > 0 ? (
+                      <div className="space-y-1">
+                        {(selectedBranch as any).openingHours.map((day: any) => (
+                          <div key={day.day} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            <span className="capitalize w-20">{day.day}:</span>
+                            {day.isClosed ? (
+                              <span className="text-gray-500">Closed</span>
+                            ) : (
+                              <span>{day.open} - {day.close}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <ClockIcon className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {(selectedBranch as any).openingTime || '09:00'} - {(selectedBranch as any).closingTime || '21:00'}
+                          </span>
+                        </div>
+                        {(selectedBranch as any).timezone && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Timezone: {(selectedBranch as any).timezone}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">Capacity</h4>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                    {(selectedBranch as any).totalTables !== undefined && (
+                      <div>Tables: {(selectedBranch as any).totalTables}</div>
+                    )}
+                    {(selectedBranch as any).totalSeats !== undefined && (
+                      <div>Seats: {(selectedBranch as any).totalSeats}</div>
+                    )}
                   </div>
                 </div>
 

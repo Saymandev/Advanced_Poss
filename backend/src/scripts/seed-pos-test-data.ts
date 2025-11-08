@@ -321,11 +321,9 @@ async function seedPOSTestData() {
           totalAmount += itemTotal;
 
           orderItems.push({
-            menuItemId: randomItem._id,
-            name: randomItem.name,
+            menuItemId: randomItem._id.toString(),
             price: randomItem.price,
             quantity: quantity,
-            total: itemTotal,
             notes: Math.random() > 0.8 ? 'Special instructions' : '',
           });
         }
@@ -340,8 +338,14 @@ async function seedPOSTestData() {
         const status = statuses[Math.floor(Math.random() * statuses.length)];
 
         const order = await posService.createOrder({
+          orderType: 'dine-in',
           tableId: randomTable._id.toString(),
-          items: orderItems,
+          items: orderItems.map((item) => ({
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            price: item.price,
+            notes: item.notes,
+          })),
           totalAmount: finalTotal,
           status: 'pending',
           notes: Math.random() > 0.7 ? 'Customer special request' : '',

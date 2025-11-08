@@ -102,10 +102,18 @@ export interface StaffPerformance {
 export const staffApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getStaff: builder.query<{ staff: Staff[]; total: number }, any>({
-      query: (params) => ({
-        url: '/users',
-        params,
-      }),
+      query: (params) => {
+        // Transform isActive to status if provided
+        const queryParams: any = { ...params };
+        if (queryParams.isActive !== undefined) {
+          queryParams.status = queryParams.isActive ? 'active' : 'inactive';
+          delete queryParams.isActive;
+        }
+        return {
+          url: '/users',
+          params: queryParams,
+        };
+      },
       transformResponse: (response: any) => {
         const data = response.data || response;
         let items = [];

@@ -40,10 +40,62 @@ export const menuItemsApi = apiSlice.injectEndpoints({
         url: '/menu-items',
         params,
       }),
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        let items = [];
+        
+        // Handle array response
+        if (Array.isArray(data)) {
+          items = data;
+        } else if (data.menuItems) {
+          items = data.menuItems;
+        } else if (data.items) {
+          items = data.items;
+        }
+        
+        return {
+          menuItems: items.map((item: any) => ({
+            id: item._id || item.id,
+            name: item.name,
+            description: item.description,
+            price: item.price || 0,
+            category: item.categoryId || item.category || '',
+            isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
+            imageUrl: item.imageUrl || item.image,
+            ingredients: item.ingredients || [],
+            allergens: item.allergens || [],
+            preparationTime: item.preparationTime,
+            calories: item.calories,
+            createdAt: item.createdAt || new Date().toISOString(),
+            updatedAt: item.updatedAt || new Date().toISOString(),
+          })) as MenuItem[],
+          total: data.total || items.length,
+          page: data.page || 1,
+          limit: data.limit || items.length,
+        };
+      },
       providesTags: ['MenuItem'],
     }),
     getMenuItemById: builder.query<MenuItem, string>({
       query: (id) => `/menu-items/${id}`,
+      transformResponse: (response: any) => {
+        const item = response.data || response;
+        return {
+          id: item._id || item.id,
+          name: item.name,
+          description: item.description,
+          price: item.price || 0,
+          category: item.categoryId || item.category || '',
+          isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
+          imageUrl: item.imageUrl || item.image,
+          ingredients: item.ingredients || [],
+          allergens: item.allergens || [],
+          preparationTime: item.preparationTime,
+          calories: item.calories,
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+        } as MenuItem;
+      },
       providesTags: ['MenuItem'],
     }),
     createMenuItem: builder.mutation<MenuItem, CreateMenuItemRequest>({

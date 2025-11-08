@@ -12,6 +12,7 @@ async function createSimplePOSData() {
   try {
     // Create a simple order with minimal data
     const orderData = {
+      orderType: 'dine-in' as const,
       tableId: new Types.ObjectId().toString(), // Use a random table ID
       items: [{
         menuItemId: new Types.ObjectId().toString(), // Use a random menu item ID

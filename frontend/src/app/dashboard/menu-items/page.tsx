@@ -12,13 +12,13 @@ import { useCreateMenuItemMutation, useDeleteMenuItemMutation, useGetMenuItemsQu
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  ClockIcon,
-  EyeIcon,
-  PencilIcon,
-  PlusIcon,
-  ShoppingBagIcon,
-  TrashIcon,
-  XMarkIcon
+    ClockIcon,
+    EyeIcon,
+    PencilIcon,
+    PlusIcon,
+    ShoppingBagIcon,
+    TrashIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -107,7 +107,28 @@ export default function MenuItemsPage() {
   const categories = useMemo(() => {
     const cats = categoriesResponse as any;
     if (!cats) return [];
-    return (cats.data?.categories || cats.categories || cats || []).map((cat: any) => ({
+    
+    // Handle different response structures
+    let categoriesArray: any[] = [];
+    
+    if (Array.isArray(cats)) {
+      categoriesArray = cats;
+    } else if (cats.data) {
+      if (Array.isArray(cats.data)) {
+        categoriesArray = cats.data;
+      } else if (Array.isArray(cats.data.categories)) {
+        categoriesArray = cats.data.categories;
+      }
+    } else if (Array.isArray(cats.categories)) {
+      categoriesArray = cats.categories;
+    }
+    
+    // Ensure we always have an array
+    if (!Array.isArray(categoriesArray)) {
+      return [];
+    }
+    
+    return categoriesArray.map((cat: any) => ({
       id: cat._id || cat.id,
       name: cat.name,
     }));
@@ -126,52 +147,29 @@ export default function MenuItemsPage() {
   const [updateMenuItem, { isLoading: isUpdating }] = useUpdateMenuItemMutation();
   const [deleteMenuItem, { isLoading: isDeleting }] = useDeleteMenuItemMutation();
 
-  // Transform API response to local format
+  // Transform API response to local format (already transformed by API)
   const menuItems = useMemo(() => {
     if (!menuItemsResponse) return [];
     
-    // Handle different response formats - backend TransformInterceptor wraps in { success: true, data: {...} }
-    // Direct service response: { menuItems: [], total, page, limit }
-    const response = menuItemsResponse as any;
-    let items = [];
-    
-    // Check for wrapped response format (TransformInterceptor)
-    if (response.data) {
-      items = response.data.menuItems || response.data.items || [];
-    } else {
-      // Direct response format
-      items = response.menuItems || response.items || [];
-    }
+    // Response is already transformed by API transformResponse to { menuItems: [], total, page, limit }
+    const items = (menuItemsResponse as any)?.menuItems || [];
     
     if (!Array.isArray(items)) {
       console.warn('⚠️ Menu items is not an array:', items);
       return [];
     }
     
-    console.log(`✅ Extracted ${items.length} menu items from API response`);
-    
     return items.map((item: any) => ({
-      id: item._id || item.id,
+      id: item.id,
       name: item.name,
       description: item.description || '',
       price: item.price,
-      category: item.categoryId?.name || 'Uncategorized',
+      category: item.category || 'Uncategorized',
       subcategory: item.subcategory,
-      imageUrl: item.images?.[0],
+      imageUrl: item.imageUrl,
       isAvailable: item.isAvailable !== false,
-      preparationTime: item.preparationTime || item.prepTime,
-      ingredients: item.ingredients?.map((ing: any) => {
-        // Handle different ingredient formats
-        if (typeof ing === 'string') return ing;
-        if (ing?.ingredientId?.name) return ing.ingredientId.name;
-        if (ing?.name) return ing.name;
-        // If ingredientId is null but we have quantity and unit, show that
-        if (ing?.quantity && ing?.unit) {
-          return `${ing.quantity} ${ing.unit}`;
-        }
-        // Return empty string to skip this ingredient instead of "Unknown"
-        return null;
-      }).filter((ing: any) => ing !== null) || [],
+      preparationTime: item.preparationTime,
+      ingredients: item.ingredients || [],
       allergens: item.allergens || [],
       nutritionalInfo: item.nutritionalInfo,
       tags: item.tags || [],
@@ -181,13 +179,9 @@ export default function MenuItemsPage() {
     }));
   }, [menuItemsResponse]);
   
-  // Extract total from API response
+  // Extract total from API response (already transformed)
   const totalItems = useMemo(() => {
-    const response = menuItemsResponse as any;
-    if (response?.data?.total) return response.data.total;
-    if (response?.total) return response.total;
-    if (response?.data?.menuItems) return response.data.menuItems.length;
-    return menuItems.length;
+    return (menuItemsResponse as any)?.total || menuItems.length;
   }, [menuItemsResponse, menuItems.length]);
 
   // Populate form when editing

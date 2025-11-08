@@ -6,92 +6,81 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useGetCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import {
-    BellIcon,
-    CalendarIcon,
-    ChartBarIcon,
-    EnvelopeIcon,
-    GiftIcon,
-    MegaphoneIcon,
-    PencilIcon,
-    PlusIcon,
-    TagIcon,
-    TrashIcon
+  MarketingCampaign,
+  useCreateCampaignMutation,
+  useDeleteCampaignMutation,
+  useGetCampaignsQuery,
+  usePauseCampaignMutation,
+  useResumeCampaignMutation,
+  useUpdateCampaignMutation
+} from '@/lib/api/endpoints/marketingApi';
+import { useAppSelector } from '@/lib/store';
+import {
+  BellIcon,
+  CalendarIcon,
+  ChartBarIcon,
+  EnvelopeIcon,
+  GiftIcon,
+  MegaphoneIcon,
+  PencilIcon,
+  PlusIcon,
+  TagIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-interface Campaign {
-  id: string;
-  name: string;
-  type: 'email' | 'sms' | 'push' | 'loyalty' | 'coupon';
-  status: 'draft' | 'scheduled' | 'active' | 'completed' | 'paused';
-  target: 'all' | 'loyalty' | 'new' | 'inactive' | 'segment';
-  segment?: string;
-  subject?: string;
-  message: string;
-  scheduledDate?: string;
-  sentDate?: string;
-  recipients: number;
-  opened?: number;
-  clicked?: number;
-  converted?: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-const mockCampaigns: Campaign[] = [
-  {
-    id: '1',
-    name: 'Summer Special Promotion',
-    type: 'email',
-    status: 'active',
-    target: 'all',
-    subject: 'Beat the Heat with Our Summer Specials!',
-    message: 'Enjoy 20% off all cold beverages this summer. Limited time offer!',
-    recipients: 1250,
-    opened: 380,
-    clicked: 95,
-    converted: 45,
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Loyalty Member Exclusive',
-    type: 'loyalty',
-    status: 'scheduled',
-    target: 'loyalty',
-    message: 'Thank you for being a valued loyalty member! Here\'s a special reward just for you.',
-    scheduledDate: '2024-01-20T09:00:00Z',
-    recipients: 450,
-    createdAt: '2024-01-16T14:30:00Z',
-    updatedAt: '2024-01-16T14:30:00Z',
-  },
-  {
-    id: '3',
-    name: 'Weekend Flash Sale',
-    type: 'sms',
-    status: 'completed',
-    target: 'all',
-    message: 'Weekend Flash Sale! 15% off entire menu. Today only! Show this SMS at checkout.',
-    recipients: 890,
-    opened: 890,
-    clicked: 234,
-    converted: 89,
-    sentDate: '2024-01-14T18:00:00Z',
-    createdAt: '2024-01-14T16:00:00Z',
-    updatedAt: '2024-01-14T20:00:00Z',
-  },
-];
+const STORAGE_KEY = 'marketing_campaigns';
 
 export default function MarketingPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>(mockCampaigns);
+  const { user } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<MarketingCampaign | null>(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
+
+  // Try to get campaigns from API, fallback to local storage
+  const { data: apiCampaigns = [], refetch } = useGetCampaignsQuery({
+    branchId: user?.branchId || undefined,
+    companyId: user?.companyId || undefined,
+  }, {
+    skip: !user?.branchId,
+  });
+
+  const { data: customersData } = useGetCustomersQuery({ 
+    branchId: user?.branchId || undefined 
+  });
+
+  const [createCampaign] = useCreateCampaignMutation();
+  const [updateCampaign] = useUpdateCampaignMutation();
+  const [deleteCampaign] = useDeleteCampaignMutation();
+  const [pauseCampaign] = usePauseCampaignMutation();
+  const [resumeCampaign] = useResumeCampaignMutation();
+
+  // Load campaigns from localStorage on mount
+  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    }
+    return [];
+  });
+
+  // Sync API campaigns and local storage
+  useEffect(() => {
+    if (apiCampaigns.length > 0) {
+      setCampaigns(apiCampaigns);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(apiCampaigns));
+    }
+  }, [apiCampaigns]);
+
+  // Save to localStorage whenever campaigns change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(campaigns));
+  }, [campaigns]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -116,56 +105,107 @@ export default function MarketingPage() {
     setSelectedCampaign(null);
   };
 
-  const handleCreate = () => {
-    const newCampaign: Campaign = {
-      id: Date.now().toString(),
-      ...formData,
-      status: 'draft',
-      recipients: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+  // Calculate recipient count based on target
+  const calculateRecipients = useMemo(() => {
+    if (!customersData) return 0;
+    const customers = Array.isArray(customersData) ? customersData : (customersData.customers || []);
+    return customers.length;
+  }, [customersData]);
 
-    setCampaigns([newCampaign, ...campaigns]);
-    toast.success('Campaign created successfully');
-    setIsCreateModalOpen(false);
-    resetForm();
+  const handleCreate = async () => {
+    try {
+      const newCampaign: MarketingCampaign = {
+        id: Date.now().toString(),
+        ...formData,
+        status: formData.scheduledDate ? 'scheduled' : 'draft',
+        recipients: calculateRecipients,
+        branchId: user?.branchId || '',
+        companyId: user?.companyId || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Try API first, then fallback to local
+      try {
+        await createCampaign(formData).unwrap();
+        await refetch();
+      } catch {
+        // API failed, use local storage
+        setCampaigns([newCampaign, ...campaigns]);
+      }
+      
+      toast.success('Campaign created successfully');
+      setIsCreateModalOpen(false);
+      resetForm();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to create campaign');
+    }
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!selectedCampaign) return;
 
-    const updatedCampaigns = campaigns.map(campaign =>
-      campaign.id === selectedCampaign.id
-        ? { ...campaign, ...formData, updatedAt: new Date().toISOString() }
-        : campaign
-    );
-
-    setCampaigns(updatedCampaigns);
-    toast.success('Campaign updated successfully');
-    setIsEditModalOpen(false);
-    resetForm();
+    try {
+      try {
+        await updateCampaign({ id: selectedCampaign.id, ...formData }).unwrap();
+        await refetch();
+      } catch {
+        const updatedCampaigns = campaigns.map(campaign =>
+          campaign.id === selectedCampaign.id
+            ? { ...campaign, ...formData, updatedAt: new Date().toISOString() }
+            : campaign
+        );
+        setCampaigns(updatedCampaigns);
+      }
+      
+      toast.success('Campaign updated successfully');
+      setIsEditModalOpen(false);
+      resetForm();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update campaign');
+    }
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
 
-    setCampaigns(campaigns.filter(campaign => campaign.id !== id));
-    toast.success('Campaign deleted successfully');
+    try {
+      try {
+        await deleteCampaign(id).unwrap();
+        await refetch();
+      } catch {
+        setCampaigns(campaigns.filter(campaign => campaign.id !== id));
+      }
+      toast.success('Campaign deleted successfully');
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to delete campaign');
+    }
   };
 
-  const handleStatusChange = (id: string, status: Campaign['status']) => {
-    const updatedCampaigns = campaigns.map(campaign =>
-      campaign.id === id
-        ? { ...campaign, status, updatedAt: new Date().toISOString() }
-        : campaign
-    );
-
-    setCampaigns(updatedCampaigns);
-    toast.success(`Campaign ${status} successfully`);
+  const handleStatusChange = async (id: string, status: MarketingCampaign['status']) => {
+    try {
+      if (status === 'active') {
+        await resumeCampaign(id).unwrap();
+      } else if (status === 'paused') {
+        await pauseCampaign(id).unwrap();
+      } else {
+        await updateCampaign({ id, status }).unwrap();
+      }
+      await refetch();
+      toast.success(`Campaign ${status} successfully`);
+    } catch {
+      // Fallback to local update
+      const updatedCampaigns = campaigns.map(campaign =>
+        campaign.id === id
+          ? { ...campaign, status, updatedAt: new Date().toISOString() }
+          : campaign
+      );
+      setCampaigns(updatedCampaigns);
+      toast.success(`Campaign ${status} successfully`);
+    }
   };
 
-  const openEditModal = (campaign: Campaign) => {
+  const openEditModal = (campaign: MarketingCampaign) => {
     setSelectedCampaign(campaign);
     setFormData({
       name: campaign.name,
@@ -179,7 +219,7 @@ export default function MarketingPage() {
     setIsEditModalOpen(true);
   };
 
-  const getStatusBadge = (status: Campaign['status']) => {
+  const getStatusBadge = (status: MarketingCampaign['status']) => {
     const variants = {
       draft: 'secondary',
       scheduled: 'info',
@@ -191,7 +231,7 @@ export default function MarketingPage() {
     return <Badge variant={variants[status]}>{status}</Badge>;
   };
 
-  const getTypeIcon = (type: Campaign['type']) => {
+  const getTypeIcon = (type: MarketingCampaign['type']) => {
     const icons = {
       email: EnvelopeIcon,
       sms: TagIcon,

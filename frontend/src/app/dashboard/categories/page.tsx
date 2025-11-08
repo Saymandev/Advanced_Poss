@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import {
   Category,
   CreateCategoryRequest,
@@ -26,6 +27,7 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function CategoriesPage() {
+  const [mounted, setMounted] = useState(false);
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -33,63 +35,53 @@ export default function CategoriesPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [formData, setFormData] = useState<CreateCategoryRequest & { isActive: boolean }>({
+  const [formData, setFormData] = useState<CreateCategoryRequest & { isActive: boolean; type?: string }>({
     name: '',
     description: '',
     color: '#3B82F6',
     icon: 'tag',
+    type: 'food',
     isActive: true,
     sortOrder: 0,
   });
 
-  const branchId = (user as any)?.branchId || 
-                   (companyContext as any)?.branchId || 
-                   (companyContext as any)?.branches?.[0]?._id ||
-                   (companyContext as any)?.branches?.[0]?.id;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const companyId = useMemo(() => {
+    if (!mounted) return undefined;
+    return (user as any)?.companyId || 
+           (companyContext as any)?.companyId ||
+           (companyContext as any)?._id ||
+           (companyContext as any)?.id;
+  }, [user, companyContext, mounted]);
+
+  const branchId = useMemo(() => {
+    if (!mounted) return undefined;
+    return (user as any)?.branchId || 
+           (companyContext as any)?.branchId || 
+           (companyContext as any)?.branches?.[0]?._id ||
+           (companyContext as any)?.branches?.[0]?.id;
+  }, [user, companyContext, mounted]);
 
   // API calls
   const { data: categoriesResponse, isLoading, error, refetch } = useGetCategoriesQuery({
     branchId,
+    companyId,
     page: 1,
     limit: 100,
-  }, { skip: !branchId });
+  }, { skip: !branchId && !companyId });
 
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
   const [deleteCategory] = useDeleteCategoryMutation();
 
-  // Extract categories from API response
+  // Extract categories from API response (already transformed by API)
   const categories = useMemo(() => {
-    if (!categoriesResponse) return [];
-    
-    const response = categoriesResponse as any;
-    let items = [];
-    
-    if (response.data) {
-      items = response.data.categories || response.data.items || [];
-    } else if (Array.isArray(response)) {
-      items = response;
-    } else {
-      items = response.categories || response.items || [];
-    }
-    
-    if (!Array.isArray(items)) return [];
-    
-    return items.map((cat: any) => ({
-      id: cat._id || cat.id,
-      name: cat.name,
-      description: cat.description,
-      icon: cat.icon || 'tag',
-      color: cat.color || '#3B82F6',
-      sortOrder: cat.sortOrder || 0,
-      isActive: cat.isActive !== undefined ? cat.isActive : true,
-      companyId: cat.companyId || cat.company?.id || cat.company?._id,
-      branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
-      createdAt: cat.createdAt || new Date().toISOString(),
-      updatedAt: cat.updatedAt || new Date().toISOString(),
-      menuItemsCount: cat.menuItemsCount || cat.itemsCount || 0,
-    }));
+    return categoriesResponse?.categories || [];
   }, [categoriesResponse]);
+
 
   // Filter categories
   const filteredCategories = useMemo(() => {
@@ -120,15 +112,35 @@ export default function CategoriesPage() {
       return;
     }
 
+    if (!companyId) {
+      toast.error('Company ID is missing');
+      return;
+    }
+
     try {
-      const payload = {
-        ...formData,
-        branchId,
-      } as any;
-      await createCategory(payload).unwrap();
+      // Build payload matching backend DTO - remove isActive, add companyId and type
+      const payload: any = {
+        companyId: companyId.toString(),
+        name: formData.name,
+        description: formData.description || undefined,
+        color: formData.color || undefined,
+        icon: formData.icon || undefined,
+        type: formData.type || 'food', // Required field, default to 'food'
+        sortOrder: formData.sortOrder || 0,
+      };
+
+      // Add branchId if available (optional)
+      if (branchId) {
+        payload.branchId = branchId.toString();
+      }
+
+      const newCategory = await createCategory(payload).unwrap();
+      console.log('Created category:', newCategory);
       toast.success('Category created successfully');
       setIsModalOpen(false);
       resetForm();
+      // RTK Query should auto-refetch due to invalidatesTags, but we'll force a refetch as backup
+      await refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to create category');
     }
@@ -142,14 +154,23 @@ export default function CategoriesPage() {
     }
     
     try {
-      await updateCategory({
+      // Build payload matching backend DTO - remove isActive
+      const payload: any = {
         id: selectedCategory.id,
-        ...formData,
-      }).unwrap();
+        name: formData.name,
+        description: formData.description || undefined,
+        color: formData.color || undefined,
+        icon: formData.icon || undefined,
+        type: formData.type || 'food',
+        sortOrder: formData.sortOrder || 0,
+      };
+
+      await updateCategory(payload).unwrap();
       toast.success('Category updated successfully');
       setIsEditModalOpen(false);
       setSelectedCategory(null);
       resetForm();
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to update category');
     }
@@ -178,6 +199,7 @@ export default function CategoriesPage() {
       description: category.description || '',
       color: category.color || '#3B82F6',
       icon: category.icon || 'tag',
+      type: (category as any).type || 'food',
       isActive: category.isActive,
       sortOrder: category.sortOrder || 0,
     });
@@ -196,6 +218,7 @@ export default function CategoriesPage() {
       description: '',
       color: '#3B82F6',
       icon: 'tag',
+      type: 'food',
       isActive: true,
       sortOrder: 0,
     });
@@ -301,8 +324,33 @@ export default function CategoriesPage() {
     };
   }, [categories]);
 
+  // Prevent hydration mismatch by not rendering until client-side mounted
+  if (!mounted) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Categories
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Manage menu categories and organization
+            </p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -513,6 +561,22 @@ export default function CategoriesPage() {
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Type *
+            </label>
+            <Select
+              value={formData.type || 'food'}
+              onChange={(value: string) => setFormData({ ...formData, type: value })}
+              options={[
+                { value: 'food', label: 'Food' },
+                { value: 'beverage', label: 'Beverage' },
+                { value: 'dessert', label: 'Dessert' },
+                { value: 'special', label: 'Special' },
+              ]}
+            />
+          </div>
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -712,6 +776,22 @@ export default function CategoriesPage() {
                 placeholder="0"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Type *
+            </label>
+            <Select
+              value={formData.type || 'food'}
+              onChange={(value: string) => setFormData({ ...formData, type: value })}
+              options={[
+                { value: 'food', label: 'Food' },
+                { value: 'beverage', label: 'Beverage' },
+                { value: 'dessert', label: 'Dessert' },
+                { value: 'special', label: 'Special' },
+              ]}
+            />
           </div>
 
           <div className="flex items-center gap-2">

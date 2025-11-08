@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { logout, setCredentials } from '../slices/authSlice';
 import { RootState } from '../store';
 
 const baseQuery = fetchBaseQuery({
@@ -14,31 +15,223 @@ const baseQuery = fetchBaseQuery({
     
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
+    } else {
+      // Log when token is missing for debugging
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ No access token found for API request');
+        console.warn('Redux token:', (getState() as RootState).auth.accessToken ? 'EXISTS' : 'MISSING');
+        console.warn('localStorage token:', localStorage.getItem('accessToken') ? 'EXISTS' : 'MISSING');
+      }
     }
     return headers;
   },
 });
 
-// Wrapper to handle subscription expiry errors
-const baseQueryWithSubscriptionHandling = async (args: any, api: any, extraOptions: any) => {
-  const result = await baseQuery(args, api, extraOptions);
+// Track refresh attempts to prevent multiple simultaneous refreshes
+let isRefreshing = false;
+let refreshPromise: Promise<any> | null = null;
+
+// Wrapper to handle token refresh and subscription expiry errors
+const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
+  let result = await baseQuery(args, api, extraOptions);
   
-  // Handle subscription expired errors
+  // Handle 401 unauthorized errors (token expired)
   if (result.error && result.error.status === 401) {
     const errorData = result.error.data as any;
     
-    // Check if it's a subscription expiry error
+    console.warn('🔴 401 Unauthorized - Attempting token refresh');
+    console.warn('Request URL:', args?.url || args?.toString() || 'Unknown');
+    console.warn('Request args:', { url: args?.url, method: args?.method, body: args?.body });
+    console.warn('Error data:', errorData);
+    
+    // Check if it's a subscription expiry error (don't try to refresh token)
     if (errorData?.code === 'SUBSCRIPTION_EXPIRED' || errorData?.code === 'TRIAL_EXPIRED') {
       // Redirect to upgrade page if in browser
       if (typeof window !== 'undefined') {
-        // Show subscription expired message
         if (errorData?.message) {
           console.error('Subscription Expired:', errorData.message);
-          // You can show a toast/notification here
         }
-        
-        // Redirect to subscriptions page
         window.location.href = '/dashboard/subscriptions';
+      }
+      return result;
+    }
+
+    // Try to refresh the token
+    const state = api.getState() as RootState;
+    const refreshToken = state.auth.refreshToken || 
+      (typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null);
+    
+    console.warn('Refresh token available:', refreshToken ? 'YES' : 'NO');
+    
+    // Don't try to refresh if this is a refresh token request itself
+    if (args.url === '/auth/refresh') {
+      console.error('❌ Refresh token request failed - logging out');
+      api.dispatch(logout());
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
+      }
+      return result;
+    }
+    
+    if (refreshToken) {
+      // If refresh is already in progress, wait for it
+      if (isRefreshing && refreshPromise) {
+        console.log('⏳ Token refresh already in progress, waiting...');
+        console.log('⏳ Current refresh state:', { isRefreshing, hasPromise: !!refreshPromise });
+        try {
+          await refreshPromise;
+          // Retry the original query with new token
+          console.log('🔄 Retrying original request after waiting for refresh...');
+          result = await baseQuery(args, api, extraOptions);
+          return result;
+        } catch (error) {
+          console.error('❌ Refresh failed while waiting:', error);
+          return result;
+        }
+      }
+
+      // Atomically check and set refresh flag to prevent race conditions
+      if (isRefreshing) {
+        // Another request started refresh between our check and now, wait for it
+        console.log('⏳ Refresh started by another request, waiting...');
+        if (refreshPromise) {
+          try {
+            await refreshPromise;
+            console.log('🔄 Retrying original request after waiting for refresh...');
+            result = await baseQuery(args, api, extraOptions);
+            return result;
+          } catch (error) {
+            console.error('❌ Refresh failed while waiting:', error);
+            return result;
+          }
+        }
+      }
+
+      // Start refresh process (atomic: check and set)
+      isRefreshing = true;
+      console.log('🔄 Attempting to refresh token...');
+      console.log('🔄 Refresh state set:', { isRefreshing, timestamp: new Date().toISOString() });
+      
+      refreshPromise = (async () => {
+        try {
+          // Create a fresh baseQuery without token for refresh call
+          const refreshQuery = fetchBaseQuery({
+            baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
+          });
+
+          const refreshResult = await refreshQuery(
+            {
+              url: '/auth/refresh',
+              method: 'POST',
+              body: { refreshToken },
+            },
+            api,
+            extraOptions
+          );
+          
+          return refreshResult;
+        } finally {
+          isRefreshing = false;
+          refreshPromise = null;
+        }
+      })();
+
+      try {
+        const refreshResult = await refreshPromise;
+
+        console.log('📦 Refresh result structure:', {
+          hasData: !!refreshResult.data,
+          dataType: typeof refreshResult.data,
+          dataKeys: refreshResult.data ? Object.keys(refreshResult.data) : [],
+          fullData: refreshResult.data,
+        });
+
+        // Handle wrapped response from TransformInterceptor: { success: true, data: { accessToken, refreshToken } }
+        // or direct response: { accessToken, refreshToken }
+        let tokenData: { accessToken: string; refreshToken?: string } | null = null;
+        
+        if (refreshResult.data) {
+          if (refreshResult.data.success && refreshResult.data.data) {
+            // Wrapped response from TransformInterceptor
+            tokenData = refreshResult.data.data as { accessToken: string; refreshToken?: string };
+            console.log('📦 Detected wrapped response format');
+          } else if (refreshResult.data.accessToken) {
+            // Direct response
+            tokenData = refreshResult.data as { accessToken: string; refreshToken?: string };
+            console.log('📦 Detected direct response format');
+          }
+        }
+
+        if (tokenData && tokenData.accessToken) {
+          console.log('✅ Token refreshed successfully');
+          console.log('🔑 New access token (first 30 chars):', tokenData.accessToken.substring(0, 30) + '...');
+          console.log('🔑 New refresh token (first 30 chars):', tokenData.refreshToken?.substring(0, 30) + '...' || 'NOT PROVIDED');
+          
+          // Store the new tokens
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('accessToken', tokenData.accessToken);
+            if (tokenData.refreshToken) {
+              localStorage.setItem('refreshToken', tokenData.refreshToken);
+            }
+          }
+          
+          // Update Redux state with new tokens
+          const currentState = api.getState() as RootState;
+          if (currentState.auth.user) {
+            // Update tokens, keep user
+            api.dispatch(setCredentials({
+              user: currentState.auth.user,
+              accessToken: tokenData.accessToken,
+              refreshToken: tokenData.refreshToken || currentState.auth.refreshToken || '',
+            }));
+            console.log('✅ Redux state updated with new tokens');
+          } else {
+            console.warn('⚠️ No user in Redux state, tokens saved to localStorage only');
+          }
+
+          // Retry the original query with new token
+          console.log('🔄 Retrying original request with new token...');
+          console.log('🔄 Original request URL:', args?.url || args?.toString() || 'Unknown');
+          result = await baseQuery(args, api, extraOptions);
+          if (result.error) {
+            console.error('❌ Retry failed:', result.error);
+            console.error('❌ Retry error status:', result.error.status);
+            console.error('❌ Retry error data:', result.error.data);
+          } else {
+            console.log('✅ Retry successful');
+          }
+        } else {
+          // Refresh failed, logout user
+          console.error('❌ Token refresh failed - invalid response structure');
+          console.error('Refresh result:', refreshResult);
+          console.error('Refresh result.data:', refreshResult.data);
+          api.dispatch(logout());
+          if (typeof window !== 'undefined') {
+            window.location.href = '/auth/login';
+          }
+        }
+      } catch (error: any) {
+        // Refresh failed, logout user
+        console.error('❌ Token refresh error:', error);
+        console.error('Error details:', {
+          message: error?.message,
+          status: error?.status,
+          data: error?.data,
+        });
+        isRefreshing = false;
+        refreshPromise = null;
+        api.dispatch(logout());
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/auth/login';
+        }
+      }
+    } else {
+      // No refresh token available, logout user
+      api.dispatch(logout());
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
       }
     }
   }
@@ -48,10 +241,11 @@ const baseQueryWithSubscriptionHandling = async (args: any, api: any, extraOptio
 
 export const apiSlice = createApi({
   reducerPath: 'api',
-  baseQuery: baseQueryWithSubscriptionHandling,
+  baseQuery: baseQueryWithReauth,
   tagTypes: [
     'Auth',
     'User',
+    'Marketing',
     'Company',
     'Branch',
     'MenuItem',

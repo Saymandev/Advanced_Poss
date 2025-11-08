@@ -1,21 +1,34 @@
 'use client';
 
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { useGetPOSSettingsQuery, useGetPrintersQuery, useTestPrinterMutation, useUpdatePOSSettingsMutation } from '@/lib/api/endpoints/posApi';
+import {
+  useCreatePrinterMutation,
+  useDeletePrinterMutation,
+  useGetPOSSettingsQuery,
+  useGetPrintersQuery,
+  useTestPrinterMutation,
+  useUpdatePOSSettingsMutation,
+  useUpdatePrinterMutation,
+} from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import {
   CheckIcon,
   CogIcon,
   CurrencyDollarIcon,
+  ExclamationCircleIcon,
   ExclamationTriangleIcon,
+  PencilSquareIcon,
+  PlusIcon,
   PrinterIcon,
   ReceiptPercentIcon,
+  TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function POSSettingsPage() {
@@ -25,13 +38,18 @@ export default function POSSettingsPage() {
   const [isTestReceiptModalOpen, setIsTestReceiptModalOpen] = useState(false);
   const [selectedPrinterForTest, setSelectedPrinterForTest] = useState('');
   const [isTestingPrint, setIsTestingPrint] = useState(false);
+  const canManageSettings = ['owner', 'manager'].includes(user?.role ?? '');
 
   const { data: settings, isLoading, refetch: refetchSettings } = useGetPOSSettingsQuery({
     branchId: user?.branchId || undefined,
   });
   
-  const { data: printers, isLoading: printersLoading } = useGetPrintersQuery();
+  const { data: printers, isLoading: printersLoading, refetch: refetchPrinters } = useGetPrintersQuery();
   const [testPrinter] = useTestPrinterMutation();
+  const [createPrinter, { isLoading: isCreatingPrinter }] = useCreatePrinterMutation();
+  const [updatePrinterMutation, { isLoading: isUpdatingPrinter }] = useUpdatePrinterMutation();
+  const [deletePrinterMutation, { isLoading: isDeletingPrinter }] = useDeletePrinterMutation();
+  const printerList = useMemo(() => (Array.isArray(printers) ? printers : []), [printers]);
 
   const [updateSettings, { isLoading: isSaving }] = useUpdatePOSSettingsMutation();
 
@@ -51,6 +69,154 @@ export default function POSSettingsPage() {
     paperSize: '80mm' as '58mm' | '80mm' | 'A4',
     autoPrint: false,
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
+  const [printerModalMode, setPrinterModalMode] = useState<'create' | 'edit'>('create');
+  const [editingPrinterName, setEditingPrinterName] = useState<string | null>(null);
+  const [printerForm, setPrinterForm] = useState({
+    name: '',
+    type: 'thermal' as 'thermal' | 'laser' | 'inkjet',
+    width: 80,
+    networkUrl: '',
+    enabled: true,
+    autoPrint: false,
+  });
+  const [printerFormErrors, setPrinterFormErrors] = useState<Record<string, string>>({});
+
+  const clearFormError = (field: string) =>
+    setFormErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+
+  const clearPrinterFormError = (field: string) =>
+    setPrinterFormErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+
+  const resetPrinterForm = () => {
+    setPrinterForm({
+      name: '',
+      type: 'thermal',
+      width: 80,
+      networkUrl: '',
+      enabled: true,
+      autoPrint: false,
+    });
+    setPrinterFormErrors({});
+  };
+
+  const openPrinterModal = (mode: 'create' | 'edit', printer?: (typeof printerList)[number]) => {
+    if (!canManageSettings) {
+      toast.error('Only owners and managers can manage printers.');
+      return;
+    }
+    setPrinterModalMode(mode);
+    setPrinterFormErrors({});
+    if (mode === 'edit' && printer) {
+      setEditingPrinterName(printer.name);
+      setPrinterForm({
+        name: printer.name,
+        type: (printer.type as any) || 'thermal',
+        width: printer.width || 80,
+        networkUrl: '',
+        enabled: printer.enabled ?? true,
+        autoPrint: (printer as any).autoPrint ?? false,
+      });
+    } else {
+      setEditingPrinterName(null);
+      resetPrinterForm();
+    }
+    setIsPrinterModalOpen(true);
+  };
+
+  const handleSavePrinter = async () => {
+    if (!canManageSettings) {
+      toast.error('Only owners and managers can manage printers.');
+      return;
+    }
+
+    const errors: Record<string, string> = {};
+    if (!printerForm.name.trim()) {
+      errors.name = 'Printer name is required.';
+    }
+    if (printerForm.width < 40 || printerForm.width > 210) {
+      errors.width = 'Width must be between 40mm and 210mm.';
+    }
+    setPrinterFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Fix highlighted printer fields before saving.');
+      return;
+    }
+
+    try {
+      if (printerModalMode === 'create') {
+        await createPrinter({
+          name: printerForm.name.trim(),
+          type: printerForm.type,
+          width: printerForm.width,
+          networkUrl: printerForm.networkUrl || undefined,
+          enabled: printerForm.enabled,
+          autoPrint: printerForm.autoPrint,
+        }).unwrap();
+        toast.success('Printer created.');
+      } else if (editingPrinterName) {
+        await updatePrinterMutation({
+          name: editingPrinterName,
+          data: {
+            name: printerForm.name.trim(),
+            type: printerForm.type,
+            width: printerForm.width,
+            networkUrl: printerForm.networkUrl || undefined,
+            enabled: printerForm.enabled,
+            autoPrint: printerForm.autoPrint,
+          },
+        }).unwrap();
+        toast.success('Printer updated.');
+        if (selectedPrinterForTest === editingPrinterName && printerForm.name !== editingPrinterName) {
+          setSelectedPrinterForTest(printerForm.name.trim());
+        }
+        if (formData.printerId === editingPrinterName && printerForm.name !== editingPrinterName) {
+          setFormData({ ...formData, printerId: printerForm.name.trim() });
+        }
+      }
+
+      setIsPrinterModalOpen(false);
+      resetPrinterForm();
+      setEditingPrinterName(null);
+      refetchPrinters();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to save printer.');
+    }
+  };
+
+  const handleDeletePrinter = async (printerName: string) => {
+    if (!canManageSettings) {
+      toast.error('Only owners and managers can delete printers.');
+      return;
+    }
+    const confirmDelete = window.confirm(`Delete printer "${printerName}"?`);
+    if (!confirmDelete) return;
+    try {
+      await deletePrinterMutation(printerName).unwrap();
+      toast.success('Printer deleted.');
+      if (selectedPrinterForTest === printerName) {
+        setSelectedPrinterForTest('');
+      }
+      if (formData.printerId === printerName) {
+        setFormData({ ...formData, printerId: '' });
+      }
+      refetchPrinters();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to delete printer.');
+    }
+  };
   
   // Populate form when settings load
   useEffect(() => {
@@ -77,35 +243,49 @@ export default function POSSettingsPage() {
   
   // Set default printer for test when printers load
   useEffect(() => {
-    if (printers && printers.length > 0 && !selectedPrinterForTest) {
-      const enabledPrinter = printers.find(p => p.enabled && p.isOnline);
+    if (printerList.length > 0 && !selectedPrinterForTest) {
+      const enabledPrinter = printerList.find((p) => p.enabled && p.isOnline);
       if (enabledPrinter) {
         setSelectedPrinterForTest(enabledPrinter.name);
       } else if (formData.printerId) {
         setSelectedPrinterForTest(formData.printerId);
       } else {
-        setSelectedPrinterForTest(printers[0].name);
+        setSelectedPrinterForTest(printerList[0].name);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [printers, formData.printerId]);
+  }, [printerList, formData.printerId]);
 
   const handleSaveSettings = async () => {
+    if (!canManageSettings) {
+      toast.error('You do not have permission to update settings.');
+      return;
+    }
+
+    const errors: Record<string, string> = {};
+    if (formData.taxRate < 0 || formData.taxRate > 100) {
+      errors.taxRate = 'Tax rate must be between 0 and 100.';
+    }
+    if (formData.serviceCharge < 0 || formData.serviceCharge > 100) {
+      errors.serviceCharge = 'Service charge must be between 0 and 100.';
+    }
+    if (formData.fontSize < 8 || formData.fontSize > 24) {
+      errors.fontSize = 'Font size must be between 8 and 24.';
+    }
+    if (formData.paperWidth < 40 || formData.paperWidth > 210) {
+      errors.paperWidth = 'Paper width must be between 40mm and 210mm.';
+    }
+    if (formData.printerEnabled && !formData.printerId) {
+      errors.printerId = 'Select a printer or enter one manually.';
+    }
+
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Fix highlighted fields before saving.');
+      return;
+    }
+
     try {
-      // Validation
-      if (formData.taxRate < 0 || formData.taxRate > 100) {
-        toast.error('Tax rate must be between 0 and 100');
-        return;
-      }
-      if (formData.serviceCharge < 0 || formData.serviceCharge > 100) {
-        toast.error('Service charge must be between 0 and 100');
-        return;
-      }
-      if (formData.fontSize < 8 || formData.fontSize > 24) {
-        toast.error('Font size must be between 8 and 24');
-        return;
-      }
-      
       await updateSettings({
         taxRate: formData.taxRate,
         serviceCharge: formData.serviceCharge,
@@ -136,6 +316,10 @@ export default function POSSettingsPage() {
   };
 
   const handleTestPrint = async () => {
+    if (!canManageSettings) {
+      toast.error('Only owners and managers can run printer tests.');
+      return;
+    }
     if (!selectedPrinterForTest) {
       toast.error('Please select a printer');
       return;
@@ -186,9 +370,14 @@ export default function POSSettingsPage() {
         </div>
         <Button
           onClick={() => {
+            if (!canManageSettings) {
+              toast.error('Only owners and managers can edit POS settings.');
+              return;
+            }
             setIsEditModalOpen(true);
           }}
           className="flex items-center gap-2"
+          disabled={!canManageSettings}
         >
           <CogIcon className="h-4 w-4" />
           Edit Settings
@@ -342,9 +531,15 @@ export default function POSSettingsPage() {
             <div className="pt-2">
               <Button
                 variant="secondary"
-                onClick={() => setIsTestPrintModalOpen(true)}
+                onClick={() => {
+                  if (!canManageSettings) {
+                    toast.error('Only owners and managers can run printer tests.');
+                    return;
+                  }
+                  setIsTestPrintModalOpen(true);
+                }}
                 className="w-full"
-                disabled={!settings?.printerSettings?.enabled}
+                disabled={!settings?.printerSettings?.enabled || !canManageSettings || printerList.length === 0}
               >
                 Test Print
               </Button>
@@ -371,9 +566,15 @@ export default function POSSettingsPage() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => setIsTestPrintModalOpen(true)}
+              onClick={() => {
+                if (!canManageSettings) {
+                  toast.error('Only owners and managers can run printer tests.');
+                  return;
+                }
+                setIsTestPrintModalOpen(true);
+              }}
               className="w-full flex items-center gap-2"
-              disabled={!settings?.printerSettings?.enabled}
+              disabled={!settings?.printerSettings?.enabled || !canManageSettings || printerList.length === 0}
             >
               <PrinterIcon className="h-4 w-4" />
               Test Printer
@@ -390,6 +591,116 @@ export default function POSSettingsPage() {
         </Card>
       </div>
 
+      {/* Printer Management */}
+      <Card>
+        <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <PrinterIcon className="h-5 w-5" />
+            Manage Printers
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              className="flex items-center gap-2"
+              onClick={() => openPrinterModal('create')}
+              disabled={!canManageSettings}
+            >
+              <PlusIcon className="h-4 w-4" />
+              Add Printer
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {printersLoading ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, idx) => (
+                <div key={idx} className="h-16 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+              ))}
+            </div>
+          ) : printerList.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Width</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {printerList.map((printer) => (
+                    <tr key={printer.name}>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{printer.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 capitalize">{printer.type || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{printer.width ? `${printer.width}mm` : 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge className={printer.isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                            {printer.isOnline ? 'Online' : 'Offline'}
+                          </Badge>
+                          <Badge className={printer.enabled ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-600'}>
+                            {printer.enabled ? 'Enabled' : 'Disabled'}
+                          </Badge>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-blue-600 dark:text-blue-400"
+                            onClick={() => {
+                              setSelectedPrinterForTest(printer.name);
+                              setIsTestPrintModalOpen(true);
+                            }}
+                          >
+                            Test
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-600 dark:text-gray-300"
+                            onClick={() => openPrinterModal('edit', printer)}
+                            disabled={!canManageSettings}
+                          >
+                            <PencilSquareIcon className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600"
+                            onClick={() => handleDeletePrinter(printer.name)}
+                            disabled={!canManageSettings || isDeletingPrinter}
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+              <PrinterIcon className="h-10 w-10 text-gray-300" />
+              <p className="text-sm text-gray-600 dark:text-gray-300">No printers configured yet.</p>
+              <Button
+                variant="secondary"
+                onClick={() => openPrinterModal('create')}
+                className="flex items-center gap-2"
+                disabled={!canManageSettings}
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add Printer
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Edit Settings Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -405,11 +716,21 @@ export default function POSSettingsPage() {
               <Input
                 type="number"
                 value={formData.taxRate}
-                onChange={(e) => setFormData({ ...formData, taxRate: Number(e.target.value) })}
+                onChange={(e) => {
+                  const nextValue = Number(e.target.value);
+                  setFormData({ ...formData, taxRate: nextValue });
+                  clearFormError('taxRate');
+                }}
                 min="0"
                 max="100"
                 step="0.1"
               />
+              {formErrors.taxRate && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                  <ExclamationCircleIcon className="h-4 w-4" />
+                  {formErrors.taxRate}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -418,11 +739,21 @@ export default function POSSettingsPage() {
               <Input
                 type="number"
                 value={formData.serviceCharge}
-                onChange={(e) => setFormData({ ...formData, serviceCharge: Number(e.target.value) })}
+                onChange={(e) => {
+                  const nextValue = Number(e.target.value);
+                  setFormData({ ...formData, serviceCharge: nextValue });
+                  clearFormError('serviceCharge');
+                }}
                 min="0"
                 max="100"
                 step="0.1"
               />
+              {formErrors.serviceCharge && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                  <ExclamationCircleIcon className="h-4 w-4" />
+                  {formErrors.serviceCharge}
+                </p>
+              )}
             </div>
           </div>
 
@@ -466,11 +797,21 @@ export default function POSSettingsPage() {
               <Input
                 type="number"
                 value={formData.fontSize}
-                onChange={(e) => setFormData({ ...formData, fontSize: Number(e.target.value) })}
+                onChange={(e) => {
+                  const nextValue = Number(e.target.value);
+                  setFormData({ ...formData, fontSize: nextValue });
+                  clearFormError('fontSize');
+                }}
                 min="8"
                 max="24"
                 step="1"
               />
+              {formErrors.fontSize && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                  <ExclamationCircleIcon className="h-4 w-4" />
+                  {formErrors.fontSize}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -479,11 +820,21 @@ export default function POSSettingsPage() {
               <Input
                 type="number"
                 value={formData.paperWidth}
-                onChange={(e) => setFormData({ ...formData, paperWidth: Number(e.target.value) })}
+                onChange={(e) => {
+                  const nextValue = Number(e.target.value);
+                  setFormData({ ...formData, paperWidth: nextValue });
+                  clearFormError('paperWidth');
+                }}
                 min="58"
                 max="210"
                 step="1"
               />
+              {formErrors.paperWidth && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                  <ExclamationCircleIcon className="h-4 w-4" />
+                  {formErrors.paperWidth}
+                </p>
+              )}
             </div>
           </div>
 
@@ -553,14 +904,17 @@ export default function POSSettingsPage() {
                 </label>
                 {printersLoading ? (
                   <div className="text-sm text-gray-500">Loading printers...</div>
-                ) : printers && printers.length > 0 ? (
+                ) : printerList.length > 0 ? (
                   <select
                     value={formData.printerId}
-                    onChange={(e) => setFormData({ ...formData, printerId: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, printerId: e.target.value });
+                      clearFormError('printerId');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   >
                     <option value="">Select a printer</option>
-                    {printers.map((printer) => (
+                    {printerList.map((printer) => (
                       <option key={printer.name} value={printer.name}>
                         {printer.name} {printer.type && `(${printer.type})`} {!printer.isOnline && '(Offline)'}
                       </option>
@@ -578,6 +932,12 @@ export default function POSSettingsPage() {
                       placeholder="Enter printer name manually"
                     />
                   </div>
+                )}
+                {formErrors.printerId && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                    <ExclamationCircleIcon className="h-4 w-4" />
+                    {formErrors.printerId}
+                  </p>
                 )}
               </div>
               
@@ -632,6 +992,131 @@ export default function POSSettingsPage() {
         </div>
       </Modal>
 
+      {/* Create/Edit Printer Modal */}
+      <Modal
+        isOpen={isPrinterModalOpen}
+        onClose={() => {
+          setIsPrinterModalOpen(false);
+          resetPrinterForm();
+          setEditingPrinterName(null);
+        }}
+        title={printerModalMode === 'create' ? 'Add Printer' : 'Edit Printer'}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Printer Name
+            </label>
+            <Input
+              value={printerForm.name}
+              onChange={(e) => {
+                setPrinterForm({ ...printerForm, name: e.target.value });
+                clearPrinterFormError('name');
+              }}
+              disabled={printerModalMode === 'edit' && !!editingPrinterName && !canManageSettings}
+            />
+            {printerFormErrors.name && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                <ExclamationCircleIcon className="h-4 w-4" />
+                {printerFormErrors.name}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Printer Type
+              </label>
+              <select
+                value={printerForm.type}
+                onChange={(e) => setPrinterForm({ ...printerForm, type: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              >
+                <option value="thermal">Thermal</option>
+                <option value="laser">Laser</option>
+                <option value="inkjet">Inkjet</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Paper Width (mm)
+              </label>
+              <Input
+                type="number"
+                value={printerForm.width}
+                onChange={(e) => {
+                  const nextValue = Number(e.target.value);
+                  setPrinterForm({ ...printerForm, width: nextValue });
+                  clearPrinterFormError('width');
+                }}
+                min="40"
+                max="210"
+                step="1"
+              />
+              {printerFormErrors.width && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
+                  <ExclamationCircleIcon className="h-4 w-4" />
+                  {printerFormErrors.width}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Network URL (optional)
+            </label>
+            <Input
+              value={printerForm.networkUrl}
+              onChange={(e) => setPrinterForm({ ...printerForm, networkUrl: e.target.value })}
+              placeholder="http://192.168.0.5"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span>Enabled</span>
+              <input
+                type="checkbox"
+                checked={printerForm.enabled}
+                onChange={(e) => setPrinterForm({ ...printerForm, enabled: e.target.checked })}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+            </label>
+            <label className="flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span>Auto Print</span>
+              <input
+                type="checkbox"
+                checked={printerForm.autoPrint}
+                onChange={(e) => setPrinterForm({ ...printerForm, autoPrint: e.target.checked })}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsPrinterModalOpen(false);
+                resetPrinterForm();
+                setEditingPrinterName(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePrinter}
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={isCreatingPrinter || isUpdatingPrinter}
+            >
+              {isCreatingPrinter || isUpdatingPrinter ? 'Saving...' : 'Save Printer'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Test Print Modal */}
       <Modal
         isOpen={isTestPrintModalOpen}
@@ -643,7 +1128,7 @@ export default function POSSettingsPage() {
             This will send a test print to your configured printer. Make sure the printer is connected and ready.
           </p>
           
-          {printers && printers.length > 0 && (
+          {printerList && printerList.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Select Printer
@@ -653,7 +1138,7 @@ export default function POSSettingsPage() {
                 onChange={(e) => setSelectedPrinterForTest(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               >
-                {printers.map((printer) => (
+                {printerList.map((printer) => (
                   <option key={printer.name} value={printer.name}>
                     {printer.name} {printer.type && `(${printer.type})`} {!printer.isOnline && '(Offline)'}
                   </option>
@@ -698,7 +1183,7 @@ export default function POSSettingsPage() {
         title="Receipt Preview"
       >
         <div className="space-y-4">
-          <div className="bg-white border-2 border-gray-300 p-4 font-mono text-sm">
+          <div className="bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700 p-4 font-mono text-sm text-gray-900 dark:text-gray-100">
             <div className="text-center font-bold text-lg mb-2">
               {settings?.receiptSettings?.header || 'Welcome to Our Restaurant'}
             </div>

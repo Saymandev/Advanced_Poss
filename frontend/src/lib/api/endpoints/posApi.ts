@@ -8,7 +8,26 @@ export interface POSOrderItem {
 }
 
 export interface CreatePOSOrderRequest {
-  tableId: string;
+  orderType: 'dine-in' | 'delivery' | 'takeaway';
+  tableId?: string;
+  deliveryFee?: number;
+  deliveryDetails?: {
+    contactName?: string;
+    contactPhone?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    instructions?: string;
+    assignedDriver?: string;
+  };
+  takeawayDetails?: {
+    contactName?: string;
+    contactPhone?: string;
+    instructions?: string;
+    assignedDriver?: string;
+  };
   items: POSOrderItem[];
   customerInfo?: {
     name?: string;
@@ -95,6 +114,9 @@ export const posApi = apiSlice.injectEndpoints({
     // Get POS order by ID
     getPOSOrder: builder.query<POSOrder, string>({
       query: (id) => `/pos/orders/${id}`,
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       providesTags: (result, error, id) => [{ type: 'POS', id }],
     }),
 
@@ -152,17 +174,43 @@ export const posApi = apiSlice.injectEndpoints({
     getAvailableTables: builder.query<Array<{
       id: string;
       number: string;
+      tableNumber?: string;
       capacity: number;
       status: 'available' | 'occupied' | 'reserved';
       currentOrderId?: string;
-    }>, { branchId?: string }>({
-      query: (params) => ({
-        url: '/pos/tables/available',
-        params,
-      }),
+      location?: string;
+    }>, void>({
+      query: () => {
+        // Use POS endpoint which gets tables from branchId in JWT token
+        // No need to pass branchId - backend extracts it from JWT
+        return {
+          url: '/pos/tables/available',
+        };
+      },
       providesTags: ['Table'],
       transformResponse: (response: any) => {
-        return response.data || response || [];
+        const data = response.data || response;
+        let items = [];
+        
+        // Handle different response structures
+        if (Array.isArray(data)) {
+          items = data;
+        } else if (data.tables) {
+          items = data.tables;
+        } else if (data.items) {
+          items = data.items;
+        }
+        
+        // Normalize table format
+        return items.map((table: any) => ({
+          id: table._id || table.id,
+          number: table.tableNumber || table.number || '',
+          tableNumber: table.tableNumber || table.number || '',
+          capacity: table.capacity || 0,
+          status: table.status || 'available',
+          currentOrderId: table.currentOrderId,
+          location: table.location,
+        }));
       },
     }),
 
@@ -191,7 +239,34 @@ export const posApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['MenuItem'],
       transformResponse: (response: any) => {
-        return response.data || response || [];
+        const data = response.data || response;
+        
+        // Handle array response directly
+        if (Array.isArray(data)) {
+          return data.map((item: any) => ({
+            id: item._id || item.id,
+            name: item.name,
+            description: item.description,
+            price: item.price || 0,
+            image: item.imageUrl || item.image,
+            category: item.categoryId || item.category || { id: '', name: 'Uncategorized' },
+            isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
+            stock: item.stock || item.currentStock,
+          }));
+        }
+        
+        // Handle object with items array
+        const items = data.menuItems || data.items || [];
+        return items.map((item: any) => ({
+          id: item._id || item.id,
+          name: item.name,
+          description: item.description,
+          price: item.price || 0,
+          image: item.imageUrl || item.image,
+          category: item.categoryId || item.category || { id: '', name: 'Uncategorized' },
+          isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
+          stock: item.stock || item.currentStock,
+        }));
       },
     }),
 
@@ -206,6 +281,9 @@ export const posApi = apiSlice.injectEndpoints({
         url: '/pos/quick-stats',
         params,
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       providesTags: ['POS'],
     }),
 
@@ -250,6 +328,10 @@ export const posApi = apiSlice.injectEndpoints({
         url: `/pos/tables/${tableId}/orders`,
         params: { limit },
       }),
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return Array.isArray(data) ? data : (data.orders || data.items || []);
+      },
       providesTags: ['POS'],
     }),
 
@@ -303,6 +385,10 @@ export const posApi = apiSlice.injectEndpoints({
       isOnline: boolean;
     }>, void>({
       query: () => '/pos/printers',
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return Array.isArray(data) ? data : (data.printers || data.items || []);
+      },
       providesTags: ['Printer'],
     }),
 
@@ -315,6 +401,9 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
     
     // Create printer
@@ -338,6 +427,9 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       invalidatesTags: ['Printer'],
     }),
     
@@ -365,6 +457,9 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'PUT',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       invalidatesTags: ['Printer'],
     }),
     
@@ -374,6 +469,9 @@ export const posApi = apiSlice.injectEndpoints({
         url: `/pos/printers/${name}`,
         method: 'DELETE',
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       invalidatesTags: ['Printer'],
     }),
     
@@ -385,6 +483,9 @@ export const posApi = apiSlice.injectEndpoints({
       queueLength: number;
     }, string>({
       query: (name) => `/pos/printers/${name}/status`,
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       providesTags: (result, error, name) => [{ type: 'Printer', id: name }],
     }),
 
@@ -399,6 +500,10 @@ export const posApi = apiSlice.injectEndpoints({
       error?: string;
     }>, void>({
       query: () => '/pos/printers/queue',
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return Array.isArray(data) ? data : (data.queue || data.items || []);
+      },
       providesTags: ['PrintJob'],
     }),
 
@@ -413,6 +518,9 @@ export const posApi = apiSlice.injectEndpoints({
       error?: string;
     }, string>({
       query: (jobId) => `/pos/print-jobs/${jobId}`,
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       providesTags: (result, error, jobId) => [{ type: 'PrintJob', id: jobId }],
     }),
 
@@ -422,6 +530,9 @@ export const posApi = apiSlice.injectEndpoints({
         url: `/pos/print-jobs/${jobId}`,
         method: 'DELETE',
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       invalidatesTags: ['PrintJob'],
     }),
 

@@ -58,24 +58,36 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'general' | 'taxes' | 'service-charges' | 'invoice'>('general');
 
   // General Settings
-  const { data: companySettings } = useGetCompanySettingsQuery(companyContext?.companyId || '');
-  const [updateCompanySettings] = useUpdateCompanySettingsMutation();
+  const { data: companySettings } = useGetCompanySettingsQuery(
+    companyContext?.companyId || '', 
+    { skip: !companyContext?.companyId }
+  );
+  const [updateCompanySettings, { isLoading: updatingCompany }] = useUpdateCompanySettingsMutation();
 
   // Tax Settings
-  const { data: taxSettings = [] } = useGetTaxSettingsQuery(companyContext?.companyId || '');
+  const { data: taxSettings = [] } = useGetTaxSettingsQuery(
+    companyContext?.companyId || '', 
+    { skip: !companyContext?.companyId }
+  );
   const [createTaxSetting] = useCreateTaxSettingMutation();
   const [updateTaxSetting] = useUpdateTaxSettingMutation();
   const [deleteTaxSetting] = useDeleteTaxSettingMutation();
 
   // Service Charge Settings
-  const { data: serviceChargeSettings = [] } = useGetServiceChargeSettingsQuery(companyContext?.companyId || '');
+  const { data: serviceChargeSettings = [] } = useGetServiceChargeSettingsQuery(
+    companyContext?.companyId || '', 
+    { skip: !companyContext?.companyId }
+  );
   const [createServiceChargeSetting] = useCreateServiceChargeSettingMutation();
   const [updateServiceChargeSetting] = useUpdateServiceChargeSettingMutation();
   const [deleteServiceChargeSetting] = useDeleteServiceChargeSettingMutation();
 
   // Invoice Settings
-  const { data: invoiceSettings } = useGetInvoiceSettingsQuery(companyContext?.companyId || '');
-  const [updateInvoiceSettings] = useUpdateInvoiceSettingsMutation();
+  const { data: invoiceSettings } = useGetInvoiceSettingsQuery(
+    companyContext?.companyId || '', 
+    { skip: !companyContext?.companyId }
+  );
+  const [updateInvoiceSettings, { isLoading: updatingInvoice }] = useUpdateInvoiceSettingsMutation();
 
   // Modal states
   const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
@@ -121,10 +133,23 @@ export default function SettingsPage() {
   };
 
   const handleCreateTax = async () => {
+    if (!taxForm.name.trim()) {
+      toast.error('Tax name is required');
+      return;
+    }
+    if (taxForm.rate <= 0) {
+      toast.error('Tax rate must be greater than 0');
+      return;
+    }
+    if (!companyContext?.companyId) {
+      toast.error('Company ID is required');
+      return;
+    }
+
     try {
       await createTaxSetting({
         ...taxForm,
-        companyId: companyContext?.companyId || '',
+        companyId: companyContext.companyId,
       }).unwrap();
       toast.success('Tax setting created successfully');
       setIsTaxModalOpen(false);
@@ -162,10 +187,23 @@ export default function SettingsPage() {
   };
 
   const handleCreateServiceCharge = async () => {
+    if (!serviceChargeForm.name.trim()) {
+      toast.error('Service charge name is required');
+      return;
+    }
+    if (serviceChargeForm.rate <= 0) {
+      toast.error('Service charge rate must be greater than 0');
+      return;
+    }
+    if (!companyContext?.companyId) {
+      toast.error('Company ID is required');
+      return;
+    }
+
     try {
       await createServiceChargeSetting({
         ...serviceChargeForm,
-        companyId: companyContext?.companyId || '',
+        companyId: companyContext.companyId,
       }).unwrap();
       toast.success('Service charge setting created successfully');
       setIsServiceChargeModalOpen(false);
@@ -291,10 +329,18 @@ export default function SettingsPage() {
                     { value: 'AUD', label: 'Australian Dollar (AUD)' },
                   ]}
                   value={companySettings?.currency || 'USD'}
-                  onChange={(value) => updateCompanySettings({
-                    companyId: companyContext?.companyId || '',
-                    data: { currency: value }
-                  })}
+                  onChange={async (value) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId: companyContext?.companyId || '',
+                        data: { currency: value }
+                      }).unwrap();
+                      toast.success('Currency updated successfully');
+                    } catch (error: any) {
+                      toast.error(error.data?.message || 'Failed to update currency');
+                    }
+                  }}
+                  disabled={updatingCompany || !companyContext?.companyId}
                 />
               </div>
 
@@ -313,10 +359,18 @@ export default function SettingsPage() {
                     { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
                   ]}
                   value={companySettings?.timezone || 'America/New_York'}
-                  onChange={(value) => updateCompanySettings({
-                    companyId: companyContext?.companyId || '',
-                    data: { timezone: value }
-                  })}
+                  onChange={async (value) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId: companyContext?.companyId || '',
+                        data: { timezone: value }
+                      }).unwrap();
+                      toast.success('Timezone updated successfully');
+                    } catch (error: any) {
+                      toast.error(error.data?.message || 'Failed to update timezone');
+                    }
+                  }}
+                  disabled={updatingCompany || !companyContext?.companyId}
                 />
               </div>
 
@@ -331,10 +385,18 @@ export default function SettingsPage() {
                     { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
                   ]}
                   value={companySettings?.dateFormat || 'MM/DD/YYYY'}
-                  onChange={(value) => updateCompanySettings({
-                    companyId: companyContext?.companyId || '',
-                    data: { dateFormat: value }
-                  })}
+                  onChange={async (value) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId: companyContext?.companyId || '',
+                        data: { dateFormat: value }
+                      }).unwrap();
+                      toast.success('Date format updated successfully');
+                    } catch (error: any) {
+                      toast.error(error.data?.message || 'Failed to update date format');
+                    }
+                  }}
+                  disabled={updatingCompany || !companyContext?.companyId}
                 />
               </div>
 
@@ -348,10 +410,18 @@ export default function SettingsPage() {
                     { value: '24h', label: '24 Hour' },
                   ]}
                   value={companySettings?.timeFormat || '12h'}
-                  onChange={(value) => updateCompanySettings({
-                    companyId: companyContext?.companyId || '',
-                    data: { timeFormat: value as '12h' | '24h' }
-                  })}
+                  onChange={async (value) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId: companyContext?.companyId || '',
+                        data: { timeFormat: value as '12h' | '24h' }
+                      }).unwrap();
+                      toast.success('Time format updated successfully');
+                    } catch (error: any) {
+                      toast.error(error.data?.message || 'Failed to update time format');
+                    }
+                  }}
+                  disabled={updatingCompany || !companyContext?.companyId}
                 />
               </div>
             </div>
@@ -498,10 +568,17 @@ export default function SettingsPage() {
               <Input
                 label="Invoice Prefix"
                 value={invoiceSettings?.invoicePrefix || ''}
-                onChange={(e) => updateInvoiceSettings({
-                  companyId: companyContext?.companyId || '',
-                  data: { invoicePrefix: e.target.value }
-                })}
+                onChange={async (e) => {
+                  try {
+                    await updateInvoiceSettings({
+                      companyId: companyContext?.companyId || '',
+                      data: { invoicePrefix: e.target.value }
+                    }).unwrap();
+                  } catch (error: any) {
+                    toast.error(error.data?.message || 'Failed to update invoice prefix');
+                  }
+                }}
+                disabled={updatingInvoice || !companyContext?.companyId}
                 placeholder="INV"
               />
 
@@ -509,10 +586,22 @@ export default function SettingsPage() {
                 label="Next Invoice Number"
                 type="number"
                 value={invoiceSettings?.invoiceNumber || 1}
-                onChange={(e) => updateInvoiceSettings({
-                  companyId: companyContext?.companyId || '',
-                  data: { invoiceNumber: parseInt(e.target.value) }
-                })}
+                onChange={async (e) => {
+                  const value = parseInt(e.target.value);
+                  if (isNaN(value) || value < 1) {
+                    toast.error('Invoice number must be a positive number');
+                    return;
+                  }
+                  try {
+                    await updateInvoiceSettings({
+                      companyId: companyContext?.companyId || '',
+                      data: { invoiceNumber: value }
+                    }).unwrap();
+                  } catch (error: any) {
+                    toast.error(error.data?.message || 'Failed to update invoice number');
+                  }
+                }}
+                disabled={updatingInvoice || !companyContext?.companyId}
               />
             </div>
 
@@ -523,10 +612,17 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     checked={invoiceSettings?.showLogo || false}
-                    onChange={(e) => updateInvoiceSettings({
-                      companyId: companyContext?.companyId || '',
-                      data: { showLogo: e.target.checked }
-                    })}
+                    onChange={async (e) => {
+                      try {
+                        await updateInvoiceSettings({
+                          companyId: companyContext?.companyId || '',
+                          data: { showLogo: e.target.checked }
+                        }).unwrap();
+                      } catch (error: any) {
+                        toast.error(error.data?.message || 'Failed to update invoice settings');
+                      }
+                    }}
+                    disabled={updatingInvoice || !companyContext?.companyId}
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">Show company logo</span>
@@ -536,10 +632,17 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     checked={invoiceSettings?.showAddress || false}
-                    onChange={(e) => updateInvoiceSettings({
-                      companyId: companyContext?.companyId || '',
-                      data: { showAddress: e.target.checked }
-                    })}
+                    onChange={async (e) => {
+                      try {
+                        await updateInvoiceSettings({
+                          companyId: companyContext?.companyId || '',
+                          data: { showAddress: e.target.checked }
+                        }).unwrap();
+                      } catch (error: any) {
+                        toast.error(error.data?.message || 'Failed to update invoice settings');
+                      }
+                    }}
+                    disabled={updatingInvoice || !companyContext?.companyId}
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">Show company address</span>
@@ -549,10 +652,17 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     checked={invoiceSettings?.showPhone || false}
-                    onChange={(e) => updateInvoiceSettings({
-                      companyId: companyContext?.companyId || '',
-                      data: { showPhone: e.target.checked }
-                    })}
+                    onChange={async (e) => {
+                      try {
+                        await updateInvoiceSettings({
+                          companyId: companyContext?.companyId || '',
+                          data: { showPhone: e.target.checked }
+                        }).unwrap();
+                      } catch (error: any) {
+                        toast.error(error.data?.message || 'Failed to update invoice settings');
+                      }
+                    }}
+                    disabled={updatingInvoice || !companyContext?.companyId}
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">Show phone number</span>
@@ -562,10 +672,17 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     checked={invoiceSettings?.showEmail || false}
-                    onChange={(e) => updateInvoiceSettings({
-                      companyId: companyContext?.companyId || '',
-                      data: { showEmail: e.target.checked }
-                    })}
+                    onChange={async (e) => {
+                      try {
+                        await updateInvoiceSettings({
+                          companyId: companyContext?.companyId || '',
+                          data: { showEmail: e.target.checked }
+                        }).unwrap();
+                      } catch (error: any) {
+                        toast.error(error.data?.message || 'Failed to update invoice settings');
+                      }
+                    }}
+                    disabled={updatingInvoice || !companyContext?.companyId}
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">Show email address</span>
@@ -580,10 +697,17 @@ export default function SettingsPage() {
               <textarea
                 rows={3}
                 value={invoiceSettings?.footerText || ''}
-                onChange={(e) => updateInvoiceSettings({
-                  companyId: companyContext?.companyId || '',
-                  data: { footerText: e.target.value }
-                })}
+                onChange={async (e) => {
+                  try {
+                    await updateInvoiceSettings({
+                      companyId: companyContext?.companyId || '',
+                      data: { footerText: e.target.value }
+                    }).unwrap();
+                  } catch (error: any) {
+                    toast.error(error.data?.message || 'Failed to update footer text');
+                  }
+                }}
+                disabled={updatingInvoice || !companyContext?.companyId}
                 className="input w-full"
                 placeholder="Thank you for your business!"
               />
@@ -596,10 +720,17 @@ export default function SettingsPage() {
               <textarea
                 rows={4}
                 value={invoiceSettings?.termsAndConditions || ''}
-                onChange={(e) => updateInvoiceSettings({
-                  companyId: companyContext?.companyId || '',
-                  data: { termsAndConditions: e.target.value }
-                })}
+                onChange={async (e) => {
+                  try {
+                    await updateInvoiceSettings({
+                      companyId: companyContext?.companyId || '',
+                      data: { termsAndConditions: e.target.value }
+                    }).unwrap();
+                  } catch (error: any) {
+                    toast.error(error.data?.message || 'Failed to update terms and conditions');
+                  }
+                }}
+                disabled={updatingInvoice || !companyContext?.companyId}
                 className="input w-full"
                 placeholder="Payment is due within 30 days..."
               />

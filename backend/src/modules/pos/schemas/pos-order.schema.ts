@@ -21,8 +21,35 @@ export class POSOrder {
   @Prop({ required: true, unique: true })
   orderNumber: string;
 
-  @Prop({ required: true, type: Types.ObjectId, ref: 'Table' })
+  @Prop({ required: true, enum: ['dine-in', 'delivery', 'takeaway'] })
+  orderType: 'dine-in' | 'delivery' | 'takeaway';
+
+  @Prop({ type: Types.ObjectId, ref: 'Table' })
   tableId: Types.ObjectId;
+
+  @Prop({ type: Number, default: 0 })
+  deliveryFee?: number;
+
+  @Prop({ type: Object })
+  deliveryDetails?: {
+    contactName?: string;
+    contactPhone?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    instructions?: string;
+    assignedDriver?: string;
+  };
+
+  @Prop({ type: Object })
+  takeawayDetails?: {
+    contactName?: string;
+    contactPhone?: string;
+    instructions?: string;
+    assignedDriver?: string;
+  };
 
   @Prop({ required: true, type: [Object] })
   items: POSOrderItem[];

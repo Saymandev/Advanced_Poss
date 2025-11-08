@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatsSkeleton } from '@/components/ui/Skeleton';
 import { useGetOrdersQuery } from '@/lib/api/endpoints/ordersApi';
 import {
-  useGetDashboardQuery,
-  useGetSalesAnalyticsQuery,
-  useGetTopSellingItemsQuery,
+    useGetDashboardQuery,
+    useGetSalesAnalyticsQuery,
+    useGetTopSellingItemsQuery,
 } from '@/lib/api/endpoints/reportsApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useGetTablesQuery } from '@/lib/api/endpoints/tablesApi';
@@ -16,16 +16,16 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  ArrowTrendingDownIcon,
-  ArrowTrendingUpIcon,
-  BeakerIcon,
-  BellIcon,
-  ChartBarIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  ShoppingCartIcon,
-  TableCellsIcon,
-  UsersIcon,
+    ArrowTrendingDownIcon,
+    ArrowTrendingUpIcon,
+    BeakerIcon,
+    BellIcon,
+    ChartBarIcon,
+    ClockIcon,
+    CurrencyDollarIcon,
+    ShoppingCartIcon,
+    TableCellsIcon,
+    UsersIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -69,37 +69,29 @@ export default function DashboardPage() {
   
   const { addNotification } = useNotifications();
   
-  // Transform data from backend response
+  // Transform data from backend response (all responses are already transformed by API)
   const dashboardStats = useMemo(() => {
-    const data = dashboardData as any;
-    return data?.data || data || {};
+    return dashboardData || {};
   }, [dashboardData]);
   
-  // Get tables data
+  // Get tables data (already transformed by API)
   const tables = useMemo(() => {
-    const data = tablesData as any;
-    const tablesArray = data?.data?.tables || data?.tables || [];
-    return Array.isArray(tablesArray) ? tablesArray : [];
+    return tablesData?.tables || [];
   }, [tablesData]);
   
-  // Get staff data
+  // Get staff data (already transformed by API)
   const staff = useMemo(() => {
-    const data = staffData as any;
-    const staffArray = data?.data?.staff || data?.staff || [];
-    return Array.isArray(staffArray) ? staffArray : [];
+    return staffData?.staff || [];
   }, [staffData]);
   
-  // Get recent orders
+  // Get recent orders (already transformed by API)
   const recentOrders = useMemo(() => {
-    const data = recentOrdersData as any;
-    const ordersArray = data?.data?.orders || data?.orders || [];
-    return Array.isArray(ordersArray) ? ordersArray : [];
+    return recentOrdersData?.orders || [];
   }, [recentOrdersData]);
   
-  // Transform sales analytics for charts
+  // Transform sales analytics for charts (already transformed by API)
   const salesTrend = useMemo(() => {
-    const analytics = salesAnalytics as any;
-    const salesByDay = analytics?.data?.salesByDay || analytics?.salesByDay || [];
+    const salesByDay = salesAnalytics?.salesByDay || [];
     
     if (salesByDay.length > 0) {
       return salesByDay.map((day: any) => ({
@@ -139,8 +131,9 @@ export default function DashboardPage() {
   const yesterdayStats = useMemo(() => {
     // For now, using week average as approximation
     // In production, you'd fetch yesterday's data
-    const weekOrders = dashboardStats?.week?.orders || 0;
-    const weekRevenue = dashboardStats?.week?.revenue || 0;
+    const dashboardStatsData = dashboardStats as any;
+    const weekOrders = dashboardStatsData?.week?.orders || 0;
+    const weekRevenue = dashboardStatsData?.week?.revenue || 0;
     const avgDailyOrders = weekOrders / 7;
     const avgDailyRevenue = weekRevenue / 7;
     
@@ -182,11 +175,12 @@ export default function DashboardPage() {
   }
 
   // Extract stats values
-  const todaySales = dashboardStats?.today?.revenue || 0;
-  const todayOrders = dashboardStats?.today?.orders || 0;
-  const activeOrders = dashboardStats?.active?.orders || 0;
-  const totalCustomers = dashboardStats?.customers?.total || 0;
-  const lowStockItems = dashboardStats?.inventory?.lowStock || 0;
+  const dashboardStatsData = dashboardStats as any;
+  const todaySales = dashboardStatsData?.today?.revenue || 0;
+  const todayOrders = dashboardStatsData?.today?.orders || 0;
+  const activeOrders = dashboardStatsData?.active?.orders || 0;
+  const totalCustomers = dashboardStatsData?.customers?.total || 0;
+  const lowStockItems = dashboardStatsData?.inventory?.lowStock || 0;
   
   // Calculate percentage changes
   const salesChange = yesterdayStats.revenue > 0

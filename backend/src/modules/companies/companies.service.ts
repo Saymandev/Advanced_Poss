@@ -108,7 +108,25 @@ export class CompaniesService {
   }
 
   async findByEmail(email: string): Promise<Company | null> {
-    return this.companyModel.findOne({ email: email.toLowerCase() }).exec();
+    if (!email) {
+      return null;
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Try exact match first (case-insensitive)
+    let company = await this.companyModel.findOne({ 
+      email: normalizedEmail 
+    }).exec();
+    
+    // If not found, try case-insensitive regex search (in case of any whitespace or casing issues)
+    if (!company) {
+      company = await this.companyModel.findOne({ 
+        email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      }).exec();
+    }
+    
+    return company;
   }
 
   async update(id: string, updateCompanyDto: UpdateCompanyDto): Promise<Company> {

@@ -7,19 +7,21 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { DemandPrediction, MenuOptimizationSuggestion, useGetDemandPredictionsQuery, useGetMenuOptimizationQuery } from '@/lib/api/endpoints/aiApi';
-import { useGetMenuItemsQuery } from '@/lib/api/endpoints/menuItemsApi';
+import { useGetMenuItemsQuery, useUpdateMenuItemMutation } from '@/lib/api/endpoints/menuItemsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
   ArrowTrendingDownIcon,
   ArrowTrendingUpIcon,
   ChartBarIcon,
+  CheckCircleIcon,
   EyeIcon,
   LightBulbIcon,
   SparklesIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import {
   Bar,
   BarChart,
@@ -36,20 +38,66 @@ export default function AIMenuOptimizationPage() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<MenuOptimizationSuggestion | null>(null);
 
-  const { data: optimizationData, isLoading: optimizationLoading, refetch: refetchOptimization } = useGetMenuOptimizationQuery({
+  const { 
+    data: optimizationData, 
+    isLoading: optimizationLoading, 
+    error: optimizationError,
+    refetch: refetchOptimization 
+  } = useGetMenuOptimizationQuery({
     branchId: user?.branchId || undefined,
     category: selectedCategory === 'all' ? undefined : selectedCategory,
+  }, {
+    skip: !user?.branchId,
   });
 
-  const { data: demandData, isLoading: demandLoading } = useGetDemandPredictionsQuery({
+  const { 
+    data: demandData, 
+    isLoading: demandLoading,
+    error: demandError 
+  } = useGetDemandPredictionsQuery({
     branchId: user?.branchId || undefined,
+  }, {
+    skip: !user?.branchId,
   });
 
-  const { data: menuItems } = useGetMenuItemsQuery({ branchId: user?.branchId || undefined });
+  const { data: menuItemsData } = useGetMenuItemsQuery({ branchId: user?.branchId || undefined });
+  const [updateMenuItem] = useUpdateMenuItemMutation();
+
+  const menuItems = useMemo(() => {
+    if (menuItemsData && 'menuItems' in menuItemsData) return menuItemsData.menuItems;
+    if (menuItemsData && 'items' in menuItemsData) return menuItemsData.items;
+    return [];
+  }, [menuItemsData]);
+
+  const categoryOptions = useMemo(() => {
+    const uniqueCategories = Array.from(new Set(menuItems.map(item => item.category).filter(Boolean)));
+    return [
+      { value: 'all', label: 'All Categories' },
+      ...uniqueCategories.map(cat => ({ value: cat, label: cat }))
+    ];
+  }, [menuItems]);
 
   const openDetailsModal = (suggestion: MenuOptimizationSuggestion) => {
     setSelectedSuggestion(suggestion);
     setIsDetailsModalOpen(true);
+  };
+
+  const handleApplySuggestion = async () => {
+    if (!selectedSuggestion) return;
+
+    try {
+      await updateMenuItem({
+        id: selectedSuggestion.itemId,
+        price: selectedSuggestion.suggestedPrice,
+      }).unwrap();
+
+      toast.success(`Price updated successfully to ${formatCurrency(selectedSuggestion.suggestedPrice)}`);
+      setIsDetailsModalOpen(false);
+      setSelectedSuggestion(null);
+      refetchOptimization();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to apply suggestion');
+    }
   };
 
   const getRecommendationBadge = (recommendation: MenuOptimizationSuggestion['recommendation']) => {
@@ -282,25 +330,36 @@ export default function AIMenuOptimizationPage() {
   ];
 
   // Prepare chart data
-  const optimizationChartData = optimizationData?.slice(0, 8).map(item => ({
-    name: item.itemName.length > 15 ? `${item.itemName.substring(0, 15)}...` : item.itemName,
-    currentPrice: item.currentPrice,
-    suggestedPrice: item.suggestedPrice,
-    demandScore: item.demandScore,
-  }));
+  const optimizationChartData = useMemo(() => {
+    if (!optimizationData || !Array.isArray(optimizationData)) return [];
+    return optimizationData.slice(0, 8).map(item => ({
+      name: item.itemName.length > 15 ? `${item.itemName.substring(0, 15)}...` : item.itemName,
+      currentPrice: item.currentPrice || 0,
+      suggestedPrice: item.suggestedPrice || 0,
+      demandScore: item.demandScore || 0,
+    }));
+  }, [optimizationData]);
 
-  const demandChartData = demandData?.slice(0, 8).map(item => ({
-    name: item.itemName.length > 15 ? `${item.itemName.substring(0, 15)}...` : item.itemName,
-    predictedDemand: item.predictedDemand,
-  }));
+  const demandChartData = useMemo(() => {
+    if (!demandData || !Array.isArray(demandData)) return [];
+    return demandData.slice(0, 8).map(item => ({
+      name: item.itemName.length > 15 ? `${item.itemName.substring(0, 15)}...` : item.itemName,
+      predictedDemand: item.predictedDemand || 0,
+    }));
+  }, [demandData]);
 
-  const stats = {
-    totalOptimizations: optimizationData?.length || 0,
-    priceIncreases: optimizationData?.filter(o => o.recommendation === 'increase_price').length || 0,
-    priceDecreases: optimizationData?.filter(o => o.recommendation === 'decrease_price').length || 0,
-    totalRevenueImpact: optimizationData?.reduce((sum, o) => sum + o.expectedImpact.revenue, 0) || 0,
-    avgConfidence: optimizationData ? optimizationData.reduce((sum, o) => sum + o.confidence, 0) / optimizationData.length : 0,
-  };
+  const stats = useMemo(() => {
+    const optimizations = Array.isArray(optimizationData) ? optimizationData : [];
+    return {
+      totalOptimizations: optimizations.length,
+      priceIncreases: optimizations.filter(o => o.recommendation === 'increase_price').length,
+      priceDecreases: optimizations.filter(o => o.recommendation === 'decrease_price').length,
+      totalRevenueImpact: optimizations.reduce((sum, o) => sum + (o.expectedImpact?.revenue || 0), 0),
+      avgConfidence: optimizations.length > 0 
+        ? optimizations.reduce((sum, o) => sum + (o.confidence || 0), 0) / optimizations.length 
+        : 0,
+    };
+  }, [optimizationData]);
 
   return (
     <div className="space-y-6">
@@ -387,13 +446,7 @@ export default function AIMenuOptimizationPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="w-full sm:w-48">
               <Select
-                options={[
-                  { value: 'all', label: 'All Categories' },
-                  { value: 'Main Course', label: 'Main Course' },
-                  { value: 'Appetizer', label: 'Appetizer' },
-                  { value: 'Dessert', label: 'Dessert' },
-                  { value: 'Beverage', label: 'Beverage' },
-                ]}
+                options={categoryOptions}
                 value={selectedCategory}
                 onChange={setSelectedCategory}
                 placeholder="Filter by category"
@@ -463,8 +516,15 @@ export default function AIMenuOptimizationPage() {
           <CardTitle>AI Optimization Suggestions</CardTitle>
         </CardHeader>
         <CardContent>
+          {optimizationError && (
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-4">
+              <p className="text-red-800 dark:text-red-400 text-sm">
+                Error loading optimization data. Please try refreshing.
+              </p>
+            </div>
+          )}
           <DataTable
-            data={optimizationData || []}
+            data={Array.isArray(optimizationData) ? optimizationData : []}
             columns={optimizationColumns}
             loading={optimizationLoading}
             searchable={false}
@@ -485,8 +545,15 @@ export default function AIMenuOptimizationPage() {
           <CardTitle>Demand Predictions</CardTitle>
         </CardHeader>
         <CardContent>
+          {demandError && (
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-4">
+              <p className="text-red-800 dark:text-red-400 text-sm">
+                Error loading demand predictions. Please try refreshing.
+              </p>
+            </div>
+          )}
           <DataTable
-            data={demandData || []}
+            data={Array.isArray(demandData) ? demandData : []}
             columns={demandColumns}
             loading={demandLoading}
             searchable={false}
@@ -637,7 +704,8 @@ export default function AIMenuOptimizationPage() {
               >
                 Close
               </Button>
-              <Button>
+              <Button onClick={handleApplySuggestion}>
+                <CheckCircleIcon className="w-4 h-4 mr-2" />
                 Apply Suggestion
               </Button>
             </div>

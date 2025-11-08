@@ -54,7 +54,7 @@ async function fixUserBranchAssociation() {
     const authService = app.get(AuthService);
     const result = await authService.findCompany('pos@restaurant.com');
     
-    if (result.found && result.branches && result.branches[0].availableRoles.length > 0) {
+    if (result.found && 'branches' in result && result.branches && result.branches[0]?.availableRoles?.length > 0) {
       console.log('✅ Roles now available!');
       console.log(`   Available roles: ${result.branches[0].availableRoles.join(', ')}`);
     } else {

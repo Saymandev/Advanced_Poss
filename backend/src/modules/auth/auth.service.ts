@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Types } from 'mongoose';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
@@ -23,6 +25,8 @@ import { SuperAdminLoginDto } from './dto/super-admin-login.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private usersService: UsersService,
     private companiesService: CompaniesService,
@@ -98,15 +102,26 @@ export class AuthService {
   async superAdminLogin(superAdminLoginDto: SuperAdminLoginDto) {
     const { email, password } = superAdminLoginDto;
 
+    this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    this.logger.log(`🔐 SUPER ADMIN LOGIN - Starting authentication`);
+    this.logger.log(`📧 Email: ${email}`);
+    this.logger.log(`🔑 Password: ***REDACTED***`);
+
     // Find user by email
+    this.logger.log(`🔍 Searching for user with email: ${email}`);
     const user = await this.usersService.findByEmail(email);
 
     if (!user) {
+      this.logger.error(`❌ User not found with email: ${email}`);
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    this.logger.log(`✅ User found: ${user.email} (${user.firstName} ${user.lastName})`);
+    this.logger.log(`🎭 User role: ${user.role}`);
+
     // Check if user is super admin
     if (user.role !== UserRole.SUPER_ADMIN) {
+      this.logger.error(`❌ Access denied - User is not super admin. Role: ${user.role}`);
       throw new UnauthorizedException('Access denied. Super admin privileges required.');
     }
 
@@ -141,6 +156,10 @@ export class AuthService {
 
     // Save refresh token
     await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
+
+    this.logger.log(`✅ SUPER ADMIN LOGIN - Success`);
+    this.logger.log(`👤 User: ${user.email} (${user.firstName} ${user.lastName})`);
+    this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
     return {
       user: {
@@ -405,23 +424,101 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string) {
+    this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    this.logger.log(`🔄 REFRESH TOKEN - Starting refresh`);
+    this.logger.log(`🔑 Refresh Token (first 50 chars): ${refreshToken ? refreshToken.substring(0, 50) + '...' : 'MISSING'}`);
+
+    if (!refreshToken) {
+      this.logger.error(`❌ Refresh token is missing`);
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
     try {
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get('jwt.refreshSecret'),
-      });
+      const refreshSecret = this.configService.get('jwt.refreshSecret');
+      const accessSecret = this.configService.get('jwt.secret');
+      
+      this.logger.log(`🔐 Refresh Secret: ${refreshSecret ? 'SET (' + refreshSecret.substring(0, 10) + '...)' : 'NOT SET'}`);
+      this.logger.log(`🔐 Access Secret: ${accessSecret ? 'SET (' + accessSecret.substring(0, 10) + '...)' : 'NOT SET'}`);
+      this.logger.log(`🔍 Secrets match: ${refreshSecret === accessSecret ? 'YES (PROBLEM!)' : 'NO (GOOD)'}`);
+
+      // Try to decode the token first (without verification) to see what's in it
+      try {
+        const decoded = this.jwtService.decode(refreshToken);
+        this.logger.log(`📋 Decoded token (without verification): ${JSON.stringify(decoded, null, 2)}`);
+      } catch (decodeError) {
+        this.logger.warn(`⚠️  Could not decode token: ${decodeError.message}`);
+      }
+
+      // Try verifying with refresh secret first
+      let payload;
+      try {
+        this.logger.log(`🔍 Attempting verification with refresh secret...`);
+        payload = this.jwtService.verify(refreshToken, {
+          secret: refreshSecret,
+        });
+        this.logger.log(`✅ Token verified successfully with refresh secret`);
+      } catch (refreshError) {
+        this.logger.error(`❌ Verification with refresh secret failed: ${refreshError.message}`);
+        
+        // Try with access secret as fallback (to see if old tokens were generated with wrong secret)
+        try {
+          this.logger.log(`🔍 Attempting verification with access secret (fallback)...`);
+          payload = this.jwtService.verify(refreshToken, {
+            secret: accessSecret,
+          });
+          this.logger.warn(`⚠️  Token verified with ACCESS secret (wrong secret used during generation!)`);
+          this.logger.warn(`⚠️  This means the token was generated with the wrong secret.`);
+        } catch (accessError) {
+          this.logger.error(`❌ Verification with access secret also failed: ${accessError.message}`);
+          throw refreshError; // Throw original error
+        }
+      }
+
+      this.logger.log(`👤 User ID from token: ${payload.sub}`);
+      this.logger.log(`📧 Email from token: ${payload.email}`);
+      this.logger.log(`🎭 Role from token: ${payload.role}`);
 
       const user = await this.usersService.findOne(payload.sub);
 
       if (!user) {
+        this.logger.error(`❌ User not found with ID: ${payload.sub}`);
         throw new UnauthorizedException('User not found');
       }
+
+      this.logger.log(`✅ User found: ${user.email} (${user.firstName} ${user.lastName})`);
 
       const tokens = await this.generateTokens(user);
       // @ts-ignore - Mongoose virtual property
       await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
 
-      return tokens;
+      this.logger.log(`✅ REFRESH TOKEN - Success`);
+      this.logger.log(`🔑 New tokens generated`);
+      this.logger.log(`🔑 Access token: ${tokens.accessToken.substring(0, 30)}...`);
+      this.logger.log(`🔑 Refresh token: ${tokens.refreshToken.substring(0, 30)}...`);
+      this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+      // Return both tokens for frontend to update
+      return {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
     } catch (error) {
+      this.logger.error(`❌ REFRESH TOKEN - Failed`);
+      this.logger.error(`📛 Error Type: ${error.constructor.name}`);
+      this.logger.error(`📛 Error Message: ${error.message || 'Unknown error'}`);
+      this.logger.error(`📋 Error Stack: ${error.stack || 'No stack trace'}`);
+      
+      // Log specific JWT errors
+      if (error.name === 'JsonWebTokenError') {
+        this.logger.error(`🚫 JWT Error: Invalid token format or signature`);
+      } else if (error.name === 'TokenExpiredError') {
+        this.logger.error(`⏰ JWT Error: Token has expired`);
+      } else if (error.name === 'NotBeforeError') {
+        this.logger.error(`⏰ JWT Error: Token not active yet`);
+      }
+      
+      this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -481,24 +578,51 @@ export class AuthService {
   }
 
   private async generateTokens(user: any) {
+    // Handle both Mongoose documents (_id) and plain objects (id)
+    const userId = user.id || (user as any)._id?.toString() || user._id;
+    
+    this.logger.log(`🔑 Token Generation - User ID resolution:`);
+    this.logger.log(`   - user.id: ${user.id || 'NOT SET'}`);
+    this.logger.log(`   - user._id: ${(user as any)._id || 'NOT SET'}`);
+    this.logger.log(`   - user._id?.toString(): ${(user as any)._id?.toString() || 'NOT SET'}`);
+    this.logger.log(`   - Final userId: ${userId}`);
+    this.logger.log(`   - userId type: ${typeof userId}`);
+    this.logger.log(`   - userId is valid ObjectId: ${Types.ObjectId.isValid(userId)}`);
+    
     const payload = {
-      sub: user.id,
+      sub: userId,
       email: user.email,
       role: user.role,
       companyId: user.companyId?.toString(),
       branchId: user.branchId?.toString(),
     };
+    
+    this.logger.log(`🔑 Token payload.sub (user ID in token): ${payload.sub}`);
+
+    const accessSecret = this.configService.get('jwt.secret');
+    const refreshSecret = this.configService.get('jwt.refreshSecret');
+    const accessExpiresIn = this.configService.get('jwt.expiresIn');
+    const refreshExpiresIn = this.configService.get('jwt.refreshExpiresIn');
+
+    this.logger.log(`🔑 Generating tokens for user: ${user.email}`);
+    this.logger.log(`🔐 Access secret: ${accessSecret ? 'SET' : 'NOT SET'}`);
+    this.logger.log(`🔐 Refresh secret: ${refreshSecret ? 'SET' : 'NOT SET'}`);
+    this.logger.log(`🔍 Secrets are different: ${accessSecret !== refreshSecret ? 'YES (GOOD)' : 'NO (PROBLEM!)'}`);
+    this.logger.log(`⏱️  Access expires in: ${accessExpiresIn}`);
+    this.logger.log(`⏱️  Refresh expires in: ${refreshExpiresIn}`);
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: this.configService.get('jwt.secret'),
-        expiresIn: this.configService.get('jwt.expiresIn'),
+        secret: accessSecret,
+        expiresIn: accessExpiresIn,
       }),
       this.jwtService.signAsync(payload, {
-        secret: this.configService.get('jwt.refreshSecret'),
-        expiresIn: this.configService.get('jwt.refreshExpiresIn'),
+        secret: refreshSecret,
+        expiresIn: refreshExpiresIn,
       }),
     ]);
+
+    this.logger.debug(`✅ Tokens generated successfully`);
 
     return {
       accessToken,
@@ -534,33 +658,94 @@ export class AuthService {
   }
 
   async findCompany(email?: string, companyId?: string) {
+    this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    this.logger.log(`🔍 FIND COMPANY - Starting search`);
+    this.logger.log(`📧 Email (raw): ${email || 'N/A'}`);
+    this.logger.log(`🏢 Company ID: ${companyId || 'N/A'}`);
+
     // Validate that at least one parameter is provided
     if (!email && !companyId) {
+      this.logger.warn(`❌ FIND COMPANY - No email or company ID provided`);
       return {
         found: false,
         message: 'Please provide either email or company ID',
       };
     }
 
+    // Normalize email to lowercase for consistent searching
+    const normalizedEmail = email ? email.toLowerCase().trim() : undefined;
+    this.logger.log(`📧 Email (normalized): ${normalizedEmail || 'N/A'}`);
+
     let user = null;
     let targetCompanyId = companyId;
 
     // If email is provided, first try to find company by email, then user by email
-    if (email) {
-      // First try to find company by email
-      const company = await this.companiesService.findByEmail(email);
+    if (normalizedEmail) {
+      this.logger.log(`🔍 Searching for company by email: ${normalizedEmail}`);
+      
+      // Debug: Check what companies exist in DB
+      try {
+        const allCompanies = await this.companiesService.findAll({});
+        this.logger.log(`📊 Total companies in database: ${allCompanies.length}`);
+        if (allCompanies.length > 0) {
+          const companyEmails = allCompanies.map((c: any) => c.email).filter(Boolean);
+          this.logger.log(`📋 All company emails in DB: ${companyEmails.join(', ')}`);
+          this.logger.log(`🔍 Looking for: "${normalizedEmail}"`);
+          this.logger.log(`🔍 Exact match exists: ${companyEmails.includes(normalizedEmail) ? 'YES' : 'NO'}`);
+          this.logger.log(`🔍 Case-insensitive match exists: ${companyEmails.some((e: string) => e.toLowerCase() === normalizedEmail) ? 'YES' : 'NO'}`);
+        } else {
+          this.logger.error(`❌ NO COMPANIES FOUND IN DATABASE!`);
+          this.logger.error(`💡 You need to create a company first. Run the demo setup script or register a new company.`);
+        }
+      } catch (err) {
+        this.logger.warn(`⚠️  Could not list companies: ${err.message}`);
+      }
+      
+      // First try to find company by email (already normalized in findByEmail)
+      const company = await this.companiesService.findByEmail(normalizedEmail);
+      
       if (company) {
         targetCompanyId = (company as any)._id.toString();
+        this.logger.log(`✅ Found company by email: ${(company as any)._id.toString()} - ${company.name}`);
+        this.logger.log(`📧 Company email in DB: ${company.email}`);
+        this.logger.log(`🔍 Email match: ${company.email === normalizedEmail ? 'YES' : 'NO'}`);
       } else {
-        // If no company found, try to find user by email
-        user = await this.usersService.findByEmail(email);
+        this.logger.error(`❌ Company not found by email: ${normalizedEmail}`);
+        this.logger.log(`🔍 Searching for user by email as fallback: ${normalizedEmail}`);
+        
+        // If no company found, try to find user by email (normalize for consistency)
+        user = await this.usersService.findByEmail(normalizedEmail);
+        
         if (!user) {
+          this.logger.error(`❌ No user found with email: ${normalizedEmail}`);
+          this.logger.error(`💡 Possible reasons:`);
+          this.logger.error(`   1. Company doesn't exist with this email`);
+          this.logger.error(`   2. User doesn't exist with this email`);
+          this.logger.error(`   3. Email format might be incorrect`);
+          this.logger.error(`💡 Make sure you're using the COMPANY email, not a user email`);
+          this.logger.error(`💡 Example company email: demo@restaurant.com`);
+          this.logger.error(`💡 Example user email: owner@demo.com`);
+          
+          // Try to find any company to help debug
+          try {
+            const allCompanies = await this.companiesService.findAll({});
+            this.logger.log(`📊 Total companies in database: ${allCompanies.length}`);
+            if (allCompanies.length > 0) {
+              this.logger.log(`📋 Available company emails: ${allCompanies.slice(0, 5).map((c: any) => c.email).join(', ')}`);
+            }
+          } catch (err) {
+            this.logger.warn(`⚠️  Could not list companies: ${err.message}`);
+          }
+          
           return {
             found: false,
             message: 'No restaurant found with this email',
           };
         }
+        
         targetCompanyId = user.companyId;
+        this.logger.log(`✅ Found user by email: ${(user as any)._id.toString()} - Company ID: ${user.companyId}`);
+        this.logger.log(`📧 User email in DB: ${user.email}`);
       }
     }
 
@@ -574,9 +759,9 @@ export class AuthService {
 
     // Get company details
     let company;
-    if (email && !user) {
+    if (normalizedEmail && !user) {
       // We found company by email, use it directly
-      company = await this.companiesService.findByEmail(email);
+      company = await this.companiesService.findByEmail(normalizedEmail);
     } else {
       // We found user by email or have companyId, get company by ID
       company = await this.usersService.getCompanyById(targetCompanyId.toString());
@@ -590,13 +775,16 @@ export class AuthService {
     }
 
     // Get all branches for this company
+    this.logger.log(`🏢 Fetching branches for company: ${targetCompanyId}`);
     const branches = await this.usersService.getCompanyBranches(targetCompanyId.toString());
+    this.logger.log(`✅ Found ${branches.length} branch(es)`);
 
     // Get available roles for each branch
     const branchesWithRoles = await Promise.all(
       branches.map(async (branch: any) => {
         const branchUsers = await this.usersService.findByBranch(branch._id.toString());
         const availableRoles = [...new Set(branchUsers.map(user => user.role))];
+        this.logger.log(`📍 Branch: ${branch.name} - Users: ${branchUsers.length}, Roles: ${availableRoles.join(', ')}`);
 
         // Group users by role for selection
         const usersByRole = {};
@@ -623,7 +811,7 @@ export class AuthService {
       })
     );
 
-    return {
+    const result = {
       found: true,
       companyId: targetCompanyId,
       companyName: company.name,
@@ -632,6 +820,11 @@ export class AuthService {
       branches: branchesWithRoles,
       message: 'Please select a branch, role, and enter your PIN to continue',
     };
+
+    this.logger.log(`✅ FIND COMPANY - Success: ${company.name} with ${branchesWithRoles.length} branch(es)`);
+    this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+    return result;
   }
 
   async loginWithRole(loginData: {
@@ -644,13 +837,25 @@ export class AuthService {
     userAgent?: string;
   }) {
     const { companyId, branchId, role, userId, pin, ipAddress, userAgent } = loginData;
+    
+    this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    this.logger.log(`🔐 PIN LOGIN WITH ROLE - Starting authentication`);
+    this.logger.log(`🏢 Company ID: ${companyId}`);
+    this.logger.log(`📍 Branch ID: ${branchId}`);
+    this.logger.log(`🎭 Role: ${role}`);
+    this.logger.log(`👤 User ID: ${userId || 'N/A (will find by role)'}`);
+    this.logger.log(`🔑 PIN: ***REDACTED***`);
+    this.logger.log(`🌐 IP: ${ipAddress || 'unknown'}`);
+    this.logger.log(`🖥️  User Agent: ${userAgent || 'unknown'}`);
 
     // Find user by role and branch
     let user: any;
     if (userId) {
+      this.logger.log(`🔍 Finding specific user by ID: ${userId}`);
       // If userId is provided, find specific user
       user = await this.usersService.findOne(userId);
       if (!user || user.role !== role || user.branchId !== branchId) {
+        this.logger.error(`❌ Invalid user selection - User: ${userId}, Role match: ${user?.role === role}, Branch match: ${user?.branchId === branchId}`);
         // Log failed login attempt
         await this.logLoginActivity({
           userId: userId || 'unknown',
@@ -666,12 +871,17 @@ export class AuthService {
         });
         throw new UnauthorizedException('Invalid user selection');
       }
+      this.logger.log(`✅ Found user: ${user.email} (${user.firstName} ${user.lastName})`);
     } else {
+      this.logger.log(`🔍 Finding user by role and branch`);
       // Find user by role and branch
       const users = await this.usersService.findByBranch(branchId);
+      this.logger.log(`📍 Found ${users.length} user(s) in branch ${branchId}`);
       const roleUsers = users.filter(u => u.role.toLowerCase() === role.toLowerCase());
+      this.logger.log(`🎭 Found ${roleUsers.length} user(s) with role ${role}`);
       
       if (roleUsers.length === 0) {
+        this.logger.error(`❌ No users found with role '${role}' in branch ${branchId}`);
         // Log failed login attempt
         await this.logLoginActivity({
           userId: 'unknown',
@@ -689,6 +899,7 @@ export class AuthService {
       }
       
       if (roleUsers.length > 1) {
+        this.logger.warn(`⚠️  Multiple users (${roleUsers.length}) found with role '${role}' - user selection required`);
         // Log failed login attempt
         await this.logLoginActivity({
           userId: 'unknown',
@@ -706,11 +917,14 @@ export class AuthService {
       }
       
       user = roleUsers[0];
+      this.logger.log(`✅ Selected user: ${user.email} (${user.firstName} ${user.lastName})`);
     }
 
     // Verify PIN
+    this.logger.log(`🔐 Verifying PIN for user: ${user.email}`);
     const userWithPin = await this.usersService.findByEmail(user.email);
     if (!userWithPin?.pin) {
+      this.logger.error(`❌ PIN not set for user: ${user.email}`);
       // Log failed login attempt
       await this.logLoginActivity({
         userId: user._id.toString(),
@@ -727,8 +941,10 @@ export class AuthService {
       throw new UnauthorizedException('PIN not set for this user');
     }
 
+    this.logger.log(`🔍 Comparing PIN...`);
     const isPinValid = await PasswordUtil.compare(pin, userWithPin.pin);
     if (!isPinValid) {
+      this.logger.error(`❌ Invalid PIN for user: ${user.email}`);
       // Log failed login attempt
       await this.logLoginActivity({
         userId: user._id.toString(),
@@ -744,18 +960,11 @@ export class AuthService {
       });
       throw new UnauthorizedException('Invalid PIN for this role');
     }
+    this.logger.log(`✅ PIN verified successfully`);
 
-    // Generate tokens
-    const payload = { 
-      sub: user._id.toString(), 
-      email: user.email, 
-      role: user.role,
-      companyId: user.companyId?.toString(),
-      branchId: user.branchId?.toString()
-    };
-    
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    // Generate tokens using the proper method (uses correct secrets)
+    const tokens = await this.generateTokens(user);
+    const { accessToken, refreshToken } = tokens;
 
     // Generate session ID
     const sessionId = GeneratorUtil.generateId();
@@ -791,7 +1000,7 @@ export class AuthService {
     // Update last login
     await this.usersService.update(user._id.toString(), { lastLogin: new Date() } as any);
 
-    return {
+    const result = {
       success: true,
       data: {
         user: {
@@ -808,6 +1017,16 @@ export class AuthService {
         sessionId
       }
     };
+
+    this.logger.log(`✅ PIN LOGIN WITH ROLE - Success`);
+    this.logger.log(`👤 User: ${user.email} (${user.firstName} ${user.lastName})`);
+    this.logger.log(`🎭 Role: ${user.role}`);
+    this.logger.log(`🏢 Company: ${user.companyId}`);
+    this.logger.log(`📍 Branch: ${user.branchId}`);
+    this.logger.log(`🔑 Session ID: ${sessionId}`);
+    this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+    return result;
   }
 
   private async logLoginActivity(activityData: {

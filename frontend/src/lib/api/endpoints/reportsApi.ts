@@ -134,6 +134,9 @@ export const reportsApi = apiSlice.injectEndpoints({
         url: '/reports/inventory',
         params,
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       providesTags: ['Report'],
     }),
     getCustomerReport: builder.query<CustomerReport, { 
@@ -145,6 +148,9 @@ export const reportsApi = apiSlice.injectEndpoints({
         url: '/reports/customers',
         params,
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       providesTags: ['Report'],
     }),
     getStaffReport: builder.query<any, { 
@@ -156,6 +162,9 @@ export const reportsApi = apiSlice.injectEndpoints({
         url: '/reports/staff',
         params,
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       providesTags: ['Report'],
     }),
     exportReport: builder.mutation<{ downloadUrl: string }, {

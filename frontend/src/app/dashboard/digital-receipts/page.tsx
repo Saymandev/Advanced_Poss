@@ -7,15 +7,17 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { DigitalReceipt, useEmailDigitalReceiptMutation, useGenerateDigitalReceiptMutation, useGetDigitalReceiptsQuery } from '@/lib/api/endpoints/aiApi';
+import { useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    DocumentTextIcon,
-    EnvelopeIcon,
-    EyeIcon,
-    ReceiptRefundIcon,
-    ShoppingCartIcon,
-    UserIcon,
+  DocumentTextIcon,
+  EnvelopeIcon,
+  EyeIcon,
+  PrinterIcon,
+  ReceiptRefundIcon,
+  ShoppingCartIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -29,12 +31,20 @@ export default function DigitalReceiptsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
   const { data: receiptsData, isLoading, refetch } = useGetDigitalReceiptsQuery({
     branchId: user?.branchId || undefined,
     startDate: dateRange.start || undefined,
     endDate: dateRange.end || undefined,
     customerId: searchQuery || undefined,
+  });
+
+  // Get completed POS orders that don't have receipts yet
+  const { data: completedOrders } = useGetPOSOrdersQuery({
+    branchId: user?.branchId || undefined,
+    status: 'completed',
+    limit: 100,
   });
 
   const [generateReceipt] = useGenerateDigitalReceiptMutation();
@@ -44,21 +54,47 @@ export default function DigitalReceiptsPage() {
     email: '',
   });
 
+  const [generateForm, setGenerateForm] = useState({
+    orderId: '',
+    customerEmail: '',
+  });
+
   const resetEmailForm = () => {
     setEmailForm({ email: '' });
   };
 
-  const handleGenerateReceipt = async (orderId: string, customerEmail?: string) => {
+  const resetGenerateForm = () => {
+    setGenerateForm({ orderId: '', customerEmail: '' });
+  };
+
+  const handleGenerateReceipt = async () => {
+    if (!generateForm.orderId) {
+      toast.error('Please select an order');
+      return;
+    }
+
     try {
       await generateReceipt({
-        orderId,
-        customerEmail,
+        orderId: generateForm.orderId,
+        customerEmail: generateForm.customerEmail || undefined,
       }).unwrap();
 
       toast.success('Digital receipt generated successfully');
+      setIsGenerateModalOpen(false);
+      resetGenerateForm();
       refetch();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to generate digital receipt');
+    }
+  };
+
+  const handleDownloadReceipt = (receipt: DigitalReceipt) => {
+    // Generate receipt HTML and download as PDF
+    const receiptWindow = window.open('', '_blank');
+    if (receiptWindow) {
+      receiptWindow.document.write(generateReceiptHTML(receipt));
+      receiptWindow.document.close();
+      receiptWindow.print();
     }
   };
 
@@ -179,14 +215,24 @@ export default function DigitalReceiptsPage() {
             variant="ghost"
             size="sm"
             onClick={() => openViewModal(row)}
+            title="View Receipt"
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => handleDownloadReceipt(row)}
+            title="Print/Download"
+          >
+            <PrinterIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => openEmailModal(row)}
             className="text-blue-600 hover:text-blue-700"
+            title="Email Receipt"
           >
             <EnvelopeIcon className="w-4 h-4" />
           </Button>
@@ -195,11 +241,74 @@ export default function DigitalReceiptsPage() {
     },
   ];
 
+  const receipts = receiptsData || [];
+  
   const stats = {
-    total: receiptsData?.length || 0,
-    totalRevenue: receiptsData?.reduce((sum, receipt) => sum + receipt.total, 0) || 0,
-    loyaltyPoints: receiptsData?.reduce((sum, receipt) => sum + (receipt.loyaltyPointsEarned || 0), 0) || 0,
-    avgOrderValue: receiptsData?.length ? (receiptsData.reduce((sum, receipt) => sum + receipt.total, 0) / receiptsData.length) : 0,
+    total: receipts.length,
+    totalRevenue: receipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0),
+    loyaltyPoints: receipts.reduce((sum, receipt) => sum + (receipt.loyaltyPointsEarned || 0), 0),
+    avgOrderValue: receipts.length ? (receipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0) / receipts.length) : 0,
+  };
+
+  // Generate receipt HTML for print/download
+  const generateReceiptHTML = (receipt: DigitalReceipt) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt ${receipt.receiptNumber}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+          .receipt-info { margin: 20px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+          .total { font-weight: bold; font-size: 1.2em; }
+          .footer { margin-top: 30px; text-align: center; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>Restaurant POS</h2>
+          <p>Receipt #${receipt.receiptNumber}</p>
+          <p>${formatDateTime(receipt.createdAt)}</p>
+        </div>
+        <div class="receipt-info">
+          <p><strong>Customer:</strong> ${receipt.customerEmail || 'Walk-in Customer'}</p>
+          <p><strong>Order ID:</strong> ${receipt.orderId}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${receipt.items.map(item => `
+              <tr>
+                <td>${item.name}</td>
+                <td>${item.quantity}</td>
+                <td>${formatCurrency(item.price)}</td>
+                <td>${formatCurrency(item.total)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="total">
+          <p>Subtotal: ${formatCurrency(receipt.subtotal)}</p>
+          <p>Tax: ${formatCurrency(receipt.tax)}</p>
+          ${receipt.tip ? `<p>Tip: ${formatCurrency(receipt.tip)}</p>` : ''}
+          <p style="font-size: 1.3em;">Total: ${formatCurrency(receipt.total)}</p>
+        </div>
+        <div class="footer">
+          <p>Thank you for your visit!</p>
+        </div>
+      </body>
+      </html>
+    `;
   };
 
   return (
@@ -212,6 +321,10 @@ export default function DigitalReceiptsPage() {
             Manage digital receipts and customer communications
           </p>
         </div>
+        <Button onClick={() => setIsGenerateModalOpen(true)}>
+          <DocumentTextIcon className="w-5 h-5 mr-2" />
+          Generate Receipt
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -299,17 +412,17 @@ export default function DigitalReceiptsPage() {
       {/* Digital Receipts Table */}
       <Card>
         <CardContent>
-          <DataTable
-            data={receiptsData || []}
+            <DataTable
+            data={receipts}
             columns={columns}
             loading={isLoading}
             searchable={true}
             selectable={true}
             pagination={{
               currentPage,
-              totalPages: Math.ceil((receiptsData?.length || 0) / itemsPerPage),
+              totalPages: Math.ceil(receipts.length / itemsPerPage),
               itemsPerPage,
-              totalItems: receiptsData?.length || 0,
+              totalItems: receipts.length,
               onPageChange: setCurrentPage,
               onItemsPerPageChange: setItemsPerPage,
             }}
@@ -485,6 +598,13 @@ export default function DigitalReceiptsPage() {
                 Close
               </Button>
               <Button
+                variant="secondary"
+                onClick={() => handleDownloadReceipt(selectedReceipt)}
+              >
+                <PrinterIcon className="w-4 h-4 mr-2" />
+                Print/Download
+              </Button>
+              <Button
                 onClick={() => {
                   setIsViewModalOpen(false);
                   openEmailModal(selectedReceipt);
@@ -555,6 +675,78 @@ export default function DigitalReceiptsPage() {
             </Button>
             <Button onClick={handleEmailReceipt}>
               Send Email
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Generate Receipt Modal */}
+      <Modal
+        isOpen={isGenerateModalOpen}
+        onClose={() => {
+          setIsGenerateModalOpen(false);
+          resetGenerateForm();
+        }}
+        title="Generate Digital Receipt"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Select a completed order to generate a digital receipt.
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Select Order *
+            </label>
+            <select
+              value={generateForm.orderId}
+              onChange={(e) => {
+                const orderId = e.target.value;
+                setGenerateForm({ ...generateForm, orderId });
+                const selectedOrder = completedOrders?.orders?.find((o: any) => o.id === orderId);
+                if (selectedOrder?.customerInfo?.email) {
+                  setGenerateForm(prev => ({ ...prev, customerEmail: selectedOrder.customerInfo?.email || '' }));
+                }
+              }}
+              className="input w-full"
+              required
+            >
+              <option value="">Select an order...</option>
+              {completedOrders?.orders?.map((order: any) => (
+                <option key={order.id} value={order.id}>
+                  Order #{order.orderNumber} - {formatCurrency(order.totalAmount)} - {new Date(order.createdAt).toLocaleDateString()}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Input
+            label="Customer Email (Optional)"
+            type="email"
+            value={generateForm.customerEmail}
+            onChange={(e) => setGenerateForm({ ...generateForm, customerEmail: e.target.value })}
+            placeholder="customer@example.com"
+          />
+
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              💡 A digital receipt will be generated and can be emailed to the customer or downloaded.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsGenerateModalOpen(false);
+                resetGenerateForm();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleGenerateReceipt}>
+              Generate Receipt
             </Button>
           </div>
         </div>
