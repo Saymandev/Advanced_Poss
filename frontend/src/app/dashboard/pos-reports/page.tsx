@@ -18,6 +18,7 @@ import {
   ClockIcon,
   CurrencyDollarIcon,
   EyeIcon,
+  MagnifyingGlassIcon,
   ShoppingBagIcon,
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
@@ -28,7 +29,10 @@ type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'cancelled';
 type OrderTypeFilter = 'all' | 'dine-in' | 'delivery' | 'takeaway';
 type QuickRange = 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'custom';
 
-const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
+const formatDateInput = (date: Date) => {
+  const tzOffsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - tzOffsetMs).toISOString().split('T')[0];
+};
 
 const computeDateRange = (range: QuickRange): { start: string; end: string } => {
   const today = new Date();
@@ -95,6 +99,8 @@ export default function POSReportsPage() {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderTypeFilter>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
 
   const statsParams = {
     branchId: user?.branchId || undefined,
@@ -111,12 +117,23 @@ export default function POSReportsPage() {
     limit: itemsPerPage,
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
     ...(orderTypeFilter !== 'all' ? { orderType: orderTypeFilter } : {}),
+    ...(committedSearch ? { search: committedSearch } : {}),
   } as const;
 
   // API calls
-  const { data: statsData, isLoading: statsLoading, error: statsError } = useGetPOSStatsQuery(statsParams);
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useGetPOSStatsQuery(statsParams);
 
-  const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useGetPOSOrdersQuery(ordersParams);
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useGetPOSOrdersQuery(ordersParams);
 
   // Fetch full order details when viewing
   const { data: orderDetails, isLoading: orderDetailsLoading } = useGetPOSOrderQuery(
@@ -340,14 +357,102 @@ export default function POSReportsPage() {
   ];
 
   const handleExport = (format: 'csv' | 'pdf' | 'excel') => {
-    // Export functionality would be implemented here
-    console.log(`Exporting data as ${format}`);
-    toast.success(`Exporting data as ${format.toUpperCase()}`);
+    if (!orders || orders.length === 0) {
+      toast.error('No orders available to export');
+      return;
+    }
+
+    const headers = ['Order #', 'Type', 'Status', 'Payment', 'Total', 'Date'];
+    const rows: string[][] = orders.map((order: any) => [
+      String(order.orderNumber ?? order.id ?? ''),
+      String(order.orderType ?? ''),
+      String(order.status ?? ''),
+      String(order.paymentMethod ?? 'N/A'),
+      formatCurrency(order.totalAmount || 0),
+      order.createdAt ? formatDateTime(order.createdAt) : '',
+    ]);
+
+    if (format === 'csv' || format === 'excel') {
+      const csvContent = [headers, ...rows]
+        .map((row: string[]) =>
+          row
+            .map((cell: string) => {
+              const value = String(cell ?? '');
+              return `"${value.replace(/"/g, '""')}"`;
+            })
+            .join(',')
+        )
+        .join('\r\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pos-orders-${Date.now()}.${format === 'excel' ? 'xls' : 'csv'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success(`${format.toUpperCase()} export ready`);
+      return;
+    }
+
+    if (format === 'pdf') {
+      const printableRows = rows
+        .map(
+          (row: string[]) =>
+            `<tr>${row
+              .map((cell: string) => `<td style="padding:6px 12px;border:1px solid #e5e7eb;">${cell}</td>`)
+              .join('')}</tr>`
+        )
+        .join('');
+      const html = `<!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>POS Orders Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 24px; }
+              h1 { font-size: 20px; margin-bottom: 16px; }
+              table { border-collapse: collapse; width: 100%; }
+              th { text-align: left; background: #0f172a; color: #fff; padding: 8px 12px; }
+            </style>
+          </head>
+          <body>
+            <h1>POS Orders Report</h1>
+            <table>
+              <thead>
+                <tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr>
+              </thead>
+              <tbody>${printableRows}</tbody>
+            </table>
+          </body>
+        </html>`;
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast.error('Pop-up blocked. Allow pop-ups to export PDF.');
+        return;
+      }
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      toast.success('PDF export sent to print dialog');
+      return;
+    }
+
+    toast.error('Unsupported export format');
   };
 
   const handleRefresh = () => {
-    // Refresh data by invalidating cache
-    window.location.reload();
+    Promise.all([refetchStats(), refetchOrders()])
+      .then(() => {
+        toast.success('Reports refreshed');
+      })
+      .catch(() => {
+        toast.error('Unable to refresh reports right now');
+      });
   };
   
   // Prepare chart data for revenue trend (if orders data is available)
@@ -413,6 +518,53 @@ export default function POSReportsPage() {
     setCurrentPage(1);
   };
 
+  const handleDateInputChange = (field: 'start' | 'end', value: string) => {
+    if (!value) {
+      return;
+    }
+
+    setDateRange((prev) => {
+      const nextRange = { ...prev, [field]: value } as { start: string; end: string };
+      const startDate = new Date(nextRange.start);
+      const endDate = new Date(nextRange.end);
+
+      if (field === 'start' && startDate > endDate) {
+        nextRange.end = value;
+      }
+
+      if (field === 'end' && startDate > endDate) {
+        nextRange.start = value;
+      }
+
+      return nextRange;
+    });
+
+    setActiveQuickRange('custom');
+    setCurrentPage(1);
+  };
+
+  const handleSearchSubmit = () => {
+    const trimmed = searchTerm.trim();
+    setCommittedSearch((prev) => {
+      if (prev === trimmed) {
+        return prev;
+      }
+      setCurrentPage(1);
+      return trimmed;
+    });
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setCommittedSearch((prev) => {
+      if (prev === '') {
+        return prev;
+      }
+      setCurrentPage(1);
+      return '';
+    });
+  };
+
   // Error handling
   if (statsError || ordersError) {
     return (
@@ -472,11 +624,8 @@ export default function POSReportsPage() {
               <Input
                 type="date"
                 value={dateRange.start}
-                onChange={(e) => {
-                  setActiveQuickRange('custom');
-                  setDateRange({ ...dateRange, start: e.target.value });
-                  setCurrentPage(1);
-                }}
+                max={dateRange.end}
+                onChange={(event) => handleDateInputChange('start', event.target.value)}
               />
             </div>
             <div>
@@ -486,11 +635,8 @@ export default function POSReportsPage() {
               <Input
                 type="date"
                 value={dateRange.end}
-                onChange={(e) => {
-                  setActiveQuickRange('custom');
-                  setDateRange({ ...dateRange, end: e.target.value });
-                  setCurrentPage(1);
-                }}
+                min={dateRange.start}
+                onChange={(event) => handleDateInputChange('end', event.target.value)}
               />
             </div>
             <div className="flex items-end">
@@ -550,6 +696,40 @@ export default function POSReportsPage() {
                 <option value="delivery">Delivery</option>
                 <option value="takeaway">Takeaway</option>
               </select>
+            </div>
+            <div className="flex flex-col flex-1 min-w-[260px]">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Search Orders
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        handleSearchSubmit();
+                      }
+                    }}
+                    placeholder="Search by order # or customer"
+                    className="pl-10"
+                  />
+                </div>
+                <Button
+                  variant="primary"
+                  onClick={handleSearchSubmit}
+                  disabled={searchTerm.trim() === committedSearch.trim()}
+                >
+                  Search
+                </Button>
+                {committedSearch && (
+                  <Button variant="secondary" onClick={handleClearSearch}>
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>

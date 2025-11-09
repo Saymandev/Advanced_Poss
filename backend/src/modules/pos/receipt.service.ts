@@ -32,22 +32,34 @@ export class ReceiptService {
       .findOne({ branchId: order.branchId })
       .exec();
 
+    const safeItems = Array.isArray(order.items)
+      ? order.items.map((item: any) => ({
+          name: item?.name ?? '',
+          quantity: Number(item?.quantity ?? 0),
+          price: Number(item?.price ?? 0),
+          notes: item?.notes ?? '',
+        }))
+      : [];
+
     const receiptData = {
       orderNumber: order.orderNumber,
       orderId: order._id,
       tableNumber: (order.tableId as any)?.number || 'N/A',
-      customerInfo: order.customerInfo,
-      items: order.items,
-      subtotal: this.calculateSubtotal(order.items),
+      customerInfo: order.customerInfo || undefined,
+      items: safeItems,
+      subtotal: this.calculateSubtotal(safeItems),
       taxRate: settings?.taxRate || 0,
       serviceCharge: settings?.serviceCharge || 0,
-      taxAmount: this.calculateTax(order.items, settings?.taxRate || 0),
-      serviceChargeAmount: this.calculateServiceCharge(order.items, settings?.serviceCharge || 0),
-      totalAmount: order.totalAmount,
+      taxAmount: this.calculateTax(safeItems, settings?.taxRate || 0),
+      serviceChargeAmount: this.calculateServiceCharge(
+        safeItems,
+        settings?.serviceCharge || 0,
+      ),
+      totalAmount: Number(order.totalAmount || 0),
       paymentMethod: order.paymentMethod,
-      paymentDetails: order.paymentId,
-      createdAt: (order as any).createdAt,
-      completedAt: (order as any).completedAt,
+      paymentDetails: order.paymentId || undefined,
+      createdAt: (order as any)?.createdAt || new Date(),
+      completedAt: (order as any)?.completedAt || undefined,
       receiptSettings: settings?.receiptSettings || {
         header: 'Restaurant Receipt',
         footer: 'Thank you for your visit!',
@@ -58,6 +70,7 @@ export class ReceiptService {
         printerId: '',
         autoPrint: false,
       },
+      notes: order?.notes || undefined,
     };
 
     return receiptData;
@@ -74,6 +87,9 @@ export class ReceiptService {
     <meta charset="UTF-8">
     <title>Receipt - ${receiptData.orderNumber}</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: 'Courier New', monospace;
             font-size: ${receiptData.receiptSettings.fontSize || 12}px;
@@ -82,26 +98,32 @@ export class ReceiptService {
             padding: 20px;
             max-width: ${receiptData.receiptSettings.paperWidth || 80}mm;
             margin: 0 auto;
+            background: #ffffff;
+            color: #1f2937;
         }
         .header {
             text-align: center;
             border-bottom: 2px solid #000;
             padding-bottom: 10px;
             margin-bottom: 20px;
+            color: #111827;
         }
         .header h1 {
             margin: 0;
             font-size: 18px;
             font-weight: bold;
+            color: #111827;
         }
         .order-info {
             margin-bottom: 20px;
+            color: #111827;
         }
         .order-info div {
             margin-bottom: 5px;
         }
         .items {
             margin-bottom: 20px;
+            color: #111827;
         }
         .item {
             display: flex;
@@ -109,6 +131,7 @@ export class ReceiptService {
             margin-bottom: 8px;
             padding-bottom: 5px;
             border-bottom: 1px dotted #ccc;
+            color: #111827;
         }
         .item-name {
             flex: 1;
@@ -118,16 +141,19 @@ export class ReceiptService {
         }
         .item-price {
             font-weight: bold;
+            color: #111827;
         }
         .totals {
             border-top: 2px solid #000;
             padding-top: 10px;
             margin-top: 20px;
+            color: #111827;
         }
         .total-line {
             display: flex;
             justify-content: space-between;
             margin-bottom: 5px;
+            color: #111827;
         }
         .total-line.final {
             font-weight: bold;
@@ -135,23 +161,26 @@ export class ReceiptService {
             border-top: 1px solid #000;
             padding-top: 10px;
             margin-top: 10px;
+            color: #0f172a;
         }
         .footer {
             text-align: center;
             margin-top: 30px;
             padding-top: 20px;
             border-top: 1px solid #000;
+            color: #111827;
         }
         .payment-info {
             margin-top: 20px;
             padding: 10px;
             background-color: #f5f5f5;
             border-radius: 5px;
+            color: #111827;
         }
         .notes {
             margin-top: 15px;
             font-style: italic;
-            color: #666;
+            color: #111827;
         }
     </style>
 </head>
@@ -216,9 +245,9 @@ export class ReceiptService {
         </div>
     ` : ''}
 
-    ${receiptData.order.notes ? `
+    ${receiptData.notes ? `
         <div class="notes">
-            <strong>Order Notes:</strong> ${receiptData.order.notes}
+            <strong>Order Notes:</strong> ${receiptData.notes}
         </div>
     ` : ''}
 

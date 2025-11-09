@@ -75,7 +75,7 @@ export class POSOrder {
   @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
   userId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Payment' })
+  @Prop({ type: Types.ObjectId, ref: 'POSPayment' })
   paymentId?: Types.ObjectId;
 
   @Prop()

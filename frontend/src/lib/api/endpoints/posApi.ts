@@ -96,6 +96,8 @@ export const posApi = apiSlice.injectEndpoints({
       endDate?: string;
       page?: number;
       limit?: number;
+      orderType?: 'dine-in' | 'delivery' | 'takeaway';
+      search?: string;
     }>({
       query: (params) => ({
         url: '/pos/orders',

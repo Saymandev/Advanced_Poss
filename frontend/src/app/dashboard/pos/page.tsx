@@ -6,12 +6,16 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
+import { useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
+  useCancelPOSOrderMutation,
   useCreatePOSOrderMutation,
   useDownloadReceiptPDFMutation,
   useGetAvailableTablesQuery,
   useGetPOSMenuItemsQuery,
+  useGetPOSOrderQuery,
+  useGetPOSOrdersQuery,
   useGetPOSSettingsQuery,
   useGetPrintersQuery,
   useGetReceiptHTMLQuery,
@@ -21,9 +25,12 @@ import {
 } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
+  ArrowPathIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   ClipboardDocumentListIcon,
   ClockIcon,
   CreditCardIcon,
@@ -47,14 +54,38 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
+interface ModifierSelection {
+  group: string;
+  option: string;
+  priceModifier: number;
+}
+
+interface ModifierChoice {
+  group: string;
+  options: Array<{
+    name: string;
+    price: number;
+  }>;
+}
+
+interface AddonSelection {
+  name: string;
+  price: number;
+}
+
 interface CartItem {
   id: string;
   menuItemId: string;
   name: string;
+  basePrice: number;
   price: number;
   quantity: number;
-  notes?: string;
   category: string;
+  notes?: string;
+  modifiersNote?: string;
+  variantSelections?: ModifierSelection[];
+  addonSelections?: AddonSelection[];
+  selectionChoices?: ModifierChoice[];
 }
 
 interface OrderSummary {
@@ -72,6 +103,31 @@ const ORDER_TYPE_OPTIONS = [
   { value: 'dine-in', label: 'Dine-In', icon: HomeModernIcon },
   { value: 'delivery', label: 'Delivery', icon: TruckIcon },
   { value: 'takeaway', label: 'Takeaway', icon: ShoppingBagIcon },
+] as const;
+
+const ORDER_TYPE_LABELS: Record<OrderType, string> = {
+  'dine-in': 'Dine-In',
+  delivery: 'Delivery',
+  takeaway: 'Takeaway',
+};
+
+const ORDER_STATUS_LABELS: Record<'pending' | 'paid' | 'cancelled', string> = {
+  pending: 'Pending',
+  paid: 'Paid',
+  cancelled: 'Cancelled',
+};
+
+const ORDER_STATUS_STYLES: Record<'pending' | 'paid' | 'cancelled', string> = {
+  pending: 'bg-amber-500/10 text-amber-200 border border-amber-500/30',
+  paid: 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30',
+  cancelled: 'bg-rose-500/10 text-rose-200 border border-rose-500/30',
+};
+
+const ORDER_STATUS_FILTERS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'cancelled', label: 'Cancelled' },
 ] as const;
 
 interface DeliveryDetailsState {
@@ -127,6 +183,36 @@ const sanitizeDetails = <T extends Record<string, string>>(details: T): Partial<
   return sanitized;
 };
 
+type ModifierConfig = {
+  quantity: number;
+  variantSelections: Record<string, string>;
+  selectionChoices: Record<string, string[]>;
+  addonSelections: Record<string, boolean>;
+};
+
+type SplitPaymentRow = {
+  id: string;
+  method: 'cash' | 'card' | 'wallet' | 'other';
+  amount: string;
+};
+
+interface PaymentSuccessState {
+  orderId: string;
+  orderNumber?: string;
+  totalPaid: number;
+  changeDue?: number;
+  summary: string;
+  breakdown?: Array<{ method: string; amount: number }>;
+};
+
+const generateClientId = () => {
+  const cryptoRef: any = (globalThis as any)?.crypto;
+  if (cryptoRef && typeof cryptoRef.randomUUID === 'function') {
+    return cryptoRef.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+};
+
 export default function POSPage() {
   const { user } = useAppSelector((state) => state.auth);
   
@@ -157,13 +243,18 @@ export default function POSPage() {
   });
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'split'>('cash');
   const [customerInfo, setCustomerInfo] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pos_customerInfo');
       return saved ? JSON.parse(saved) : { name: '', phone: '', email: '' };
     }
     return { name: '', phone: '', email: '' };
+  });
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pos_customerId') || '';
+    }
+    return '';
   });
   const [deliveryDetails, setDeliveryDetails] = useState<DeliveryDetailsState>(() => {
     if (typeof window !== 'undefined') {
@@ -222,6 +313,28 @@ export default function POSPage() {
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, { type: 'percent' | 'amount'; value: string }>>({});
   const [isItemDiscountModalOpen, setIsItemDiscountModalOpen] = useState(false);
   const [noteEditor, setNoteEditor] = useState<{ itemId: string; value: string } | null>(null);
+  const [isCustomerLookupOpen, setIsCustomerLookupOpen] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [modifierEditor, setModifierEditor] = useState<{
+    item: any;
+    quantity: number;
+    variantSelections: Record<string, string>;
+    selectionChoices: Record<string, string[]>;
+    addonSelections: Record<string, boolean>;
+  } | null>(null);
+  const [paymentTab, setPaymentTab] = useState<'full' | 'multi'>('full');
+  const [fullPaymentMethod, setFullPaymentMethod] = useState<'cash' | 'card'>('cash');
+  const [fullPaymentReceived, setFullPaymentReceived] = useState<string>('0');
+  const [multiPayments, setMultiPayments] = useState<SplitPaymentRow[]>([]);
+  const [paymentSuccessOrder, setPaymentSuccessOrder] = useState<PaymentSuccessState | null>(null);
+  const [isQueueCollapsed, setIsQueueCollapsed] = useState(true);
+  const [queueTab, setQueueTab] = useState<'active' | 'history'>('active');
+  const [queueStatusFilter, setQueueStatusFilter] = useState<'all' | 'pending' | 'paid' | 'cancelled'>('pending');
+  const [queueOrderTypeFilter, setQueueOrderTypeFilter] = useState<'all' | OrderType>('all');
+  const [queueSearchInput, setQueueSearchInput] = useState('');
+  const [queueSearchTerm, setQueueSearchTerm] = useState('');
+  const [queueDetailId, setQueueDetailId] = useState<string | null>(null);
+  const [queueActionOrderId, setQueueActionOrderId] = useState<string | null>(null);
 
   const resetDeliveryDetails = useCallback(() => {
     const defaults = createDefaultDeliveryDetails();
@@ -342,9 +455,80 @@ export default function POSPage() {
   const [printReceiptPDF] = usePrintReceiptPDFMutation();
   const [downloadReceiptPDF] = useDownloadReceiptPDFMutation();
   const { data: printers } = useGetPrintersQuery();
-  const { data: receiptHTML } = useGetReceiptHTMLQuery(currentOrderId, {
+  const {
+    data: receiptHTML,
+    isFetching: receiptLoading,
+    isError: receiptError,
+    refetch: refetchReceipt,
+    error: receiptErrorDetails,
+  } = useGetReceiptHTMLQuery(currentOrderId, {
     skip: !currentOrderId,
   });
+  const queueQueryParams = useMemo(() => {
+    const params: {
+      branchId?: string;
+      status?: string;
+      orderType?: OrderType;
+      limit: number;
+      page: number;
+      search?: string;
+    } = {
+      limit: queueTab === 'active' ? 25 : 50,
+      page: 1,
+    };
+
+    if (user?.branchId) {
+      params.branchId = user.branchId;
+    }
+
+    if (queueTab === 'active') {
+      params.status = 'pending';
+    } else if (queueStatusFilter !== 'all') {
+      params.status = queueStatusFilter;
+    }
+
+    if (queueOrderTypeFilter !== 'all') {
+      params.orderType = queueOrderTypeFilter;
+    }
+
+    if (queueSearchTerm) {
+      params.search = queueSearchTerm;
+    }
+
+    return params;
+  }, [queueTab, queueStatusFilter, queueOrderTypeFilter, queueSearchTerm, user?.branchId]);
+
+  const {
+    data: queueData,
+    isFetching: queueLoading,
+    refetch: refetchQueue,
+  } = useGetPOSOrdersQuery(queueQueryParams, {
+    skip: !user,
+  });
+
+  const { data: queueDetailData, isFetching: queueDetailLoading } = useGetPOSOrderQuery(queueDetailId as string, {
+    skip: !queueDetailId,
+  });
+
+  const [cancelOrder] = useCancelPOSOrderMutation();
+  const queueOrders = useMemo(() => {
+    if (queueData?.orders && Array.isArray(queueData.orders)) {
+      return queueData.orders;
+    }
+    return [] as any[];
+  }, [queueData]);
+  const queueDetail = queueDetailId
+    ? queueDetailData ?? queueOrders.find((order: any) => order.id === queueDetailId)
+    : null;
+  const queueTotalAmount = useMemo(() => {
+    return queueOrders.reduce((sum, order) => {
+      const amount = Number(order?.totalAmount ?? 0);
+      if (Number.isFinite(amount)) {
+        return sum + amount;
+      }
+      return sum;
+    }, 0);
+  }, [queueOrders]);
 
   const createOrderWithRetry = useCallback(
     async (payload: CreatePOSOrderRequest, attempts = 2): Promise<any> => {
@@ -366,6 +550,17 @@ export default function POSPage() {
     { limit: 200, status: 'active' },
     { refetchOnMountOrArgChange: false }
   );
+
+  const [triggerCustomerSearch, { data: customerSearchResults, isFetching: isCustomerSearchLoading }]
+    = useLazySearchCustomersQuery();
+  const resolvedCustomerResults = useMemo(() => {
+    if (Array.isArray(customerSearchResults)) return customerSearchResults;
+    if (!customerSearchResults) return [] as any[];
+    if (Array.isArray((customerSearchResults as any).customers)) {
+      return (customerSearchResults as any).customers;
+    }
+    return [] as any[];
+  }, [customerSearchResults]);
 
   const waiterOptions = useMemo<Array<{ id: string; name: string }>>(() => {
     const staffList = staffData?.staff || [];
@@ -398,6 +593,18 @@ export default function POSPage() {
     // Response is already transformed by API transformResponse
     return Array.isArray(menuItemsData) ? menuItemsData : [];
   }, [menuItemsData]);
+
+  const menuItemNameById = useMemo(() => {
+    const map = new Map<string, { name?: string; price?: number }>();
+    if (Array.isArray(menuItemsArray)) {
+      menuItemsArray.forEach((item: any) => {
+        if (item?.id) {
+          map.set(item.id, { name: item.name, price: item.price });
+        }
+      });
+    }
+    return map;
+  }, [menuItemsArray]);
 
   // Filter menu items based on search and category (client-side filter for better UX)
   const filteredMenuItems = useMemo(() => {
@@ -492,6 +699,17 @@ export default function POSPage() {
     getItemDiscountAmount,
   ]);
 
+  useEffect(() => {
+    const formattedTotal = orderSummary.total.toFixed(2);
+    setFullPaymentReceived(formattedTotal);
+    setMultiPayments((prev) => {
+      if (prev.length === 0) {
+        return [{ id: generateClientId(), method: 'cash', amount: formattedTotal }];
+      }
+      return prev;
+    });
+  }, [orderSummary.total]);
+
   // Save to localStorage whenever cart, selectedTable, or customerInfo changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -519,6 +737,16 @@ export default function POSPage() {
       }
     }
   }, [customerInfo]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (selectedCustomerId) {
+        localStorage.setItem('pos_customerId', selectedCustomerId);
+      } else {
+        localStorage.removeItem('pos_customerId');
+      }
+    }
+  }, [selectedCustomerId]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -579,31 +807,330 @@ export default function POSPage() {
     }
   }, [takeawayDetails]);
 
-  // Cart functions
-  const addToCart = (menuItem: any) => {
-    const existingItem = cart.find(item => item.menuItemId === menuItem.id);
+  useEffect(() => {
+    if (!isCustomerLookupOpen) {
+      return;
+    }
+    const term = customerSearchTerm.trim();
+    if (term.length < 2) {
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      triggerCustomerSearch({ query: term, branchId: user?.branchId || undefined });
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [customerSearchTerm, isCustomerLookupOpen, triggerCustomerSearch, user?.branchId]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setQueueSearchTerm(queueSearchInput.trim());
+    }, 300);
+
+    return () => window.clearTimeout(handle);
+  }, [queueSearchInput]);
+
+  useEffect(() => {
+    if (queueTab === 'active' && queueStatusFilter !== 'pending') {
+      setQueueStatusFilter('pending');
+    }
+
+    if (queueTab === 'history' && queueStatusFilter === 'pending') {
+      setQueueStatusFilter('all');
+    }
+  }, [queueTab, queueStatusFilter]);
+
+  const buildItemNotes = useCallback((item: CartItem) => {
+    const segments: string[] = [];
+    if (item.modifiersNote) {
+      segments.push(item.modifiersNote);
+    }
+    if (item.notes) {
+      segments.push(item.notes);
+    }
+    return segments.length > 0 ? segments.join('\n') : undefined;
+  }, []);
+
+  const hasMenuItemModifiers = useCallback((menuItem: any) => {
+    const hasVariants = Array.isArray(menuItem?.variants) && menuItem.variants.length > 0;
+    const hasAddons = Array.isArray(menuItem?.addons) && menuItem.addons.some((addon: any) => addon?.isAvailable !== false);
+    const hasSelections = Array.isArray(menuItem?.selections) && menuItem.selections.length > 0;
+    return hasVariants || hasAddons || hasSelections;
+  }, []);
     
-    const updatedCart = existingItem
-      ? cart.map(item =>
-          item.menuItemId === menuItem.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      : [
-          ...cart,
-          {
-            id: Date.now().toString(),
+  const getDefaultModifierConfig = useCallback((menuItem: any): ModifierConfig => {
+    const variantSelections: Record<string, string> = {};
+    const selectionChoices: Record<string, string[]> = {};
+    const addonSelections: Record<string, boolean> = {};
+
+    if (Array.isArray(menuItem?.variants)) {
+      menuItem.variants.forEach((variant: any) => {
+        if (!variant?.name || !Array.isArray(variant.options) || variant.options.length === 0) {
+          return;
+        }
+        const defaultOption = variant.options[0];
+        if (defaultOption?.name) {
+          variantSelections[variant.name] = defaultOption.name;
+        }
+      });
+    }
+
+    if (Array.isArray(menuItem?.selections)) {
+      menuItem.selections.forEach((selection: any) => {
+        if (!selection?.name || !Array.isArray(selection.options) || selection.options.length === 0) {
+          selectionChoices[selection?.name ?? ''] = [];
+          return;
+        }
+        if (selection.type === 'single') {
+          selectionChoices[selection.name] = [selection.options[0].name];
+        } else {
+          selectionChoices[selection.name] = [];
+        }
+      });
+    }
+
+    if (Array.isArray(menuItem?.addons)) {
+      menuItem.addons.forEach((addon: any) => {
+        if (!addon?.name) return;
+        if (addon?.isAvailable === false) {
+          addonSelections[addon.name] = false;
+          return;
+        }
+        addonSelections[addon.name] = false;
+      });
+    }
+
+    return {
+      quantity: 1,
+      variantSelections,
+      selectionChoices,
+      addonSelections,
+    };
+  }, []);
+
+  const buildCartItemFromMenuItem = useCallback((menuItem: any, overrides?: Partial<ModifierConfig>): CartItem => {
+    const defaults = getDefaultModifierConfig(menuItem);
+    const config: ModifierConfig = {
+      quantity: overrides?.quantity ?? defaults.quantity,
+      variantSelections: { ...defaults.variantSelections, ...(overrides?.variantSelections ?? {}) },
+      selectionChoices: { ...defaults.selectionChoices, ...(overrides?.selectionChoices ?? {}) },
+      addonSelections: { ...defaults.addonSelections, ...(overrides?.addonSelections ?? {}) },
+    };
+
+    const basePrice = Number(menuItem?.price) || 0;
+    let unitPrice = basePrice;
+
+    const variantSelections: ModifierSelection[] = [];
+    const addonSelections: AddonSelection[] = [];
+    const selectionChoices: ModifierChoice[] = [];
+    const summaryParts: string[] = [];
+
+    if (Array.isArray(menuItem?.variants)) {
+      menuItem.variants.forEach((variant: any) => {
+        if (!variant?.name || !Array.isArray(variant.options) || variant.options.length === 0) {
+          return;
+        }
+        const requestedOptionName = config.variantSelections[variant.name];
+        const option = variant.options.find((opt: any) => opt?.name === requestedOptionName) || variant.options[0];
+        if (!option) {
+          return;
+        }
+        const modifierAmount = Number(option.priceModifier) || 0;
+        unitPrice += modifierAmount;
+        variantSelections.push({
+          group: variant.name,
+          option: option.name,
+          priceModifier: modifierAmount,
+        });
+        const label = modifierAmount
+          ? `${variant.name}: ${option.name} (+${formatCurrency(modifierAmount)})`
+          : `${variant.name}: ${option.name}`;
+        summaryParts.push(label);
+      });
+    }
+
+    if (Array.isArray(menuItem?.selections)) {
+      menuItem.selections.forEach((selection: any) => {
+        if (!selection?.name || !Array.isArray(selection.options) || selection.options.length === 0) {
+          return;
+        }
+        const chosen = config.selectionChoices[selection.name] ?? [];
+        const normalized = Array.isArray(chosen) ? chosen : [chosen];
+        const applied: ModifierChoice['options'] = [];
+
+        normalized.forEach((choiceName) => {
+          if (!choiceName) return;
+          const option = selection.options.find((opt: any) => opt?.name === choiceName);
+          if (!option) return;
+          const priceToAdd = Number(option.price) || 0;
+          unitPrice += priceToAdd;
+          applied.push({ name: option.name, price: priceToAdd });
+        });
+
+        if (applied.length > 0) {
+          selectionChoices.push({
+            group: selection.name,
+            options: applied,
+          });
+          const label = `${selection.name}: ${applied
+            .map((opt) => (opt.price ? `${opt.name} (+${formatCurrency(opt.price)})` : opt.name))
+            .join(', ')}`;
+          summaryParts.push(label);
+        }
+      });
+    }
+
+    if (Array.isArray(menuItem?.addons)) {
+      const chosenAddons = menuItem.addons.filter((addon: any) => {
+        if (!addon?.name || addon?.isAvailable === false) return false;
+        return Boolean(config.addonSelections[addon.name]);
+      });
+      if (chosenAddons.length > 0) {
+        const addonLabels: string[] = [];
+        chosenAddons.forEach((addon: any) => {
+          const addonPrice = Number(addon.price) || 0;
+          unitPrice += addonPrice;
+          addonSelections.push({ name: addon.name, price: addonPrice });
+          addonLabels.push(addonPrice ? `${addon.name} (+${formatCurrency(addonPrice)})` : addon.name);
+        });
+        summaryParts.push(`Add-ons: ${addonLabels.join(', ')}`);
+      }
+    }
+
+    return {
+      id: overrides && 'id' in overrides && overrides.id ? String((overrides as any).id) : generateClientId(),
             menuItemId: menuItem.id,
             name: menuItem.name,
-            price: menuItem.price,
-            quantity: 1,
+      basePrice,
+      price: Number(unitPrice.toFixed(2)),
+      quantity: config.quantity,
             category: menuItem.category?.name || 'Uncategorized',
-          } as CartItem,
-        ];
-    
-    setCart(updatedCart);
-    toast.success(`${menuItem.name} added to cart`);
-  };
+      modifiersNote: summaryParts.length > 0 ? summaryParts.join('; ') : undefined,
+      variantSelections: variantSelections.length > 0 ? variantSelections : undefined,
+      addonSelections: addonSelections.length > 0 ? addonSelections : undefined,
+      selectionChoices: selectionChoices.length > 0 ? selectionChoices : undefined,
+    };
+  }, [getDefaultModifierConfig]);
+
+  const areModifiersEqual = useCallback((first: CartItem, second: CartItem) => {
+    if (first.menuItemId !== second.menuItemId) {
+      return false;
+    }
+
+    const serializeVariants = (item: CartItem) =>
+      JSON.stringify((item.variantSelections || [])
+        .map((entry) => `${entry.group}:${entry.option}`)
+        .sort());
+
+    const serializeAddons = (item: CartItem) =>
+      JSON.stringify((item.addonSelections || [])
+        .map((entry) => entry.name)
+        .sort());
+
+    const serializeChoices = (item: CartItem) =>
+      JSON.stringify((item.selectionChoices || [])
+        .map((entry) => ({
+          group: entry.group,
+          options: entry.options.map((option) => option.name).sort(),
+        }))
+        .sort((a, b) => a.group.localeCompare(b.group)));
+
+    return (
+      serializeVariants(first) === serializeVariants(second) &&
+      serializeAddons(first) === serializeAddons(second) &&
+      serializeChoices(first) === serializeChoices(second) &&
+      (first.modifiersNote || '') === (second.modifiersNote || '')
+    );
+  }, []);
+
+  const appendCartItem = useCallback((newItem: CartItem, silent = false) => {
+    setCart((prev) => {
+      const existingIndex = prev.findIndex((item) => areModifiersEqual(item, newItem));
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        next[existingIndex] = {
+          ...next[existingIndex],
+          quantity: next[existingIndex].quantity + newItem.quantity,
+        };
+        return next;
+      }
+      return [...prev, newItem];
+    });
+    if (!silent) {
+      toast.success(`${newItem.name} added to cart`);
+    }
+  }, [areModifiersEqual]);
+
+  const addMultiPaymentRow = useCallback(() => {
+    setMultiPayments((prev) => [...prev, { id: generateClientId(), method: 'cash', amount: '0' }]);
+  }, []);
+
+  const updateMultiPaymentRow = useCallback((id: string, patch: Partial<{ method: 'cash' | 'card' | 'wallet' | 'other'; amount: string }>) => {
+    setMultiPayments((prev) => prev.map((payment) => (payment.id === id ? { ...payment, ...patch } : payment)));
+  }, []);
+
+  const removeMultiPaymentRow = useCallback((id: string) => {
+    setMultiPayments((prev) => prev.filter((payment) => payment.id !== id));
+  }, []);
+
+  const applyCustomerSelection = useCallback((customer: any) => {
+    if (!customer) {
+      return;
+    }
+    const firstName = customer.firstName || customer.name || '';
+    const lastName = customer.lastName || '';
+    const composedName =
+      `${firstName} ${lastName}`.trim() ||
+      customer.email ||
+      customer.phoneNumber ||
+      customer.phone ||
+      'Customer';
+    const phone = customer.phoneNumber || customer.phone || '';
+    const email = customer.email || '';
+
+    setCustomerInfo({
+      name: composedName,
+      phone,
+      email,
+    });
+    setSelectedCustomerId(customer.id || customer._id || '');
+    setIsCustomerLookupOpen(false);
+    toast.success(`Linked customer ${composedName}`);
+  }, []);
+
+  const clearCustomerSelection = useCallback(() => {
+    setSelectedCustomerId('');
+    setCustomerInfo({ name: '', phone: '', email: '' });
+    toast.success('Customer cleared');
+  }, []);
+
+  const closeModifierEditor = useCallback(() => setModifierEditor(null), []);
+
+  const handleModifierConfirm = useCallback(() => {
+    if (!modifierEditor) {
+      return;
+    }
+    const cartItem = buildCartItemFromMenuItem(modifierEditor.item, modifierEditor);
+    appendCartItem(cartItem);
+    setModifierEditor(null);
+  }, [appendCartItem, buildCartItemFromMenuItem, modifierEditor]);
+
+  // Cart functions
+  const addToCart = useCallback((menuItem: any) => {
+    if (hasMenuItemModifiers(menuItem)) {
+      const defaults = getDefaultModifierConfig(menuItem);
+      setModifierEditor({
+        item: menuItem,
+        quantity: defaults.quantity,
+        variantSelections: defaults.variantSelections,
+        selectionChoices: defaults.selectionChoices,
+        addonSelections: defaults.addonSelections,
+      });
+      return;
+    }
+
+    const cartItem = buildCartItemFromMenuItem(menuItem, { quantity: 1 });
+    appendCartItem(cartItem);
+  }, [appendCartItem, buildCartItemFromMenuItem, getDefaultModifierConfig, hasMenuItemModifiers]);
 
   const updateQuantity = (itemId: string, quantity: number) => {
     if (quantity <= 0) {
@@ -648,8 +1175,16 @@ export default function POSPage() {
     setDiscountValue('0');
     setDiscountMode('full');
     setOrderNotes('');
+    setSelectedCustomerId('');
+    setCustomerInfo({ name: '', phone: '', email: '' });
+    setPaymentTab('full');
+    setFullPaymentMethod('cash');
+    setFullPaymentReceived('0');
+    setMultiPayments([]);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('pos_cart');
+      localStorage.removeItem('pos_customerId');
+      localStorage.removeItem('pos_customerInfo');
     }
     toast.success('Cart cleared');
   };
@@ -665,11 +1200,11 @@ export default function POSPage() {
       setOrderType(type);
       if (type === 'dine-in') {
         if (!selectedTable) {
-          setIsTableModalOpen(true);
+        setIsTableModalOpen(true);
           setHasStartedOrder(false);
         } else {
           setHasStartedOrder(true);
-        }
+      }
       } else {
         setIsTableModalOpen(false);
         setHasStartedOrder(false);
@@ -695,9 +1230,12 @@ export default function POSPage() {
       const noteSegments: string[] = [];
       if (orderNotes.trim()) {
         noteSegments.push(orderNotes.trim());
-      }
+    }
       if (selectedWaiterName) {
         noteSegments.push(`Waiter: ${selectedWaiterName}`);
+      }
+      if (selectedCustomerId) {
+        noteSegments.push(`Customer ID: ${selectedCustomerId}`);
       }
       if (orderSummary.discount > 0) {
         if (discountMode === 'full') {
@@ -706,7 +1244,7 @@ export default function POSPage() {
           );
         } else {
           noteSegments.push('Item-wise discounts applied.');
-        }
+    }
       }
  
       const orderData: CreatePOSOrderRequest = {
@@ -727,17 +1265,18 @@ export default function POSPage() {
           menuItemId: item.menuItemId,
           quantity: item.quantity,
           price: item.price,
-          notes: item.notes,
+          notes: buildItemNotes(item),
         })),
         customerInfo: customerInfo,
         totalAmount: Number(orderSummary.total.toFixed(2)),
         status: 'pending' as const,
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
       };
- 
+
       const orderResponse = await createOrderWithRetry(orderData);
       const order = (orderResponse as any).data || orderResponse;
       toast.success(`Order created successfully! Order #${order.orderNumber || order.id}`);
+      refetchQueue();
       clearCart();
       if (requiresTable) {
         setSelectedTable('');
@@ -778,17 +1317,20 @@ export default function POSPage() {
     discountMode,
     discountType,
     discountValue,
+    buildItemNotes,
+    selectedCustomerId,
+    refetchQueue,
   ]);
 
   const handlePayment = async () => {
-     const requiresTable = orderType === 'dine-in';
+    const requiresTable = orderType === 'dine-in';
     const isDelivery = orderType === 'delivery';
     const isTakeaway = orderType === 'takeaway';
- 
-     if (requiresTable && !selectedTable) {
-       toast.error('Please select a table for dine-in orders');
-       return;
-     }
+
+    if (requiresTable && !selectedTable) {
+      toast.error('Please select a table for dine-in orders');
+      return;
+    }
  
     if (isDelivery) {
       const hasAddress = deliveryDetails.addressLine1.trim() && deliveryDetails.city.trim();
@@ -798,7 +1340,7 @@ export default function POSPage() {
         return;
       }
     }
-
+ 
     if (isTakeaway) {
       const hasContact = takeawayDetails.contactName.trim() && takeawayDetails.contactPhone.trim();
       if (!hasContact) {
@@ -811,115 +1353,184 @@ export default function POSPage() {
       toast.error('Cart is empty');
       return;
     }
+
+    const totalDue = Number(orderSummary.total.toFixed(2));
+    if (!Number.isFinite(totalDue) || totalDue <= 0) {
+      toast.error('Total due must be greater than zero before processing payment');
+      return;
+    }
  
-     try {
-       const deliveryPayload = isDelivery
-         ? (sanitizeDetails(deliveryDetails) as CreatePOSOrderRequest['deliveryDetails'])
-         : undefined;
-       const takeawayPayload = isTakeaway
-         ? (sanitizeDetails(takeawayDetails) as CreatePOSOrderRequest['takeawayDetails'])
-         : undefined;
+    try {
+      const deliveryPayload = isDelivery
+        ? (sanitizeDetails(deliveryDetails) as CreatePOSOrderRequest['deliveryDetails'])
+        : undefined;
+      const takeawayPayload = isTakeaway
+        ? (sanitizeDetails(takeawayDetails) as CreatePOSOrderRequest['takeawayDetails'])
+        : undefined;
  
-       const noteSegments: string[] = [];
-       if (orderNotes.trim()) {
-         noteSegments.push(orderNotes.trim());
-       }
-       if (selectedWaiterName) {
-         noteSegments.push(`Waiter: ${selectedWaiterName}`);
-       }
-       if (orderSummary.discount > 0) {
-         if (discountMode === 'full') {
-           noteSegments.push(
-             `Discount applied: ${discountType === 'percent' ? `${discountValue}%` : formatCurrency(Number(discountValue || '0'))} on full order`
-           );
-         } else {
-           noteSegments.push('Item-wise discounts applied.');
-         }
-       }
+      const paymentNotes: string[] = [];
+      let paymentMethodForBackend: 'cash' | 'card' | 'split' = 'cash';
+      let transactionReference: string | undefined;
+      let changeDue = 0;
+      let paymentBreakdown: Array<{ method: string; amount: number }> = [];
  
-       const orderData: CreatePOSOrderRequest = {
-         orderType,
-         ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
-         ...(isDelivery
-           ? {
-               deliveryFee: deliveryFeeValue,
-               deliveryDetails: deliveryPayload,
-             }
-           : {}),
-         ...(isTakeaway
-           ? {
-               takeawayDetails: takeawayPayload,
-             }
-           : {}),
-         items: cart.map(item => ({
-           menuItemId: item.menuItemId,
-           quantity: item.quantity,
-           price: item.price,
-           notes: item.notes,
-         })),
-         customerInfo: customerInfo,
-         totalAmount: orderSummary.total,
-         status: 'paid' as const,
-         paymentMethod,
-         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
-       };
+      if (paymentTab === 'full') {
+        const received = parseFloat(fullPaymentReceived || '0');
+        if (!Number.isFinite(received) || received <= 0) {
+          toast.error('Enter the amount received before completing payment');
+          return;
+        }
+        if (fullPaymentMethod === 'cash' && received + 0.009 < totalDue) {
+          toast.error('Received cash is less than the total due');
+          return;
+        }
  
-       const orderResponse = await createOrderWithRetry(orderData);
-       const order = (orderResponse as any).data || orderResponse;
-       const orderId = order.id || order._id;
-       
-       // Process payment
-       await processPayment({
-         orderId,
-         amount: orderSummary.total,
-         method: paymentMethod,
-       }).unwrap();
+        paymentMethodForBackend = fullPaymentMethod;
+        paymentBreakdown = [{ method: fullPaymentMethod, amount: totalDue }];
+        if (fullPaymentMethod === 'cash') {
+          changeDue = Math.max(0, received - totalDue);
+          paymentNotes.push(
+            `Cash payment received ${formatCurrency(received)} • Change ${formatCurrency(changeDue)}`
+          );
+          transactionReference = `cash:${received.toFixed(2)}|change:${changeDue.toFixed(2)}`;
+        } else {
+          paymentNotes.push(`Card payment processed for ${formatCurrency(totalDue)}`);
+        }
+      } else {
+        const activeRows = multiPayments.filter((row) => parseFloat(row.amount || '0') > 0);
+        if (activeRows.length === 0) {
+          toast.error('Add at least one payment row with an amount to process a split payment');
+          return;
+        }
+        const totalApplied = activeRows.reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
+        if (totalApplied + 0.009 < totalDue) {
+          toast.error('The split payments do not cover the total due yet');
+          return;
+        }
  
-       // Print receipt (optional - don't fail if it fails)
-       try {
-         await printReceipt({
-           orderId,
-         }).unwrap();
-         toast.success('Receipt printed successfully');
-       } catch (error) {
-         console.warn('Receipt printing failed:', error);
-         // Don't fail the entire transaction if receipt printing fails
-       }
+        paymentMethodForBackend = 'split';
+        paymentBreakdown = activeRows.map((row) => ({
+          method: row.method,
+          amount: parseFloat(row.amount || '0') || 0,
+        }));
+        const breakdownSummary = activeRows
+          .map((row) => `${row.method}: ${formatCurrency(parseFloat(row.amount || '0') || 0)}`)
+          .join(', ');
+        paymentNotes.push(`Split payment applied — ${breakdownSummary}`);
+        transactionReference = activeRows
+          .map((row) => `${row.method}:${(parseFloat(row.amount || '0') || 0).toFixed(2)}`)
+          .join('|');
  
-       // Set current order ID for receipt viewing
-       setCurrentOrderId(orderId);
+        const cashPortion = activeRows
+          .filter((row) => row.method === 'cash')
+          .reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
+        if (cashPortion > 0 && totalApplied > totalDue) {
+          changeDue = totalApplied - totalDue;
+          paymentNotes.push(`Change due: ${formatCurrency(changeDue)}`);
+        }
+      }
  
-       toast.success('Order completed successfully');
-       // Show receipt option after a short delay
-       setTimeout(() => {
-         if (confirm('Would you like to view the receipt?')) {
-           handleViewReceipt(orderId);
-         }
-       }, 1000);
-       clearCart();
-       if (requiresTable) {
-         setSelectedTable('');
-         if (typeof window !== 'undefined') {
-           localStorage.removeItem('pos_selectedTable');
-         }
-       }
-       if (isDelivery) {
-         resetDeliveryDetails();
-       }
-       if (isTakeaway) {
-         resetTakeawayDetails();
-       }
-       if (typeof window !== 'undefined') {
-         localStorage.removeItem('pos_customerInfo');
-       }
-       setCustomerInfo({ name: '', phone: '', email: '' });
-       setIsPaymentModalOpen(false);
-       setIsCartModalOpen(false);
-+      setHasStartedOrder(false);
-     } catch (error: any) {
-       toast.error(error?.data?.message || 'Failed to process payment');
-     }
-   };
+      const noteSegments: string[] = [];
+      if (orderNotes.trim()) {
+        noteSegments.push(orderNotes.trim());
+      }
+      if (selectedWaiterName) {
+        noteSegments.push(`Waiter: ${selectedWaiterName}`);
+      }
+      if (selectedCustomerId) {
+        noteSegments.push(`Customer ID: ${selectedCustomerId}`);
+      }
+      if (orderSummary.discount > 0) {
+        if (discountMode === 'full') {
+          noteSegments.push(
+            `Discount applied: ${
+              discountType === 'percent'
+                ? `${discountValue}%`
+                : formatCurrency(Number(discountValue || '0'))
+            } on full order`
+          );
+        } else {
+          noteSegments.push('Item-wise discounts applied.');
+        }
+      }
+      noteSegments.push(...paymentNotes);
+ 
+      const orderData: CreatePOSOrderRequest = {
+        orderType,
+        ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
+        ...(isDelivery
+          ? {
+              deliveryFee: deliveryFeeValue,
+              deliveryDetails: deliveryPayload,
+            }
+          : {}),
+        ...(isTakeaway
+          ? {
+              takeawayDetails: takeawayPayload,
+            }
+          : {}),
+        items: cart.map((item) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          price: item.price,
+          notes: buildItemNotes(item),
+        })),
+        customerInfo: customerInfo,
+        totalAmount: totalDue,
+        status: 'pending' as const,
+        paymentMethod: paymentMethodForBackend,
+        notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
+      };
+
+      const orderResponse = await createOrderWithRetry(orderData);
+      const order = (orderResponse as any).data || orderResponse;
+      const orderId = order.id || order._id;
+      const orderNumber = order.orderNumber || order.order_number || orderId;
+      
+      await processPayment({
+        orderId,
+        amount: totalDue,
+        method: paymentMethodForBackend,
+        transactionId: transactionReference,
+      }).unwrap();
+
+      setCurrentOrderId(orderId);
+      setPaymentSuccessOrder({
+          orderId,
+        orderNumber,
+        totalPaid: totalDue,
+        changeDue: changeDue > 0 ? changeDue : undefined,
+        summary: paymentNotes.join(' | '),
+        breakdown: paymentBreakdown,
+      });
+      toast.success('Payment completed successfully');
+      refetchQueue();
+ 
+      clearCart();
+      if (requiresTable) {
+        setSelectedTable('');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('pos_selectedTable');
+        }
+      }
+      if (isDelivery) {
+        resetDeliveryDetails();
+      }
+      if (isTakeaway) {
+        resetTakeawayDetails();
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('pos_customerInfo');
+      }
+      setCustomerInfo({ name: '', phone: '', email: '' });
+      setHasStartedOrder(false);
+      setIsPaymentModalOpen(false);
+      setIsCartModalOpen(false);
+    } catch (error: any) {
+      console.error('Payment flow failed:', error);
+      toast.error(error?.data?.message || 'Failed to process payment');
+    }
+  };
 
   const handlePrintReceipt = async (orderId: string, usePDF = false) => {
     try {
@@ -960,10 +1571,64 @@ export default function POSPage() {
     }
   };
 
-  const handleViewReceipt = (orderId: string) => {
+  const handleViewReceipt = useCallback(
+    (orderId: string) => {
+      if (!orderId) {
+        toast.error('Receipt is not available for this order yet.');
+        return;
+      }
+      setQueueDetailId(null);
     setCurrentOrderId(orderId);
     setIsReceiptModalOpen(true);
-  };
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (isReceiptModalOpen && currentOrderId) {
+      refetchReceipt();
+    }
+  }, [isReceiptModalOpen, currentOrderId, refetchReceipt]);
+
+  const handleQueueRefresh = useCallback(() => {
+    refetchQueue();
+  }, [refetchQueue]);
+
+  const handleQueueViewDetails = useCallback((orderId: string) => {
+    setQueueDetailId(orderId);
+  }, []);
+
+  const resolveOrderId = useCallback((order: any) => {
+    if (!order) return '';
+    return order.id || order._id || '';
+  }, []);
+
+  const handleQueueCancel = useCallback(
+    async (orderId: string) => {
+      if (typeof window !== 'undefined') {
+        const confirmed = window.confirm('Are you sure you want to cancel this order?');
+        if (!confirmed) {
+          return;
+        }
+      }
+
+      try {
+        setQueueActionOrderId(orderId);
+        await cancelOrder(orderId).unwrap();
+        toast.success('Order cancelled successfully');
+        if (queueDetailId === orderId) {
+          setQueueDetailId(null);
+        }
+        refetchQueue();
+      } catch (error: any) {
+        console.error('Error cancelling order:', error);
+        toast.error(error?.data?.message || 'Failed to cancel order');
+      } finally {
+        setQueueActionOrderId(null);
+      }
+    },
+    [cancelOrder, queueDetailId, refetchQueue]
+  );
 
   const getTableStatus = (table: any) => {
     if (table.status === 'occupied') return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200';
@@ -983,6 +1648,63 @@ export default function POSPage() {
     }
     return hasStartedOrder;
   }, [orderType, hasStartedOrder, selectedTable]);
+
+  const modifierPreview = useMemo(() => {
+    if (!modifierEditor) return null;
+    const previewItem = buildCartItemFromMenuItem(modifierEditor.item, {
+      ...modifierEditor,
+      quantity: 1,
+      id: 'preview',
+    } as Partial<ModifierConfig> & { id: string });
+    return previewItem;
+  }, [buildCartItemFromMenuItem, modifierEditor]);
+
+  const quickCashSuggestions = useMemo(() => {
+    if (orderSummary.total <= 0) {
+      return [] as number[];
+    }
+    const base = Number(orderSummary.total.toFixed(2));
+    const suggestions = new Set<number>();
+    suggestions.add(base);
+    suggestions.add(Math.ceil(base / 5) * 5);
+    suggestions.add(Math.ceil(base / 10) * 10);
+    suggestions.add(base + 5);
+    suggestions.add(base + 10);
+    return Array.from(suggestions)
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .map((value) => Number(value.toFixed(2)))
+      .sort((a, b) => a - b);
+  }, [orderSummary.total]);
+
+  const fullPaymentChange = useMemo(() => {
+    if (paymentTab !== 'full' || fullPaymentMethod !== 'cash') {
+      return 0;
+    }
+    const received = parseFloat(fullPaymentReceived || '0');
+    if (!Number.isFinite(received)) {
+      return 0;
+    }
+    return Math.max(0, received - orderSummary.total);
+  }, [fullPaymentMethod, fullPaymentReceived, orderSummary.total, paymentTab]);
+
+  const splitTotals = useMemo(() => {
+    const applied = multiPayments.reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
+    return {
+      applied,
+      remaining: Number((orderSummary.total - applied).toFixed(2)),
+    };
+  }, [multiPayments, orderSummary.total]);
+
+  const receiptErrorMessage = useMemo(() => {
+    if (!receiptErrorDetails || typeof receiptErrorDetails !== 'object') {
+      return '';
+    }
+    const maybeData = (receiptErrorDetails as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    if (maybeData && typeof maybeData === 'object' && 'message' in maybeData) {
+      return String(maybeData.message);
+    }
+    return '';
+  }, [receiptErrorDetails]);
 
   useEffect(() => {
     if (!isOrderingActive) {
@@ -1237,6 +1959,233 @@ export default function POSPage() {
     </div>
   );
 
+  const renderQueuePanel = () => {
+    if (isQueueCollapsed) {
+      return (
+        <aside className="hidden md:flex md:w-16 md:flex-col md:items-center md:justify-center border-l border-slate-900/50 bg-slate-950/60">
+          <Button
+            variant="ghost"
+            onClick={() => setIsQueueCollapsed(false)}
+            className="flex flex-col items-center gap-2 text-slate-300 hover:text-white"
+          >
+            <ChevronLeftIcon className="h-5 w-5" />
+            <span className="text-xs font-medium">Queue</span>
+          </Button>
+        </aside>
+      );
+    }
+
+    return (
+      <>
+        <div
+          className="fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm md:hidden"
+          onClick={() => setIsQueueCollapsed(true)}
+        />
+        <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-md flex-col border-l border-slate-900 bg-slate-950/95 shadow-xl md:static md:z-auto md:max-w-xs md:bg-slate-950/80">
+          <div className="flex items-center justify-between border-b border-slate-900/70 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-100">Orders</p>
+              <p className="text-xs text-slate-400">
+                {queueTab === 'active' ? 'Active queue' : 'Completed orders'}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleQueueRefresh}
+                disabled={queueLoading}
+                className="h-9 w-9 rounded-full border border-slate-800 bg-slate-900/80 text-slate-200 hover:bg-slate-800/80 disabled:opacity-40"
+                title="Refresh"
+              >
+                <ArrowPathIcon className={`h-4 w-4 ${queueLoading ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsQueueCollapsed(true)}
+                className="h-9 w-9 rounded-full border border-slate-800 bg-slate-900/80 text-slate-200 hover:bg-slate-800/80"
+                title="Collapse queue"
+              >
+                <ChevronRightIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="border-b border-slate-900/70 px-4 py-3 space-y-3">
+            <div className="flex items-center gap-2">
+              {(['active', 'history'] as const).map((tab) => {
+                const isActive = queueTab === tab;
+                return (
+                  <Button
+                    key={tab}
+                    variant={isActive ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => setQueueTab(tab)}
+                    className={`rounded-full px-4 py-1.5 text-xs uppercase tracking-wide ${
+                      isActive
+                        ? 'bg-sky-600 hover:bg-sky-500 text-white'
+                        : 'bg-slate-900/70 text-slate-300 hover:bg-slate-800/70'
+                    }`}
+                  >
+                    {tab === 'active' ? 'Active' : 'History'}
+                  </Button>
+                );
+              })}
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center gap-2">
+                <label className="text-xs uppercase tracking-[0.3em] text-slate-500">Type</label>
+                <select
+                  value={queueOrderTypeFilter}
+                  onChange={(event) => setQueueOrderTypeFilter(event.target.value as typeof queueOrderTypeFilter)}
+                  className="flex-1 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                >
+                  <option value="all">All Types</option>
+                  {ORDER_TYPE_OPTIONS.map(({ value, label }) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {queueTab === 'history' && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs uppercase tracking-[0.3em] text-slate-500">Status</label>
+                  <select
+                    value={queueStatusFilter}
+                    onChange={(event) => setQueueStatusFilter(event.target.value as typeof queueStatusFilter)}
+                    className="flex-1 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                  >
+                    {ORDER_STATUS_FILTERS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="relative">
+                <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Input
+                  value={queueSearchInput}
+                  onChange={(event) => setQueueSearchInput(event.target.value)}
+                  placeholder="Search order # or customer"
+                  className="pl-9 pr-3 py-2 text-sm h-10 bg-slate-950/80 border border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-sky-600 focus:ring-sky-600/40"
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-slate-900 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+                <span>{queueOrders.length} order{queueOrders.length === 1 ? '' : 's'} listed</span>
+                <span className="font-semibold text-emerald-300">{formatCurrency(queueTotalAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+            {queueLoading ? (
+              [...Array(5)].map((_, index) => (
+                <div key={index} className="h-24 rounded-2xl border border-slate-900/60 bg-slate-900/40 animate-pulse" />
+              ))
+            ) : queueOrders.length === 0 ? (
+              <div className="rounded-2xl border border-slate-900/60 bg-slate-950/70 p-6 text-center text-sm text-slate-400">
+                No orders found with the selected filters.
+              </div>
+            ) : (
+              queueOrders.map((order: any, index: number) => {
+                const orderId = resolveOrderId(order);
+                const derivedKey = orderId || order.orderNumber || `order-${index}`;
+                const canAct = Boolean(orderId);
+                return (
+                <div
+                  key={derivedKey}
+                  className="rounded-2xl border border-slate-900/60 bg-slate-950/70 p-4 shadow-sm transition hover:border-sky-800/50 hover:shadow-sky-900/20"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-100">
+                        {order.orderNumber || (orderId ? `Order ${orderId?.slice(-6)}` : 'Order')}
+                      </p>
+                      <p className="text-xs text-slate-500">{order.createdAt ? formatDateTime(order.createdAt) : 'N/A'}</p>
+                    </div>
+                    <Badge className={ORDER_STATUS_STYLES[order.status as 'pending' | 'paid' | 'cancelled'] || ORDER_STATUS_STYLES.pending}>
+                      {ORDER_STATUS_LABELS[order.status as 'pending' | 'paid' | 'cancelled'] || order.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-300">
+                    <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
+                      {ORDER_TYPE_LABELS[order.orderType as OrderType] || order.orderType}
+                    </span>
+                    <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
+                      {formatCurrency(Number(order.totalAmount || 0))}
+                    </span>
+                    {order.paymentMethod && (
+                      <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
+                        Payment: {order.paymentMethod}
+                      </span>
+                    )}
+                    {order?.customerInfo?.name && (
+                      <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
+                        {order.customerInfo.name}
+                      </span>
+                    )}
+                  </div>
+                  {order.notes && (
+                    <p className="mt-2 rounded-lg border border-slate-900 bg-slate-950/80 px-3 py-2 text-xs text-slate-400">
+                      {order.notes}
+                    </p>
+                  )}
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => canAct && handleQueueViewDetails(orderId)}
+                      disabled={!canAct}
+                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                    >
+                      View
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => canAct && handleViewReceipt(orderId)}
+                      disabled={!canAct}
+                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                    >
+                      Receipt
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => canAct && handlePrintReceipt(orderId, false)}
+                      disabled={!canAct}
+                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                    >
+                      Print
+                    </Button>
+                    {order.status === 'pending' && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => canAct && handleQueueCancel(orderId)}
+                        disabled={!canAct || queueActionOrderId === orderId}
+                        className="rounded-lg bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
+                      >
+                        {queueActionOrderId === orderId ? 'Cancelling...' : 'Cancel'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );})
+            )}
+          </div>
+        </aside>
+      </>
+    );
+  };
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -1287,6 +2236,7 @@ export default function POSPage() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [cart.length, selectedTable, showKeyboardShortcuts, handleCreateOrder, requiresTable, checkoutBlocked]);
 
+
   return (
     <div className="h-screen flex flex-col bg-slate-950 text-slate-100">
       {/* Header */}
@@ -1296,8 +2246,8 @@ export default function POSPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-white tracking-tight">POS System</h1>
               <Badge className="bg-sky-500/15 text-sky-100 border border-sky-500/30">
-                {orderTypeLabel}
-              </Badge>
+              {orderTypeLabel}
+            </Badge>
             </div>
             <div className="flex items-center gap-3 flex-wrap text-sm text-slate-300">
               <TableCellsIcon className="h-4 w-4 text-slate-400" />
@@ -1318,7 +2268,7 @@ export default function POSPage() {
               <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-940/70 px-3 py-1.5 shadow-sm">
                 <ActiveOrderIcon className="h-4 w-4 text-sky-300" />
                 <span className="font-medium tracking-wide">{orderTypeLabel} mode</span>
-              </div>
+          </div>
               <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-940/70 px-3 py-1.5">
                 <ClipboardDocumentListIcon className="h-4 w-4 text-emerald-300" />
                 <span>{orderSummary.itemCount} item{orderSummary.itemCount === 1 ? '' : 's'} in cart</span>
@@ -1343,23 +2293,31 @@ export default function POSPage() {
           </div>
           <div className="flex flex-col gap-3 lg:items-end">
             <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
-              {ORDER_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => {
-                const isActive = orderType === value;
-                return (
-                  <Button
-                    key={value}
-                    size="sm"
-                    variant={isActive ? 'primary' : 'secondary'}
-                    onClick={() => handleOrderTypeChange(value)}
+                {ORDER_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => {
+                  const isActive = orderType === value;
+                  return (
+                    <Button
+                      key={value}
+                      size="sm"
+                      variant={isActive ? 'primary' : 'secondary'}
+                      onClick={() => handleOrderTypeChange(value)}
                     className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition ${isActive ? 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25' : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'}`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </Button>
-                );
-              })}
-            </div>
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
+              <Button
+                variant="secondary"
+                onClick={() => setIsQueueCollapsed(false)}
+                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+              >
+                <ClipboardDocumentListIcon className="h-4 w-4" />
+                Orders Queue
+              </Button>
               <Button
                 variant="secondary"
                 onClick={() => setIsTableModalOpen(true)}
@@ -1391,7 +2349,12 @@ export default function POSPage() {
         </div>
       </div>
 
-      {isOrderingActive ? renderOrderingWorkspace() : renderPreOrderView()}
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col">
+          {isOrderingActive ? renderOrderingWorkspace() : renderPreOrderView()}
+                </div>
+        {renderQueuePanel()}
+              </div>
 
       {/* Order Cart Modal */}
       <Modal
@@ -1406,7 +2369,7 @@ export default function POSPage() {
               {ORDER_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => {
                 const isActive = orderType === value;
                 return (
-                  <Button
+                <Button
                     key={value}
                     size="sm"
                     variant={isActive ? 'primary' : 'secondary'}
@@ -1433,17 +2396,17 @@ export default function POSPage() {
                     </span>
                     <Button
                       size="sm"
-                      variant="secondary"
+                  variant="secondary"
                       onClick={() => setIsTableModalOpen(true)}
                       className="bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
-                    >
+                >
                       Choose Table
-                    </Button>
-                  </div>
+                </Button>
+              </div>
                 ) : (
                   <p className="text-sm text-slate-300">Table not required for this order type.</p>
                 )}
-              </div>
+            </div>
               <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Assigned Waiter</p>
                 <select
@@ -1461,19 +2424,80 @@ export default function POSPage() {
                     ))
                   )}
                 </select>
-              </div>
-            </div>
           </div>
+              </div>
+            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Customer</p>
+                  <div className="text-sm text-slate-200">
+                    {customerInfo.name ? customerInfo.name : 'Guest customer'}
+                  </div>
+                  {customerInfo.phone && (
+                    <div className="text-xs text-slate-400">{customerInfo.phone}</div>
+                        )}
+                      </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedCustomerId && (
+                    <Badge className="bg-emerald-500/10 text-emerald-200 border border-emerald-500/30">
+                      Linked
+                    </Badge>
+                  )}
+                        <Button
+                          size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setCustomerSearchTerm('');
+                      setIsCustomerLookupOpen(true);
+                    }}
+                    className="bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+                        >
+                    Lookup
+                        </Button>
+                  {selectedCustomerId && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={clearCustomerSelection}
+                      className="text-slate-400 hover:text-slate-100"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                      </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Input
+                  value={customerInfo.name}
+                  onChange={(event) => setCustomerInfo({ ...customerInfo, name: event.target.value })}
+                  placeholder="Customer name"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                />
+                <Input
+                  value={customerInfo.phone}
+                  onChange={(event) => setCustomerInfo({ ...customerInfo, phone: event.target.value })}
+                  placeholder="Phone"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                />
+                <Input
+                  value={customerInfo.email}
+                  onChange={(event) => setCustomerInfo({ ...customerInfo, email: event.target.value })}
+                  placeholder="Email"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                />
+              </div>
+          </div>
+        </div>
 
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-slate-100">Items in Cart</h3>
             <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-850 bg-slate-950/70">
-              {cart.length === 0 ? (
+            {cart.length === 0 ? (
                 <div className="py-12 text-center text-slate-500">
                   <ShoppingCartIcon className="mx-auto mb-3 h-10 w-10 opacity-40" />
                   <p>No items yet. Add menu items to begin.</p>
-                </div>
-              ) : (
+              </div>
+            ) : (
                 cart.map((item) => {
                   const itemDiscount = discountMode === 'item' ? itemDiscounts[item.id] : undefined;
                   const itemDiscountAmount = discountMode === 'item' ? getItemDiscountAmount(item) : 0;
@@ -1488,6 +2512,9 @@ export default function POSPage() {
                             </Badge>
                           </div>
                           <p className="text-xs text-slate-500">{item.category}</p>
+                          {item.modifiersNote ? (
+                            <p className="text-xs text-slate-400">{item.modifiersNote}</p>
+                          ) : null}
                           {item.notes ? (
                             <p className="text-xs text-slate-400">Note: {item.notes}</p>
                           ) : null}
@@ -1495,27 +2522,27 @@ export default function POSPage() {
                             <p className="text-xs text-emerald-300">
                               Discount: {formatCurrency(itemDiscountAmount)}{' '}
                               {itemDiscount?.type === 'percent' ? `(${itemDiscount?.value}% )` : ''}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
                             className="h-8 w-8 p-0 text-slate-300 hover:text-slate-100"
-                          >
-                            <MinusIcon className="h-4 w-4" />
-                          </Button>
+                        >
+                          <MinusIcon className="h-4 w-4" />
+                        </Button>
                           <span className="w-8 text-center text-sm font-semibold text-slate-200">{item.quantity}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
                             className="h-8 w-8 p-0 text-slate-300 hover:text-slate-100"
-                          >
-                            <PlusIcon className="h-4 w-4" />
-                          </Button>
+                        >
+                          <PlusIcon className="h-4 w-4" />
+                        </Button>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1524,27 +2551,27 @@ export default function POSPage() {
                             title="Add note"
                           >
                             <PencilSquareIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeFromCart(item.id)}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeFromCart(item.id)}
                             className="h-8 w-8 p-0 text-rose-400 hover:text-rose-200"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </Button>
                       </div>
+                    </div>
                       <div className="mt-3 flex items-center justify-between text-sm text-slate-300">
                         <span>Line total</span>
                         <span className="font-semibold text-slate-100">
                           {formatCurrency(item.price * item.quantity - itemDiscountAmount)}
-                        </span>
-                      </div>
+                      </span>
                     </div>
+              </div>
                   );
                 })
-              )}
+            )}
             </div>
           </div>
 
@@ -1573,7 +2600,7 @@ export default function POSPage() {
                 />
                 Item wise
               </label>
-            </div>
+                </div>
             {discountMode === 'full' ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Input
@@ -1592,7 +2619,7 @@ export default function POSPage() {
                   <option value="percent">Percent</option>
                   <option value="amount">Amount</option>
                 </select>
-              </div>
+                </div>
             ) : (
               <div className="flex flex-wrap items-center gap-3">
                 <Button
@@ -1605,12 +2632,12 @@ export default function POSPage() {
                 </Button>
                 <span className="text-xs text-slate-400">
                   Discounts apply per item; open the editor to adjust amounts.
-                </span>
-              </div>
+                  </span>
+                </div>
             )}
-          </div>
+              </div>
 
-          <div className="space-y-2">
+              <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-100">Order Notes</label>
             <textarea
               value={orderNotes}
@@ -1656,15 +2683,15 @@ export default function POSPage() {
                 <ClockIcon className="mr-2 h-4 w-4" />
                 Create Order
               </Button>
-              <Button
+                <Button
                 variant="primary"
                 onClick={handlePayment}
                 disabled={checkoutBlocked || cart.length === 0}
                 className="bg-emerald-600 hover:bg-emerald-500"
-              >
+                >
                 <CreditCardIcon className="mr-2 h-4 w-4" />
                 Process Payment
-              </Button>
+                </Button>
             </div>
           </div>
         </div>
@@ -1689,15 +2716,15 @@ export default function POSPage() {
                       <h4 className="text-sm font-semibold text-slate-100">{item.name}</h4>
                       <p className="text-xs text-slate-500">{formatCurrency(item.price)} • Qty {item.quantity}</p>
                     </div>
-                    <Button
+                <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => updateItemDiscountEntry(item.id, { type: 'percent', value: '0' })}
                       className="text-xs text-slate-400 hover:text-slate-100"
                     >
                       Reset
-                    </Button>
-                  </div>
+                </Button>
+              </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <select
                       value={entry.type}
@@ -1721,7 +2748,7 @@ export default function POSPage() {
                     />
                     <div className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-300">
                       Savings: {formatCurrency(getItemDiscountAmount(item))}
-                    </div>
+            </div>
                   </div>
                 </div>
               );
@@ -1757,9 +2784,72 @@ export default function POSPage() {
               >
                 Save Note
               </Button>
-            </div>
+      </div>
           </div>
         )}
+      </Modal>
+
+      {/* Customer Lookup Modal */}
+      <Modal
+        isOpen={isCustomerLookupOpen}
+        onClose={() => setIsCustomerLookupOpen(false)}
+        title="Customer Lookup"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Search customers</label>
+            <Input
+              value={customerSearchTerm}
+              onChange={(event) => setCustomerSearchTerm(event.target.value)}
+              placeholder="Search by name, phone, or email"
+              className="bg-slate-950/70 border-slate-850 text-slate-100"
+            />
+          </div>
+
+          {customerSearchTerm.trim().length < 2 ? (
+            <p className="text-sm text-slate-400">
+              Enter at least two characters to search your customer list.
+            </p>
+          ) : isCustomerSearchLoading ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, index) => (
+                <div key={index} className="h-16 animate-pulse rounded-xl bg-slate-900/60" />
+              ))}
+            </div>
+          ) : resolvedCustomerResults.length > 0 ? (
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+              {resolvedCustomerResults.map((customer: any) => {
+                const fullName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.name || 'Unnamed Customer';
+                const phone = customer.phoneNumber || customer.phone || '';
+                const isActive = selectedCustomerId && (selectedCustomerId === customer.id || selectedCustomerId === customer._id);
+                return (
+                  <button
+                    key={customer.id || customer._id}
+                    onClick={() => applyCustomerSelection(customer)}
+                    className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                      isActive
+                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-100'
+                        : 'border-slate-850 bg-slate-950/70 text-slate-200 hover:bg-slate-900/70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{fullName}</p>
+                        {phone && <p className="text-xs text-slate-400">{phone}</p>}
+                      </div>
+                      <Badge className="bg-slate-900/60 text-slate-300 border border-slate-800">
+                        {customer.totalOrders ? `${customer.totalOrders} orders` : 'Customer'}
+                      </Badge>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">No customers found for that search.</p>
+          )}
+        </div>
       </Modal>
 
       {/* Table Selection Modal */}
@@ -1812,82 +2902,197 @@ export default function POSPage() {
       <Modal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
-        title="Payment Details"
+        title="Checkout Payment"
+        size="lg"
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Payment Method
-            </label>
-            <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/60 p-1">
               <Button
-                variant={paymentMethod === 'cash' ? 'primary' : 'secondary'}
-                onClick={() => setPaymentMethod('cash')}
-                className="flex items-center gap-2"
+              size="sm"
+              variant={paymentTab === 'full' ? 'primary' : 'secondary'}
+              onClick={() => setPaymentTab('full')}
+              className={`flex-1 rounded-xl ${paymentTab === 'full' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-transparent text-slate-300 hover:bg-slate-900/70'}`}
               >
-                💵 Cash
+              Full Amount
               </Button>
               <Button
-                variant={paymentMethod === 'card' ? 'primary' : 'secondary'}
-                onClick={() => setPaymentMethod('card')}
-                className="flex items-center gap-2"
-              >
-                <CreditCardIcon className="h-4 w-4" />
-                Card
+              size="sm"
+              variant={paymentTab === 'multi' ? 'primary' : 'secondary'}
+              onClick={() => setPaymentTab('multi')}
+              className={`flex-1 rounded-xl ${paymentTab === 'multi' ? 'bg-sky-600 hover:bg-sky-500' : 'bg-transparent text-slate-300 hover:bg-slate-900/70'}`}
+            >
+              Split Tender
               </Button>
+          </div>
+
+          {paymentTab === 'full' ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
               <Button
-                variant={paymentMethod === 'split' ? 'primary' : 'secondary'}
-                onClick={() => setPaymentMethod('split')}
-                className="flex items-center gap-2"
+                  variant={fullPaymentMethod === 'cash' ? 'primary' : 'secondary'}
+                  onClick={() => setFullPaymentMethod('cash')}
+                  className={`flex-1 ${fullPaymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'}`}
+                >
+                  💵 Cash
+                </Button>
+                <Button
+                  variant={fullPaymentMethod === 'card' ? 'primary' : 'secondary'}
+                  onClick={() => setFullPaymentMethod('card')}
+                  className={`flex-1 ${fullPaymentMethod === 'card' ? 'bg-sky-600 hover:bg-sky-500' : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'}`}
               >
-                <UserGroupIcon className="h-4 w-4" />
-                Split
+                  <CreditCardIcon className="h-4 w-4" /> Card
               </Button>
             </div>
-          </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Customer Name (Optional)
-            </label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Amount received</label>
             <Input
-              value={customerInfo.name}
-              onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-              placeholder="Enter customer name"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={fullPaymentReceived}
+                  onChange={(event) => setFullPaymentReceived(event.target.value)}
+                  className="bg-slate-950/70 border-slate-850 text-slate-100"
+                  placeholder="0.00"
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Phone Number (Optional)
-            </label>
-            <Input
-              value={customerInfo.phone}
-              onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-              placeholder="Enter phone number"
-            />
-          </div>
-
-          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total Amount:</span>
-              <span className="text-green-600">{formatCurrency(orderSummary.total)}</span>
+              {quickCashSuggestions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {quickCashSuggestions.map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setFullPaymentReceived(suggestion.toFixed(2))}
+                      className="rounded-full bg-slate-900/80 text-slate-200 hover:bg-slate-800/80"
+                    >
+                      {formatCurrency(suggestion)}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {fullPaymentMethod === 'cash' && (
+                <div className="text-sm text-slate-300">
+                  Change due:{' '}
+                  <span className="font-semibold text-emerald-300">{formatCurrency(fullPaymentChange)}</span>
+                </div>
+              )}
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {multiPayments.map((row) => {
+                  const methodLabel: Record<SplitPaymentRow['method'], string> = {
+                    cash: 'Cash',
+                    card: 'Card',
+                    wallet: 'Wallet',
+                    other: 'Other',
+                  };
+                  return (
+                    <div
+                      key={row.id}
+                      className="grid gap-3 sm:grid-cols-[160px_1fr_auto] items-center rounded-xl border border-slate-850 bg-slate-950/60 p-3"
+                    >
+                      <select
+                        value={row.method}
+                        onChange={(event) =>
+                          updateMultiPaymentRow(row.id, { method: event.target.value as SplitPaymentRow['method'] })
+                        }
+                        className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      >
+                        {(Object.keys(methodLabel) as SplitPaymentRow['method'][]).map((method) => (
+                          <option key={method} value={method} className="bg-slate-900">
+                            {methodLabel[method]}
+                          </option>
+                        ))}
+                      </select>
+            <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.amount}
+                        onChange={(event) => updateMultiPaymentRow(row.id, { amount: event.target.value })}
+                        className="bg-slate-950/70 border-slate-850 text-slate-100"
+                        placeholder="0.00"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeMultiPaymentRow(row.id)}
+                        disabled={multiPayments.length === 1}
+                        className="text-rose-400 hover:text-rose-200 disabled:opacity-40"
+                        title={multiPayments.length === 1 ? 'At least one payment row is required' : 'Remove row'}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
           </div>
-
-          <div className="flex justify-end gap-2 pt-4">
+                  );
+                })}
+            </div>
             <Button
               variant="secondary"
-              onClick={() => setIsPaymentModalOpen(false)}
-            >
+                onClick={addMultiPaymentRow}
+                className="w-full rounded-xl bg-slate-900/80 text-slate-200 hover:bg-slate-800/80"
+              >
+                + Add another payment
+              </Button>
+              <div className="flex items-center justify-between rounded-xl border border-slate-850 bg-slate-950/70 p-3 text-sm text-slate-300">
+                <span>Applied</span>
+                <span className="font-semibold text-slate-100">{formatCurrency(splitTotals.applied)}</span>
+              </div>
+              <div
+                className={`text-sm ${
+                  splitTotals.remaining > 0
+                    ? 'text-amber-300'
+                    : splitTotals.remaining < 0
+                    ? 'text-emerald-300'
+                    : 'text-slate-300'
+                }`}
+              >
+                {splitTotals.remaining > 0 && `${formatCurrency(Math.abs(splitTotals.remaining))} remaining`}
+                {splitTotals.remaining < 0 && `${formatCurrency(Math.abs(splitTotals.remaining))} change expected`}
+                {splitTotals.remaining === 0 && 'Ready to settle'}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4 space-y-2 text-sm">
+            <div className="flex items-center justify-between text-slate-300">
+              <span>Subtotal</span>
+              <span className="text-slate-100">{formatCurrency(orderSummary.subtotal)}</span>
+            </div>
+            {orderSummary.discount > 0 && (
+              <div className="flex items-center justify-between text-emerald-300">
+                <span>Discount</span>
+                <span>-{formatCurrency(orderSummary.discount)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-slate-300">
+              <span>Tax ({taxRate}%)</span>
+              <span className="text-slate-100">{formatCurrency(orderSummary.tax)}</span>
+            </div>
+            {orderSummary.deliveryFee > 0 && (
+              <div className="flex items-center justify-between text-slate-300">
+                <span>Delivery Fee</span>
+                <span className="text-slate-100">{formatCurrency(orderSummary.deliveryFee)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-slate-800 pt-3 text-base font-semibold text-emerald-400">
+              <span>Total Due</span>
+              <span>{formatCurrency(orderSummary.total)}</span>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>
               Cancel
             </Button>
             <Button
               onClick={handlePayment}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-emerald-600 hover:bg-emerald-500"
+              disabled={checkoutBlocked || cart.length === 0}
             >
               <CheckIcon className="h-4 w-4 mr-2" />
-              Process Payment
+              Complete Payment
             </Button>
           </div>
         </div>
@@ -1953,6 +3158,167 @@ export default function POSPage() {
         </div>
       </Modal>
 
+      {/* Order Detail Modal */}
+      <Modal
+        isOpen={Boolean(queueDetailId)}
+        onClose={() => setQueueDetailId(null)}
+        title="Order Details"
+        size="lg"
+      >
+        {queueDetailLoading ? (
+          <div className="py-10 text-center text-slate-400">Loading order details…</div>
+        ) : queueDetail ? (
+          (() => {
+            const detailId = resolveOrderId(queueDetail);
+            const statusKey = (queueDetail.status as 'pending' | 'paid' | 'cancelled') || 'pending';
+            const canActOnOrder = Boolean(detailId);
+
+            return (
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-100">
+                      {queueDetail.orderNumber || (detailId ? `Order ${String(detailId).slice(-6)}` : 'Order')}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      {queueDetail.createdAt ? formatDateTime(queueDetail.createdAt) : 'N/A'}
+                    </p>
+                  </div>
+                  <Badge className={ORDER_STATUS_STYLES[statusKey] || ORDER_STATUS_STYLES.pending}>
+                    {ORDER_STATUS_LABELS[statusKey] || queueDetail.status}
+                  </Badge>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Order Type</p>
+                    <p className="text-sm font-semibold text-slate-100">
+                      {ORDER_TYPE_LABELS[queueDetail.orderType as OrderType] || queueDetail.orderType}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Payment</p>
+                    <p className="text-sm font-semibold text-slate-100">
+                      {queueDetail.paymentMethod ? queueDetail.paymentMethod : 'Not recorded'}
+                    </p>
+                  </div>
+                  {queueDetail.customerInfo && (
+                    <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Customer</p>
+                      <div className="space-y-1 text-sm text-slate-200">
+                        {queueDetail.customerInfo.name && <p>{queueDetail.customerInfo.name}</p>}
+                        {queueDetail.customerInfo.phone && <p>{queueDetail.customerInfo.phone}</p>}
+                        {queueDetail.customerInfo.email && <p>{queueDetail.customerInfo.email}</p>}
+                        {!queueDetail.customerInfo.name &&
+                          !queueDetail.customerInfo.phone &&
+                          !queueDetail.customerInfo.email && <p>No customer details captured.</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-200 uppercase tracking-[0.25em]">Items</h4>
+                  <div className="mt-3 space-y-3">
+                    {Array.isArray(queueDetail.items) && queueDetail.items.length > 0 ? (
+                      queueDetail.items.map((item: any, index: number) => {
+                        const lookup = menuItemNameById.get(item.menuItemId);
+                        const itemLabel =
+                          lookup?.name ||
+                          item.name ||
+                          item.menuItemName ||
+                          `Item ${index + 1}`;
+                        const itemTotal = Number(item.price || 0) * Number(item.quantity || 0);
+                        return (
+                          <div
+                            key={`${item.menuItemId || index}-${index}`}
+                            className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3 text-sm text-slate-200"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-slate-100">{itemLabel}</p>
+                                <p className="text-xs text-slate-400">
+                                  Qty {item.quantity || 0} • {formatCurrency(Number(item.price || 0))}
+                                </p>
+                                {item.notes && (
+                                  <p className="mt-2 rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-300 whitespace-pre-line">
+                                    {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="text-sm font-semibold text-slate-100">
+                                {formatCurrency(itemTotal)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-6 text-center text-xs text-slate-400">
+                        No line items recorded for this order.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {queueDetail.notes && (
+                  <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3 text-sm text-slate-200">
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Order Notes</p>
+                    <p className="whitespace-pre-line">{queueDetail.notes}</p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1 text-sm text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <CurrencyDollarIcon className="h-4 w-4 text-emerald-300" />
+                      <span className="font-semibold text-emerald-300">
+                        {formatCurrency(Number(queueDetail.totalAmount || 0))}
+                      </span>
+                    </div>
+                    {queueDetail.deliveryFee ? (
+                      <p className="text-xs text-slate-400">
+                        Includes delivery fee of {formatCurrency(Number(queueDetail.deliveryFee || 0))}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => canActOnOrder && handleViewReceipt(detailId)}
+                      disabled={!canActOnOrder}
+                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                    >
+                      View Receipt
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => canActOnOrder && handlePrintReceipt(detailId, false)}
+                      disabled={!canActOnOrder}
+                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                    >
+                      Print
+                    </Button>
+                    {queueDetail.status === 'pending' && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => canActOnOrder && handleQueueCancel(detailId)}
+                        disabled={!canActOnOrder || queueActionOrderId === detailId}
+                        className="rounded-lg bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
+                      >
+                        {queueActionOrderId === detailId ? 'Cancelling…' : 'Cancel Order'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <div className="py-10 text-center text-slate-400">Order details unavailable.</div>
+        )}
+      </Modal>
+
       {/* Receipt Modal */}
       <Modal
         isOpen={isReceiptModalOpen}
@@ -1961,7 +3327,28 @@ export default function POSPage() {
         size="lg"
       >
         <div className="space-y-4">
-          {receiptHTML?.html ? (
+          {receiptLoading ? (
+            <div className="text-center py-8 text-gray-500">
+              <ClockIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Loading receipt...</p>
+            </div>
+          ) : receiptError ? (
+            <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-6 py-5 text-center text-sm text-slate-300 space-y-3">
+              <p>We couldn’t load the receipt for this order.</p>
+              {receiptErrorDetails && 'status' in (receiptErrorDetails as Record<string, unknown>) && (
+                <p className="text-xs text-slate-500">
+                  Error {(receiptErrorDetails as any).status}: {receiptErrorMessage || 'Unexpected error'}
+                </p>
+              )}
+              <Button
+                variant="secondary"
+                onClick={() => currentOrderId && refetchReceipt()}
+                className="rounded-full bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+              >
+                Try Again
+              </Button>
+            </div>
+          ) : receiptHTML?.html ? (
             <div className="border rounded-lg p-4 bg-white">
               <div 
                 dangerouslySetInnerHTML={{ __html: receiptHTML.html }}
@@ -1978,7 +3365,7 @@ export default function POSPage() {
           ) : (
             <div className="text-center py-8 text-gray-500">
               <ClockIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Loading receipt...</p>
+              <p>No receipt content available for this order.</p>
             </div>
           )}
 
@@ -2029,6 +3416,305 @@ export default function POSPage() {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* Modifier Modal */}
+      <Modal
+        isOpen={Boolean(modifierEditor)}
+        onClose={closeModifierEditor}
+        title={modifierEditor ? `Customize ${modifierEditor.item?.name ?? ''}` : 'Customize Item'}
+        size="lg"
+      >
+        {modifierEditor && modifierPreview && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-850 bg-slate-950/70 p-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Unit price</p>
+                <p className="text-2xl font-semibold text-emerald-300">{formatCurrency(modifierPreview.price)}</p>
+                {modifierPreview.modifiersNote && (
+                  <p className="mt-1 text-xs text-slate-400">{modifierPreview.modifiersNote}</p>
+                )}
+    </div>
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-slate-300">Quantity</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={modifierEditor.quantity}
+                  onChange={(event) => {
+                    const next = Math.max(1, Number(event.target.value) || 1);
+                    setModifierEditor((prev) => (prev ? { ...prev, quantity: next } : prev));
+                  }}
+                  className="w-20 bg-slate-950/70 border-slate-850 text-slate-100"
+                />
+              </div>
+            </div>
+
+            {Array.isArray(modifierEditor.item?.variants) && modifierEditor.item.variants.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-slate-100">Variants</h3>
+                {modifierEditor.item.variants.map((variant: any) => (
+                  <div key={variant.name} className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500">{variant.name}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.isArray(variant.options) && variant.options.length > 0 ? (
+                        variant.options.map((option: any) => {
+                          const isActive = modifierEditor.variantSelections[variant.name] === option.name;
+                          const priceLabel = Number(option.priceModifier || 0);
+                          return (
+                            <Button
+                              key={option.name}
+                              size="sm"
+                              variant={isActive ? 'primary' : 'secondary'}
+                              onClick={() =>
+                                setModifierEditor((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        variantSelections: {
+                                          ...prev.variantSelections,
+                                          [variant.name]: option.name,
+                                        },
+                                      }
+                                    : prev
+                                )
+                              }
+                              className={`rounded-full ${
+                                isActive
+                                  ? 'bg-sky-600 hover:bg-sky-500'
+                                  : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                              }`}
+                            >
+                              {option.name}
+                              {priceLabel ? ` (+${formatCurrency(priceLabel)})` : ''}
+                            </Button>
+                          );
+                        })
+                      ) : (
+                        <p className="text-sm text-slate-400">No options configured</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {Array.isArray(modifierEditor.item?.selections) && modifierEditor.item.selections.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-slate-100">Selections</h3>
+                {modifierEditor.item.selections.map((selection: any) => {
+                  const currentChoices = modifierEditor.selectionChoices[selection.name] || [];
+                  const selectionType = selection.type || 'single';
+                  return (
+                    <div key={selection.name} className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-500">
+                        <span>{selection.name}</span>
+                        <Badge className="bg-slate-900/70 text-slate-300 border border-slate-800">
+                          {selectionType === 'multi' ? 'Multiple' : selectionType === 'optional' ? 'Optional' : 'Single'}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.isArray(selection.options) && selection.options.length > 0 ? (
+                          selection.options.map((option: any) => {
+                            const isActive = currentChoices.includes(option.name);
+                            const priceLabel = Number(option.price || 0);
+                            return (
+                              <Button
+                                key={option.name}
+                                size="sm"
+                                variant={isActive ? 'primary' : 'secondary'}
+                                onClick={() =>
+                                  setModifierEditor((prev) => {
+                                    if (!prev) return prev;
+                                    const previous = prev.selectionChoices[selection.name] || [];
+                                    let nextChoices: string[] = [];
+                                    if (selectionType === 'single') {
+                                      nextChoices = [option.name];
+                                    } else {
+                                      const buffer = new Set(previous);
+                                      if (buffer.has(option.name)) {
+                                        buffer.delete(option.name);
+                                      } else {
+                                        buffer.add(option.name);
+                                      }
+                                      nextChoices = Array.from(buffer);
+                                    }
+                                    return {
+                                      ...prev,
+                                      selectionChoices: {
+                                        ...prev.selectionChoices,
+                                        [selection.name]: nextChoices,
+                                      },
+                                    };
+                                  })
+                                }
+                                className={`rounded-full ${
+                                  isActive
+                                    ? 'bg-amber-500 hover:bg-amber-400'
+                                    : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                                }`}
+                              >
+                                {option.name}
+                                {priceLabel ? ` (+${formatCurrency(priceLabel)})` : ''}
+                              </Button>
+                            );
+                          })
+                        ) : (
+                          <p className="text-sm text-slate-400">No options configured</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {Array.isArray(modifierEditor.item?.addons) && modifierEditor.item.addons.some((addon: any) => addon?.isAvailable !== false) && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-slate-100">Add-ons</h3>
+                <div className="flex flex-wrap gap-2">
+                  {modifierEditor.item.addons
+                    .filter((addon: any) => addon?.isAvailable !== false)
+                    .map((addon: any) => {
+                      const isActive = Boolean(modifierEditor.addonSelections[addon.name]);
+                      const addonPrice = Number(addon.price || 0);
+                      return (
+                        <Button
+                          key={addon.name}
+                          size="sm"
+                          variant={isActive ? 'primary' : 'secondary'}
+                          onClick={() =>
+                            setModifierEditor((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    addonSelections: {
+                                      ...prev.addonSelections,
+                                      [addon.name]: !prev.addonSelections[addon.name],
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className={`rounded-full ${
+                            isActive
+                              ? 'bg-emerald-600 hover:bg-emerald-500'
+                              : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                          }`}
+                        >
+                          {addon.name}
+                          {addonPrice ? ` (+${formatCurrency(addonPrice)})` : ''}
+                        </Button>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={closeModifierEditor}>
+                Cancel
+              </Button>
+              <Button onClick={handleModifierConfirm} className="bg-sky-600 hover:bg-sky-500">
+                Add to Cart
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Payment Success Modal */}
+      <Modal
+        isOpen={Boolean(paymentSuccessOrder)}
+        onClose={() => setPaymentSuccessOrder(null)}
+        title="Payment Completed"
+        size="lg"
+      >
+        {paymentSuccessOrder && (
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-emerald-600/40 bg-emerald-500/10 p-6 text-emerald-100">
+              <p className="text-sm uppercase tracking-[0.3em] text-emerald-200">Order</p>
+              <h3 className="text-2xl font-semibold">
+                {paymentSuccessOrder.orderNumber ? `Order #${paymentSuccessOrder.orderNumber}` : paymentSuccessOrder.orderId}
+              </h3>
+              <p className="mt-2 text-sm text-emerald-100/80">
+                {paymentSuccessOrder.summary || 'Payment recorded successfully.'}
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Total Paid</p>
+                <p className="text-xl font-semibold text-emerald-300">
+                  {formatCurrency(paymentSuccessOrder.totalPaid)}
+                </p>
+              </div>
+              {paymentSuccessOrder.changeDue !== undefined && (
+                <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Change Due</p>
+                  <p className="text-xl font-semibold text-amber-300">
+                    {formatCurrency(paymentSuccessOrder.changeDue)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {paymentSuccessOrder.breakdown && paymentSuccessOrder.breakdown.length > 0 && (
+              <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4 space-y-2">
+                <p className="text-sm font-semibold text-slate-100">Payment Breakdown</p>
+                <div className="space-y-1 text-sm text-slate-300">
+                  {paymentSuccessOrder.breakdown.map((row) => (
+                    <div key={`${row.method}-${row.amount}`} className="flex items-center justify-between">
+                      <span className="capitalize">{row.method}</span>
+                      <span className="font-semibold text-slate-100">{formatCurrency(row.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => handleViewReceipt(paymentSuccessOrder.orderId)}
+                className="flex items-center gap-2"
+              >
+                <ClipboardDocumentListIcon className="h-4 w-4" />
+                View Receipt
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handlePrintReceipt(paymentSuccessOrder.orderId, false)}
+                className="flex items-center gap-2"
+              >
+                <PrinterIcon className="h-4 w-4" />
+                Print Receipt
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handlePrintReceipt(paymentSuccessOrder.orderId, true)}
+                className="flex items-center gap-2"
+              >
+                <PrinterIcon className="h-4 w-4" />
+                Print PDF
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handleDownloadReceiptPDF(paymentSuccessOrder.orderId)}
+                className="flex items-center gap-2"
+              >
+                <DocumentArrowDownIcon className="h-4 w-4" />
+                Download PDF
+              </Button>
+              <Button
+                onClick={() => setPaymentSuccessOrder(null)}
+                className="bg-emerald-600 hover:bg-emerald-500"
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

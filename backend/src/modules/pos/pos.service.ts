@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { TablesService } from '../tables/tables.service';
+import { IngredientsService } from '../ingredients/ingredients.service';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
 import { POSOrderFiltersDto, POSStatsFiltersDto } from './dto/pos-filters.dto';
 import { UpdatePOSSettingsDto } from './dto/pos-settings.dto';
@@ -21,6 +22,7 @@ export class POSService {
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
     private receiptService: ReceiptService,
     private menuItemsService: MenuItemsService,
+    private ingredientsService: IngredientsService,
     @Inject(forwardRef(() => TablesService))
     private tablesService: TablesService,
   ) {}
@@ -38,7 +40,8 @@ export class POSService {
 
     let sequence = 1;
     if (lastOrder && lastOrder.orderNumber.includes(dateStr)) {
-      const lastSequence = parseInt(lastOrder.orderNumber.split('-')[2]) || 0;
+      const parts = lastOrder.orderNumber.split('-');
+      const lastSequence = parts.length >= 4 ? parseInt(parts[3], 10) || 0 : 0;
       sequence = lastSequence + 1;
     }
 
@@ -47,35 +50,163 @@ export class POSService {
 
   // Create POS order
   async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string): Promise<POSOrder> {
-    const orderNumber = await this.generateOrderNumber(branchId);
-
-    const orderData: any = {
+    const baseOrderData: any = {
       ...createOrderDto,
-      orderNumber,
       branchId: new Types.ObjectId(branchId),
       userId: new Types.ObjectId(userId),
-      items: createOrderDto.items.map(item => ({
+      items: createOrderDto.items.map((item) => ({
         ...item,
         menuItemId: new Types.ObjectId(item.menuItemId),
       })),
     };
 
     if (createOrderDto.tableId) {
-      orderData.tableId = new Types.ObjectId(createOrderDto.tableId);
+      baseOrderData.tableId = new Types.ObjectId(createOrderDto.tableId);
     } else {
-      delete orderData.tableId;
+      delete baseOrderData.tableId;
     }
 
     if (createOrderDto.deliveryDetails) {
-      orderData.deliveryDetails = { ...createOrderDto.deliveryDetails };
+      baseOrderData.deliveryDetails = { ...createOrderDto.deliveryDetails };
     }
 
     if (createOrderDto.takeawayDetails) {
-      orderData.takeawayDetails = { ...createOrderDto.takeawayDetails };
+      baseOrderData.takeawayDetails = { ...createOrderDto.takeawayDetails };
     }
 
-    const order = new this.posOrderModel(orderData);
-    return order.save();
+    const menuItemCache = new Map<string, any>();
+    const ingredientUsage = new Map<
+      string,
+      { quantity: number; name?: string; unit?: string }
+    >();
+
+    for (const item of createOrderDto.items) {
+      const menuItemId = item.menuItemId;
+      if (!menuItemId) {
+        continue;
+      }
+
+      let menuItem = menuItemCache.get(menuItemId);
+      if (!menuItem) {
+        menuItem = await this.menuItemsService.findOne(menuItemId);
+        menuItemCache.set(menuItemId, menuItem);
+      }
+
+      if (
+        !menuItem ||
+        menuItem.trackInventory !== true ||
+        !Array.isArray(menuItem.ingredients) ||
+        menuItem.ingredients.length === 0
+      ) {
+        continue;
+      }
+
+      for (const ingredient of menuItem.ingredients) {
+        const rawIngredient = ingredient?.ingredientId as any;
+        const ingredientObjectId: Types.ObjectId | undefined =
+          rawIngredient?.id
+            ? new Types.ObjectId(rawIngredient.id)
+            : rawIngredient?._id
+            ? new Types.ObjectId(rawIngredient._id)
+            : rawIngredient instanceof Types.ObjectId
+            ? rawIngredient
+            : undefined;
+
+        const ingredientId = ingredientObjectId
+          ? ingredientObjectId.toString()
+          : rawIngredient
+          ? String(rawIngredient)
+          : null;
+
+        const baseQuantity = Number(ingredient?.quantity ?? 0);
+        if (!ingredientId || Number.isNaN(baseQuantity) || baseQuantity <= 0) {
+          continue;
+        }
+
+        const totalUsage = baseQuantity * item.quantity;
+        if (totalUsage <= 0) {
+          continue;
+        }
+
+        const existing = ingredientUsage.get(ingredientId) ?? {
+          quantity: 0,
+          name: rawIngredient?.name,
+          unit: ingredient?.unit,
+        };
+
+        existing.quantity += totalUsage;
+        if (!existing.name && rawIngredient?.name) {
+          existing.name = rawIngredient.name;
+        }
+        if (!existing.unit && ingredient?.unit) {
+          existing.unit = ingredient.unit;
+        }
+
+        ingredientUsage.set(ingredientId, existing);
+      }
+    }
+
+    for (const [ingredientId, usage] of ingredientUsage.entries()) {
+      const ingredient = await this.ingredientsService.findOne(ingredientId);
+
+      if (ingredient.currentStock < usage.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for ingredient ${
+            usage.name || ingredient.name
+          }. Required ${usage.quantity}${
+            ingredient.unit ? ` ${ingredient.unit}` : ''
+          }, available ${ingredient.currentStock}.`,
+        );
+      }
+
+      ingredientUsage.set(ingredientId, {
+        quantity: usage.quantity,
+        name: ingredient.name,
+        unit: ingredient.unit,
+      });
+    }
+
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const orderNumber = await this.generateOrderNumber(branchId);
+      const order = new this.posOrderModel({
+        ...baseOrderData,
+        orderNumber,
+      });
+
+      try {
+        const savedOrder = await order.save();
+
+        try {
+          for (const [ingredientId, usage] of ingredientUsage.entries()) {
+            await this.ingredientsService.removeStock(
+              ingredientId,
+              usage.quantity,
+            );
+          }
+        } catch (inventoryError) {
+          await this.posOrderModel.deleteOne({ _id: savedOrder._id });
+          throw inventoryError;
+        }
+
+        return savedOrder;
+      } catch (error: any) {
+        lastError = error;
+        const isDuplicateOrderNumber =
+          error?.code === 11000 &&
+          (error?.keyPattern?.orderNumber || error?.keyValue?.orderNumber);
+
+        if (!isDuplicateOrderNumber) {
+          throw error;
+        }
+      }
+    }
+
+    throw new ConflictException(
+      lastError?.message ||
+        'Unable to generate a unique order number after multiple attempts.',
+    );
   }
 
   // Get POS orders with filters

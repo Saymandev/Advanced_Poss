@@ -196,4 +196,5 @@ export const {
   useGetCustomerLoyaltyHistoryQuery,
   useUpdateLoyaltyPointsMutation,
   useSearchCustomersQuery,
+  useLazySearchCustomersQuery,
 } = customersApi;

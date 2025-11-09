@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
+import { IngredientsModule } from '../ingredients/ingredients.module';
 import { TablesModule } from '../tables/tables.module';
 import { PDFGeneratorService } from './pdf-generator.service';
 import { POSController } from './pos.controller';
@@ -22,6 +23,7 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
       { name: PrinterConfig.name, schema: PrinterConfigSchema },
     ]),
     MenuItemsModule,
+    IngredientsModule,
     forwardRef(() => TablesModule),
   ],
   controllers: [POSController, PrinterManagementController],
