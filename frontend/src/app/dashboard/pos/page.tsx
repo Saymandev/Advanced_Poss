@@ -242,7 +242,6 @@ export default function POSPage() {
     return [];
   });
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [customerInfo, setCustomerInfo] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pos_customerInfo');
@@ -304,7 +303,12 @@ export default function POSPage() {
     return false;
   });
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
-  const [hasAutoOpenedCart, setHasAutoOpenedCart] = useState(false);
+  const [hasAutoOpenedCart, setHasAutoOpenedCart] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pos_orderStarted') === 'true';
+    }
+    return false;
+  });
   const [orderNotes, setOrderNotes] = useState('');
   const [selectedWaiterId, setSelectedWaiterId] = useState<string>('');
   const [discountMode, setDiscountMode] = useState<'full' | 'item'>('full');
@@ -1199,18 +1203,32 @@ export default function POSPage() {
     (type: OrderType) => {
       setOrderType(type);
       if (type === 'dine-in') {
-        if (!selectedTable) {
-        setIsTableModalOpen(true);
-          setHasStartedOrder(false);
-        } else {
-          setHasStartedOrder(true);
-      }
+        setHasStartedOrder(Boolean(selectedTable));
       } else {
-        setIsTableModalOpen(false);
         setHasStartedOrder(false);
       }
     },
     [selectedTable]
+  );
+
+  const handleTableSelection = useCallback(
+    (tableId: string) => {
+      if (!tableId) {
+        setSelectedTable('');
+        setHasStartedOrder(false);
+        return;
+      }
+
+      const table = tables.find((entry: any) => entry.id === tableId);
+      if (table?.status === 'occupied' || table?.status === 'reserved') {
+        toast.error('This table is not available right now. Please choose another table.');
+        return;
+      }
+
+      setSelectedTable(tableId);
+      setHasStartedOrder(true);
+    },
+    [tables]
   );
 
   // Order functions
@@ -1739,10 +1757,7 @@ export default function POSPage() {
                   return (
                     <button
                       key={table.id}
-                      onClick={() => {
-                        setSelectedTable(table.id);
-                        setHasStartedOrder(true);
-                      }}
+                      onClick={() => handleTableSelection(table.id)}
                       className={`rounded-2xl border-2 p-6 text-left transition-all ${
                         isSelected
                           ? 'border-sky-500 bg-sky-500/10 shadow-lg shadow-sky-500/20'
@@ -1818,31 +1833,52 @@ export default function POSPage() {
               />
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2">
-              <UserGroupIcon className="h-4 w-4 text-slate-400" />
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="bg-transparent text-sm text-slate-100 focus:outline-none"
+          <div className="flex flex-col gap-3 items-stretch lg:items-end">
+            <div className="flex flex-wrap items-center gap-3 justify-between sm:justify-end">
+              <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2">
+                <UserGroupIcon className="h-4 w-4 text-slate-400" />
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="bg-transparent text-sm text-slate-100 focus:outline-none"
+                >
+                  <option value="all" className="bg-slate-900">All Categories</option>
+                  {categories.map((category: any) => (
+                    <option key={category.id} value={category.id} className="bg-slate-900">
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                variant="secondary"
+                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                onClick={resetFilters}
+                disabled={selectedCategory === 'all' && !searchQuery}
               >
-                <option value="all" className="bg-slate-900">All Categories</option>
-                {categories.map((category: any) => (
-                  <option key={category.id} value={category.id} className="bg-slate-900">
-                    {category.name}
-                  </option>
-                ))}
-              </select>
+                <FunnelIcon className="h-4 w-4" />
+                Reset Filters
+              </Button>
             </div>
-            <Button
-              variant="secondary"
-              className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
-              onClick={resetFilters}
-              disabled={selectedCategory === 'all' && !searchQuery}
-            >
-              <FunnelIcon className="h-4 w-4" />
-              Reset Filters
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 justify-between sm:justify-end">
+              <Button
+                variant="secondary"
+                onClick={() => setIsCartModalOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+              >
+                <ShoppingCartIcon className="h-4 w-4" />
+                Open Order Cart
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => setIsPaymentModalOpen(true)}
+                disabled={cart.length === 0 || checkoutBlocked}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40"
+              >
+                <CreditCardIcon className="h-4 w-4" />
+                Checkout
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -1928,34 +1964,7 @@ export default function POSPage() {
         )}
       </div>
 
-      <div className="border-t border-slate-900/70 bg-slate-950/70 px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3 text-sm text-slate-200">
-          <Badge className="bg-sky-500/10 text-sky-200 border border-sky-500/30">
-            {cart.length} item{cart.length === 1 ? '' : 's'}
-          </Badge>
-          <span className="text-slate-400">Current total:</span>
-          <span className="text-lg font-semibold text-emerald-400">{formatCurrency(orderSummary.total)}</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setIsCartModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
-          >
-            <ShoppingCartIcon className="h-4 w-4" />
-            Open Order Cart
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => setIsPaymentModalOpen(true)}
-            disabled={cart.length === 0 || checkoutBlocked}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500"
-          >
-            <CreditCardIcon className="h-4 w-4" />
-            Checkout
-          </Button>
-        </div>
-      </div>
+      
     </div>
   );
 
@@ -2197,11 +2206,7 @@ export default function POSPage() {
       switch (event.key) {
         case 'F1':
           event.preventDefault();
-          if (requiresTable) {
-            setIsTableModalOpen(true);
-          } else {
-            toast('Table selection is only required for dine-in orders');
-          }
+          setIsQueueCollapsed((prev) => !prev);
           break;
         case 'F2':
           event.preventDefault();
@@ -2220,8 +2225,8 @@ export default function POSPage() {
         case 'Escape':
           event.preventDefault();
           setIsPaymentModalOpen(false);
-          setIsTableModalOpen(false);
           setShowKeyboardShortcuts(false);
+          setIsQueueCollapsed(true);
           break;
         case 'Enter':
           event.preventDefault();
@@ -2251,17 +2256,36 @@ export default function POSPage() {
             </div>
             <div className="flex items-center gap-3 flex-wrap text-sm text-slate-300">
               <TableCellsIcon className="h-4 w-4 text-slate-400" />
-              <span className="text-slate-200">
-                {requiresTable
-                  ? selectedTable
-                    ? `Table ${activeTable?.number || activeTable?.tableNumber || selectedTable}`
-                    : 'No table selected'
-                  : 'Table not required for this order'}
-              </span>
-              {requiresTable && activeTable && (
-                <Badge className={`${getTableStatus(activeTable)} border border-white/10` }>
-                  {getTableStatusText(activeTable)}
-                </Badge>
+              {requiresTable ? (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedTable}
+                    onChange={(event) => handleTableSelection(event.target.value)}
+                    disabled={tablesLoading || tables.length === 0}
+                    className="rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-1.5 text-sm text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {tablesLoading ? 'Loading tables…' : 'Select a table'}
+                    </option>
+                    {tables.map((table: any) => (
+                      <option
+                        key={table.id}
+                        value={table.id}
+                        disabled={table.status === 'occupied' || table.status === 'reserved'}
+                      >
+                        {table.number || table.tableNumber || table.name || table.id}
+                        {table.status ? ` • ${getTableStatusText(table)}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedTable && activeTable ? (
+                    <Badge className={`${getTableStatus(activeTable)} border border-white/10`}>
+                      {getTableStatusText(activeTable)}
+                    </Badge>
+                  ) : null}
+                </div>
+              ) : (
+                <span className="text-slate-200">Table not required for this order</span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
@@ -2311,22 +2335,16 @@ export default function POSPage() {
               </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <Button
-                variant="secondary"
-                onClick={() => setIsQueueCollapsed(false)}
-                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+                variant={isQueueCollapsed ? 'secondary' : 'primary'}
+                onClick={() => setIsQueueCollapsed((prev) => !prev)}
+                className={`flex items-center gap-2 rounded-xl ${
+                  isQueueCollapsed
+                    ? 'bg-slate-900/80 text-slate-100 hover:bg-slate-800/80'
+                    : 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25'
+                }`}
               >
                 <ClipboardDocumentListIcon className="h-4 w-4" />
-                Orders Queue
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setIsTableModalOpen(true)}
-                disabled={!requiresTable}
-                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-50 disabled:hover:bg-slate-900"
-                title={requiresTable ? undefined : 'Table selection is only required for dine-in orders'}
-              >
-                <TableCellsIcon className="h-4 w-4" />
-                Select Table (F1)
+                Orders Queue (F1)
               </Button>
               <Button
                 variant="secondary"
@@ -2388,21 +2406,40 @@ export default function POSPage() {
               <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Table</p>
                 {orderType === 'dine-in' ? (
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-semibold text-slate-100">
-                      {selectedTable
-                        ? `Table ${activeTable?.number || activeTable?.tableNumber || selectedTable}`
-                        : 'No table selected'}
-                    </span>
-                    <Button
-                      size="sm"
-                  variant="secondary"
-                      onClick={() => setIsTableModalOpen(true)}
-                      className="bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
-                >
-                      Choose Table
-                </Button>
-              </div>
+                  <div className="space-y-3">
+                    <select
+                      value={selectedTable}
+                      onChange={(event) => handleTableSelection(event.target.value)}
+                      disabled={tablesLoading || tables.length === 0}
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {tablesLoading ? 'Loading tables…' : 'Select a table'}
+                      </option>
+                      {tables.map((table: any) => (
+                        <option key={table.id} value={table.id} disabled={table.status === 'occupied' || table.status === 'reserved'}>
+                          {table.number || table.tableNumber || table.name || table.id}
+                          {table.status ? ` • ${getTableStatusText(table)}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {tables.length === 0 && !tablesLoading ? (
+                      <p className="text-xs text-slate-400">No tables available for this branch.</p>
+                    ) : (
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span>
+                          {selectedTable
+                            ? `Currently assigned to table ${activeTable?.number || activeTable?.tableNumber || selectedTable}`
+                            : 'Select a table to continue with a dine-in order.'}
+                        </span>
+                        {selectedTable && activeTable && (
+                          <Badge className={`${getTableStatus(activeTable)} border border-white/10`}>
+                            {getTableStatusText(activeTable)}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <p className="text-sm text-slate-300">Table not required for this order type.</p>
                 )}
@@ -2852,52 +2889,6 @@ export default function POSPage() {
         </div>
       </Modal>
 
-      {/* Table Selection Modal */}
-      <Modal
-        isOpen={isTableModalOpen}
-        onClose={() => setIsTableModalOpen(false)}
-        title="Select Table"
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {tablesLoading ? (
-              [...Array(8)].map((_, i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded-lg animate-pulse"></div>
-              ))
-            ) : tables.length > 0 ? (
-              tables.map((table: any) => (
-                <button
-                  key={table.id}
-                  onClick={() => {
-                    setSelectedTable(table.id);
-                    setHasStartedOrder(true);
-                    setIsTableModalOpen(false);
-                  }}
-                  className={`p-3 rounded-lg border-2 transition-colors ${
-                    selectedTable === table.id
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className="text-center">
-                    <div className="font-semibold text-gray-900 dark:text-white">
-                      Table {table.number || table.tableNumber || table.id}
-                    </div>
-                    <Badge className={`mt-1 ${getTableStatus(table)}`}>
-                      {getTableStatusText(table)}
-                    </Badge>
-                  </div>
-                </button>
-              ))
-            ) : (
-              <div className="col-span-full text-center text-gray-500 dark:text-gray-400 py-8">
-                No tables available
-              </div>
-            )}
-          </div>
-        </div>
-      </Modal>
-
       {/* Payment Modal */}
       <Modal
         isOpen={isPaymentModalOpen}
@@ -3110,7 +3101,7 @@ export default function POSPage() {
               <h3 className="font-semibold text-gray-900 dark:text-white">Navigation</h3>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span>Select Table</span>
+                  <span>Toggle Orders Queue</span>
                   <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">F1</kbd>
                 </div>
                 <div className="flex justify-between">
@@ -3334,7 +3325,7 @@ export default function POSPage() {
             </div>
           ) : receiptError ? (
             <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-6 py-5 text-center text-sm text-slate-300 space-y-3">
-              <p>We couldn’t load the receipt for this order.</p>
+              <p>We couldn't load the receipt for this order.</p>
               {receiptErrorDetails && 'status' in (receiptErrorDetails as Record<string, unknown>) && (
                 <p className="text-xs text-slate-500">
                   Error {(receiptErrorDetails as any).status}: {receiptErrorMessage || 'Unexpected error'}

@@ -74,14 +74,9 @@ const navigation: NavigationItem[] = [
   },
   {
     name: 'Orders',
-    href: '/dashboard/orders',
+    href: '/dashboard/order-history',
     icon: ClipboardDocumentListIcon,
     children: [
-      {
-        name: 'Active Orders',
-        href: '/dashboard/orders',
-        icon: ClipboardDocumentListIcon,
-      },
       {
         name: 'Order History',
         href: '/dashboard/order-history',

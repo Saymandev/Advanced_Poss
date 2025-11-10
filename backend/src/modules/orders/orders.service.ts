@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -137,24 +137,42 @@ export class OrdersService {
     return this.findOne(savedOrder._id.toString());
   }
 
-  async findAll(filterDto: OrderFilterDto): Promise<{ orders: Order[], total: number, page: number, limit: number }> {
-    const { 
-      page = 1, 
-      limit = 20, 
-      sortBy = 'createdAt', 
+  async findAll(
+    filterDto: OrderFilterDto,
+  ): Promise<{ orders: Order[]; total: number; page: number; limit: number }> {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
       sortOrder = 'desc',
       search,
-      ...filters 
+      startDate,
+      endDate,
+      ...filters
     } = filterDto;
-    
+
     const skip = (page - 1) * limit;
     const query: any = { ...filters };
 
+    // Normalize order type filter naming
+    if (query.orderType) {
+      query.type = query.orderType;
+      delete query.orderType;
+    }
+
+    // Coerce branchId/companyId/task ids into ObjectId when present
+    if (query.branchId && Types.ObjectId.isValid(query.branchId)) {
+      query.branchId = new Types.ObjectId(query.branchId);
+    }
+    if (query.companyId && Types.ObjectId.isValid(query.companyId)) {
+      query.companyId = new Types.ObjectId(query.companyId);
+    }
+
     // Add date range filtering
-    if (filters.startDate || filters.endDate) {
+    if (startDate || endDate) {
       query.createdAt = {};
-      if (filters.startDate) query.createdAt.$gte = new Date(filters.startDate);
-      if (filters.endDate) query.createdAt.$lte = new Date(filters.endDate);
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
     }
 
     // Add search functionality
