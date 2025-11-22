@@ -18,7 +18,8 @@ import {
   useGetKitchenUrgentOrdersQuery,
   useMarkKitchenOrderUrgentMutation,
   useStartKitchenOrderItemMutation,
-  useStartKitchenOrderMutation
+  useStartKitchenOrderMutation,
+  useUpdateKitchenItemPriorityMutation
 } from '@/lib/api/endpoints/kitchenApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
@@ -280,6 +281,7 @@ export default function KitchenPage() {
   const [completeOrder] = useCompleteKitchenOrderMutation();
   const [markUrgent] = useMarkKitchenOrderUrgentMutation();
   const [cancelOrder] = useCancelKitchenOrderMutation();
+  const [updateItemPriority] = useUpdateKitchenItemPriorityMutation();
 
   const handleItemStatusChange = async (orderId: string, itemId: string, newStatus: 'pending' | 'preparing' | 'ready', chefId?: string) => {
     try {
@@ -343,6 +345,16 @@ export default function KitchenPage() {
       refetchAll();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to cancel order');
+    }
+  };
+
+  const handleUpdateItemPriority = async (orderId: string, itemId: string, priority: number) => {
+    try {
+      await updateItemPriority({ id: orderId, itemId, priority: priority.toString() }).unwrap();
+      toast.success('Item priority updated');
+      refetchAll();
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to update priority');
     }
   };
 
@@ -569,6 +581,151 @@ export default function KitchenPage() {
                 </p>
               </div>
               <ClockIcon className="w-8 h-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Kitchen Performance Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Performance Metrics</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Orders Completed Today</span>
+              <span className="text-xl font-bold text-gray-900 dark:text-white">
+                {isLoading ? '...' : kitchenStats?.ordersCompleted || 0}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Urgent Orders</span>
+              <span className="text-xl font-bold text-red-600">
+                {isLoading ? '...' : urgentOrders.length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Delayed Orders</span>
+              <span className="text-xl font-bold text-orange-600">
+                {isLoading ? '...' : delayedOrders.length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Total Active Orders</span>
+              <span className="text-xl font-bold text-blue-600">
+                {isLoading ? '...' : (pendingOrders.length + preparingOrders.length + readyOrders.length)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Preparation Time Analytics</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Average Prep Time</span>
+                <span className="text-xl font-bold text-purple-600">
+                  {isLoading ? '...' : `${Math.round(kitchenStats?.avgPrepTime || 0)} min`}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-purple-600 h-2 rounded-full transition-all"
+                  style={{ width: `${Math.min((kitchenStats?.avgPrepTime || 0) / 60 * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+            {preparingOrders.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Current Prep Times</p>
+                <div className="space-y-2">
+                  {preparingOrders.slice(0, 5).map((order: any) => {
+                    const elapsed = getElapsedTime(order);
+                    return (
+                      <div key={order.id || order._id} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">#{order.orderNumber}</span>
+                        <span className={`font-semibold ${elapsed > 30 ? 'text-red-600' : elapsed > 20 ? 'text-orange-600' : 'text-green-600'}`}>
+                          {elapsed} min
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Order Status Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Pending</span>
+                  <span className="text-sm font-semibold text-yellow-600">
+                    {pendingOrders.length} ({pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
+                      ? Math.round((pendingOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100) 
+                      : 0}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-yellow-600 h-2 rounded-full transition-all"
+                    style={{ 
+                      width: `${pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
+                        ? (pendingOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100 
+                        : 0}%` 
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Preparing</span>
+                  <span className="text-sm font-semibold text-blue-600">
+                    {preparingOrders.length} ({pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
+                      ? Math.round((preparingOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100) 
+                      : 0}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    style={{ 
+                      width: `${pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
+                        ? (preparingOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100 
+                        : 0}%` 
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Ready</span>
+                  <span className="text-sm font-semibold text-green-600">
+                    {readyOrders.length} ({pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
+                      ? Math.round((readyOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100) 
+                      : 0}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-green-600 h-2 rounded-full transition-all"
+                    style={{ 
+                      width: `${pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
+                        ? (readyOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100 
+                        : 0}%` 
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -879,6 +1036,23 @@ export default function KitchenPage() {
                                 : 'Chef'}
                             </p>
                           )}
+                          {/* Item Priority */}
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Priority:</span>
+                            <Select
+                              options={[
+                                { value: '0', label: 'Low' },
+                                { value: '1', label: 'Normal' },
+                                { value: '2', label: 'High' },
+                                { value: '3', label: 'Urgent' },
+                              ]}
+                              value={item.priority?.toString() || '1'}
+                              onChange={(priority) => {
+                                handleUpdateItemPriority(order.id || order._id, item.id || item._id || item.itemId, parseInt(priority));
+                              }}
+                              className="w-24"
+                            />
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {getItemStatusBadge(item.status)}
