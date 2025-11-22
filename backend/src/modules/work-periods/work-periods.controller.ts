@@ -42,8 +42,13 @@ export class WorkPeriodsController {
 
   @Get('active')
   @ApiOperation({ summary: 'Get current active work period' })
-  findActive(@CurrentUser('companyId') companyId: string) {
-    return this.workPeriodsService.findActive(companyId);
+  async findActive(@CurrentUser('companyId') companyId: string) {
+    const activePeriod = await this.workPeriodsService.findActive(companyId);
+    // Return null explicitly if no active period found (not undefined)
+    if (!activePeriod) {
+      return null;
+    }
+    return activePeriod;
   }
 
   @Post('start')
@@ -74,8 +79,20 @@ export class WorkPeriodsController {
 
   @Get(':id/sales-summary')
   @ApiOperation({ summary: 'Get sales summary for work period' })
-  getSalesSummary(@Param('id') id: string) {
-    return this.workPeriodsService.getSalesSummary(id);
+  getSalesSummary(
+    @Param('id') id: string,
+    @CurrentUser('branchId') branchId?: string,
+  ) {
+    return this.workPeriodsService.getSalesSummary(id, branchId);
+  }
+
+  @Get(':id/activities')
+  @ApiOperation({ summary: 'Get activities during work period' })
+  getPeriodActivities(
+    @Param('id') id: string,
+    @CurrentUser('branchId') branchId?: string,
+  ) {
+    return this.workPeriodsService.getPeriodActivities(id, branchId);
   }
 
   @Get(':id')

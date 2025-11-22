@@ -31,6 +31,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { POSModule } from './modules/pos/pos.module';
 import { PublicModule } from './modules/public/public.module';
 import { QRCodesModule } from './modules/qr-codes/qr-codes.module';
+import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
@@ -135,6 +136,7 @@ import { AppService } from './app.service';
     AiModule,
     WebsocketsModule,
     WorkPeriodsModule,
+    PurchaseOrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

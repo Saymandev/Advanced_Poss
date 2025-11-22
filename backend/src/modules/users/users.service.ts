@@ -1,8 +1,8 @@
 import {
-    BadRequestException,
-    ConflictException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -93,6 +93,22 @@ export class UsersService {
     
     const skip = (page - 1) * limit;
     const query: any = { ...filters };
+
+    // Transform status to isActive if provided
+    if (query.status !== undefined) {
+      query.isActive = query.status === 'active';
+      delete query.status;
+    }
+
+    // Convert branchId string to ObjectId if provided (same as findByBranch)
+    if (query.branchId) {
+      try {
+        query.branchId = new Types.ObjectId(query.branchId);
+      } catch (error) {
+        // If branchId is not a valid ObjectId, remove it from query
+        delete query.branchId;
+      }
+    }
 
     // Add search functionality
     if (search) {

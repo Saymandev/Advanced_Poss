@@ -29,11 +29,27 @@ export class IngredientsService {
       throw new BadRequestException('Ingredient with this name already exists');
     }
 
-    const ingredient = new this.ingredientModel({
+    const ingredientData: any = {
       ...createIngredientDto,
       averageCost: createIngredientDto.unitCost,
       lastPurchasePrice: createIngredientDto.unitCost,
-    });
+    };
+
+    if (createIngredientDto.companyId) {
+      if (!Types.ObjectId.isValid(createIngredientDto.companyId)) {
+        throw new BadRequestException('Invalid company ID');
+      }
+      ingredientData.companyId = new Types.ObjectId(createIngredientDto.companyId);
+    }
+
+    if (createIngredientDto.branchId) {
+      if (!Types.ObjectId.isValid(createIngredientDto.branchId)) {
+        throw new BadRequestException('Invalid branch ID');
+      }
+      ingredientData.branchId = new Types.ObjectId(createIngredientDto.branchId);
+    }
+
+    const ingredient = new this.ingredientModel(ingredientData);
 
     return ingredient.save();
   }
@@ -50,6 +66,14 @@ export class IngredientsService {
     
     const skip = (page - 1) * limit;
     const query: any = { ...filters };
+
+    // Convert string IDs to ObjectIds for proper MongoDB querying
+    if (query.companyId && typeof query.companyId === 'string') {
+      query.companyId = new Types.ObjectId(query.companyId);
+    }
+    if (query.branchId && typeof query.branchId === 'string') {
+      query.branchId = new Types.ObjectId(query.branchId);
+    }
 
     // Add search functionality
     if (search) {

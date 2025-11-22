@@ -89,6 +89,9 @@ export class POSOrder {
 
   @Prop()
   cancellationReason?: string;
+
+  @Prop({ type: Number })
+  guestCount?: number;
 }
 
 export const POSOrderSchema = SchemaFactory.createForClass(POSOrder);

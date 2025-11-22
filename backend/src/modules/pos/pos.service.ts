@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { IngredientsService } from '../ingredients/ingredients.service';
+import { KitchenService } from '../kitchen/kitchen.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { TablesService } from '../tables/tables.service';
-import { IngredientsService } from '../ingredients/ingredients.service';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
 import { POSOrderFiltersDto, POSStatsFiltersDto } from './dto/pos-filters.dto';
 import { UpdatePOSSettingsDto } from './dto/pos-settings.dto';
@@ -25,6 +26,8 @@ export class POSService {
     private ingredientsService: IngredientsService,
     @Inject(forwardRef(() => TablesService))
     private tablesService: TablesService,
+    @Inject(forwardRef(() => KitchenService))
+    private kitchenService: KitchenService,
   ) {}
 
   // Generate unique order number
@@ -190,6 +193,31 @@ export class POSService {
           throw inventoryError;
         }
 
+        // Update table status if dine-in order
+        if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in') {
+          try {
+            await this.tablesService.updateStatus(
+              createOrderDto.tableId.toString(),
+              {
+                status: 'occupied',
+                orderId: savedOrder._id.toString(),
+                occupiedBy: userId,
+              },
+            );
+          } catch (tableError) {
+            // Log error but don't fail order creation
+            console.error('Failed to update table status:', tableError);
+          }
+        }
+
+        // Create kitchen order from POS order
+        try {
+          await this.createKitchenOrderFromPOS(savedOrder, menuItemCache);
+        } catch (kitchenError) {
+          // Log error but don't fail order creation
+          console.error('Failed to create kitchen order:', kitchenError);
+        }
+
         return savedOrder;
       } catch (error: any) {
         lastError = error;
@@ -231,7 +259,12 @@ export class POSService {
         query.createdAt.$gte = new Date(filters.startDate);
       }
       if (filters.endDate) {
-        query.createdAt.$lte = new Date(filters.endDate + 'T23:59:59.999Z');
+        // Check if endDate is already a full ISO string (contains 'T')
+        // If it is, use it directly; otherwise append time
+        const endDate = filters.endDate.includes('T') 
+          ? new Date(filters.endDate)
+          : new Date(filters.endDate + 'T23:59:59.999Z');
+        query.createdAt.$lte = endDate;
       }
     }
 
@@ -831,6 +864,75 @@ export class POSService {
       console.error('Error fetching POS menu items:', error);
       return [];
     }
+  }
+
+  // Create kitchen order from POS order
+  private async createKitchenOrderFromPOS(
+    posOrder: POSOrderDocument,
+    menuItemCache: Map<string, any>,
+  ): Promise<void> {
+    // Get table number if dine-in
+    let tableNumber: string | undefined;
+    if (posOrder.tableId) {
+      try {
+        const table = await this.tablesService.findOne(posOrder.tableId.toString());
+        tableNumber = table?.tableNumber;
+      } catch (error) {
+        console.error('Failed to fetch table for kitchen order:', error);
+      }
+    }
+
+    // Build kitchen order items with menu item names
+    const kitchenItems = [];
+    for (let index = 0; index < posOrder.items.length; index++) {
+      const item = posOrder.items[index];
+      const menuItemId = item.menuItemId?.toString();
+      
+      // Get menu item name from cache or fetch it
+      let menuItem = menuItemCache.get(menuItemId || '');
+      if (!menuItem && menuItemId) {
+        try {
+          menuItem = await this.menuItemsService.findOne(menuItemId);
+          if (menuItem) {
+            menuItemCache.set(menuItemId, menuItem);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch menu item ${menuItemId}:`, error);
+        }
+      }
+
+      const itemName = menuItem?.name || `Item ${index + 1}`;
+
+      kitchenItems.push({
+        itemId: `${posOrder.orderNumber}-${index}`,
+        menuItemId: item.menuItemId,
+        name: itemName,
+        quantity: item.quantity,
+        specialInstructions: item.notes,
+        status: 'pending',
+        priority: 0,
+      });
+    }
+
+    // Transform POS order to kitchen order format
+    const kitchenOrderData = {
+      _id: posOrder._id,
+      id: posOrder._id.toString(),
+      orderId: posOrder._id,
+      branchId: posOrder.branchId,
+      orderNumber: posOrder.orderNumber,
+      tableId: posOrder.tableId,
+      tableNumber: tableNumber,
+      type: posOrder.orderType, // Map orderType to type for kitchen service
+      orderType: posOrder.orderType,
+      items: kitchenItems,
+      guestName: posOrder.customerInfo?.name,
+      customerId: posOrder.customerInfo ? { firstName: posOrder.customerInfo.name } : undefined,
+      customerNotes: posOrder.notes,
+    };
+
+    // Use kitchen service to create the order
+    await this.kitchenService.createFromOrder(kitchenOrderData);
   }
 }
 

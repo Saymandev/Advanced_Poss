@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 
 export class EndWorkPeriodDto {
   @IsNumber()
@@ -9,6 +9,6 @@ export class EndWorkPeriodDto {
   note?: string;
 
   @IsString()
-  @MinLength(6, { message: 'PIN must be 6 digits' })
+  @Matches(/^\d{4,6}$/, { message: 'PIN must be 4-6 digits' })
   pin: string;
 }

@@ -1,7 +1,7 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -19,27 +19,27 @@ export class KitchenService {
   async createFromOrder(order: any): Promise<KitchenOrder> {
     // Create kitchen order from regular order
     const kitchenOrder = new this.kitchenOrderModel({
-      orderId: order._id || order.id,
+      orderId: order._id || order.id || order.orderId,
       branchId: order.branchId,
       orderNumber: order.orderNumber,
       tableId: order.tableId,
-      tableNumber: order.tableId?.tableNumber,
-      orderType: order.type,
+      tableNumber: order.tableNumber || order.tableId?.tableNumber,
+      orderType: order.type || order.orderType,
       items: order.items.map((item: any, index: number) => ({
-        itemId: `${order.orderNumber}-${index}`,
+        itemId: item.itemId || `${order.orderNumber}-${index}`,
         menuItemId: item.menuItemId,
         name: item.name,
         quantity: item.quantity,
         selectedVariant: item.selectedVariant,
         selectedAddons: item.selectedAddons,
-        specialInstructions: item.specialInstructions,
-        status: 'pending',
-        priority: 0,
+        specialInstructions: item.specialInstructions || item.notes,
+        status: item.status || 'pending',
+        priority: item.priority || 0,
       })),
       status: 'pending',
       receivedAt: new Date(),
-      customerName: order.guestName || order.customerId?.firstName,
-      notes: order.customerNotes,
+      customerName: order.guestName || order.customerId?.firstName || order.customerName,
+      notes: order.customerNotes || order.notes,
     });
 
     const saved = await kitchenOrder.save();

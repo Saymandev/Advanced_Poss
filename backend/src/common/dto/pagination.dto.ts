@@ -125,6 +125,10 @@ export class IngredientFilterDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
   category?: string;
 
   @IsOptional()
@@ -152,6 +156,36 @@ export class SupplierFilterDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string; // Search by name
+}
+
+export class PurchaseOrderFilterDto extends PaginationDto {
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string; // Search by order number or supplier name
 }
 
 export class ExpenseFilterDto extends PaginationDto {
