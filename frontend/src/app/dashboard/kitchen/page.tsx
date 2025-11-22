@@ -20,17 +20,24 @@ import {
   useStartKitchenOrderItemMutation,
   useStartKitchenOrderMutation
 } from '@/lib/api/endpoints/kitchenApi';
+import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
   ArrowPathIcon,
+  ArrowsPointingInIcon,
+  ArrowsPointingOutIcon,
+  ArrowsUpDownIcon,
   CheckCircleIcon,
   ClockIcon,
   FireIcon,
   MagnifyingGlassIcon,
+  SpeakerWaveIcon,
+  SpeakerXMarkIcon,
+  UserIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function KitchenPage() {
@@ -39,11 +46,23 @@ export default function KitchenPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOrderType, setFilterOrderType] = useState<'all' | 'dine-in' | 'takeaway' | 'delivery'>('all');
+  const [sortBy, setSortBy] = useState<'time' | 'priority' | 'table'>('time');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const previousOrderCounts = useRef<{ pending: number; urgent: number }>({ pending: 0, urgent: 0 });
 
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
+
+  // Fetch chefs for assignment
+  const { data: chefsData } = useGetStaffQuery(
+    { role: 'chef', branchId, isActive: true },
+    { skip: !branchId }
+  );
+  const chefs = useMemo(() => chefsData?.staff || [], [chefsData]);
 
   // Update time every second
   useEffect(() => {
@@ -101,6 +120,43 @@ export default function KitchenPage() {
     return () => clearInterval(interval);
   }, [branchId, refetchAll]);
 
+  const playSound = useCallback((type: 'new-order' | 'urgent') => {
+    if (!soundEnabled) return;
+    
+    try {
+      const audio = new Audio();
+      if (type === 'urgent') {
+        // Urgent alert sound (higher frequency beep)
+        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77+efTRAMUKfj8LZjHAY4kdfyzHksBSR3x/DdkEAKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+/nn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBACg==';
+      } else {
+        // New order sound (lower frequency beep)
+        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77+efTRAMUKfj8LZjHAY4kdfyzHksBSR3x/DdkEAKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+/nn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBACg==';
+      }
+      audio.volume = 0.3;
+      audio.play().catch(() => {}); // Ignore errors
+    } catch (e) {
+      // Fallback: use Web Audio API
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = type === 'urgent' ? 800 : 400;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+      } catch (err) {
+        // Sound not available
+      }
+    }
+  }, [soundEnabled]);
+
   // Extract data from API responses (already transformed by API)
   const kitchenStats = useMemo(() => {
     if (!statsResponse) return null;
@@ -127,6 +183,35 @@ export default function KitchenPage() {
     return delayedResponse || [];
   }, [delayedResponse]);
 
+  // Sound alerts for new/urgent orders
+  useEffect(() => {
+    if (!soundEnabled) return;
+    
+    const currentPending = pendingOrders.length;
+    const currentUrgent = urgentOrders.length;
+    
+    if (currentPending > previousOrderCounts.current.pending) {
+      playSound('new-order');
+    }
+    
+    if (currentUrgent > previousOrderCounts.current.urgent) {
+      playSound('urgent');
+    }
+    
+    previousOrderCounts.current = { pending: currentPending, urgent: currentUrgent };
+  }, [pendingOrders.length, urgentOrders.length, soundEnabled, playSound]);
+
+  // Full-screen mode
+  useEffect(() => {
+    if (isFullScreen) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {});
+      }
+    }
+  }, [isFullScreen]);
+
   // Calculate elapsed time for orders
   const getElapsedTime = useCallback((order: any) => {
     if (!order.receivedAt && !order.createdAt) return 0;
@@ -136,9 +221,9 @@ export default function KitchenPage() {
   }, []);
 
 
-  // Filter orders based on search and filter
-  const filterOrders = useCallback((orders: any[]) => {
-    return orders.filter((order: any) => {
+  // Filter and sort orders
+  const filterAndSortOrders = useCallback((orders: any[]) => {
+    const filtered = orders.filter((order: any) => {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -157,12 +242,36 @@ export default function KitchenPage() {
       
       return true;
     });
-  }, [searchQuery, filterOrderType]);
 
-  // Apply filters to orders
-  const filteredPendingOrders = useMemo(() => filterOrders(pendingOrders), [pendingOrders, filterOrders]);
-  const filteredPreparingOrders = useMemo(() => filterOrders(preparingOrders), [preparingOrders, filterOrders]);
-  const filteredReadyOrders = useMemo(() => filterOrders(readyOrders), [readyOrders, filterOrders]);
+    // Sort orders
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'time') {
+        const timeA = new Date(a.receivedAt || a.createdAt).getTime();
+        const timeB = new Date(b.receivedAt || b.createdAt).getTime();
+        comparison = timeA - timeB;
+      } else if (sortBy === 'priority') {
+        const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
+        const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+        const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+        comparison = priorityB - priorityA; // Higher priority first
+      } else if (sortBy === 'table') {
+        const tableA = parseInt(a.tableNumber || '0') || 0;
+        const tableB = parseInt(b.tableNumber || '0') || 0;
+        comparison = tableA - tableB;
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [searchQuery, filterOrderType, sortBy, sortOrder]);
+
+  // Apply filters and sorting to orders
+  const filteredPendingOrders = useMemo(() => filterAndSortOrders(pendingOrders), [pendingOrders, filterAndSortOrders]);
+  const filteredPreparingOrders = useMemo(() => filterAndSortOrders(preparingOrders), [preparingOrders, filterAndSortOrders]);
+  const filteredReadyOrders = useMemo(() => filterAndSortOrders(readyOrders), [readyOrders, filterAndSortOrders]);
 
   // Mutations
   const [startOrder] = useStartKitchenOrderMutation();
@@ -172,10 +281,15 @@ export default function KitchenPage() {
   const [markUrgent] = useMarkKitchenOrderUrgentMutation();
   const [cancelOrder] = useCancelKitchenOrderMutation();
 
-  const handleItemStatusChange = async (orderId: string, itemId: string, newStatus: 'pending' | 'preparing' | 'ready') => {
+  const handleItemStatusChange = async (orderId: string, itemId: string, newStatus: 'pending' | 'preparing' | 'ready', chefId?: string) => {
     try {
       if (newStatus === 'preparing') {
-        await startItem({ id: orderId, itemId }).unwrap();
+        const chef = chefId || (user as any)?._id || (user as any)?.id;
+        if (!chef) {
+          toast.error('Please select a chef');
+          return;
+        }
+        await startItem({ id: orderId, itemId, chefId: chef }).unwrap();
         toast.success('Item preparation started');
         refetchAll();
       } else if (newStatus === 'ready') {
@@ -188,10 +302,15 @@ export default function KitchenPage() {
     }
   };
 
-  const handleOrderStatusChange = async (orderId: string, newStatus: 'pending' | 'preparing' | 'ready' | 'completed') => {
+  const handleOrderStatusChange = async (orderId: string, newStatus: 'pending' | 'preparing' | 'ready' | 'completed', chefId?: string) => {
     try {
       if (newStatus === 'preparing') {
-        await startOrder(orderId).unwrap();
+        const chef = chefId || (user as any)?._id || (user as any)?.id;
+        if (!chef) {
+          toast.error('Please select a chef');
+          return;
+        }
+        await startOrder({ id: orderId, chefId: chef }).unwrap();
         toast.success('Order preparation started');
         refetchAll();
       } else if (newStatus === 'ready' || newStatus === 'completed') {
@@ -203,6 +322,7 @@ export default function KitchenPage() {
       toast.error(error?.data?.message || error?.message || 'Failed to update order status');
     }
   };
+
 
   const handleMarkUrgent = async (orderId: string) => {
     if (!confirm('Mark this order as urgent?')) return;
@@ -289,6 +409,32 @@ export default function KitchenPage() {
           <Button
             variant="secondary"
             size="sm"
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            title={soundEnabled ? 'Disable Sound Alerts' : 'Enable Sound Alerts'}
+          >
+            {soundEnabled ? (
+              <SpeakerWaveIcon className="w-4 h-4 mr-2" />
+            ) : (
+              <SpeakerXMarkIcon className="w-4 h-4 mr-2" />
+            )}
+            Sound
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsFullScreen(!isFullScreen)}
+            title={isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen'}
+          >
+            {isFullScreen ? (
+              <ArrowsPointingInIcon className="w-4 h-4 mr-2" />
+            ) : (
+              <ArrowsPointingOutIcon className="w-4 h-4 mr-2" />
+            )}
+            {isFullScreen ? 'Exit' : 'Full Screen'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => refetchAll()}
             title="Refresh Orders"
           >
@@ -346,6 +492,25 @@ export default function KitchenPage() {
                 onChange={(value) => setFilterOrderType(value as any)}
               />
             </div>
+            <div className="w-full sm:w-48">
+              <Select
+                options={[
+                  { value: 'time', label: 'Sort by Time' },
+                  { value: 'priority', label: 'Sort by Priority' },
+                  { value: 'table', label: 'Sort by Table' },
+                ]}
+                value={sortBy}
+                onChange={(value) => setSortBy(value as any)}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+            >
+              <ArrowsUpDownIcon className="w-4 h-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -461,6 +626,11 @@ export default function KitchenPage() {
                       {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
                        order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
+                    {order.customerName && (
+                      <p className="text-xs text-gray-500 dark:text-gray-500">
+                        Customer: {order.customerName}
+                      </p>
+                    )}
                     <p className="text-xs text-gray-500 dark:text-gray-500">
                       {formatDateTime(order.receivedAt || order.createdAt)}
                     </p>
@@ -474,29 +644,78 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id || item._id} className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
-                        </p>
-                        {item.notes && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Note: {item.notes}
+                    <div key={item.id || item._id || item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
                           </p>
-                        )}
-                        {item.prepTime && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Prep: {item.prepTime} min
-                          </p>
-                        )}
+                          {/* Variants & Addons */}
+                          {item.selectedVariant && (
+                            <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                              Variant: {item.selectedVariant.name}
+                              {item.selectedVariant.priceModifier > 0 && ` (+${item.selectedVariant.priceModifier})`}
+                            </p>
+                          )}
+                          {item.selectedAddons && item.selectedAddons.length > 0 && (
+                            <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                              <span className="font-medium">Addons: </span>
+                              {item.selectedAddons.map((addon: any, idx: number) => (
+                                <span key={idx}>
+                                  {addon.name}
+                                  {idx < item.selectedAddons.length - 1 ? ', ' : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Special Instructions */}
+                          {item.specialInstructions && (
+                            <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+                              ⚠️ {item.specialInstructions}
+                            </p>
+                          )}
+                          {/* Chef Assignment */}
+                          {item.preparedBy && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                              <UserIcon className="w-3 h-3" />
+                              {typeof item.preparedBy === 'object' 
+                                ? `${item.preparedBy.firstName || ''} ${item.preparedBy.lastName || ''}`.trim() || 'Chef'
+                                : 'Chef'}
+                            </p>
+                          )}
+                          {item.prepTime && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Prep: {item.prepTime} min
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {chefs.length > 0 && (
+                            <Select
+                              options={chefs.map((chef) => ({
+                                value: chef.id,
+                                label: `${chef.firstName} ${chef.lastName}`,
+                              }))}
+                              value=""
+                              onChange={(chefId) => {
+                                if (chefId) {
+                                  handleItemStatusChange(order.id || order._id, item.id || item._id || item.itemId, 'preparing', chefId);
+                                }
+                              }}
+                              placeholder="Assign Chef"
+                              className="w-32"
+                            />
+                          )}
+                          {!chefs.length && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleItemStatusChange(order.id || order._id, item.id || item._id || item.itemId, 'preparing')}
+                            >
+                              Start
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleItemStatusChange(order.id || order._id, item.id || item._id, 'preparing')}
-                        className="ml-2"
-                      >
-                        Start
-                      </Button>
                     </div>
                   ))}
                 </div>
@@ -508,12 +727,29 @@ export default function KitchenPage() {
                 )}
 
                 <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleOrderStatusChange(order.id || order._id, 'preparing')}
-                    className="flex-1"
-                  >
-                    Start Preparing
-                  </Button>
+                  {chefs.length > 0 ? (
+                    <Select
+                      options={chefs.map((chef) => ({
+                        value: chef.id,
+                        label: `${chef.firstName} ${chef.lastName}`,
+                      }))}
+                      value=""
+                      onChange={(chefId) => {
+                        if (chefId) {
+                          handleOrderStatusChange(order.id || order._id, 'preparing', chefId);
+                        }
+                      }}
+                      placeholder="Assign Chef & Start"
+                      className="flex-1"
+                    />
+                  ) : (
+                    <Button
+                      onClick={() => handleOrderStatusChange(order.id || order._id, 'preparing')}
+                      className="flex-1"
+                    >
+                      Start Preparing
+                    </Button>
+                  )}
                   {order.priority !== 'urgent' && (
                     <Button
                       variant="secondary"
@@ -586,6 +822,11 @@ export default function KitchenPage() {
                       {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
                        order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
+                    {order.customerName && (
+                      <p className="text-xs text-gray-500 dark:text-gray-500">
+                        Customer: {order.customerName}
+                      </p>
+                    )}
                     <p className="text-xs text-gray-500 dark:text-gray-500">
                       Est: {order.estimatedTime ? `${order.estimatedTime} min` : 'TBD'}
                     </p>
@@ -599,28 +840,58 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id || item._id} className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
-                        </p>
-                        {item.notes && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Note: {item.notes}
+                    <div key={item.id || item._id || item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
                           </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getItemStatusBadge(item.status)}
-                        {item.status !== 'ready' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleItemStatusChange(order.id || order._id, item.id || item._id, 'ready')}
-                          >
-                            <CheckCircleIcon className="w-4 h-4" />
-                          </Button>
-                        )}
+                          {/* Variants & Addons */}
+                          {item.selectedVariant && (
+                            <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                              Variant: {item.selectedVariant.name}
+                              {item.selectedVariant.priceModifier > 0 && ` (+${item.selectedVariant.priceModifier})`}
+                            </p>
+                          )}
+                          {item.selectedAddons && item.selectedAddons.length > 0 && (
+                            <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                              <span className="font-medium">Addons: </span>
+                              {item.selectedAddons.map((addon: any, idx: number) => (
+                                <span key={idx}>
+                                  {addon.name}
+                                  {idx < item.selectedAddons.length - 1 ? ', ' : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Special Instructions */}
+                          {item.specialInstructions && (
+                            <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+                              ⚠️ {item.specialInstructions}
+                            </p>
+                          )}
+                          {/* Chef Assignment */}
+                          {item.preparedBy && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                              <UserIcon className="w-3 h-3" />
+                              {typeof item.preparedBy === 'object' 
+                                ? `${item.preparedBy.firstName || ''} ${item.preparedBy.lastName || ''}`.trim() || 'Chef'
+                                : 'Chef'}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getItemStatusBadge(item.status)}
+                          {item.status !== 'ready' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleItemStatusChange(order.id || order._id, item.id || item._id || item.itemId, 'ready')}
+                            >
+                              <CheckCircleIcon className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -698,20 +969,50 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id || item._id} className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
-                        </p>
-                        {item.notes && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Note: {item.notes}
+                    <div key={item.id || item._id || item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {item.quantity}x {item.name || item.menuItemId?.name || 'Item'}
                           </p>
-                        )}
+                          {/* Variants & Addons */}
+                          {item.selectedVariant && (
+                            <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                              Variant: {item.selectedVariant.name}
+                              {item.selectedVariant.priceModifier > 0 && ` (+${item.selectedVariant.priceModifier})`}
+                            </p>
+                          )}
+                          {item.selectedAddons && item.selectedAddons.length > 0 && (
+                            <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                              <span className="font-medium">Addons: </span>
+                              {item.selectedAddons.map((addon: any, idx: number) => (
+                                <span key={idx}>
+                                  {addon.name}
+                                  {idx < item.selectedAddons.length - 1 ? ', ' : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Special Instructions */}
+                          {item.specialInstructions && (
+                            <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+                              ⚠️ {item.specialInstructions}
+                            </p>
+                          )}
+                          {/* Chef Assignment */}
+                          {item.preparedBy && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                              <UserIcon className="w-3 h-3" />
+                              {typeof item.preparedBy === 'object' 
+                                ? `${item.preparedBy.firstName || ''} ${item.preparedBy.lastName || ''}`.trim() || 'Chef'
+                                : 'Chef'}
+                            </p>
+                          )}
+                        </div>
+                        <Badge variant="success">
+                          READY
+                        </Badge>
                       </div>
-                      <Badge variant="success">
-                        READY
-                      </Badge>
                     </div>
                   ))}
                 </div>

@@ -110,17 +110,19 @@ export const kitchenApi = apiSlice.injectEndpoints({
       query: (orderId) => `/kitchen/order/${orderId}`,
       providesTags: ['Kitchen'],
     }),
-    startKitchenOrder: builder.mutation<KitchenOrder, string>({
-      query: (id) => ({
+    startKitchenOrder: builder.mutation<KitchenOrder, { id: string; chefId: string }>({
+      query: ({ id, chefId }) => ({
         url: `/kitchen/${id}/start`,
         method: 'POST',
+        body: { chefId },
       }),
       invalidatesTags: ['Kitchen', 'Order'],
     }),
-    startKitchenOrderItem: builder.mutation<KitchenOrder, { id: string; itemId: string }>({
-      query: ({ id, itemId }) => ({
+    startKitchenOrderItem: builder.mutation<KitchenOrder, { id: string; itemId: string; chefId: string }>({
+      query: ({ id, itemId, chefId }) => ({
         url: `/kitchen/${id}/items/${itemId}/start`,
         method: 'POST',
+        body: { chefId },
       }),
       invalidatesTags: ['Kitchen'],
     }),
