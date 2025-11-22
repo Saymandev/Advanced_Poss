@@ -7,19 +7,19 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useUpdatePOSOrderMutation } from '@/lib/api/endpoints/posApi';
+import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
   ArrowPathIcon,
-  BanknotesIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
+  DocumentTextIcon,
   EyeIcon,
   MagnifyingGlassIcon,
   PlusIcon,
   PrinterIcon,
+  QrCodeIcon,
   ShoppingCartIcon,
+  StarIcon,
   UserIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
@@ -179,7 +179,6 @@ export default function OrdersPage() {
     skip: !selectedOrderId || !isViewModalOpen,
   });
   
-  const [updatePOSOrder, { isLoading: isUpdatingStatus }] = useUpdatePOSOrderMutation();
   const [cancelPOSOrder, { isLoading: isCancelling }] = useCancelPOSOrderMutation();
 
   const handleQuickRange = (range: QuickRange) => {
@@ -289,26 +288,6 @@ export default function OrdersPage() {
     return orders.length;
   }, [ordersResponse, orders.length]);
 
-  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
-    try {
-      if (newStatus === 'cancelled') {
-        await cancelPOSOrder(orderId).unwrap();
-        toast.success('Order cancelled');
-      } else {
-        await updatePOSOrder({ id: orderId, data: { status: newStatus as 'pending' | 'paid' } }).unwrap();
-        toast.success(`Order status updated to ${newStatus}`);
-      }
-
-      refetch();
-      if (selectedOrderId === orderId && selectedOrderData) {
-        const updated = orders.find((o) => o.id === orderId);
-        if (updated) setSelectedOrder(updated);
-      }
-    } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to update order status');
-    }
-  };
-  
   const handleDeleteOrder = async (orderId: string) => {
     if (!confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
       return;
@@ -396,15 +375,17 @@ export default function OrdersPage() {
   };
 
   const getPaymentStatusBadge = (status: Order['paymentStatus']) => {
-    const variants = {
+    const variants: Record<string, 'warning' | 'success' | 'danger' | 'secondary'> = {
       pending: 'warning',
+      unpaid: 'warning',
       paid: 'success',
       refunded: 'danger',
       cancelled: 'danger',
-    } as const;
+    };
 
-    const variant = variants[status as keyof typeof variants] || 'secondary';
-    return <Badge variant={variant}>{status}</Badge>;
+    const label = status === 'pending' || status === 'unpaid' ? 'Unpaid' : status === 'paid' ? 'Paid' : status;
+    const variant = variants[status as string] || 'secondary';
+    return <Badge variant={variant}>{label}</Badge>;
   };
 
   const getOrderTypeBadge = (type?: Order['orderType']) => {
@@ -473,11 +454,7 @@ export default function OrdersPage() {
       title: 'Type',
       render: (value: Order['orderType']) => getOrderTypeBadge(value),
     },
-    {
-      key: 'paymentStatus',
-      title: 'Payment',
-      render: (value: Order['paymentStatus']) => getPaymentStatusBadge(value),
-    },
+    
     {
       key: 'createdAt',
       title: 'Time',
@@ -499,33 +476,12 @@ export default function OrdersPage() {
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
-          {row.status !== 'completed' && row.status !== 'cancelled' && (
-            <Select
-              options={[
-                { value: 'pending', label: 'Pending' },
-                { value: 'paid', label: 'Mark Paid' },
-                { value: 'cancelled', label: 'Cancelled' },
-              ]}
-              value={row.status}
-              onChange={(value) => handleStatusChange(row.id, value as Order['status'])}
-              className="w-32"
-            />
-          )}
+          
         </div>
       ),
     },
   ];
 
-  const stats = useMemo(() => ({
-    total: totalOrders,
-    pending: orders.filter((o) => o.status === 'pending').length,
-    paid: orders.filter((o) => o.status === 'paid').length,
-    cancelled: orders.filter((o) => o.status === 'cancelled').length,
-    totalRevenue: orders
-      .filter((o) => o.status === 'paid' || o.paymentStatus === 'paid')
-      .reduce((sum, o) => sum + (o.total ?? 0), 0),
-  }), [orders, totalOrders]);
-  
   const filteredOrders = useMemo(() => {
     let filtered = orders;
 
@@ -565,69 +521,6 @@ export default function OrdersPage() {
             New Order
           </Button>
         </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
-              </div>
-              <ShoppingCartIcon className="w-8 h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
-              </div>
-              <ClockIcon className="w-8 h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Paid</p>
-                <p className="text-3xl font-bold text-green-600">{stats.paid}</p>
-              </div>
-              <BanknotesIcon className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Cancelled</p>
-                <p className="text-3xl font-bold text-red-500">{stats.cancelled}</p>
-              </div>
-              <XCircleIcon className="w-8 h-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Revenue</p>
-                <p className="text-3xl font-bold text-purple-600">{formatCurrency(stats.totalRevenue)}</p>
-              </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Filters */}
@@ -789,196 +682,253 @@ export default function OrdersPage() {
         onClose={() => {
           setIsViewModalOpen(false);
           setSelectedOrder(null);
+          setSelectedOrderId('');
         }}
-        title={`Order Details - ${selectedOrder?.orderNumber}`}
-        className="max-w-4xl"
+        title=""
+        className="max-w-6xl"
       >
         {selectedOrder && (
           <div className="space-y-6">
-            {/* Order Header */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white mb-2">Order Information</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Order #:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.orderNumber}</span>
+            {/* Modal Header with Actions */}
+            <div className="flex items-start justify-between border-b border-gray-200 dark:border-gray-700 pb-4">
+              <div className="flex items-center gap-3">
+                <DocumentTextIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Order Details</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Token #{selectedOrder.orderNumber.split('-').pop() || selectedOrder.orderNumber}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    // TODO: Implement QR review
+                    toast('QR Review feature coming soon', { icon: 'ℹ️' });
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <QrCodeIcon className="w-4 h-4" />
+                  Review QR
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    // TODO: Implement KOT print
+                    toast('KOT Print feature coming soon', { icon: 'ℹ️' });
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <PrinterIcon className="w-4 h-4" />
+                  KOT Print
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleDeleteOrder(selectedOrder.id)}
+                  disabled={isCancelling}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <XCircleIcon className="w-4 h-4" />
+                  {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+                </Button>
+              </div>
+            </div>
+
+            {/* Overview and Summary Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Overview Section (Left) */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Overview</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Invoice Number:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.orderNumber.replace(/[^0-9]/g, '').slice(-6) || selectedOrder.orderNumber}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Table:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.tableNumber}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.tableNumber === '—' ? '—' : selectedOrder.tableNumber}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Order Status:</span>
                     {getStatusBadge(selectedOrder.status)}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Order Type:</span>
-                    {getOrderTypeBadge(selectedOrder.orderType)}
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Payment Status:</span>
+                    {getPaymentStatusBadge(selectedOrder.paymentStatus === 'paid' ? 'paid' : 'unpaid')}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Payment:</span>
-                    {getPaymentStatusBadge(selectedOrder.paymentStatus)}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white mb-2">Customer Details</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Name:</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Payment At:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {selectedOrder.customerName || 'Walk-in Customer'}
+                      {selectedOrder.paymentStatus === 'paid' && selectedOrder.completedAt
+                        ? formatDateTime(selectedOrder.completedAt)
+                        : '—'}
                     </span>
                   </div>
-                  {selectedOrder.customerPhone && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Phone:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.customerPhone}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Order Type:</span>
+                    <span className="font-medium text-gray-900 dark:text-white capitalize">
+                      {selectedOrder.orderType || 'Dine-In'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Waiter Name:</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                        <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {selectedOrder.waiterName || 'Default Waiter'}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white mb-2">Timestamps</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Ordered:</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Customer Name:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {selectedOrder.customerName || '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Branch Name:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {(companyContext as any)?.branches?.[0]?.name || (companyContext as any)?.branchName || '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Order Date:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
                       {formatDateTime(selectedOrder.createdAt)}
                     </span>
                   </div>
-                  {selectedOrder.servedAt && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Served:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {formatDateTime(selectedOrder.servedAt)}
-                      </span>
-                    </div>
-                  )}
-                  {selectedOrder.completedAt && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Completed:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {formatDateTime(selectedOrder.completedAt)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Order Items */}
-            <div>
-              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Order Items</h3>
-              <div className="space-y-3">
-                {selectedOrder.items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
-                      {item.notes && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Note: {item.notes}</p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {item.quantity} × {formatCurrency(item.price)}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {formatCurrency(item.quantity * item.price)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Order Summary */}
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <div className="max-w-md ml-auto space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {formatCurrency(selectedOrder.total - selectedOrder.tax)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Tax:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {formatCurrency(selectedOrder.tax)}
-                  </span>
-                </div>
-                {selectedOrder.tip && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Tip:</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Customer Phone:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(selectedOrder.tip)}
+                      {selectedOrder.customerPhone || '—'}
                     </span>
                   </div>
-                )}
-                {selectedOrder.discount && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Payment Method:</span>
+                    <span className="font-medium text-gray-900 dark:text-white capitalize">
+                      {selectedOrder.paymentMethod || '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Payment Ref:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">—</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary Section (Right) */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Summary</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(selectedOrder.total - selectedOrder.tax - (selectedOrder.total * 0.05))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">SC 5%:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formatCurrency((selectedOrder.total - selectedOrder.tax) * 0.05)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">VAT 5%:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(selectedOrder.tax)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Discount:</span>
-                    <span className="font-medium text-green-600">
-                      -{formatCurrency(selectedOrder.discount)}
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {selectedOrder.discount ? formatCurrency(selectedOrder.discount) : formatCurrency(0)}
                     </span>
                   </div>
-                )}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span className="text-gray-900 dark:text-white">Total:</span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(selectedOrder.total + (selectedOrder.tip || 0) - (selectedOrder.discount || 0))}
-                    </span>
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">Total:</span>
+                      <span className="text-xl font-bold text-gray-900 dark:text-white">
+                        {formatCurrency(selectedOrder.total + (selectedOrder.tip || 0) - (selectedOrder.discount || 0))}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setIsViewModalOpen(false);
-                  setSelectedOrder(null);
-                  setSelectedOrderId('');
-                }}
-              >
-                Close
-              </Button>
-              {selectedOrder.paymentStatus !== 'paid' && selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
-                <Button
-                  variant="secondary"
-                  onClick={() => window.open(`/dashboard/pos/receipts/${selectedOrder.id}`, '_blank')}
-                >
-                  <PrinterIcon className="w-4 h-4 mr-2" />
-                  Print Receipt
-                </Button>
-              )}
-              <Button
-                variant="secondary"
-                onClick={() => handleDeleteOrder(selectedOrder.id)}
-                disabled={isCancelling}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {isCancelling ? 'Cancelling...' : 'Cancel Order'}
-              </Button>
-              {selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
-                <Select
-                  options={[
-                    { value: 'pending', label: 'Mark Pending' },
-                    { value: 'paid', label: 'Mark Paid' },
-                    { value: 'cancelled', label: 'Cancel Order' },
-                  ]}
-                  value={selectedOrder.status}
-                  onChange={(value) => handleStatusChange(selectedOrder.id, value as Order['status'])}
-                  className="w-40"
-                  disabled={isUpdatingStatus}
-                />
-              )}
+            {/* Order Items Table */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order Items</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Food Items</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Order Status</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Base Price</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Selections</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Price</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Total Price</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Note</th>
+                      <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Ratings</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Reviews</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedOrder.items.map((item) => (
+                      <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                              <ShoppingCartIcon className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {getStatusBadge(selectedOrder.status)}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="text-gray-900 dark:text-white">{formatCurrency(item.price)}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-gray-600 dark:text-gray-400">—</span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="text-gray-900 dark:text-white">{formatCurrency(item.price)}</span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {formatCurrency(item.quantity * item.price)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-gray-600 dark:text-gray-400">{item.notes || '—'}</span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <StarIcon key={star} className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-gray-600 dark:text-gray-400">—</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

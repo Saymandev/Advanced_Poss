@@ -40,6 +40,8 @@ export interface PurchaseOrder {
 }
 
 export interface CreatePurchaseOrderRequest {
+  companyId: string;
+  branchId?: string;
   supplierId: string;
   expectedDeliveryDate: string;
   notes?: string;
@@ -73,6 +75,7 @@ export interface ApprovePurchaseOrderRequest {
 export const purchaseOrdersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getPurchaseOrders: builder.query<{ orders: PurchaseOrder[]; total: number }, {
+      companyId?: string;
       branchId?: string;
       supplierId?: string;
       status?: string;
@@ -86,10 +89,117 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
         url: '/purchase-orders',
         params,
       }),
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        const ordersData = data.orders || data.items || [];
+        
+        return {
+          orders: ordersData.map((order: any) => ({
+            id: order._id || order.id,
+            orderNumber: order.orderNumber,
+            supplierId: order.supplierId?._id || order.supplierId?.id || order.supplierId,
+            supplier: order.supplier || order.supplierId ? {
+              id: order.supplierId?._id || order.supplierId?.id || order.supplierId,
+              name: order.supplierId?.name || order.supplier?.name || '',
+              contactPerson: order.supplierId?.contactPerson || order.supplier?.contactPerson || '',
+              phoneNumber: order.supplierId?.phone || order.supplierId?.phoneNumber || order.supplier?.phoneNumber || '',
+              email: order.supplierId?.email || order.supplier?.email || '',
+            } : {
+              id: '',
+              name: '',
+              contactPerson: '',
+              phoneNumber: '',
+              email: '',
+            },
+            status: order.status,
+            orderDate: order.orderDate,
+            expectedDeliveryDate: order.expectedDeliveryDate,
+            actualDeliveryDate: order.actualDeliveryDate,
+            totalAmount: order.totalAmount || 0,
+            taxAmount: order.taxAmount || 0,
+            discountAmount: order.discountAmount,
+            notes: order.notes,
+            items: (order.items || []).map((item: any) => ({
+              id: item._id || item.id,
+              ingredientId: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
+              ingredient: item.ingredient || item.ingredientId ? {
+                id: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
+                name: item.ingredientId?.name || item.ingredient?.name || item.ingredientName || '',
+                unit: item.ingredientId?.unit || item.ingredient?.unit || item.unit || '',
+              } : {
+                id: '',
+                name: item.ingredientName || '',
+                unit: item.unit || '',
+              },
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice || (item.quantity * item.unitPrice),
+              receivedQuantity: item.receivedQuantity,
+              notes: item.notes,
+            })),
+            createdBy: order.createdBy,
+            approvedBy: order.approvedBy,
+            createdAt: order.createdAt,
+            updatedAt: order.updatedAt,
+          } as PurchaseOrder)),
+          total: data.total || ordersData.length,
+        };
+      },
       providesTags: ['PurchaseOrder'],
     }),
     getPurchaseOrderById: builder.query<PurchaseOrder, string>({
       query: (id) => `/purchase-orders/${id}`,
+      transformResponse: (response: any) => {
+        const order = response.data || response;
+        return {
+          id: order._id || order.id,
+          orderNumber: order.orderNumber,
+          supplierId: order.supplierId?._id || order.supplierId?.id || order.supplierId,
+          supplier: order.supplier || order.supplierId ? {
+            id: order.supplierId?._id || order.supplierId?.id || order.supplierId,
+            name: order.supplierId?.name || order.supplier?.name || '',
+            contactPerson: order.supplierId?.contactPerson || order.supplier?.contactPerson || '',
+            phoneNumber: order.supplierId?.phone || order.supplierId?.phoneNumber || order.supplier?.phoneNumber || '',
+            email: order.supplierId?.email || order.supplier?.email || '',
+          } : {
+            id: '',
+            name: '',
+            contactPerson: '',
+            phoneNumber: '',
+            email: '',
+          },
+          status: order.status,
+          orderDate: order.orderDate,
+          expectedDeliveryDate: order.expectedDeliveryDate,
+          actualDeliveryDate: order.actualDeliveryDate,
+          totalAmount: order.totalAmount || 0,
+          taxAmount: order.taxAmount || 0,
+          discountAmount: order.discountAmount,
+          notes: order.notes,
+          items: (order.items || []).map((item: any) => ({
+            id: item._id || item.id,
+            ingredientId: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
+            ingredient: item.ingredient || item.ingredientId ? {
+              id: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
+              name: item.ingredientId?.name || item.ingredient?.name || item.ingredientName || '',
+              unit: item.ingredientId?.unit || item.ingredient?.unit || item.unit || '',
+            } : {
+              id: '',
+              name: item.ingredientName || '',
+              unit: item.unit || '',
+            },
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice || (item.quantity * item.unitPrice),
+            receivedQuantity: item.receivedQuantity,
+            notes: item.notes,
+          })),
+          createdBy: order.createdBy,
+          approvedBy: order.approvedBy,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+        } as PurchaseOrder;
+      },
       providesTags: ['PurchaseOrder'],
     }),
     createPurchaseOrder: builder.mutation<PurchaseOrder, CreatePurchaseOrderRequest>({
@@ -98,6 +208,57 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        const order = response.data || response;
+        return {
+          id: order._id || order.id,
+          orderNumber: order.orderNumber,
+          supplierId: order.supplierId?._id || order.supplierId?.id || order.supplierId,
+          supplier: order.supplier || order.supplierId ? {
+            id: order.supplierId?._id || order.supplierId?.id || order.supplierId,
+            name: order.supplierId?.name || order.supplier?.name || '',
+            contactPerson: order.supplierId?.contactPerson || order.supplier?.contactPerson || '',
+            phoneNumber: order.supplierId?.phone || order.supplierId?.phoneNumber || order.supplier?.phoneNumber || '',
+            email: order.supplierId?.email || order.supplier?.email || '',
+          } : {
+            id: '',
+            name: '',
+            contactPerson: '',
+            phoneNumber: '',
+            email: '',
+          },
+          status: order.status,
+          orderDate: order.orderDate,
+          expectedDeliveryDate: order.expectedDeliveryDate,
+          actualDeliveryDate: order.actualDeliveryDate,
+          totalAmount: order.totalAmount || 0,
+          taxAmount: order.taxAmount || 0,
+          discountAmount: order.discountAmount,
+          notes: order.notes,
+          items: (order.items || []).map((item: any) => ({
+            id: item._id || item.id,
+            ingredientId: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
+            ingredient: item.ingredient || item.ingredientId ? {
+              id: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
+              name: item.ingredientId?.name || item.ingredient?.name || item.ingredientName || '',
+              unit: item.ingredientId?.unit || item.ingredient?.unit || item.unit || '',
+            } : {
+              id: '',
+              name: item.ingredientName || '',
+              unit: item.unit || '',
+            },
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice || (item.quantity * item.unitPrice),
+            receivedQuantity: item.receivedQuantity,
+            notes: item.notes,
+          })),
+          createdBy: order.createdBy,
+          approvedBy: order.approvedBy,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+        } as PurchaseOrder;
+      },
       invalidatesTags: ['PurchaseOrder', 'Ingredient'],
     }),
     updatePurchaseOrder: builder.mutation<PurchaseOrder, { id: string; data: UpdatePurchaseOrderRequest }>({

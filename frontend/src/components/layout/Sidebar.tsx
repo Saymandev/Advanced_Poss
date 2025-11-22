@@ -5,26 +5,26 @@ import { Button } from '@/components/ui/Button';
 import { useAppSelector } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-  Bars3Icon,
-  BeakerIcon,
-  BuildingOfficeIcon,
-  ChartBarIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  CogIcon,
-  CurrencyDollarIcon,
-  GiftIcon,
-  HomeIcon,
-  PrinterIcon,
-  ReceiptPercentIcon,
-  ShoppingBagIcon,
-  TableCellsIcon,
-  TagIcon,
-  TruckIcon,
-  UserCircleIcon,
-  UserGroupIcon,
-  UsersIcon,
-  XMarkIcon
+    Bars3Icon,
+    BeakerIcon,
+    BuildingOfficeIcon,
+    ChartBarIcon,
+    ClipboardDocumentListIcon,
+    ClockIcon,
+    CogIcon,
+    CurrencyDollarIcon,
+    GiftIcon,
+    HomeIcon,
+    PrinterIcon,
+    ReceiptPercentIcon,
+    ShoppingBagIcon,
+    TableCellsIcon,
+    TagIcon,
+    TruckIcon,
+    UserCircleIcon,
+    UserGroupIcon,
+    UsersIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -120,11 +120,6 @@ const navigation: NavigationItem[] = [
     name: 'Staff',
     href: '/dashboard/staff',
     icon: UsersIcon,
-  },
-  {
-    name: 'Schedule',
-    href: '/dashboard/schedule',
-    icon: ClockIcon,
   },
   {
     name: 'Inventory',

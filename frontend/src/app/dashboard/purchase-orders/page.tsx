@@ -22,11 +22,11 @@ import {
   TruckIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function PurchaseOrdersPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
@@ -40,17 +40,33 @@ export default function PurchaseOrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
+  const companyId =
+    (user as any)?.companyId ||
+    (companyContext as any)?.companyId ||
+    (companyContext as any)?._id ||
+    (companyContext as any)?.id;
+
+  const branchId =
+    (user as any)?.branchId ||
+    (companyContext as any)?.branchId ||
+    (companyContext as any)?.branches?.[0]?._id ||
+    (companyContext as any)?.branches?.[0]?.id;
+
   const { data: ordersData, isLoading, refetch } = useGetPurchaseOrdersQuery({
-    branchId: user?.branchId || undefined,
+    companyId: companyId || undefined,
+    branchId: branchId || undefined,
     search: searchQuery || undefined,
     status: statusFilter === 'all' ? undefined : statusFilter,
     supplierId: supplierFilter === 'all' ? undefined : supplierFilter,
     page: currentPage,
     limit: itemsPerPage,
-  });
+  }, { skip: !companyId });
 
-  const { data: suppliers } = useGetSuppliersQuery({ companyId: user?.companyId || undefined });
-  const { data: ingredients } = useGetInventoryItemsQuery({ branchId: user?.branchId || undefined });
+  const { data: suppliers } = useGetSuppliersQuery({ companyId: companyId || undefined });
+  const { data: ingredients } = useGetInventoryItemsQuery({
+    companyId: companyId || undefined,
+    branchId: branchId || undefined,
+  }, { skip: !companyId });
 
   const [createOrder] = useCreatePurchaseOrderMutation();
   const [approveOrder] = useApprovePurchaseOrderMutation();
@@ -58,6 +74,8 @@ export default function PurchaseOrdersPage() {
   const [cancelOrder] = useCancelPurchaseOrderMutation();
 
   const [formData, setFormData] = useState<CreatePurchaseOrderRequest>({
+    companyId: companyId || '',
+    branchId: branchId || undefined,
     supplierId: '',
     expectedDeliveryDate: '',
     notes: '',
@@ -71,8 +89,18 @@ export default function PurchaseOrdersPage() {
     notes: '',
   });
 
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      companyId: companyId || prev.companyId,
+      branchId: branchId || prev.branchId,
+    }));
+  }, [companyId, branchId]);
+
   const resetForm = () => {
     setFormData({
+      companyId: companyId || '',
+      branchId: branchId || undefined,
       supplierId: '',
       expectedDeliveryDate: '',
       notes: '',
@@ -113,16 +141,26 @@ export default function PurchaseOrdersPage() {
   };
 
   const handleCreate = async () => {
+    if (!formData.companyId) {
+      toast.error('Company context is missing. Please refresh the page.');
+      return;
+    }
+
     if (!formData.supplierId || formData.items.length === 0) {
       toast.error('Please select a supplier and add at least one item');
       return;
     }
 
     try {
-      await createOrder(formData).unwrap();
+      await createOrder({
+        ...formData,
+        branchId: formData.branchId || branchId,
+      }).unwrap();
       toast.success('Purchase order created successfully');
       setIsCreateModalOpen(false);
       resetForm();
+      // Refetch will be triggered automatically by RTK Query cache invalidation
+      // But we call it explicitly to ensure immediate update
       refetch();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to create purchase order');

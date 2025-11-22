@@ -7,18 +7,21 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
+import { useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPeriodActivitiesQuery, useGetWorkPeriodByIdQuery, useGetWorkPeriodSalesSummaryQuery, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
+  ArrowDownTrayIcon,
   ClockIcon,
   CurrencyDollarIcon,
   EyeIcon,
+  PaperAirplaneIcon,
   PlayIcon,
+  PrinterIcon,
   StopIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function WorkPeriodsPage() {
@@ -33,14 +36,66 @@ export default function WorkPeriodsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const { data, isLoading, refetch } = useGetWorkPeriodsQuery({
+  const { data: workPeriodsData, isLoading, refetch } = useGetWorkPeriodsQuery({
     branchId: user?.branchId || undefined,
     status: statusFilter === 'all' ? undefined : statusFilter,
-    page: currentPage,
-    limit: itemsPerPage,
+    page: 1,
+    limit: 1000, // Get all for client-side filtering
   });
 
-  const { data: activePeriod } = useGetCurrentWorkPeriodQuery();
+  const { data: activePeriod, refetch: refetchActive } = useGetCurrentWorkPeriodQuery();
+
+  // Client-side filtering
+  const filteredWorkPeriods = useMemo(() => {
+    if (!workPeriodsData?.workPeriods) return [];
+    
+    let filtered = [...workPeriodsData.workPeriods];
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((wp) => {
+        const serial = wp.serial?.toString() || '';
+        const startedBy = typeof wp.startedBy === 'object' && wp.startedBy !== null && 'firstName' in wp.startedBy
+          ? `${(wp.startedBy as any).firstName || ''} ${(wp.startedBy as any).lastName || ''}`.toLowerCase()
+          : typeof wp.startedBy === 'string' ? wp.startedBy.toLowerCase() : '';
+        return serial.includes(query) || startedBy.includes(query);
+      });
+    }
+
+    // Date range filter
+    if (dateRange.start) {
+      const startDate = new Date(dateRange.start);
+      startDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter((wp) => {
+        const wpDate = new Date(wp.startTime);
+        wpDate.setHours(0, 0, 0, 0);
+        return wpDate >= startDate;
+      });
+    }
+
+    if (dateRange.end) {
+      const endDate = new Date(dateRange.end);
+      endDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((wp) => {
+        const wpDate = new Date(wp.startTime);
+        return wpDate <= endDate;
+      });
+    }
+
+    return filtered;
+  }, [workPeriodsData?.workPeriods, searchQuery, dateRange]);
+
+  // Pagination
+  const paginatedWorkPeriods = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredWorkPeriods.slice(start, start + itemsPerPage);
+  }, [filteredWorkPeriods, currentPage, itemsPerPage]);
+
+  const data = {
+    workPeriods: paginatedWorkPeriods,
+    total: filteredWorkPeriods.length,
+  };
 
   const [startWorkPeriod] = useStartWorkPeriodMutation();
   const [endWorkPeriod] = useEndWorkPeriodMutation();
@@ -75,8 +130,8 @@ export default function WorkPeriodsPage() {
       return;
     }
 
-    if (!openFormData.pin || openFormData.pin.length < 6) {
-      toast.error('PIN must be at least 6 digits');
+    if (!openFormData.pin || openFormData.pin.length < 4 || openFormData.pin.length > 6) {
+      toast.error('PIN must be 4-6 digits');
       return;
     }
 
@@ -90,7 +145,17 @@ export default function WorkPeriodsPage() {
       resetForms();
       refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to open work period');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to open work period';
+      if (errorMessage.includes('already an active work period')) {
+        toast.error(errorMessage, { duration: 5000 });
+        // Refetch to show the active period
+        refetch();
+        refetchActive();
+      } else if (errorMessage.includes('Invalid PIN')) {
+        toast.error('Invalid PIN. Please enter your login PIN.');
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -102,8 +167,8 @@ export default function WorkPeriodsPage() {
       return;
     }
 
-    if (!closeFormData.pin || closeFormData.pin.length < 6) {
-      toast.error('PIN must be at least 6 digits');
+    if (!closeFormData.pin || closeFormData.pin.length < 4 || closeFormData.pin.length > 6) {
+      toast.error('PIN must be 4-6 digits');
       return;
     }
 
@@ -117,9 +182,16 @@ export default function WorkPeriodsPage() {
       toast.success('Work period closed successfully');
       setIsCloseModalOpen(false);
       resetForms();
+      // Refetch both work periods list and active period
       refetch();
+      refetchActive();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to close work period');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to close work period';
+      if (errorMessage.includes('Invalid PIN')) {
+        toast.error('Invalid PIN. Please enter your login PIN.');
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -128,13 +200,67 @@ export default function WorkPeriodsPage() {
     setIsViewModalOpen(true);
   };
 
-  const getStatusBadge = (status: string) => {
-    return status === 'active'
-      ? <Badge variant="success">Active</Badge>
-      : <Badge variant="secondary">Completed</Badge>;
+  // Fetch sales summary when viewing a work period
+  const { data: salesSummary, isLoading: isLoadingSalesSummary } = useGetWorkPeriodSalesSummaryQuery(
+    selectedWorkPeriod?.id || '',
+    { skip: !selectedWorkPeriod || !isViewModalOpen }
+  );
+
+  // Fetch full work period details when viewing
+  const { data: fullWorkPeriod } = useGetWorkPeriodByIdQuery(
+    selectedWorkPeriod?.id || '',
+    { skip: !selectedWorkPeriod || !isViewModalOpen }
+  );
+
+  // Fetch activities when viewing a work period
+  const { data: activitiesData } = useGetWorkPeriodActivitiesQuery(
+    selectedWorkPeriod?.id || '',
+    { skip: !selectedWorkPeriod || !isViewModalOpen }
+  );
+
+  // Removed unused getStatusBadge function
+
+  // Live duration counter for active periods
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatDuration = (startTime: string, endTime?: string, duration?: string) => {
+    if (duration) return duration;
+    if (!endTime) {
+      // Calculate live duration for active periods
+      const start = new Date(startTime);
+      const diff = currentTime.getTime() - start.getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const diff = end.getTime() - start.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const columns = [
+    {
+      key: 'serial',
+      title: 'Serial',
+      sortable: true,
+      render: (value: number) => (
+        <span className="font-semibold text-gray-900 dark:text-white">
+          #{value}
+        </span>
+      ),
+    },
     {
       key: 'startTime',
       title: 'Start Time',
@@ -149,21 +275,21 @@ export default function WorkPeriodsPage() {
       ),
     },
     {
-      key: 'status',
-      title: 'Status',
-      render: (value: string) => getStatusBadge(value),
-    },
-    {
       key: 'startedBy',
       title: 'Started By',
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <UserIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            User {value?.slice(-6) || 'N/A'}
-          </span>
-        </div>
-      ),
+      render: (value: any) => {
+        const startedBy = typeof value === 'object' && value !== null && 'firstName' in value
+          ? `${(value as any).firstName || ''} ${(value as any).lastName || ''}`.trim() || 'Unknown'
+          : typeof value === 'string' ? value.slice(-6) : 'N/A';
+        return (
+          <div className="flex items-center gap-2">
+            <UserIcon className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {startedBy}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'endTime',
@@ -172,46 +298,44 @@ export default function WorkPeriodsPage() {
         <div className="flex items-center gap-2">
           <ClockIcon className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {value ? formatDateTime(value) : 'Ongoing'}
+            {value ? formatDateTime(value) : '-'}
           </span>
         </div>
       ),
     },
     {
-      key: 'createdAt',
-      title: 'Created',
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <ClockIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {formatDateTime(value)}
-          </span>
-        </div>
-      ),
+      key: 'endedBy',
+      title: 'Ended By',
+      render: (value: any, row: WorkPeriod) => {
+        if (!row.endTime) return <span className="text-gray-400">-</span>;
+        const endedBy = typeof value === 'object' && value !== null && 'firstName' in value
+          ? `${(value as any).firstName || ''} ${(value as any).lastName || ''}`.trim() || 'Unknown'
+          : typeof value === 'string' ? value.slice(-6) : 'N/A';
+        return (
+          <div className="flex items-center gap-2">
+            <UserIcon className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {endedBy}
+            </span>
+          </div>
+        );
+      },
     },
     {
-      key: 'openingBalance',
-      title: 'Opening Balance',
-      align: 'right' as const,
-      render: (value: number) => (
-        <div className="text-right">
-          <p className="font-semibold text-gray-900 dark:text-white">
-            {formatCurrency(value)}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: 'closingBalance',
-      title: 'Closing Balance',
-      align: 'right' as const,
-      render: (value: number | undefined) => (
-        <div className="text-right">
-          <p className="font-semibold text-gray-900 dark:text-white">
-            {value ? formatCurrency(value) : '-'}
-          </p>
-        </div>
-      ),
+      key: 'duration',
+      title: 'Duration',
+      render: (value: any, row: WorkPeriod) => {
+        const duration = formatDuration(row.startTime, row.endTime, row.duration || fullWorkPeriod?.duration);
+        const isActive = row.status === 'active' && !row.endTime;
+        return (
+          <div className="flex items-center gap-2">
+            <ClockIcon className={`w-4 h-4 ${isActive ? 'text-blue-500 animate-pulse' : 'text-gray-400'}`} />
+            <span className={`text-sm font-medium ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
+              {duration}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'actions',
@@ -222,6 +346,7 @@ export default function WorkPeriodsPage() {
             variant="ghost"
             size="sm"
             onClick={() => openViewModal(row)}
+            title="View Details"
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
@@ -234,6 +359,7 @@ export default function WorkPeriodsPage() {
                 setIsCloseModalOpen(true);
               }}
               className="text-red-600 hover:text-red-700"
+              title="End Period"
             >
               <StopIcon className="w-4 h-4" />
             </Button>
@@ -249,8 +375,16 @@ export default function WorkPeriodsPage() {
     closed: data?.workPeriods?.filter(wp => wp.status === 'completed').length || 0,
   };
 
-  // Use active period from query or find in list
-  const currentOpenPeriod = activePeriod || data?.workPeriods?.find(wp => wp.status === 'active');
+  // Use active period from query or find in list - only if it's a valid object with an id and status is active
+  const currentOpenPeriod = useMemo(() => {
+    // Check if activePeriod is valid and has required fields
+    if (activePeriod && activePeriod.id && activePeriod.status === 'active') {
+      return activePeriod;
+    }
+    // Fallback to finding in the list
+    const found = filteredWorkPeriods.find(wp => wp.status === 'active' && wp.id);
+    return found || null;
+  }, [activePeriod, filteredWorkPeriods]);
 
   return (
     <div className="space-y-6">
@@ -271,7 +405,7 @@ export default function WorkPeriodsPage() {
       </div>
 
       {/* Current Work Period Alert */}
-      {currentOpenPeriod && (
+      {currentOpenPeriod && currentOpenPeriod.id && currentOpenPeriod.status === 'active' && (
         <Card className="border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -383,8 +517,8 @@ export default function WorkPeriodsPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Status' },
-                  { value: 'open', label: 'Open' },
-                  { value: 'closed', label: 'Closed' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'completed', label: 'Completed' },
                 ]}
                 value={statusFilter}
                 onChange={setStatusFilter}
@@ -413,16 +547,16 @@ export default function WorkPeriodsPage() {
 
       {/* Work Periods Table */}
       <DataTable
-        data={data?.workPeriods || []}
+        data={paginatedWorkPeriods}
         columns={columns}
         loading={isLoading}
         searchable={false}
         selectable={true}
         pagination={{
           currentPage,
-          totalPages: Math.ceil((data?.total || 0) / itemsPerPage),
+          totalPages: Math.ceil(filteredWorkPeriods.length / itemsPerPage),
           itemsPerPage,
-          totalItems: data?.total || 0,
+          totalItems: filteredWorkPeriods.length,
           onPageChange: setCurrentPage,
           onItemsPerPageChange: setItemsPerPage,
         }}
@@ -466,8 +600,9 @@ export default function WorkPeriodsPage() {
             label="PIN *"
             type="password"
             value={openFormData.pin}
-            onChange={(e) => setOpenFormData({ ...openFormData, pin: e.target.value })}
-            placeholder="Enter your 6-digit PIN"
+            onChange={(e) => setOpenFormData({ ...openFormData, pin: e.target.value.replace(/\D/g, '') })}
+            placeholder="Enter your PIN (4-6 digits)"
+            minLength={4}
             maxLength={6}
             required
           />
@@ -555,8 +690,9 @@ export default function WorkPeriodsPage() {
             label="PIN *"
             type="password"
             value={closeFormData.pin}
-            onChange={(e) => setCloseFormData({ ...closeFormData, pin: e.target.value })}
-            placeholder="Enter your 6-digit PIN"
+            onChange={(e) => setCloseFormData({ ...closeFormData, pin: e.target.value.replace(/\D/g, '') })}
+            placeholder="Enter your PIN (4-6 digits)"
+            minLength={4}
             maxLength={6}
             required
           />
@@ -585,41 +721,210 @@ export default function WorkPeriodsPage() {
           setIsViewModalOpen(false);
           setSelectedWorkPeriod(null);
         }}
-        title={`Work Period Details - ${selectedWorkPeriod?.id}`}
-        className="max-w-4xl"
+        title="Work Period Details"
+        className="max-w-6xl"
       >
         {selectedWorkPeriod && (
           <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-start gap-6">
-              <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${
-                (selectedWorkPeriod as any).status === 'open'
-                  ? 'bg-green-100 dark:bg-green-900/30'
-                  : 'bg-gray-100 dark:bg-gray-800'
-              }`}>
-                <ClockIcon className={`w-8 h-8 ${
-                  (selectedWorkPeriod as any).status === 'open'
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`} />
+            {/* Header with Serial and Actions */}
+            <div className="flex items-start justify-between border-b border-gray-200 dark:border-gray-700 pb-4">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Serial #{selectedWorkPeriod.serial}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Work Period Range
+                </p>
+                <p className="text-base font-medium text-gray-900 dark:text-white">
+                  {formatDateTime(selectedWorkPeriod.startTime)} - {selectedWorkPeriod.endTime ? formatDateTime(selectedWorkPeriod.endTime) : 'Ongoing'}
+                </p>
               </div>
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      Work Period {(selectedWorkPeriod as any).status === 'open' ? 'Active' : 'Closed'}
-                    </h3>
-                    {getStatusBadge((selectedWorkPeriod as any).status)}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Duration</p>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {selectedWorkPeriod.endTime
-                        ? `${Math.round((new Date(selectedWorkPeriod.endTime).getTime() - new Date(selectedWorkPeriod.startTime).getTime()) / (1000 * 60 * 60 * 24))} days`
-                        : 'Ongoing'
-                      }
-                    </p>
-                  </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    // Print functionality
+                    window.print();
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <PrinterIcon className="w-4 h-4" />
+                  Print
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    // Download functionality
+                    toast('Download feature coming soon');
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowDownTrayIcon className="w-4 h-4" />
+                  Download
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    // Send Email functionality
+                    toast('Send email feature coming soon');
+                  }}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                >
+                  <PaperAirplaneIcon className="w-4 h-4" />
+                  Send Email
+                </Button>
+              </div>
+            </div>
+
+            {/* Duration Display */}
+            <div className="flex items-center gap-2 text-sm">
+              <ClockIcon className="w-5 h-5 text-gray-400" />
+              <span className="text-gray-600 dark:text-gray-400">Duration:</span>
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {fullWorkPeriod?.duration || (selectedWorkPeriod.endTime
+                  ? formatDuration(selectedWorkPeriod.startTime, selectedWorkPeriod.endTime)
+                  : formatDuration(selectedWorkPeriod.startTime))}
+              </span>
+            </div>
+
+            {/* Summary Section */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Summary</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Opening Balance:</span>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {formatCurrency(selectedWorkPeriod.openingBalance || 0)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Expected Closing Balance:</span>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {isLoadingSalesSummary ? (
+                      <span>Loading...</span>
+                    ) : (
+                      formatCurrency((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Actual Closing Balance:</span>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {formatCurrency(selectedWorkPeriod.closingBalance || 0)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Difference:</span>
+                  <p className={`font-semibold ${
+                    (selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0)) >= 0
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  }`}>
+                    {isLoadingSalesSummary ? (
+                      <span>Loading...</span>
+                    ) : (
+                      formatCurrency((selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0)))
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Void Count:</span>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {salesSummary?.voidCount || 0}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Cancel Count:</span>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {salesSummary?.cancelCount || 0}
+                  </p>
+                </div>
+                <div className="md:col-span-2">
+                  <span className="text-gray-600 dark:text-gray-400">Notes:</span>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {closeFormData.note || '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Report Section: Sales Summary and Payment Methods */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Sales Summary Table */}
+              <div>
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Sales Summary</h4>
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Metric</th>
+                        <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Total Orders</td>
+                        <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">
+                          {isLoadingSalesSummary ? 'Loading...' : (salesSummary?.totalOrders || 0)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Gross Sales</td>
+                        <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">
+                          {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.grossSales || 0)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Payment Methods Table */}
+              <div>
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Payment Methods</h4>
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Type</th>
+                        <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">Percentage</th>
+                        <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">Count</th>
+                        <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">Amount</th>
+                        <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">Commission</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {isLoadingSalesSummary ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-2 text-center text-gray-600 dark:text-gray-400">
+                            Loading...
+                          </td>
+                        </tr>
+                      ) : salesSummary?.paymentMethods && salesSummary.paymentMethods.length > 0 ? (
+                        salesSummary.paymentMethods.map((method: any, index: number) => (
+                          <tr key={index}>
+                            <td className="px-4 py-2 text-gray-900 dark:text-white font-medium">{method.type}</td>
+                            <td className="px-4 py-2 text-right text-gray-600 dark:text-gray-400">{method.percentage}%</td>
+                            <td className="px-4 py-2 text-right text-gray-600 dark:text-gray-400">{method.count}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">
+                              {formatCurrency(method.amount)}
+                            </td>
+                            <td className="px-4 py-2 text-right text-gray-600 dark:text-gray-400">
+                              {formatCurrency(parseFloat(method.commission))}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-2 text-center text-gray-600 dark:text-gray-400">
+                            No payment methods found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -628,9 +933,9 @@ export default function WorkPeriodsPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Starting Cash</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Opening Balance</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency((selectedWorkPeriod as any).startCash)}
+                    {formatCurrency(selectedWorkPeriod.openingBalance || 0)}
                   </p>
                 </CardContent>
               </Card>
@@ -639,29 +944,42 @@ export default function WorkPeriodsPage() {
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Sales</p>
                   <p className="text-xl font-bold text-green-600">
-                    {formatCurrency((selectedWorkPeriod as any).totalSales)}
+                    {isLoadingSalesSummary ? (
+                      <span className="text-sm">Loading...</span>
+                    ) : (
+                      formatCurrency(salesSummary?.grossSales || 0)
+                    )}
+                  </p>
+                  {salesSummary && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {salesSummary.totalOrders || 0} orders
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Closing Balance</p>
+                  <p className="text-xl font-bold text-blue-600">
+                    {formatCurrency(selectedWorkPeriod.closingBalance || 0)}
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</p>
-                  <p className="text-xl font-bold text-red-600">
-                    {formatCurrency((selectedWorkPeriod as any).totalExpenses)}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Net Cash Flow</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Expected Closing</p>
                   <p className={`text-xl font-bold ${
-                    ((selectedWorkPeriod as any).totalSales - (selectedWorkPeriod as any).totalExpenses) >= 0
+                    (salesSummary?.grossSales || 0) >= 0
                       ? 'text-green-600'
                       : 'text-red-600'
                   }`}>
-                    {formatCurrency((selectedWorkPeriod as any).totalSales - (selectedWorkPeriod as any).totalExpenses)}
+                    {isLoadingSalesSummary ? (
+                      <span className="text-sm">Loading...</span>
+                    ) : (
+                      formatCurrency((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -681,7 +999,9 @@ export default function WorkPeriodsPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Started By:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      User {(selectedWorkPeriod as any).userId.slice(-6)}
+                      {fullWorkPeriod?.startedBy && typeof fullWorkPeriod.startedBy === 'object' && 'firstName' in fullWorkPeriod.startedBy
+                        ? `${(fullWorkPeriod.startedBy as any).firstName || ''} ${(fullWorkPeriod.startedBy as any).lastName || ''}`.trim() || 'Unknown'
+                        : typeof selectedWorkPeriod.startedBy === 'string' ? selectedWorkPeriod.startedBy.slice(-6) : 'Unknown'}
                     </span>
                   </div>
                   {selectedWorkPeriod.endTime && (
@@ -692,11 +1012,21 @@ export default function WorkPeriodsPage() {
                           {formatDateTime(selectedWorkPeriod.endTime)}
                         </span>
                       </div>
-                      {(selectedWorkPeriod as any).endCash && (
+                      {fullWorkPeriod?.endedBy && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">Ending Cash:</span>
+                          <span className="text-gray-600 dark:text-gray-400">Ended By:</span>
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {formatCurrency((selectedWorkPeriod as any).endCash)}
+                            {typeof fullWorkPeriod.endedBy === 'object' && 'firstName' in fullWorkPeriod.endedBy
+                              ? `${(fullWorkPeriod.endedBy as any).firstName || ''} ${(fullWorkPeriod.endedBy as any).lastName || ''}`.trim() || 'Unknown'
+                              : 'Unknown'}
+                          </span>
+                        </div>
+                      )}
+                      {selectedWorkPeriod.closingBalance && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Closing Balance:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {formatCurrency(selectedWorkPeriod.closingBalance)}
                           </span>
                         </div>
                       )}
@@ -711,36 +1041,143 @@ export default function WorkPeriodsPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Expected Cash:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(
-                        (selectedWorkPeriod as any).startCash + (selectedWorkPeriod as any).totalSales - (selectedWorkPeriod as any).totalExpenses
+                      {isLoadingSalesSummary ? (
+                        <span>Loading...</span>
+                      ) : (
+                        formatCurrency(
+                          (selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0)
+                        )
                       )}
                     </span>
                   </div>
-                  {(selectedWorkPeriod as any).endCash && (
+                  {selectedWorkPeriod.closingBalance && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Actual Cash:</span>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          {formatCurrency((selectedWorkPeriod as any).endCash)}
+                          {formatCurrency(selectedWorkPeriod.closingBalance)}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Variance:</span>
                         <span className={`font-medium ${
-                          ((selectedWorkPeriod as any).endCash - ((selectedWorkPeriod as any).startCash + (selectedWorkPeriod as any).totalSales - (selectedWorkPeriod as any).totalExpenses)) >= 0
+                          (selectedWorkPeriod.closingBalance - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))) >= 0
                             ? 'text-green-600'
                             : 'text-red-600'
                         }`}>
-                          {formatCurrency(
-                            (selectedWorkPeriod as any).endCash - ((selectedWorkPeriod as any).startCash + (selectedWorkPeriod as any).totalSales - (selectedWorkPeriod as any).totalExpenses)
+                          {isLoadingSalesSummary ? (
+                            <span>Loading...</span>
+                          ) : (
+                            formatCurrency(
+                              selectedWorkPeriod.closingBalance - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))
+                            )
                           )}
                         </span>
                       </div>
                     </>
                   )}
+                  {salesSummary && (
+                    <>
+                      <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(salesSummary.subtotal || 0)}
+                        </span>
+                      </div>
+                      {salesSummary.vatTotal > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">VAT:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {formatCurrency(salesSummary.vatTotal || 0)}
+                          </span>
+                        </div>
+                      )}
+                      {salesSummary.serviceCharge > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Service Charge:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {formatCurrency(salesSummary.serviceCharge || 0)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* Orders Created During Period */}
+            {salesSummary && salesSummary.orders && salesSummary.orders.length > 0 && (
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                  Orders Created ({salesSummary.totalOrders})
+                </h4>
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Order #</th>
+                          <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Type</th>
+                          <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Amount</th>
+                          <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {salesSummary.orders.map((order: any) => (
+                          <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="px-4 py-2 text-gray-900 dark:text-white">{order.orderNumber}</td>
+                            <td className="px-4 py-2">
+                              <Badge variant="secondary" className="capitalize">
+                                {order.orderType || 'N/A'}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2 text-gray-900 dark:text-white font-medium">
+                              {formatCurrency(order.totalAmount || 0)}
+                            </td>
+                            <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
+                              {order.createdAt ? formatDateTime(order.createdAt) : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Activities During Period */}
+            {activitiesData && activitiesData.activities && activitiesData.activities.length > 0 && (
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                  Activities ({activitiesData.totalActivities})
+                </h4>
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  <div className="max-h-64 overflow-y-auto">
+                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {activitiesData.activities.map((activity: any, index: number) => (
+                        <div key={index} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {activity.description}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {formatDateTime(activity.timestamp)}
+                              </p>
+                            </div>
+                            <Badge variant="secondary" className="capitalize">
+                              {activity.type.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -753,7 +1190,7 @@ export default function WorkPeriodsPage() {
               >
                 Close
               </Button>
-              {(selectedWorkPeriod as any).status === 'open' && (
+              {selectedWorkPeriod.status === 'active' && (
                 <Button
                   onClick={() => {
                     setIsViewModalOpen(false);

@@ -113,17 +113,42 @@ export const inventoryApi = apiSlice.injectEndpoints({
         params,
       }),
       transformResponse: (response: any) => {
-        const data = response.data || response;
+        // Handle wrapped response from TransformInterceptor: { success: true, data: [...] }
+        // or direct response: [...]
+        const unwrapData = (payload: any): any => {
+          if (!payload || typeof payload !== 'object') return payload;
+          if ('success' in payload && payload.success && payload.data) {
+            return unwrapData(payload.data);
+          }
+          if ('data' in payload && payload.data) {
+            return unwrapData(payload.data);
+          }
+          return payload;
+        };
+
+        const normalizedResponse = unwrapData(response);
+
         let items = [];
-        
-        if (data.ingredients) {
-          items = data.ingredients;
-        } else if (Array.isArray(data)) {
-          items = data;
-        } else {
-          items = data.items || [];
+        let total = 0;
+        if (Array.isArray(normalizedResponse)) {
+          items = normalizedResponse;
+          total = items.length;
+        } else if (normalizedResponse && typeof normalizedResponse === 'object') {
+          if (Array.isArray(normalizedResponse.ingredients)) {
+            items = normalizedResponse.ingredients;
+          } else if (Array.isArray(normalizedResponse.items)) {
+            items = normalizedResponse.items;
+          }
+          total = normalizedResponse.total ?? items.length ?? 0;
         }
-        
+
+        console.log('🔍 Ingredients transformResponse:', {
+          response,
+          normalized: normalizedResponse,
+          itemsCount: items.length,
+          total,
+        });
+
         return {
           items: items.map((ingredient: any) => ({
             id: ingredient._id || ingredient.id,
@@ -157,7 +182,7 @@ export const inventoryApi = apiSlice.injectEndpoints({
             createdAt: ingredient.createdAt || new Date().toISOString(),
             updatedAt: ingredient.updatedAt || new Date().toISOString(),
           } as InventoryItem)),
-          total: data.total || items.length,
+          total,
         };
       },
       providesTags: ['Ingredient'],

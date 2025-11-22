@@ -9,46 +9,46 @@ import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
-  useCancelPOSOrderMutation,
-  useCreatePOSOrderMutation,
-  useDownloadReceiptPDFMutation,
-  useGetAvailableTablesQuery,
-  useGetPOSMenuItemsQuery,
-  useGetPOSOrderQuery,
-  useGetPOSOrdersQuery,
-  useGetPOSSettingsQuery,
-  useGetPrintersQuery,
-  useGetReceiptHTMLQuery,
-  usePrintReceiptMutation,
-  usePrintReceiptPDFMutation,
-  useProcessPaymentMutation
+    useCancelPOSOrderMutation,
+    useCreatePOSOrderMutation,
+    useDownloadReceiptPDFMutation,
+    useGetAvailableTablesQuery,
+    useGetPOSMenuItemsQuery,
+    useGetPOSOrderQuery,
+    useGetPOSOrdersQuery,
+    useGetPOSSettingsQuery,
+    useGetPrintersQuery,
+    useGetReceiptHTMLQuery,
+    usePrintReceiptMutation,
+    usePrintReceiptPDFMutation,
+    useProcessPaymentMutation
 } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  ArrowPathIcon,
-  CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  CreditCardIcon,
-  CurrencyDollarIcon,
-  DocumentArrowDownIcon,
-  FunnelIcon,
-  HomeModernIcon,
-  MagnifyingGlassIcon,
-  MinusIcon,
-  PencilSquareIcon,
-  PlusIcon,
-  PrinterIcon,
-  ShoppingBagIcon,
-  ShoppingCartIcon,
-  TableCellsIcon,
-  TrashIcon,
-  TruckIcon,
-  UserGroupIcon,
+    ArrowPathIcon,
+    CheckIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    ClipboardDocumentListIcon,
+    ClockIcon,
+    CreditCardIcon,
+    CurrencyDollarIcon,
+    DocumentArrowDownIcon,
+    FunnelIcon,
+    HomeModernIcon,
+    MagnifyingGlassIcon,
+    MinusIcon,
+    PencilSquareIcon,
+    PlusIcon,
+    PrinterIcon,
+    ShoppingBagIcon,
+    ShoppingCartIcon,
+    TableCellsIcon,
+    TrashIcon,
+    TruckIcon,
+    UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -317,6 +317,13 @@ export default function POSPage() {
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, { type: 'percent' | 'amount'; value: string }>>({});
   const [isItemDiscountModalOpen, setIsItemDiscountModalOpen] = useState(false);
   const [noteEditor, setNoteEditor] = useState<{ itemId: string; value: string } | null>(null);
+  const [guestCount, setGuestCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pos_guestCount');
+      return saved ? parseInt(saved, 10) || 1 : 1;
+    }
+    return 1;
+  });
   const [isCustomerLookupOpen, setIsCustomerLookupOpen] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [modifierEditor, setModifierEditor] = useState<{
@@ -413,7 +420,7 @@ export default function POSPage() {
 
   // API calls
   // Note: branchId is extracted from JWT token in backend, no need to pass it
-  const { data: tablesData, isLoading: tablesLoading, error: _tablesError } = useGetAvailableTablesQuery();
+  const { data: tablesData, isLoading: tablesLoading, error: _tablesError, refetch: refetchTables } = useGetAvailableTablesQuery();
 
   const { data: categoriesData } = useGetCategoriesQuery({
     branchId: user?.branchId || undefined,
@@ -550,9 +557,20 @@ export default function POSPage() {
     [createOrder]
   );
 
-  const { data: staffData } = useGetStaffQuery(
-    { limit: 200, status: 'active' },
-    { refetchOnMountOrArgChange: false }
+  const branchId = (user as any)?.branchId || 
+                   (user as any)?.branch?.id || 
+                   (user as any)?.branch?._id;
+
+  const { data: staffData, isLoading: staffLoading, error: staffError } = useGetStaffQuery(
+    { 
+      branchId,
+      limit: 200, 
+      isActive: true 
+    },
+    { 
+      skip: !branchId,
+      refetchOnMountOrArgChange: false 
+    }
   );
 
   const [triggerCustomerSearch, { data: customerSearchResults, isFetching: isCustomerSearchLoading }]
@@ -1268,6 +1286,7 @@ export default function POSPage() {
       const orderData: CreatePOSOrderRequest = {
         orderType,
         ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
+        ...(requiresTable && selectedTable && guestCount ? { guestCount } : {}),
         ...(isDelivery
           ? {
               deliveryFee: deliveryFeeValue,
@@ -1295,11 +1314,14 @@ export default function POSPage() {
       const order = (orderResponse as any).data || orderResponse;
       toast.success(`Order created successfully! Order #${order.orderNumber || order.id}`);
       refetchQueue();
+      refetchTables(); // Refetch tables to update status
       clearCart();
       if (requiresTable) {
         setSelectedTable('');
+        setGuestCount(1);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('pos_selectedTable');
+          localStorage.removeItem('pos_guestCount');
         }
       }
       if (isDelivery) {
@@ -1527,8 +1549,10 @@ export default function POSPage() {
       clearCart();
       if (requiresTable) {
         setSelectedTable('');
+        setGuestCount(1);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('pos_selectedTable');
+          localStorage.removeItem('pos_guestCount');
         }
       }
       if (isDelivery) {
@@ -1774,6 +1798,9 @@ export default function POSPage() {
                         <Badge className={`${statusClass} border border-white/10`}>
                           {getTableStatusText(table)}
                         </Badge>
+                        <div className="text-xs text-slate-400 mt-1">
+                          Capacity: {table.capacity || 0} seats
+                        </div>
                       </div>
                     </button>
                   );
@@ -2420,9 +2447,35 @@ export default function POSPage() {
                         <option key={table.id} value={table.id} disabled={table.status === 'occupied' || table.status === 'reserved'}>
                           {table.number || table.tableNumber || table.name || table.id}
                           {table.status ? ` • ${getTableStatusText(table)}` : ''}
+                          {table.capacity ? ` • ${table.capacity} seats` : ''}
                         </option>
                       ))}
                     </select>
+                    {selectedTable && activeTable && (
+                      <div className="space-y-2">
+                        <label className="block text-xs text-slate-400">
+                          Number of Guests
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={activeTable.capacity || 99}
+                          value={guestCount}
+                          onChange={(e) => {
+                            const value = Math.max(1, Math.min(activeTable.capacity || 99, parseInt(e.target.value) || 1));
+                            setGuestCount(value);
+                            if (typeof window !== 'undefined') {
+                              localStorage.setItem('pos_guestCount', value.toString());
+                            }
+                          }}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                          placeholder="Enter guest count"
+                        />
+                        <p className="text-xs text-slate-500">
+                          {activeTable.capacity ? `${activeTable.capacity - guestCount} seats will remain available` : 'Enter guest count'}
+                        </p>
+                      </div>
+                    )}
                     {tables.length === 0 && !tablesLoading ? (
                       <p className="text-xs text-slate-400">No tables available for this branch.</p>
                     ) : (
@@ -2449,10 +2502,15 @@ export default function POSPage() {
                 <select
                   value={selectedWaiterId}
                   onChange={(event) => setSelectedWaiterId(event.target.value)}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                  disabled={staffLoading || !branchId}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {waiterOptions.length === 0 ? (
-                    <option value="">No waiters found</option>
+                  {staffLoading ? (
+                    <option value="">Loading waiters...</option>
+                  ) : staffError ? (
+                    <option value="">Error loading waiters</option>
+                  ) : waiterOptions.length === 0 ? (
+                    <option value="">No waiters found for this branch</option>
                   ) : (
                     waiterOptions.map((waiter) => (
                       <option key={waiter.id} value={waiter.id} className="bg-slate-900">
@@ -2461,7 +2519,10 @@ export default function POSPage() {
                     ))
                   )}
                 </select>
-          </div>
+                {!branchId && (
+                  <p className="text-xs text-slate-400 mt-1">Branch not selected</p>
+                )}
+              </div>
               </div>
             <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">

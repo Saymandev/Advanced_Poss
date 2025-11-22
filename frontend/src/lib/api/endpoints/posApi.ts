@@ -38,6 +38,7 @@ export interface CreatePOSOrderRequest {
   status: 'pending' | 'paid' | 'cancelled';
   paymentMethod?: 'cash' | 'card' | 'split';
   notes?: string;
+  guestCount?: number;
 }
 
 export interface POSOrder extends CreatePOSOrderRequest {

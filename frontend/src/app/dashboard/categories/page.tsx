@@ -66,12 +66,19 @@ export default function CategoriesPage() {
   }, [user, companyContext, mounted]);
 
   // API calls
-  const { data: categoriesResponse, isLoading, error, refetch } = useGetCategoriesQuery({
+  const { 
+    data: categoriesResponse, 
+    isLoading, 
+    error, 
+    refetch,
+    isFetching 
+  } = useGetCategoriesQuery({
     branchId,
     companyId,
-    page: 1,
-    limit: 100,
-  }, { skip: !branchId && !companyId });
+  }, { 
+    skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
+  });
 
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
@@ -79,13 +86,28 @@ export default function CategoriesPage() {
 
   // Extract categories from API response (already transformed by API)
   const categories = useMemo(() => {
-    return categoriesResponse?.categories || [];
+    if (!categoriesResponse) return [];
+    
+    // Handle different response structures
+    const cats = categoriesResponse.categories || [];
+    
+    // Ensure all required fields are present
+    return cats.map((cat: any) => ({
+      ...cat,
+      id: cat.id || cat._id,
+      isActive: cat.isActive !== undefined ? cat.isActive : true,
+      sortOrder: cat.sortOrder || 0,
+      type: cat.type || 'food',
+      color: cat.color || '#3B82F6',
+      icon: cat.icon || 'tag',
+    }));
   }, [categoriesResponse]);
 
 
   // Filter categories
   const filteredCategories = useMemo(() => {
-    let filtered = categories;
+    // Create a copy of the array to avoid mutating read-only array
+    let filtered = [...categories];
 
     // Search filter
     if (searchQuery) {
@@ -102,7 +124,7 @@ export default function CategoriesPage() {
       filtered = filtered.filter(cat => !cat.isActive);
     }
 
-    // Sort by sortOrder
+    // Sort by sortOrder (now safe since we have a copy)
     return filtered.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }, [categories, searchQuery, statusFilter]);
 
@@ -118,31 +140,44 @@ export default function CategoriesPage() {
     }
 
     try {
-      // Build payload matching backend DTO - remove isActive, add companyId and type
+      // Build payload matching backend DTO structure
       const payload: any = {
         companyId: companyId.toString(),
-        name: formData.name,
-        description: formData.description || undefined,
-        color: formData.color || undefined,
-        icon: formData.icon || undefined,
+        name: formData.name.trim(),
         type: formData.type || 'food', // Required field, default to 'food'
-        sortOrder: formData.sortOrder || 0,
       };
+
+      // Optional fields
+      if (formData.description?.trim()) {
+        payload.description = formData.description.trim();
+      }
+      if (formData.color) {
+        payload.color = formData.color;
+      }
+      if (formData.icon) {
+        payload.icon = formData.icon;
+      }
+      if (formData.sortOrder !== undefined && formData.sortOrder !== null) {
+        payload.sortOrder = formData.sortOrder;
+      }
 
       // Add branchId if available (optional)
       if (branchId) {
         payload.branchId = branchId.toString();
       }
 
-      const newCategory = await createCategory(payload).unwrap();
-      console.log('Created category:', newCategory);
+      await createCategory(payload).unwrap();
       toast.success('Category created successfully');
       setIsModalOpen(false);
       resetForm();
-      // RTK Query should auto-refetch due to invalidatesTags, but we'll force a refetch as backup
+      // RTK Query should auto-refetch due to invalidatesTags
       await refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to create category');
+      const errorMessage = error?.data?.message || 
+                          error?.data?.error || 
+                          error?.message || 
+                          'Failed to create category';
+      toast.error(errorMessage);
     }
   };
 
@@ -154,25 +189,42 @@ export default function CategoriesPage() {
     }
     
     try {
-      // Build payload matching backend DTO - remove isActive
+      // Build payload matching backend DTO structure
+      // Note: isActive is not in the DTO, so we can't update it through the API
       const payload: any = {
         id: selectedCategory.id,
-        name: formData.name,
-        description: formData.description || undefined,
-        color: formData.color || undefined,
-        icon: formData.icon || undefined,
+        name: formData.name.trim(),
         type: formData.type || 'food',
-        sortOrder: formData.sortOrder || 0,
       };
+
+      // Optional fields - only include if they have values
+      if (formData.description?.trim()) {
+        payload.description = formData.description.trim();
+      } else {
+        payload.description = undefined; // Explicitly set to undefined to clear
+      }
+      if (formData.color) {
+        payload.color = formData.color;
+      }
+      if (formData.icon) {
+        payload.icon = formData.icon;
+      }
+      if (formData.sortOrder !== undefined && formData.sortOrder !== null) {
+        payload.sortOrder = formData.sortOrder;
+      }
 
       await updateCategory(payload).unwrap();
       toast.success('Category updated successfully');
       setIsEditModalOpen(false);
       setSelectedCategory(null);
       resetForm();
-      refetch();
+      await refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to update category');
+      const errorMessage = error?.data?.message || 
+                          error?.data?.error || 
+                          error?.message || 
+                          'Failed to update category';
+      toast.error(errorMessage);
     }
   };
 
@@ -182,8 +234,13 @@ export default function CategoriesPage() {
     try {
       await deleteCategory(id).unwrap();
       toast.success('Category deleted successfully');
+      await refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to delete category');
+      const errorMessage = error?.data?.message || 
+                          error?.data?.error || 
+                          error?.message || 
+                          'Failed to delete category';
+      toast.error(errorMessage);
     }
   };
 
@@ -459,50 +516,50 @@ export default function CategoriesPage() {
       </Card>
 
       {/* Categories Table */}
-      {isLoading ? (
-        <Card>
-          <CardContent className="p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>All Categories ({filteredCategories.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading || isFetching ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">Loading categories...</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : error ? (
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center py-12">
-              <p className="text-red-600 mb-4">Error loading categories</p>
-              <Button onClick={() => refetch()}>Try Again</Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>All Categories ({filteredCategories.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filteredCategories.length === 0 ? (
-              <div className="text-center py-12">
-                <TagIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 dark:text-gray-400">
-                  {searchQuery || statusFilter !== 'all' 
-                    ? 'No categories match your filters' 
-                    : 'No categories found. Create your first category!'}
-                </p>
+              <div className="animate-pulse space-y-4">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mx-auto"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mx-auto"></div>
               </div>
-            ) : (
-              <DataTable
-                data={filteredCategories}
-                columns={columns}
-                loading={isLoading}
-                searchable={false}
-                emptyMessage="No categories found."
-              />
-            )}
-          </CardContent>
-        </Card>
-      )}
+              <p className="text-gray-500 dark:text-gray-400 mt-4">Loading categories...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="text-red-600 dark:text-red-400 mb-4">
+                {error && 'data' in error 
+                  ? (error.data as any)?.message || 'Error loading categories'
+                  : 'Error loading categories'}
+              </p>
+              <Button onClick={() => refetch()} variant="secondary">
+                Try Again
+              </Button>
+            </div>
+          ) : filteredCategories.length === 0 ? (
+            <div className="text-center py-12">
+              <TagIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400">
+                {searchQuery || statusFilter !== 'all' 
+                  ? 'No categories match your filters' 
+                  : 'No categories found. Create your first category!'}
+              </p>
+            </div>
+          ) : (
+            <DataTable
+              data={filteredCategories}
+              columns={columns}
+              loading={isLoading || isFetching}
+              searchable={false}
+              emptyMessage="No categories found."
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Create Category Modal */}
       <Modal
@@ -794,18 +851,16 @@ export default function CategoriesPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isActiveEdit"
-              checked={formData.isActive}
-              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <label htmlFor="isActiveEdit" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Active
-            </label>
-          </div>
+          {selectedCategory && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Status:</strong> {selectedCategory.isActive ? 'Active' : 'Inactive'}
+                <span className="block text-xs mt-1 text-blue-600 dark:text-blue-300">
+                  Note: Status cannot be changed through the API at this time.
+                </span>
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <Button

@@ -7,18 +7,19 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { useGetCategoriesByBranchQuery } from '@/lib/api/endpoints/categoriesApi';
+import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
+import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
 import { useCreateMenuItemMutation, useDeleteMenuItemMutation, useGetMenuItemsQuery, useToggleAvailabilityMutation, useUpdateMenuItemMutation } from '@/lib/api/endpoints/menuItemsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ClockIcon,
-    EyeIcon,
-    PencilIcon,
-    PlusIcon,
-    ShoppingBagIcon,
-    TrashIcon,
-    XMarkIcon
+  ClockIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  ShoppingBagIcon,
+  TrashIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -29,6 +30,7 @@ interface MenuItem {
   description: string;
   price: number;
   category: string;
+  categoryId?: string;
   subcategory?: string;
   imageUrl?: string;
   isAvailable: boolean;
@@ -58,10 +60,21 @@ export default function MenuItemsPage() {
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [availabilityFilter, setAvailabilityFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCommittedSearch(searchQuery);
+      setCurrentPage(1); // Reset to first page on search
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -71,7 +84,7 @@ export default function MenuItemsPage() {
     preparationTime: 0,
     isAvailable: true,
     images: [] as string[],
-    ingredients: [] as string[],
+    ingredients: [] as Array<{ ingredientId: string; quantity: number; unit: string }>,
     allergens: [] as string[],
     tags: [] as string[],
     nutritionalInfo: {
@@ -88,59 +101,113 @@ export default function MenuItemsPage() {
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
   
-  console.log('🔍 Menu Items Debug:', {
-    branchId,
-    user,
-    companyContext,
-    hasBranchId: !!branchId
-  });
 
-  const { data: menuItemsResponse, isLoading, error, refetch } = useGetMenuItemsQuery({
-    branchId,
-    search: searchQuery || undefined,
-    page: currentPage,
-    limit: itemsPerPage,
-  }, { skip: !branchId });
-  
-  const { data: categoriesResponse } = useGetCategoriesByBranchQuery(branchId || '', { skip: !branchId });
-  
-  const categories = useMemo(() => {
-    const cats = categoriesResponse as any;
-    if (!cats) return [];
+  // Build API query parameters
+  const queryParams = useMemo(() => {
+    const params: any = {
+      branchId,
+      page: currentPage,
+      limit: itemsPerPage,
+    };
     
-    // Handle different response structures
-    let categoriesArray: any[] = [];
-    
-    if (Array.isArray(cats)) {
-      categoriesArray = cats;
-    } else if (cats.data) {
-      if (Array.isArray(cats.data)) {
-        categoriesArray = cats.data;
-      } else if (Array.isArray(cats.data.categories)) {
-        categoriesArray = cats.data.categories;
-      }
-    } else if (Array.isArray(cats.categories)) {
-      categoriesArray = cats.categories;
+    // Add search if provided
+    if (committedSearch) {
+      params.search = committedSearch;
     }
     
-    // Ensure we always have an array
-    if (!Array.isArray(categoriesArray)) {
+    // Add category filter if not 'all'
+    if (categoryFilter !== 'all') {
+      params.categoryId = categoryFilter;
+    }
+    
+    // Add availability filter if not 'all'
+    if (availabilityFilter !== 'all') {
+      params.isAvailable = availabilityFilter === 'available';
+    }
+    
+    return params;
+  }, [branchId, currentPage, itemsPerPage, committedSearch, categoryFilter, availabilityFilter]);
+
+  const { data: menuItemsResponse, isLoading, error, refetch } = useGetMenuItemsQuery(
+    queryParams,
+    { skip: !branchId }
+  );
+  
+  // Get stats - fetch all items for accurate stats (without filters)
+  const { data: statsResponse } = useGetMenuItemsQuery(
+    { branchId, limit: 1000 },
+    { skip: !branchId }
+  );
+
+  // Calculate stats from real API data
+  const stats = useMemo(() => {
+    const statsItems = (statsResponse as any)?.menuItems || [];
+    const total = statsItems.length;
+    const available = statsItems.filter((item: any) => item.isAvailable !== false).length;
+    const unavailable = total - available;
+    const avgPrepTime = total > 0 
+      ? Math.round(statsItems.reduce((sum: number, item: any) => sum + (item.preparationTime || 0), 0) / total)
+      : 0;
+    const avgPopularity = total > 0
+      ? Number((statsItems.reduce((sum: number, item: any) => sum + (item.popularity || 4.0), 0) / total).toFixed(1))
+      : 0;
+    
+    return {
+      total,
+      available,
+      unavailable,
+      avgPrepTime,
+      avgPopularity,
+    };
+  }, [statsResponse]);
+  
+  // Get companyId for query (same as categories page)
+  const companyId = (user as any)?.companyId || 
+                   (companyContext as any)?.companyId || 
+                   (companyContext as any)?._id ||
+                   (companyContext as any)?.id;
+  
+  // Use the same query as categories page to ensure consistency
+  // This shows the same categories that appear on /dashboard/categories
+  const { data: categoriesResponse, isLoading: isLoadingCategories, isFetching: isFetchingCategories } = useGetCategoriesQuery(
+    { branchId, companyId },
+    { skip: !branchId && !companyId, refetchOnMountOrArgChange: true }
+  );
+  
+  // Fetch ingredients for the ingredient selector
+  const { data: ingredientsResponse, isLoading: isLoadingIngredients } = useGetInventoryItemsQuery(
+    { companyId, branchId, limit: 1000 },
+    { skip: !companyId }
+  );
+  
+  const availableIngredients = useMemo(() => {
+    if (!ingredientsResponse) {
+      console.log('📦 No ingredients response');
       return [];
     }
     
-    return categoriesArray.map((cat: any) => ({
-      id: cat._id || cat.id,
-      name: cat.name,
-    }));
+    const items = ingredientsResponse.items || [];
+    console.log('📦 Available ingredients:', items.length, items);
+    return items.filter((ing: any) => ing && ing.id && ing.name); // Filter out invalid entries
+  }, [ingredientsResponse]);
+  
+  const categories = useMemo(() => {
+    // useGetCategoriesQuery returns { categories: Category[], total: number }
+    if (!categoriesResponse) {
+      return [];
+    }
+    
+    // Extract categories array from response (same structure as categories page)
+    const cats = categoriesResponse.categories || [];
+    
+    return cats
+      .filter((cat: any) => cat && cat.id && cat.name) // Filter out invalid entries
+      .map((cat: any) => ({
+        id: String(cat.id || cat._id),
+        name: String(cat.name),
+      }));
   }, [categoriesResponse]);
   
-  const responseAny = menuItemsResponse as any;
-  console.log('📊 Menu Items API Response:', {
-    menuItemsResponse,
-    isLoading,
-    error,
-    menuItemsCount: responseAny?.menuItems?.length || responseAny?.items?.length || 0
-  });
 
   const [toggleAvailability] = useToggleAvailabilityMutation();
   const [createMenuItem, { isLoading: isCreating }] = useCreateMenuItemMutation();
@@ -159,24 +226,76 @@ export default function MenuItemsPage() {
       return [];
     }
     
-    return items.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description || '',
-      price: item.price,
-      category: item.category || 'Uncategorized',
-      subcategory: item.subcategory,
-      imageUrl: item.imageUrl,
-      isAvailable: item.isAvailable !== false,
-      preparationTime: item.preparationTime,
-      ingredients: item.ingredients || [],
-      allergens: item.allergens || [],
-      nutritionalInfo: item.nutritionalInfo,
-      tags: item.tags || [],
-      popularity: item.popularity || 4.0,
-      createdAt: item.createdAt || new Date().toISOString(),
-      updatedAt: item.updatedAt || new Date().toISOString(),
-    }));
+    return items.map((item: any) => {
+      // Extract category name - API should provide it as a string, but handle both formats as fallback
+      let categoryName = 'Uncategorized';
+      if (item.category) {
+        if (typeof item.category === 'string') {
+          categoryName = item.category;
+        } else if (item.category && typeof item.category === 'object') {
+          // Fallback: if category is still an object, extract the name
+          categoryName = item.category.name || item.categoryId?.name || 'Uncategorized';
+        }
+      }
+      
+      // Extract subcategory name - handle both object and string formats
+      let subcategoryName = undefined;
+      if (item.subcategory) {
+        if (typeof item.subcategory === 'string') {
+          subcategoryName = item.subcategory;
+        } else if (item.subcategory && typeof item.subcategory === 'object' && item.subcategory.name) {
+          subcategoryName = item.subcategory.name;
+        }
+      }
+      
+      // Extract categoryId - prefer string ID, fallback to extracting from object
+      let categoryIdValue = item.categoryId;
+      if (!categoryIdValue) {
+        // Try to extract from category object
+        if (item.category && typeof item.category === 'object' && item.category !== null) {
+          categoryIdValue = item.category._id || item.category.id;
+        } else if (item.categoryObject && typeof item.categoryObject === 'object' && item.categoryObject !== null) {
+          categoryIdValue = item.categoryObject._id || item.categoryObject.id;
+        }
+      }
+      // Ensure categoryId is always a string
+      if (categoryIdValue && typeof categoryIdValue === 'object' && categoryIdValue !== null) {
+        categoryIdValue = categoryIdValue._id || categoryIdValue.id;
+      }
+      categoryIdValue = categoryIdValue ? String(categoryIdValue) : '';
+      
+      // Handle ingredients - convert objects to display format if needed
+      let ingredientsArray: any[] = [];
+      if (item.ingredients && Array.isArray(item.ingredients)) {
+        ingredientsArray = item.ingredients;
+      }
+      
+      return {
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        price: item.price,
+        category: categoryName, // Always a string
+        subcategory: subcategoryName,
+        categoryId: categoryIdValue, // Always a string
+        imageUrl: item.imageUrl,
+        images: item.images || [],
+        isAvailable: item.isAvailable !== false,
+        preparationTime: item.preparationTime,
+        ingredients: ingredientsArray,
+        allergens: item.allergens || item.nutrition?.allergens || [],
+        nutritionalInfo: item.nutrition || item.nutritionalInfo || {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+        },
+        tags: item.tags || [],
+        popularity: item.popularity || 4.0,
+        createdAt: item.createdAt || new Date().toISOString(),
+        updatedAt: item.updatedAt || new Date().toISOString(),
+      };
+    });
   }, [menuItemsResponse]);
   
   // Extract total from API response (already transformed)
@@ -188,15 +307,75 @@ export default function MenuItemsPage() {
   useEffect(() => {
     if (isEditModalOpen && selectedMenuItem) {
       const itemData = selectedMenuItem as any;
+      
+      // Extract categoryId - handle both string and object formats
+      let categoryIdValue = itemData.categoryId || '';
+      
+      // Ensure categoryId is a string
+      if (categoryIdValue && typeof categoryIdValue !== 'string') {
+        categoryIdValue = String(categoryIdValue);
+      }
+      
+      // If categoryId is still not available or doesn't match any category, try to find it from categories array
+      if (!categoryIdValue || !categories.find((cat: any) => String(cat.id) === String(categoryIdValue))) {
+        // Try to find by category name
+        const matchingCategory = categories.find((cat: any) => {
+          const catId = String(cat.id);
+          const catName = cat.name;
+          return (
+            catId === String(itemData.categoryId) ||
+            catName === itemData.category ||
+            catId === String(itemData.category)
+          );
+        });
+        categoryIdValue = matchingCategory ? String(matchingCategory.id) : (categories[0] ? String(categories[0].id) : '');
+      }
+      
+      // Final fallback: ensure we have a valid categoryId
+      if (!categoryIdValue && categories.length > 0 && categories[0]) {
+        categoryIdValue = String(categories[0].id);
+      }
+      
+      // Convert ingredients from objects to structured format
+      let ingredientsArray: Array<{ ingredientId: string; quantity: number; unit: string }> = [];
+      if (itemData.ingredients && Array.isArray(itemData.ingredients)) {
+        ingredientsArray = itemData.ingredients.map((ing: any) => {
+          if (ing && typeof ing === 'object') {
+            // Handle object format: { ingredientId: {...} or string, quantity: number, unit: string }
+            let ingredientId = '';
+            if (ing.ingredientId) {
+              if (typeof ing.ingredientId === 'object' && ing.ingredientId !== null) {
+                // Populated ingredient object
+                ingredientId = ing.ingredientId._id || ing.ingredientId.id || '';
+              } else if (typeof ing.ingredientId === 'string') {
+                // Already a string ID
+                ingredientId = ing.ingredientId;
+              }
+            }
+            
+            // Only return if we have a valid ingredientId
+            if (ingredientId) {
+              return {
+                ingredientId: String(ingredientId),
+                quantity: Number(ing.quantity || 0),
+                unit: String(ing.unit || 'pcs'),
+              };
+            }
+          }
+          // Skip invalid ingredients
+          return null;
+        }).filter((ing: any) => ing !== null && ing.ingredientId) as Array<{ ingredientId: string; quantity: number; unit: string }>;
+      }
+      
       setFormData({
         name: itemData.name || '',
         description: itemData.description || '',
         price: itemData.price || 0,
-        categoryId: itemData.categoryId || categories[0]?.id || '',
+        categoryId: categoryIdValue,
         preparationTime: itemData.preparationTime || 0,
         isAvailable: itemData.isAvailable !== false,
         images: itemData.images || (itemData.imageUrl ? [itemData.imageUrl] : []),
-        ingredients: itemData.ingredients || [],
+        ingredients: ingredientsArray,
         allergens: itemData.allergens || [],
         tags: itemData.tags || [],
         nutritionalInfo: itemData.nutritionalInfo || {
@@ -220,7 +399,7 @@ export default function MenuItemsPage() {
         preparationTime: 0,
         isAvailable: true,
         images: [],
-        ingredients: [],
+        ingredients: [] as Array<{ ingredientId: string; quantity: number; unit: string }>,
         allergens: [],
         tags: [],
         nutritionalInfo: {
@@ -241,12 +420,53 @@ export default function MenuItemsPage() {
 
     try {
       const companyId = (companyContext as any)?.companyId || (user as any)?.companyId;
-      await createMenuItem({
-        ...formData,
+      
+      // Map form data to backend DTO structure
+      const payload: any = {
         companyId,
         branchId,
-        images: formData.images.filter(Boolean),
-      } as any).unwrap();
+        categoryId: formData.categoryId,
+        name: formData.name,
+        description: formData.description || undefined,
+        price: formData.price,
+        preparationTime: formData.preparationTime || undefined,
+        isAvailable: formData.isAvailable !== false,
+        images: formData.images.filter(Boolean).length > 0 ? formData.images.filter(Boolean) : undefined,
+        tags: formData.tags.length > 0 ? formData.tags : undefined,
+      };
+
+      // Add nutrition object if any nutritional info is provided
+      if (formData.nutritionalInfo && (
+        formData.nutritionalInfo.calories > 0 ||
+        formData.nutritionalInfo.protein > 0 ||
+        formData.nutritionalInfo.carbs > 0 ||
+        formData.nutritionalInfo.fat > 0
+      )) {
+        payload.nutrition = {
+          calories: formData.nutritionalInfo.calories || undefined,
+          protein: formData.nutritionalInfo.protein || undefined,
+          carbs: formData.nutritionalInfo.carbs || undefined,
+          fat: formData.nutritionalInfo.fat || undefined,
+          allergens: formData.allergens.length > 0 ? formData.allergens : undefined,
+        };
+      } else if (formData.allergens.length > 0) {
+        // If only allergens are provided, still include nutrition object
+        payload.nutrition = {
+          allergens: formData.allergens,
+        };
+      }
+
+      // Handle ingredients - backend expects array of {ingredientId, quantity, unit}
+      // Filter out ingredients without ingredientId
+      const validIngredients = formData.ingredients.filter(ing => ing.ingredientId && ing.quantity > 0);
+      if (validIngredients.length > 0) {
+        payload.ingredients = validIngredients;
+      } else {
+        // Empty ingredients array - clear existing ingredients
+        payload.ingredients = [];
+      }
+
+      await createMenuItem(payload).unwrap();
       toast.success('Menu item created successfully');
       setIsCreateModalOpen(false);
       refetch();
@@ -262,11 +482,50 @@ export default function MenuItemsPage() {
     }
 
     try {
-      await updateMenuItem({
+      // Map form data to backend DTO structure
+      const payload: any = {
         id: selectedMenuItem.id,
-        ...formData,
-        images: formData.images.filter(Boolean),
-      } as any).unwrap();
+        categoryId: formData.categoryId,
+        name: formData.name,
+        description: formData.description || undefined,
+        price: formData.price,
+        preparationTime: formData.preparationTime || undefined,
+        isAvailable: formData.isAvailable !== false,
+        images: formData.images.filter(Boolean).length > 0 ? formData.images.filter(Boolean) : undefined,
+        tags: formData.tags.length > 0 ? formData.tags : undefined,
+      };
+
+      // Add nutrition object if any nutritional info is provided
+      if (formData.nutritionalInfo && (
+        formData.nutritionalInfo.calories > 0 ||
+        formData.nutritionalInfo.protein > 0 ||
+        formData.nutritionalInfo.carbs > 0 ||
+        formData.nutritionalInfo.fat > 0
+      )) {
+        payload.nutrition = {
+          calories: formData.nutritionalInfo.calories || undefined,
+          protein: formData.nutritionalInfo.protein || undefined,
+          carbs: formData.nutritionalInfo.carbs || undefined,
+          fat: formData.nutritionalInfo.fat || undefined,
+          allergens: formData.allergens.length > 0 ? formData.allergens : undefined,
+        };
+      } else if (formData.allergens.length > 0) {
+        payload.nutrition = {
+          allergens: formData.allergens,
+        };
+      }
+
+      // Handle ingredients - backend expects array of {ingredientId, quantity, unit}
+      // Filter out ingredients without ingredientId
+      const validIngredients = formData.ingredients.filter(ing => ing.ingredientId && ing.quantity > 0);
+      if (validIngredients.length > 0) {
+        payload.ingredients = validIngredients;
+      } else {
+        // Empty ingredients array - clear existing ingredients
+        payload.ingredients = [];
+      }
+
+      await updateMenuItem(payload).unwrap();
       toast.success('Menu item updated successfully');
       setIsEditModalOpen(false);
       setSelectedMenuItem(null);
@@ -321,13 +580,16 @@ export default function MenuItemsPage() {
   const addIngredient = () => {
     setFormData({
       ...formData,
-      ingredients: [...formData.ingredients, ''],
+      ingredients: [...formData.ingredients, { ingredientId: '', quantity: 0, unit: 'pcs' }],
     });
   };
   
-  const updateIngredient = (index: number, value: string) => {
+  const updateIngredient = (index: number, field: 'ingredientId' | 'quantity' | 'unit', value: string | number) => {
     const newIngredients = [...formData.ingredients];
-    newIngredients[index] = value;
+    newIngredients[index] = {
+      ...newIngredients[index],
+      [field]: field === 'quantity' ? Number(value) : value,
+    };
     setFormData({ ...formData, ingredients: newIngredients });
   };
   
@@ -474,13 +736,24 @@ export default function MenuItemsPage() {
     },
   ];
 
-  const stats = {
-    total: menuItems.length,
-    available: menuItems.filter((i: MenuItem) => i.isAvailable).length,
-    unavailable: menuItems.filter((i: MenuItem) => !i.isAvailable).length,
-    avgPrepTime: menuItems.length > 0 ? Math.round(menuItems.reduce((sum: number, item: MenuItem) => sum + (item.preparationTime || 0), 0) / menuItems.length) : 0,
-    avgPopularity: menuItems.length > 0 ? Number((menuItems.reduce((sum: number, item: MenuItem) => sum + (item.popularity || 0), 0) / menuItems.length).toFixed(1)) : 0,
-  };
+  // Filter menu items based on client-side filters (for display)
+  const filteredMenuItems = useMemo(() => {
+    let filtered = menuItems;
+
+    // Category filter is handled by API, but we can add client-side filtering as fallback
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter((item: MenuItem) => item.categoryId === categoryFilter);
+    }
+
+    // Availability filter is handled by API, but we can add client-side filtering as fallback
+    if (availabilityFilter !== 'all') {
+      filtered = filtered.filter((item: MenuItem) => 
+        availabilityFilter === 'available' ? item.isAvailable : !item.isAvailable
+      );
+    }
+
+    return filtered;
+  }, [menuItems, categoryFilter, availabilityFilter]);
 
   if (isLoading) {
     return (
@@ -588,6 +861,12 @@ export default function MenuItemsPage() {
                 placeholder="Search menu items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setCommittedSearch(searchQuery);
+                    setCurrentPage(1);
+                  }
+                }}
               />
             </div>
             <div className="w-full sm:w-48">
@@ -619,9 +898,9 @@ export default function MenuItemsPage() {
 
       {/* Menu Items Table */}
       <DataTable
-        data={menuItems}
+        data={filteredMenuItems}
         columns={columns}
-        loading={false}
+        loading={isLoading}
         searchable={false}
         selectable={true}
         pagination={{
@@ -636,8 +915,9 @@ export default function MenuItemsPage() {
         exportFilename="menu-items"
         onExport={(format, items) => {
           console.log(`Exporting ${items.length} menu items as ${format}`);
+          toast.success(`Exporting ${items.length} menu items as ${format.toUpperCase()}`);
         }}
-        emptyMessage="No menu items found."
+        emptyMessage={isLoading ? 'Loading menu items...' : error ? 'Error loading menu items. Please try again.' : 'No menu items found.'}
       />
 
       {/* Menu Item Details Modal */}
@@ -741,45 +1021,52 @@ export default function MenuItemsPage() {
               )}
 
               {/* Nutritional Info */}
-              {selectedMenuItem.nutritionalInfo && (
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">Nutritional Information</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    {selectedMenuItem.nutritionalInfo.calories && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Calories:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {selectedMenuItem.nutritionalInfo.calories}
-                        </span>
-                      </div>
-                    )}
-                    {selectedMenuItem.nutritionalInfo.protein && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Protein:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {selectedMenuItem.nutritionalInfo.protein}g
-                        </span>
-                      </div>
-                    )}
-                    {selectedMenuItem.nutritionalInfo.carbs && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Carbs:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {selectedMenuItem.nutritionalInfo.carbs}g
-                        </span>
-                      </div>
-                    )}
-                    {selectedMenuItem.nutritionalInfo.fat && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Fat:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {selectedMenuItem.nutritionalInfo.fat}g
-                        </span>
-                      </div>
-                    )}
+              {(() => {
+                const nutrition = selectedMenuItem.nutritionalInfo;
+                if (!nutrition) return null;
+                const hasNutrition = (nutrition.calories || 0) > 0 || (nutrition.protein || 0) > 0 || (nutrition.carbs || 0) > 0 || (nutrition.fat || 0) > 0;
+                if (!hasNutrition) return null;
+                
+                return (
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white mb-3">Nutritional Information</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      {(nutrition.calories || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Calories:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {nutrition.calories}
+                          </span>
+                        </div>
+                      )}
+                      {(nutrition.protein || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Protein:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {nutrition.protein}g
+                          </span>
+                        </div>
+                      )}
+                      {(nutrition.carbs || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Carbs:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {nutrition.carbs}g
+                          </span>
+                        </div>
+                      )}
+                      {(nutrition.fat || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Fat:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {nutrition.fat}g
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Tags */}
               {selectedMenuItem.tags && (
@@ -851,12 +1138,26 @@ export default function MenuItemsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Category *
               </label>
-              <Select
-                options={categories.map((cat: any) => ({ value: cat.id, label: cat.name }))}
-                value={formData.categoryId}
-                onChange={(value) => setFormData({ ...formData, categoryId: value })}
-                placeholder="Select category"
-              />
+              {isLoadingCategories || isFetchingCategories ? (
+                <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 dark:bg-gray-800 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400">
+                  Loading categories...
+                </div>
+              ) : !branchId ? (
+                <div className="px-3 py-2 border border-yellow-300 rounded-md bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800 text-sm text-yellow-600 dark:text-yellow-400">
+                  No branch selected. Please select a branch first.
+                </div>
+              ) : categories.length > 0 ? (
+                <Select
+                  options={categories.map((cat: any) => ({ value: String(cat.id), label: cat.name }))}
+                  value={formData.categoryId ? String(formData.categoryId) : ''}
+                  onChange={(value) => setFormData({ ...formData, categoryId: value })}
+                  placeholder="Select category"
+                />
+              ) : (
+                <div className="px-3 py-2 border border-red-300 rounded-md bg-red-50 dark:bg-red-900/20 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
+                  No categories available. Please create a category first. (Branch ID: {branchId || 'none'})
+                </div>
+              )}
             </div>
           </div>
 
@@ -916,21 +1217,76 @@ export default function MenuItemsPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Ingredients
             </label>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {formData.ingredients.map((ingredient, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    value={ingredient}
-                    onChange={(e) => updateIngredient(index, e.target.value)}
-                    placeholder="Ingredient name"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => removeIngredient(index)}
-                  >
-                    <XMarkIcon className="w-4 h-4" />
-                  </Button>
+                <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-5">
+                    {isLoadingIngredients ? (
+                      <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 dark:bg-gray-800 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400">
+                        Loading ingredients...
+                      </div>
+                    ) : availableIngredients.length > 0 ? (
+                      <Select
+                        options={[
+                          { value: '', label: 'Select ingredient' },
+                          ...availableIngredients.map((ing: any) => ({
+                            value: String(ing.id),
+                            label: `${ing.name} (${ing.unit || 'pcs'})`,
+                          })),
+                        ]}
+                        value={ingredient.ingredientId}
+                        onChange={(value) => {
+                          const selectedIng = availableIngredients.find((ing: any) => String(ing.id) === String(value));
+                          updateIngredient(index, 'ingredientId', value);
+                          if (selectedIng) {
+                            updateIngredient(index, 'unit', selectedIng.unit || 'pcs');
+                          }
+                        }}
+                        placeholder="Select ingredient"
+                      />
+                    ) : (
+                      <div className="px-3 py-2 border border-yellow-300 rounded-md bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800 text-sm text-yellow-600 dark:text-yellow-400">
+                        No ingredients available. Please create ingredients first.
+                      </div>
+                    )}
+                  </div>
+                  <div className="col-span-3">
+                    <Input
+                      type="number"
+                      value={ingredient.quantity}
+                      onChange={(e) => updateIngredient(index, 'quantity', Number(e.target.value))}
+                      placeholder="Quantity"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <Select
+                      options={[
+                        { value: 'pcs', label: 'pcs' },
+                        { value: 'kg', label: 'kg' },
+                        { value: 'g', label: 'g' },
+                        { value: 'l', label: 'l' },
+                        { value: 'ml', label: 'ml' },
+                        { value: 'box', label: 'box' },
+                        { value: 'pack', label: 'pack' },
+                        { value: 'bottle', label: 'bottle' },
+                        { value: 'can', label: 'can' },
+                      ]}
+                      value={ingredient.unit}
+                      onChange={(value) => updateIngredient(index, 'unit', value)}
+                      placeholder="Unit"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => removeIngredient(index)}
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
               <Button

@@ -43,7 +43,7 @@ export default function SuppliersPage() {
   const companyId = (user as any)?.companyId || 
                     (companyContext as any)?.companyId;
 
-  const { data: suppliersResponse, isLoading } = useGetSuppliersQuery({
+    const { data: suppliersResponse, isLoading, refetch } = useGetSuppliersQuery({
     companyId,
     search: searchQuery || undefined,
     isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
@@ -195,6 +195,7 @@ export default function SuppliersPage() {
       toast.success('Supplier created successfully');
       setIsCreateModalOpen(false);
       resetForm();
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to create supplier');
     }
@@ -240,6 +241,7 @@ export default function SuppliersPage() {
       toast.success('Supplier updated successfully');
       setIsEditModalOpen(false);
       resetForm();
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to update supplier');
     }
@@ -251,6 +253,7 @@ export default function SuppliersPage() {
     try {
       await deleteSupplier(supplier.id).unwrap();
       toast.success('Supplier deleted successfully');
+      refetch();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to delete supplier');
     }
@@ -265,6 +268,7 @@ export default function SuppliersPage() {
         await activateSupplier(supplier.id).unwrap();
         toast.success('Supplier activated successfully');
       }
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to toggle supplier status');
     }
@@ -279,6 +283,7 @@ export default function SuppliersPage() {
         await makePreferred(supplier.id).unwrap();
         toast.success('Added to preferred suppliers');
       }
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to toggle preferred status');
     }

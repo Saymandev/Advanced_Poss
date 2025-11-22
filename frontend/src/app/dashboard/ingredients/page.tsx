@@ -41,15 +41,38 @@ export default function IngredientsPage() {
                    (companyContext as any)?.branches?.[0]?.id;
 
   const companyId = (user as any)?.companyId || 
-                    (companyContext as any)?.companyId;
+                    (companyContext as any)?.companyId ||
+                    (companyContext as any)?._id ||
+                    (companyContext as any)?.id;
 
-  const { data: ingredientsResponse, isLoading } = useGetInventoryItemsQuery({
-    branchId,
-    search: searchQuery || undefined,
-    category: categoryFilter === 'all' ? undefined : categoryFilter,
-    page: currentPage,
-    limit: itemsPerPage,
-  }, { skip: !branchId });
+  const queryParams = useMemo(() => {
+    if (!companyId) return null;
+    
+    const params: Record<string, any> = {
+      companyId,
+      page: currentPage,
+      limit: itemsPerPage,
+    };
+
+    if (branchId) {
+      params.branchId = branchId;
+    }
+
+    const trimmedSearch = searchQuery.trim();
+    if (trimmedSearch) {
+      params.search = trimmedSearch;
+    }
+
+    if (categoryFilter !== 'all') {
+      params.category = categoryFilter;
+    }
+
+    return params;
+  }, [companyId, branchId, categoryFilter, searchQuery, currentPage, itemsPerPage]);
+
+  const { data: ingredientsResponse, isLoading, refetch } = useGetInventoryItemsQuery(queryParams!, {
+    skip: !queryParams,
+  });
 
   const [createIngredient, { isLoading: isCreating }] = useCreateInventoryItemMutation();
   const [updateIngredient, { isLoading: isUpdating }] = useUpdateInventoryItemMutation();
@@ -166,6 +189,7 @@ export default function IngredientsPage() {
       toast.success('Ingredient created successfully');
       setIsCreateModalOpen(false);
       resetForm();
+      await refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to create ingredient');
     }
@@ -200,6 +224,7 @@ export default function IngredientsPage() {
       toast.success('Ingredient updated successfully');
       setIsEditModalOpen(false);
       resetForm();
+      await refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to update ingredient');
     }
@@ -211,6 +236,7 @@ export default function IngredientsPage() {
     try {
       await deleteIngredient(ingredient.id).unwrap();
       toast.success('Ingredient deleted successfully');
+      await refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to delete ingredient');
     }
@@ -242,6 +268,7 @@ export default function IngredientsPage() {
       toast.success('Stock adjusted successfully');
       setIsAdjustStockModalOpen(false);
       resetStockAdjustment();
+      await refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to adjust stock');
     }

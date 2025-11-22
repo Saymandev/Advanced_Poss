@@ -117,8 +117,38 @@ export const categoriesApi = apiSlice.injectEndpoints({
     getCategoriesByBranch: builder.query<Category[], string>({
       query: (branchId) => `/categories/branch/${branchId}`,
       transformResponse: (response: any) => {
-        const data = response.data || response;
-        const items = Array.isArray(data) ? data : (data.categories || data.items || []);
+        // Handle wrapped response from TransformInterceptor: { success: true, data: [...] }
+        // or direct response: [...]
+        let data: any;
+        
+        if (response && typeof response === 'object') {
+          if (response.success && response.data) {
+            // Wrapped response: { success: true, data: [...] }
+            data = response.data;
+          } else if (response.data) {
+            // Has data property
+            data = response.data;
+          } else {
+            // Direct response
+            data = response;
+          }
+        } else {
+          data = response;
+        }
+        
+        // Extract items array
+        let items: any[] = [];
+        if (Array.isArray(data)) {
+          items = data;
+        } else if (data && typeof data === 'object') {
+          if (Array.isArray(data.categories)) {
+            items = data.categories;
+          } else if (Array.isArray(data.items)) {
+            items = data.items;
+          }
+        }
+        
+        // Map to Category format
         return items.map((cat: any) => ({
           id: cat._id || cat.id,
           name: cat.name,
@@ -142,6 +172,23 @@ export const categoriesApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        const cat = response.data || response;
+        return {
+          id: cat._id || cat.id,
+          name: cat.name,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          sortOrder: cat.sortOrder,
+          isActive: cat.isActive !== undefined ? cat.isActive : true,
+          type: cat.type,
+          companyId: cat.companyId || cat.company?.id || cat.company?._id,
+          branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          createdAt: cat.createdAt || new Date().toISOString(),
+          updatedAt: cat.updatedAt || new Date().toISOString(),
+        } as Category;
+      },
       invalidatesTags: ['Category'],
     }),
     updateCategory: builder.mutation<Category, UpdateCategoryRequest>({
@@ -150,6 +197,23 @@ export const categoriesApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        const cat = response.data || response;
+        return {
+          id: cat._id || cat.id,
+          name: cat.name,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          sortOrder: cat.sortOrder,
+          isActive: cat.isActive !== undefined ? cat.isActive : true,
+          type: cat.type,
+          companyId: cat.companyId || cat.company?.id || cat.company?._id,
+          branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          createdAt: cat.createdAt || new Date().toISOString(),
+          updatedAt: cat.updatedAt || new Date().toISOString(),
+        } as Category;
+      },
       invalidatesTags: ['Category'],
     }),
     updateCategorySortOrder: builder.mutation<Category, { id: string; sortOrder: number }>({

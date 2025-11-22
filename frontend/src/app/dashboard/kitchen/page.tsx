@@ -3,6 +3,8 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import {
   KitchenOrder,
   useCancelKitchenOrderMutation,
@@ -21,9 +23,11 @@ import {
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
+  ArrowPathIcon,
   CheckCircleIcon,
   ClockIcon,
   FireIcon,
+  MagnifyingGlassIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -33,6 +37,8 @@ export default function KitchenPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [selectedOrder, setSelectedOrder] = useState<KitchenOrder | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterOrderType, setFilterOrderType] = useState<'all' | 'dine-in' | 'takeaway' | 'delivery'>('all');
 
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
@@ -95,47 +101,68 @@ export default function KitchenPage() {
     return () => clearInterval(interval);
   }, [branchId, refetchAll]);
 
-  // Extract data from API responses
+  // Extract data from API responses (already transformed by API)
   const kitchenStats = useMemo(() => {
     if (!statsResponse) return null;
-    const response = statsResponse as any;
-    return response.data || response;
+    return statsResponse;
   }, [statsResponse]);
 
   const pendingOrders = useMemo(() => {
-    if (!pendingResponse) return [];
-    const response = pendingResponse as any;
-    const items = response.data || (Array.isArray(response) ? response : []);
-    return Array.isArray(items) ? items : [];
+    return pendingResponse || [];
   }, [pendingResponse]);
 
   const preparingOrders = useMemo(() => {
-    if (!preparingResponse) return [];
-    const response = preparingResponse as any;
-    const items = response.data || (Array.isArray(response) ? response : []);
-    return Array.isArray(items) ? items : [];
+    return preparingResponse || [];
   }, [preparingResponse]);
 
   const readyOrders = useMemo(() => {
-    if (!readyResponse) return [];
-    const response = readyResponse as any;
-    const items = response.data || (Array.isArray(response) ? response : []);
-    return Array.isArray(items) ? items : [];
+    return readyResponse || [];
   }, [readyResponse]);
 
   const urgentOrders = useMemo(() => {
-    if (!urgentResponse) return [];
-    const response = urgentResponse as any;
-    const items = response.data || (Array.isArray(response) ? response : []);
-    return Array.isArray(items) ? items : [];
+    return urgentResponse || [];
   }, [urgentResponse]);
 
   const delayedOrders = useMemo(() => {
-    if (!delayedResponse) return [];
-    const response = delayedResponse as any;
-    const items = response.data || (Array.isArray(response) ? response : []);
-    return Array.isArray(items) ? items : [];
+    return delayedResponse || [];
   }, [delayedResponse]);
+
+  // Calculate elapsed time for orders
+  const getElapsedTime = useCallback((order: any) => {
+    if (!order.receivedAt && !order.createdAt) return 0;
+    const startTime = new Date(order.receivedAt || order.createdAt).getTime();
+    const now = Date.now();
+    return Math.floor((now - startTime) / 60000); // minutes
+  }, []);
+
+
+  // Filter orders based on search and filter
+  const filterOrders = useCallback((orders: any[]) => {
+    return orders.filter((order: any) => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesOrderNumber = order.orderNumber?.toLowerCase().includes(query);
+        const matchesTableNumber = order.tableNumber?.toLowerCase().includes(query);
+        const matchesCustomerName = order.customerName?.toLowerCase().includes(query);
+        if (!matchesOrderNumber && !matchesTableNumber && !matchesCustomerName) {
+          return false;
+        }
+      }
+      
+      // Order type filter
+      if (filterOrderType !== 'all' && order.orderType !== filterOrderType) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [searchQuery, filterOrderType]);
+
+  // Apply filters to orders
+  const filteredPendingOrders = useMemo(() => filterOrders(pendingOrders), [pendingOrders, filterOrders]);
+  const filteredPreparingOrders = useMemo(() => filterOrders(preparingOrders), [preparingOrders, filterOrders]);
+  const filteredReadyOrders = useMemo(() => filterOrders(readyOrders), [readyOrders, filterOrders]);
 
   // Mutations
   const [startOrder] = useStartKitchenOrderMutation();
@@ -251,7 +278,7 @@ export default function KitchenPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Kitchen Display</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -259,6 +286,15 @@ export default function KitchenPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => refetchAll()}
+            title="Refresh Orders"
+          >
+            <ArrowPathIcon className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
           <div className="text-right">
             <p className="text-sm text-gray-600 dark:text-gray-400">Current Time</p>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -281,6 +317,38 @@ export default function KitchenPage() {
           </div>
         </div>
       </div>
+
+      {/* Search and Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search by order number, table, or customer..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="w-full sm:w-48">
+              <Select
+                options={[
+                  { value: 'all', label: 'All Order Types' },
+                  { value: 'dine-in', label: 'Dine-In' },
+                  { value: 'takeaway', label: 'Takeaway' },
+                  { value: 'delivery', label: 'Delivery' },
+                ]}
+                value={filterOrderType}
+                onChange={(value) => setFilterOrderType(value as any)}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Kitchen Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -348,7 +416,7 @@ export default function KitchenPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ClockIcon className="w-5 h-5 text-yellow-600" />
-              Pending Orders ({pendingOrders.length})
+              Pending Orders ({filteredPendingOrders.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -357,21 +425,27 @@ export default function KitchenPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mx-auto"></div>
                 <p className="text-gray-600 dark:text-gray-400 mt-2">Loading orders...</p>
               </div>
-            ) : pendingOrders.length === 0 ? (
+            ) : filteredPendingOrders.length === 0 ? (
               <div className="text-center py-8">
                 <ClockIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 dark:text-gray-400">No pending orders</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {searchQuery || filterOrderType !== 'all' ? 'No orders match your filters' : 'No pending orders'}
+                </p>
               </div>
             ) : (
-              pendingOrders.map((order: any) => (
-              <div 
-                key={order.id || order._id} 
-                className={`border rounded-lg p-4 ${
-                  order.priority === 'urgent' 
-                    ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
-                    : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
-                }`}
-              >
+              filteredPendingOrders.map((order: any) => {
+                const elapsedMinutes = getElapsedTime(order);
+                const isUrgent = order.isUrgent || order.priority === 'urgent' || elapsedMinutes > 20;
+                const isDelayed = order.isDelayed || elapsedMinutes > 30;
+                return (
+                  <div 
+                    key={order.id || order._id} 
+                    className={`border rounded-lg p-4 ${
+                      isUrgent || isDelayed
+                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
+                        : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
+                    }`}
+                  >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -388,8 +462,13 @@ export default function KitchenPage() {
                        order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
-                      {formatDateTime(order.createdAt)}
+                      {formatDateTime(order.receivedAt || order.createdAt)}
                     </p>
+                    {order.receivedAt && (
+                      <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mt-1">
+                        Elapsed: {getElapsedTime(order)} min
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -455,8 +534,9 @@ export default function KitchenPage() {
                     <XCircleIcon className="w-4 h-4" />
                   </Button>
                 </div>
-              </div>
-            ))
+                  </div>
+                );
+              })
             )}
           </CardContent>
         </Card>
@@ -466,7 +546,7 @@ export default function KitchenPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FireIcon className="w-5 h-5 text-blue-600" />
-              Preparing ({preparingOrders.length})
+              Preparing ({filteredPreparingOrders.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -475,21 +555,25 @@ export default function KitchenPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="text-gray-600 dark:text-gray-400 mt-2">Loading orders...</p>
               </div>
-            ) : preparingOrders.length === 0 ? (
+            ) : filteredPreparingOrders.length === 0 ? (
               <div className="text-center py-8">
                 <FireIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 dark:text-gray-400">No orders being prepared</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {searchQuery || filterOrderType !== 'all' ? 'No orders match your filters' : 'No orders being prepared'}
+                </p>
               </div>
             ) : (
-              preparingOrders.map((order: any) => (
-              <div 
-                key={order.id || order._id} 
-                className={`border rounded-lg p-4 ${
-                  order.priority === 'urgent' 
-                    ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' 
-                    : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
-                }`}
-              >
+              filteredPreparingOrders.map((order: any) => {
+                const elapsedMinutes = getElapsedTime(order);
+                return (
+                  <div 
+                    key={order.id || order._id} 
+                    className={`border rounded-lg p-4 ${
+                      order.priority === 'urgent' 
+                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' 
+                        : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
+                    }`}
+                  >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -505,6 +589,11 @@ export default function KitchenPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-500">
                       Est: {order.estimatedTime ? `${order.estimatedTime} min` : 'TBD'}
                     </p>
+                    {order.startedAt && (
+                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-1">
+                        Prep time: {elapsedMinutes} min
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -557,8 +646,9 @@ export default function KitchenPage() {
                     </Button>
                   )}
                 </div>
-              </div>
-            ))
+                  </div>
+                );
+              })
             )}
           </CardContent>
         </Card>
@@ -568,7 +658,7 @@ export default function KitchenPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircleIcon className="w-5 h-5 text-green-600" />
-              Ready for Service ({readyOrders.length})
+              Ready for Service ({filteredReadyOrders.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -577,14 +667,17 @@ export default function KitchenPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
                 <p className="text-gray-600 dark:text-gray-400 mt-2">Loading orders...</p>
               </div>
-            ) : readyOrders.length === 0 ? (
+            ) : filteredReadyOrders.length === 0 ? (
               <div className="text-center py-8">
                 <CheckCircleIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 dark:text-gray-400">No orders ready for service</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {searchQuery || filterOrderType !== 'all' ? 'No orders match your filters' : 'No orders ready for service'}
+                </p>
               </div>
             ) : (
-              readyOrders.map((order: any) => (
-              <div key={order.id || order._id} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
+              filteredReadyOrders.map((order: any) => {
+                return (
+                  <div key={order.id || order._id} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -629,8 +722,9 @@ export default function KitchenPage() {
                 >
                   Mark as Served
                 </Button>
-              </div>
-            ))
+                  </div>
+                );
+              })
             )}
           </CardContent>
         </Card>

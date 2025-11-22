@@ -1,20 +1,48 @@
 import { apiSlice } from '../apiSlice';
 
 export interface DashboardStats {
-  todaySales: number;
-  todayOrders: number;
-  activeOrders: number;
-  totalCustomers: number;
-  salesTrend: Array<{
+  today?: {
+    orders: number;
+    completed: number;
+    revenue: number;
+    averageOrderValue: number;
+  };
+  week?: {
+    orders: number;
+    revenue: number;
+  };
+  month?: {
+    orders: number;
+    revenue: number;
+  };
+  active?: {
+    orders: number;
+  };
+  customers?: {
+    total: number;
+    active: number;
+    vip: number;
+  };
+  inventory?: {
+    lowStock: number;
+    outOfStock: number;
+  };
+  timestamp?: Date;
+  // Legacy fields for backwards compatibility
+  todaySales?: number;
+  todayOrders?: number;
+  activeOrders?: number;
+  totalCustomers?: number;
+  salesTrend?: Array<{
     date: string;
     sales: number;
   }>;
-  topSellingItems: Array<{
+  topSellingItems?: Array<{
     name: string;
     quantity: number;
     revenue: number;
   }>;
-  recentOrders: Array<{
+  recentOrders?: Array<{
     id: string;
     orderNumber: string;
     customerName?: string;
@@ -108,7 +136,67 @@ export const reportsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Report'],
       transformResponse: (response: any) => {
-        return response.data || response;
+        const data = response.data || response;
+        // Backend returns: { period, data: [...], summary: { totalRevenue, totalOrders, averageOrderValue } }
+        return {
+          period: data.period || 'week',
+          totalSales: data.summary?.totalRevenue || 0,
+          totalOrders: data.summary?.totalOrders || 0,
+          averageOrderValue: data.summary?.averageOrderValue || 0,
+          salesByDay: (data.data || []).map((item: any) => ({
+            day: item.date || item.day || '',
+            sales: item.revenue || item.sales || 0,
+            orders: item.orders || 0,
+          })),
+          salesByCategory: [], // Will be fetched separately
+          salesByHour: [], // Will be fetched separately
+        };
+      },
+    }),
+    getRevenueByCategory: builder.query<Array<{
+      category: string;
+      sales: number;
+      percentage: number;
+    }>, { branchId?: string }>({
+      query: (params) => ({
+        url: '/reports/revenue-by-category',
+        params,
+      }),
+      providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return (Array.isArray(data) ? data : []).map((item: any) => ({
+          category: item.categoryId || item.category || 'Unknown',
+          sales: item.revenue || item.sales || 0,
+          percentage: item.percentage || 0,
+        }));
+      },
+    }),
+    getPeakHours: builder.query<{
+      hourlyData: Array<{ hour: number; orders: number; sales: number }>;
+      peakHours: Array<{ hour: number; orders: number; sales: number }>;
+      busiestHour: { hour: number; orders: number; sales: number };
+    }, { branchId?: string; startDate?: string; endDate?: string }>({
+      query: (params) => {
+        if (!params.branchId) {
+          throw new Error('branchId is required for peak hours query');
+        }
+        return {
+          url: `/reports/peak-hours/${params.branchId}`,
+          params: {
+            startDate: params.startDate,
+            endDate: params.endDate,
+          },
+        };
+      },
+      providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          hourlyData: data.hourlyData || [],
+          peakHours: data.peakHours || [],
+          busiestHour: data.busiestHour || { hour: 0, orders: 0, sales: 0 },
+        };
       },
     }),
     
@@ -188,5 +276,7 @@ export const {
   useGetInventoryReportQuery,
   useGetCustomerReportQuery,
   useGetStaffReportQuery,
+  useGetRevenueByCategoryQuery,
+  useGetPeakHoursQuery,
   useExportReportMutation,
 } = reportsApi;

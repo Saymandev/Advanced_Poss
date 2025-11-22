@@ -48,7 +48,11 @@ export default function TablesPage() {
     status: statusFilter === 'all' ? undefined : statusFilter,
     page: currentPage,
     limit: itemsPerPage,
-  }, { skip: !branchId });
+  }, { 
+    skip: !branchId,
+    // Auto-refresh every 5 seconds to sync table status
+    pollingInterval: 5000,
+  });
 
   console.log('🔍 Tables Query State:', { isLoading, error, tablesResponse });
 
