@@ -47,25 +47,53 @@ export default function CustomersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
+  const companyId = (user as any)?.companyId || 
+                   (companyContext as any)?.companyId;
+  
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
 
-  const { data: customersResponse, isLoading } = useGetCustomersQuery({
-    branchId,
-    search: searchQuery || undefined,
-    page: currentPage,
-    limit: itemsPerPage,
-  }, { skip: !branchId });
+  const queryParams = useMemo(() => {
+    const params: any = {
+      page: currentPage,
+      limit: itemsPerPage,
+    };
+    
+    if (branchId) params.branchId = branchId;
+    if (companyId) params.companyId = companyId;
+    if (searchQuery) params.search = searchQuery;
+    
+    return params;
+  }, [branchId, companyId, searchQuery, currentPage, itemsPerPage]);
 
-  const { data: selectedCustomerData } = useGetCustomerByIdQuery(selectedCustomerId, {
-    skip: !selectedCustomerId || !isViewModalOpen,
+  const { data: customersResponse, isLoading, error, refetch } = useGetCustomersQuery(queryParams, { 
+    skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   });
 
-  const { data: customerOrdersData } = useGetCustomerOrdersQuery(selectedCustomerId, {
+  const { data: selectedCustomerData, refetch: refetchCustomerData } = useGetCustomerByIdQuery(selectedCustomerId, {
     skip: !selectedCustomerId || !isViewModalOpen,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
   });
+
+  const { data: customerOrdersData, refetch: refetchCustomerOrders } = useGetCustomerOrdersQuery(selectedCustomerId, {
+    skip: !selectedCustomerId || !isViewModalOpen,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+  });
+
+  // Refetch customer data when modal opens to ensure fresh data
+  useEffect(() => {
+    if (isViewModalOpen && selectedCustomerId) {
+      refetchCustomerData();
+      refetchCustomerOrders();
+    }
+  }, [isViewModalOpen, selectedCustomerId, refetchCustomerData, refetchCustomerOrders]);
 
   const { data: loyaltyHistoryData } = useGetCustomerLoyaltyHistoryQuery(selectedCustomerId, {
     skip: !selectedCustomerId || !isLoyaltyModalOpen,
@@ -155,6 +183,8 @@ export default function CustomersPage() {
     phoneNumber: '',
   });
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (!isCreateModalOpen && !isEditModalOpen) {
       resetForm();
@@ -170,32 +200,112 @@ export default function CustomersPage() {
     });
     setSelectedCustomer(null);
     setSelectedCustomerId('');
+    setFormErrors({});
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.firstName?.trim()) {
+      errors.firstName = 'First name is required';
+    }
+
+    if (!formData.lastName?.trim()) {
+      errors.lastName = 'Last name is required';
+    }
+
+    if (!formData.email?.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    if (formData.phoneNumber && !/^[\d\s\-\+\(\)]+$/.test(formData.phoneNumber)) {
+      errors.phoneNumber = 'Please enter a valid phone number';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleCreate = async () => {
-    if (!formData.firstName || !formData.lastName || !formData.email) {
-      toast.error('First name, last name, and email are required');
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
+      return;
+    }
+
+    if (!companyId) {
+      toast.error('Company ID is missing');
       return;
     }
 
     try {
-      const payload = {
-        ...formData,
-        branchId,
-      } as any;
+      const payload: any = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        companyId, // Backend expects 'companyId'
+      };
+      
+      // Only include phone if provided (now optional)
+      if (formData.phoneNumber && formData.phoneNumber.trim()) {
+        payload.phone = formData.phoneNumber.trim();
+      }
+      
+      // Include branchId if available (now supported by CreateCustomerDto)
+      if (branchId) {
+        payload.branchId = branchId;
+      }
+      
+      // Only include optional fields if they have values
+      if (formData.dateOfBirth) payload.dateOfBirth = formData.dateOfBirth;
+      if (formData.address) payload.address = formData.address;
+      if (formData.preferences) payload.preferences = formData.preferences;
+      if (formData.notes) payload.notes = formData.notes;
+      
       await createCustomer(payload).unwrap();
       toast.success('Customer created successfully');
       setIsCreateModalOpen(false);
       resetForm();
+      
+      // Force refetch immediately and after a short delay to ensure cache is updated
+      refetch();
+      setTimeout(() => {
+        refetch();
+      }, 300);
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to create customer');
+      let errorMessage = error?.data?.message || error?.message || 'Failed to create customer';
+      
+      // Handle duplicate key error more gracefully
+      if (errorMessage.includes('E11000') || errorMessage.includes('duplicate key')) {
+        if (errorMessage.includes('email')) {
+          errorMessage = 'A customer with this email already exists';
+          setFormErrors({ email: 'This email is already registered' });
+        } else if (errorMessage.includes('phone')) {
+          errorMessage = 'A customer with this phone number already exists';
+          setFormErrors({ phoneNumber: 'This phone number is already registered' });
+        } else {
+          errorMessage = 'This customer already exists';
+        }
+      }
+      
+      toast.error(errorMessage);
+      
+      // Set field-specific errors if available
+      if (error?.data?.errors) {
+        setFormErrors(error.data.errors);
+      }
     }
   };
 
   const handleEdit = async () => {
-    if (!selectedCustomer) return;
-    if (!formData.firstName || !formData.lastName || !formData.email) {
-      toast.error('First name, last name, and email are required');
+    if (!selectedCustomer) {
+      toast.error('No customer selected');
+      return;
+    }
+
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
       return;
     }
 
@@ -210,8 +320,15 @@ export default function CustomersPage() {
       toast.success('Customer updated successfully');
       setIsEditModalOpen(false);
       resetForm();
+      refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to update customer');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to update customer';
+      toast.error(errorMessage);
+      
+      // Set field-specific errors if available
+      if (error?.data?.errors) {
+        setFormErrors(error.data.errors);
+      }
     }
   };
 
@@ -221,6 +338,7 @@ export default function CustomersPage() {
     try {
       await deleteCustomer(customer.id).unwrap();
       toast.success('Customer deleted successfully');
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to delete customer');
     }
@@ -244,6 +362,7 @@ export default function CustomersPage() {
       setIsLoyaltyModalOpen(false);
       setLoyaltyPointsChange(0);
       setLoyaltyReason('');
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to adjust loyalty points');
     }
@@ -259,6 +378,7 @@ export default function CustomersPage() {
       }).unwrap();
       toast.success(`Loyalty points ${points >= 0 ? 'added' : 'deducted'} successfully`);
       setIsLoyaltyModalOpen(false);
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to adjust loyalty points');
     }
@@ -442,6 +562,22 @@ export default function CustomersPage() {
     };
   }, [customers, totalCustomers]);
 
+  // Show warning if companyId is missing
+  if (!companyId && !branchId && !isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-red-600 dark:text-red-400 mb-2">Unable to load customers</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Company or Branch ID is missing. Please ensure you are logged in and have selected a company/branch.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -451,6 +587,11 @@ export default function CustomersPage() {
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage your customers and loyalty program
           </p>
+          {error && (
+            <p className="text-red-600 dark:text-red-400 text-sm mt-1">
+              Error loading customers: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
+            </p>
+          )}
         </div>
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <PlusIcon className="w-5 h-5 mr-2" />
@@ -561,6 +702,23 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
 
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-red-600 dark:text-red-400 font-medium">
+            Error loading customers: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => refetch()}
+            className="mt-2"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* Customers Table */}
       {isLoading ? (
         <Card>
@@ -649,6 +807,16 @@ export default function CustomersPage() {
               {isCreating ? 'Creating...' : 'Add Customer'}
             </Button>
           </div>
+          {Object.keys(formErrors).length > 0 && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mt-4">
+              <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-1">Please fix the following errors:</p>
+              <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400 space-y-1">
+                {Object.values(formErrors).map((error, idx) => (
+                  <li key={idx}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -753,7 +921,7 @@ export default function CustomersPage() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(order.total || 0)}</p>
+                          <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(order.totalAmount || order.total || 0)}</p>
                           <Badge variant="secondary">{order.status || 'N/A'}</Badge>
                         </div>
                       </div>
@@ -902,6 +1070,16 @@ export default function CustomersPage() {
               {isUpdating ? 'Updating...' : 'Update Customer'}
             </Button>
           </div>
+          {Object.keys(formErrors).length > 0 && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mt-4">
+              <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-1">Please fix the following errors:</p>
+              <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400 space-y-1">
+                {Object.values(formErrors).map((error, idx) => (
+                  <li key={idx}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </Modal>
 

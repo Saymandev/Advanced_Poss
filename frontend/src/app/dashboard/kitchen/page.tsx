@@ -6,37 +6,37 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import {
-  KitchenOrder,
-  useCancelKitchenOrderMutation,
-  useCompleteKitchenOrderItemMutation,
-  useCompleteKitchenOrderMutation,
-  useGetKitchenDelayedOrdersQuery,
-  useGetKitchenPendingOrdersQuery,
-  useGetKitchenPreparingOrdersQuery,
-  useGetKitchenReadyOrdersQuery,
-  useGetKitchenStatsQuery,
-  useGetKitchenUrgentOrdersQuery,
-  useMarkKitchenOrderUrgentMutation,
-  useStartKitchenOrderItemMutation,
-  useStartKitchenOrderMutation,
-  useUpdateKitchenItemPriorityMutation
+    KitchenOrder,
+    useCancelKitchenOrderMutation,
+    useCompleteKitchenOrderItemMutation,
+    useCompleteKitchenOrderMutation,
+    useGetKitchenDelayedOrdersQuery,
+    useGetKitchenPendingOrdersQuery,
+    useGetKitchenPreparingOrdersQuery,
+    useGetKitchenReadyOrdersQuery,
+    useGetKitchenStatsQuery,
+    useGetKitchenUrgentOrdersQuery,
+    useMarkKitchenOrderUrgentMutation,
+    useStartKitchenOrderItemMutation,
+    useStartKitchenOrderMutation,
+    useUpdateKitchenItemPriorityMutation
 } from '@/lib/api/endpoints/kitchenApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-  ArrowPathIcon,
-  ArrowsPointingInIcon,
-  ArrowsPointingOutIcon,
-  ArrowsUpDownIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  FireIcon,
-  MagnifyingGlassIcon,
-  SpeakerWaveIcon,
-  SpeakerXMarkIcon,
-  UserIcon,
-  XCircleIcon
+    ArrowPathIcon,
+    ArrowsPointingInIcon,
+    ArrowsPointingOutIcon,
+    ArrowsUpDownIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    FireIcon,
+    MagnifyingGlassIcon,
+    SpeakerWaveIcon,
+    SpeakerXMarkIcon,
+    UserIcon,
+    XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -135,7 +135,8 @@ export default function KitchenPage() {
       }
       audio.volume = 0.3;
       audio.play().catch(() => {}); // Ignore errors
-    } catch (e) {
+    } catch (error) {
+      console.error(error);
       // Fallback: use Web Audio API
       try {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -152,8 +153,8 @@ export default function KitchenPage() {
         
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.3);
-      } catch (err) {
-        // Sound not available
+      } catch (fallbackError) {
+        console.error(fallbackError);
       }
     }
   }, [soundEnabled]);

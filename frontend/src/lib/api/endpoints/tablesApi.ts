@@ -139,7 +139,23 @@ export const tablesApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: { status },
       }),
-      invalidatesTags: ['Table'],
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'Table', id },
+        { type: 'Table', id: 'LIST' },
+        'Table', // Invalidate all table queries
+        'POS', // Also invalidate POS queries that use tables
+      ],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Force refetch of POS tables
+          dispatch(
+            tablesApi.util.invalidateTags(['Table', 'POS'])
+          );
+        } catch (error) {
+          // Handle error
+        }
+      },
     }),
     generateQRCode: builder.mutation<{ qrCode: string }, string>({
       query: (id) => ({

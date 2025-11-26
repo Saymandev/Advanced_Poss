@@ -12,6 +12,7 @@ import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
   CalendarIcon,
+  ClockIcon,
   CurrencyDollarIcon,
   EyeIcon,
   PencilIcon,
@@ -20,7 +21,7 @@ import {
   TrashIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 const EXPENSE_CATEGORIES = [
@@ -44,6 +45,14 @@ const PAYMENT_METHODS = [
   { value: 'other', label: 'Other' },
 ];
 
+interface FormErrors {
+  title?: string;
+  amount?: string;
+  category?: string;
+  date?: string;
+  paymentMethod?: string;
+}
+
 const RECURRING_FREQUENCIES = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
@@ -52,7 +61,20 @@ const RECURRING_FREQUENCIES = [
 ];
 
 export default function ExpensesPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  const companyId =
+    (user as any)?.companyId ||
+    (companyContext as any)?.companyId ||
+    (companyContext as any)?._id ||
+    (companyContext as any)?.id;
+
+  const branchId =
+    (user as any)?.branchId ||
+    (companyContext as any)?.branchId ||
+    (companyContext as any)?.branches?.[0]?._id ||
+    (companyContext as any)?.branches?.[0]?.id;
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -63,21 +85,28 @@ export default function ExpensesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const { data, isLoading, refetch } = useGetExpensesQuery({
-    branchId: user?.branchId || undefined,
+  const { data, isLoading, error, refetch } = useGetExpensesQuery({
+    companyId: companyId || undefined,
+    branchId: branchId || undefined,
     category: categoryFilter === 'all' ? undefined : categoryFilter,
     startDate: dateRange.start || undefined,
     endDate: dateRange.end || undefined,
     search: searchQuery || undefined,
     page: currentPage,
     limit: itemsPerPage,
+  }, {
+    skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
   });
 
   const [createExpense] = useCreateExpenseMutation();
   const [updateExpense] = useUpdateExpenseMutation();
   const [deleteExpense] = useDeleteExpenseMutation();
 
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [formData, setFormData] = useState<CreateExpenseRequest>({
+    companyId: '',
+    branchId: '',
     title: '',
     description: '',
     amount: 0,
@@ -89,10 +118,13 @@ export default function ExpensesPage() {
     notes: '',
     isRecurring: false,
     recurringFrequency: 'monthly',
+    createdBy: '',
   });
 
   const resetForm = () => {
     setFormData({
+      companyId: user?.companyId || '',
+      branchId: user?.branchId || '',
       title: '',
       description: '',
       amount: 0,
@@ -104,9 +136,23 @@ export default function ExpensesPage() {
       notes: '',
       isRecurring: false,
       recurringFrequency: 'monthly',
+      createdBy: user?.id || '',
     });
+    setFormErrors({});
     setSelectedExpense(null);
   };
+
+  // Initialize form data with user context
+  useEffect(() => {
+    if (user?.companyId && user?.branchId && user?.id) {
+      setFormData(prev => ({
+        ...prev,
+        companyId: user.companyId || '',
+        branchId: user.branchId || '',
+        createdBy: user.id || '',
+      }));
+    }
+  }, [user]);
 
   // const handleApprove = async (expense: Expense, approved: boolean) => {
   //   try {
@@ -122,60 +168,118 @@ export default function ExpensesPage() {
   //   }
   // };
 
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {};
+
+    if (!formData.title || formData.title.trim().length === 0) {
+      errors.title = 'Title is required';
+    } else if (formData.title.length > 200) {
+      errors.title = 'Title must be less than 200 characters';
+    }
+
+    if (!formData.amount || formData.amount <= 0) {
+      errors.amount = 'Amount must be greater than 0';
+    } else if (formData.amount > 10000000) {
+      errors.amount = 'Amount is too large';
+    }
+
+    if (!formData.category) {
+      errors.category = 'Category is required';
+    }
+
+    if (!formData.date) {
+      errors.date = 'Date is required';
+    } else {
+      const date = new Date(formData.date);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (date > today) {
+        errors.date = 'Date cannot be in the future';
+      }
+    }
+
+    if (!formData.paymentMethod) {
+      errors.paymentMethod = 'Payment method is required';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCreate = async () => {
-    if (!formData.title || !formData.category || formData.amount <= 0 || !formData.date) {
-      toast.error('Please fill in all required fields');
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
       return;
     }
 
-    if (!user?.branchId || !user?.companyId) {
-      toast.error('Branch or Company ID is missing');
+    if (!user?.branchId || !user?.companyId || !user?.id) {
+      toast.error('User context is missing. Please refresh the page.');
       return;
     }
 
     try {
-      const payload: any = {
-        ...formData,
-        branchId: user.branchId,
+      const payload: CreateExpenseRequest = {
         companyId: user.companyId,
+        branchId: user.branchId,
         createdBy: user.id,
+        title: formData.title.trim(),
+        description: formData.description?.trim() || undefined,
+        amount: Number(formData.amount.toFixed(2)),
+        category: formData.category,
+        date: formData.date,
+        paymentMethod: formData.paymentMethod,
+        vendorName: formData.vendorName?.trim() || undefined,
+        invoiceNumber: formData.invoiceNumber?.trim() || undefined,
+        notes: formData.notes?.trim() || undefined,
+        isRecurring: formData.isRecurring || false,
+        recurringFrequency: formData.isRecurring ? formData.recurringFrequency : undefined,
       };
-
-      // Only include optional fields if they have values
-      if (formData.vendorName) {
-        payload.vendorName = formData.vendorName;
-      }
-      if (formData.invoiceNumber) {
-        payload.invoiceNumber = formData.invoiceNumber;
-      }
-      if (formData.notes) {
-        payload.notes = formData.notes;
-      }
 
       await createExpense(payload).unwrap();
       toast.success('Expense created successfully');
       setIsCreateModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to create expense');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to create expense';
+      toast.error(errorMessage);
+      console.error('Create expense error:', error);
     }
   };
 
   const handleEdit = async () => {
     if (!selectedExpense) return;
 
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
+      return;
+    }
+
     try {
+      const payload: Partial<CreateExpenseRequest> = {
+        title: formData.title.trim(),
+        description: formData.description?.trim() || undefined,
+        amount: Number(formData.amount.toFixed(2)),
+        category: formData.category,
+        date: formData.date,
+        paymentMethod: formData.paymentMethod,
+        vendorName: formData.vendorName?.trim() || undefined,
+        invoiceNumber: formData.invoiceNumber?.trim() || undefined,
+        notes: formData.notes?.trim() || undefined,
+        isRecurring: formData.isRecurring || false,
+        recurringFrequency: formData.isRecurring ? formData.recurringFrequency : undefined,
+      };
+
       await updateExpense({
         id: selectedExpense.id,
-        ...formData,
+        ...payload,
       }).unwrap();
       toast.success('Expense updated successfully');
       setIsEditModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update expense');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to update expense';
+      toast.error(errorMessage);
+      console.error('Update expense error:', error);
     }
   };
 
@@ -185,7 +289,6 @@ export default function ExpensesPage() {
     try {
       await deleteExpense(expense.id).unwrap();
       toast.success('Expense deleted successfully');
-      refetch();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to delete expense');
     }
@@ -194,13 +297,22 @@ export default function ExpensesPage() {
   const openEditModal = (expense: Expense) => {
     setSelectedExpense(expense);
     setFormData({
+      companyId: user?.companyId || '',
+      branchId: user?.branchId || '',
+      createdBy: user?.id || '',
       title: expense.title || '',
       description: expense.description || '',
       amount: expense.amount,
       category: expense.category,
-      date: expense.date.split('T')[0],
+      date: expense.date ? expense.date.split('T')[0] : new Date().toISOString().split('T')[0],
       paymentMethod: expense.paymentMethod || 'cash',
+      vendorName: expense.vendorName || '',
+      invoiceNumber: expense.invoiceNumber || '',
+      notes: expense.notes || '',
+      isRecurring: expense.isRecurring || false,
+      recurringFrequency: expense.recurringFrequency || 'monthly',
     });
+    setFormErrors({});
     setIsEditModalOpen(true);
   };
 
@@ -227,6 +339,18 @@ export default function ExpensesPage() {
   const getCategoryLabel = (category: string) => {
     const cat = EXPENSE_CATEGORIES.find(c => c.value === category);
     return cat?.label || category;
+  };
+
+  const getPaymentMethodLabel = (method: string) => {
+    const methodMap: Record<string, string> = {
+      'cash': 'Cash',
+      'card': 'Card',
+      'bank-transfer': 'Bank Transfer',
+      'cheque': 'Cheque',
+      'online': 'Online',
+      'other': 'Other',
+    };
+    return methodMap[method] || method;
   };
 
   const getStatusBadge = (status: string) => {
@@ -290,16 +414,24 @@ export default function ExpensesPage() {
       ),
     },
     {
-      key: 'userId',
+      key: 'createdBy',
       title: 'Recorded By',
-      render: (value: string, row: Expense) => (
-        <div className="flex items-center gap-2">
-          <UserIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            User {(row as any).userId?.slice(-6) || 'N/A'}
-          </span>
-        </div>
-      ),
+      render: (value: string, row: Expense) => {
+        const userName = row.createdByUser?.name 
+          || (row.createdByUser?.firstName && row.createdByUser?.lastName 
+            ? `${row.createdByUser.firstName} ${row.createdByUser.lastName}` 
+            : row.createdByUser?.firstName || row.createdByUser?.lastName)
+          || 'Unknown User';
+        
+        return (
+          <div className="flex items-center gap-2">
+            <UserIcon className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {userName}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'createdAt',
@@ -342,16 +474,31 @@ export default function ExpensesPage() {
     },
   ];
 
-  const stats = {
-    total: data?.total || 0,
-    totalAmount: data?.expenses?.reduce((sum, expense) => sum + expense.amount, 0) || 0,
-    thisMonth: data?.expenses?.filter(e => {
+  const stats = useMemo(() => {
+    const expenses = data?.expenses || [];
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const thisMonthExpenses = expenses.filter(e => {
       const expenseDate = new Date(e.date);
-      const now = new Date();
-      return expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear();
-    }).reduce((sum, expense) => sum + expense.amount, 0) || 0,
-    categories: EXPENSE_CATEGORIES.length,
-  };
+      return expenseDate >= thisMonthStart && expenseDate <= thisMonthEnd;
+    });
+
+    const pendingExpenses = expenses.filter(e => e.status === 'pending');
+    const paidExpenses = expenses.filter(e => e.status === 'paid');
+
+    return {
+      total: data?.total || 0,
+      totalAmount: expenses.reduce((sum, expense) => sum + expense.amount, 0),
+      thisMonth: thisMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0),
+      pending: pendingExpenses.length,
+      pendingAmount: pendingExpenses.reduce((sum, expense) => sum + expense.amount, 0),
+      paid: paidExpenses.length,
+      paidAmount: paidExpenses.reduce((sum, expense) => sum + expense.amount, 0),
+      categories: EXPENSE_CATEGORIES.length,
+    };
+  }, [data]);
 
   return (
     <div className="space-y-6">
@@ -411,10 +558,11 @@ export default function ExpensesPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Categories</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.categories}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
+                <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
+                <p className="text-xs text-gray-500 mt-1">{formatCurrency(stats.pendingAmount)}</p>
               </div>
-              <ReceiptRefundIcon className="w-8 h-8 text-purple-600" />
+              <ClockIcon className="w-8 h-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
@@ -463,6 +611,21 @@ export default function ExpensesPage() {
       </Card>
 
       {/* Expenses Table */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+          <p className="text-red-800 dark:text-red-400">
+            Error loading expenses: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => refetch()}
+            className="mt-2"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
       <DataTable
         data={data?.expenses || []}
         columns={columns}
@@ -497,22 +660,40 @@ export default function ExpensesPage() {
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Title *"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="e.g., Office supplies"
-              required
-            />
-            <Input
-              label="Amount *"
-              type="number"
-              step="0.01"
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
-              placeholder="0.00"
-              required
-            />
+            <div>
+              <Input
+                label="Title *"
+                value={formData.title}
+                onChange={(e) => {
+                  setFormData({ ...formData, title: e.target.value });
+                  if (formErrors.title) {
+                    setFormErrors({ ...formErrors, title: undefined });
+                  }
+                }}
+                placeholder="e.g., Office supplies"
+                required
+                error={formErrors.title}
+              />
+            </div>
+            <div>
+              <Input
+                label="Amount *"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={formData.amount || ''}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  setFormData({ ...formData, amount: value });
+                  if (formErrors.amount) {
+                    setFormErrors({ ...formErrors, amount: undefined });
+                  }
+                }}
+                placeholder="0.00"
+                required
+                error={formErrors.amount}
+              />
+            </div>
           </div>
 
           <Input
@@ -523,13 +704,21 @@ export default function ExpensesPage() {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
-              label="Category *"
-              options={EXPENSE_CATEGORIES}
-              value={formData.category}
-              onChange={(value) => setFormData({ ...formData, category: value as any })}
-              placeholder="Select expense category"
-            />
+            <div>
+              <Select
+                label="Category *"
+                options={EXPENSE_CATEGORIES}
+                value={formData.category}
+                onChange={(value) => {
+                  setFormData({ ...formData, category: value as any });
+                  if (formErrors.category) {
+                    setFormErrors({ ...formErrors, category: undefined });
+                  }
+                }}
+                placeholder="Select expense category"
+                error={formErrors.category}
+              />
+            </div>
             <Input
               label="Date *"
               type="date"
@@ -539,13 +728,21 @@ export default function ExpensesPage() {
             />
           </div>
 
-          <Select
-            label="Payment Method"
-            options={PAYMENT_METHODS}
-            value={formData.paymentMethod}
-            onChange={(value) => setFormData({ ...formData, paymentMethod: value as any })}
-            placeholder="Select payment method"
-          />
+          <div>
+            <Select
+              label="Payment Method *"
+              options={PAYMENT_METHODS}
+              value={formData.paymentMethod}
+              onChange={(value) => {
+                setFormData({ ...formData, paymentMethod: value as any });
+                if (formErrors.paymentMethod) {
+                  setFormErrors({ ...formErrors, paymentMethod: undefined });
+                }
+              }}
+              placeholder="Select payment method"
+              error={formErrors.paymentMethod}
+            />
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -627,20 +824,38 @@ export default function ExpensesPage() {
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Title *"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
-            <Input
-              label="Amount *"
-              type="number"
-              step="0.01"
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
-              required
-            />
+            <div>
+              <Input
+                label="Title *"
+                value={formData.title}
+                onChange={(e) => {
+                  setFormData({ ...formData, title: e.target.value });
+                  if (formErrors.title) {
+                    setFormErrors({ ...formErrors, title: undefined });
+                  }
+                }}
+                required
+                error={formErrors.title}
+              />
+            </div>
+            <div>
+              <Input
+                label="Amount *"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={formData.amount || ''}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  setFormData({ ...formData, amount: value });
+                  if (formErrors.amount) {
+                    setFormErrors({ ...formErrors, amount: undefined });
+                  }
+                }}
+                required
+                error={formErrors.amount}
+              />
+            </div>
           </div>
 
           <Input
@@ -650,12 +865,20 @@ export default function ExpensesPage() {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
-              label="Category *"
-              options={EXPENSE_CATEGORIES}
-              value={formData.category}
-              onChange={(value) => setFormData({ ...formData, category: value as any })}
-            />
+            <div>
+              <Select
+                label="Category *"
+                options={EXPENSE_CATEGORIES}
+                value={formData.category}
+                onChange={(value) => {
+                  setFormData({ ...formData, category: value as any });
+                  if (formErrors.category) {
+                    setFormErrors({ ...formErrors, category: undefined });
+                  }
+                }}
+                error={formErrors.category}
+              />
+            </div>
             <Input
               label="Date *"
               type="date"
@@ -665,12 +888,20 @@ export default function ExpensesPage() {
             />
           </div>
 
-          <Select
-            label="Payment Method"
-            options={PAYMENT_METHODS}
-            value={formData.paymentMethod}
-            onChange={(value) => setFormData({ ...formData, paymentMethod: value as any })}
-          />
+          <div>
+            <Select
+              label="Payment Method *"
+              options={PAYMENT_METHODS}
+              value={formData.paymentMethod}
+              onChange={(value) => {
+                setFormData({ ...formData, paymentMethod: value as any });
+                if (formErrors.paymentMethod) {
+                  setFormErrors({ ...formErrors, paymentMethod: undefined });
+                }
+              }}
+              error={formErrors.paymentMethod}
+            />
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -780,11 +1011,60 @@ export default function ExpensesPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Recorded By:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Payment Method:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      User {(selectedExpense as any).userId?.slice(-6) || 'N/A'}
+                      {getPaymentMethodLabel(selectedExpense.paymentMethod)}
                     </span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                    {getStatusBadge(selectedExpense.status)}
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Recorded By:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {selectedExpense.createdByUser?.name 
+                        || (selectedExpense.createdByUser?.firstName && selectedExpense.createdByUser?.lastName 
+                          ? `${selectedExpense.createdByUser.firstName} ${selectedExpense.createdByUser.lastName}` 
+                          : selectedExpense.createdByUser?.firstName || selectedExpense.createdByUser?.lastName)
+                        || (selectedExpense.createdBy ? `User ${selectedExpense.createdBy.slice(-6)}` : 'N/A')}
+                    </span>
+                  </div>
+                  {selectedExpense.expenseNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Expense #:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {selectedExpense.expenseNumber}
+                      </span>
+                    </div>
+                  )}
+                  {selectedExpense.purchaseOrderId && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Purchase Order:</span>
+                      <a 
+                        href={`/dashboard/purchase-orders`}
+                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        {selectedExpense.purchaseOrderId}
+                      </a>
+                    </div>
+                  )}
+                  {selectedExpense.vendorName && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Vendor:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {selectedExpense.vendorName}
+                      </span>
+                    </div>
+                  )}
+                  {selectedExpense.invoiceNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Invoice #:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {selectedExpense.invoiceNumber}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

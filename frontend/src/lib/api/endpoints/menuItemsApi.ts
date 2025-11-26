@@ -86,10 +86,8 @@ export const menuItemsApi = apiSlice.injectEndpoints({
             }
             
             // Extract category name for display
-            let categoryName = categoryValue;
-            if (typeof categoryValue === 'object' && categoryValue !== null) {
-              categoryName = categoryValue.name || categoryValue._id || categoryValue.id || 'Uncategorized';
-            }
+            // categoryValue is already a string (converted above), so use it directly
+            const categoryName: string = typeof categoryValue === 'string' ? categoryValue : 'Uncategorized';
             
             // Handle ingredients - preserve structure if objects, convert to array
             let ingredientsArray: any[] = [];
@@ -181,13 +179,47 @@ export const menuItemsApi = apiSlice.injectEndpoints({
       },
       providesTags: ['MenuItem'],
     }),
+    uploadMenuImages: builder.mutation<
+      { success: boolean; images: Array<{ url: string; publicId: string; width: number; height: number }> },
+      FormData
+    >({
+      query: (formData) => ({
+        url: '/menu-items/upload-images',
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header - browser will set it with boundary for multipart/form-data
+        prepareHeaders: (headers: Headers) => {
+          // Remove Content-Type to let browser set it with boundary
+          headers.delete('Content-Type');
+          return headers;
+        },
+      }),
+    }),
     createMenuItem: builder.mutation<MenuItem, CreateMenuItemRequest>({
       query: (data) => ({
         url: '/menu-items',
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['MenuItem'],
+      invalidatesTags: () => [
+        { type: 'MenuItem', id: 'LIST' },
+        'MenuItem',
+      ],
+      // Force refetch by invalidating all menu item queries
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate all menu item list queries
+          dispatch(
+            menuItemsApi.util.invalidateTags([
+              { type: 'MenuItem', id: 'LIST' },
+              'MenuItem',
+            ]),
+          );
+        } catch {
+          // Ignore errors
+        }
+      },
     }),
     updateMenuItem: builder.mutation<MenuItem, UpdateMenuItemRequest>({
       query: ({ id, ...data }) => ({
@@ -222,4 +254,5 @@ export const {
   useUpdateMenuItemMutation,
   useDeleteMenuItemMutation,
   useToggleAvailabilityMutation,
+  useUploadMenuImagesMutation,
 } = menuItemsApi;

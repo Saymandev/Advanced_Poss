@@ -52,16 +52,27 @@ export default function StaffPage() {
   const companyId = (user as any)?.companyId || 
                     (companyContext as any)?.companyId;
 
-  const { data: staffResponse, isLoading } = useGetStaffQuery({
-    branchId,
-    search: searchQuery || undefined,
-    role: roleFilter !== 'all' ? roleFilter : undefined,
-    page: currentPage,
-    limit: itemsPerPage,
-  }, { skip: !branchId });
+  const queryParams = useMemo(() => {
+    const params: any = {
+      branchId: branchId || undefined,
+      page: currentPage,
+      limit: itemsPerPage,
+    };
+    
+    if (searchQuery) params.search = searchQuery;
+    if (roleFilter !== 'all') params.role = roleFilter;
+    
+    return params;
+  }, [branchId, searchQuery, roleFilter, currentPage, itemsPerPage]);
+
+  const { data: staffResponse, isLoading, error, refetch } = useGetStaffQuery(queryParams, { 
+    skip: !branchId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+  });
 
   const { data: selectedStaffData } = useGetStaffByIdQuery(selectedStaffId, {
-    skip: !selectedStaffId || !isViewModalOpen,
+    skip: !selectedStaffId || (!isViewModalOpen && !isEditModalOpen),
   });
 
   const [createStaff, { isLoading: isCreating }] = useCreateStaffMutation();
@@ -97,6 +108,8 @@ export default function StaffPage() {
     notes: '',
   });
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (!isCreateModalOpen && !isEditModalOpen) {
       resetForm();
@@ -104,24 +117,26 @@ export default function StaffPage() {
   }, [isCreateModalOpen, isEditModalOpen]);
 
   useEffect(() => {
+    // Populate form when editing staff member
     if (selectedStaffData && selectedStaffId && isEditModalOpen) {
       setFormData({
-        firstName: selectedStaffData.firstName,
-        lastName: selectedStaffData.lastName,
-        email: selectedStaffData.email,
-        phoneNumber: selectedStaffData.phoneNumber,
-        role: selectedStaffData.role,
+        firstName: selectedStaffData.firstName || '',
+        lastName: selectedStaffData.lastName || '',
+        email: selectedStaffData.email || '',
+        phoneNumber: selectedStaffData.phoneNumber || '',
+        role: selectedStaffData.role || 'waiter',
         salary: selectedStaffData.salary,
         hourlyRate: selectedStaffData.hourlyRate,
-        department: selectedStaffData.department,
+        department: selectedStaffData.department || '',
         emergencyContact: selectedStaffData.emergencyContact,
         address: selectedStaffData.address,
         skills: selectedStaffData.skills || [],
         certifications: selectedStaffData.certifications || [],
-        notes: selectedStaffData.notes,
+        notes: selectedStaffData.notes || '',
         pin: '',
         password: '',
       });
+      setFormErrors({});
     }
   }, [selectedStaffData, selectedStaffId, isEditModalOpen]);
 
@@ -144,11 +159,55 @@ export default function StaffPage() {
       notes: '',
     });
     setSelectedStaffId('');
+    setFormErrors({});
+  };
+
+  const validateForm = (isEdit = false): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.firstName?.trim()) {
+      errors.firstName = 'First name is required';
+    }
+
+    if (!formData.lastName?.trim()) {
+      errors.lastName = 'Last name is required';
+    }
+
+    if (!formData.email?.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    if (!isEdit && !formData.password) {
+      errors.password = 'Password is required';
+    } else if (formData.password && formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    }
+
+    if (formData.pin && formData.pin.length !== 6) {
+      errors.pin = 'PIN must be exactly 6 digits';
+    }
+
+    if (formData.phoneNumber && !/^[\d\s\-\+\(\)]+$/.test(formData.phoneNumber)) {
+      errors.phoneNumber = 'Please enter a valid phone number';
+    }
+
+    if (formData.salary !== undefined && formData.salary < 0) {
+      errors.salary = 'Salary cannot be negative';
+    }
+
+    if (formData.hourlyRate !== undefined && formData.hourlyRate < 0) {
+      errors.hourlyRate = 'Hourly rate cannot be negative';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleCreate = async () => {
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
-      toast.error('Please fill in all required fields');
+    if (!validateForm(false)) {
+      toast.error('Please fix the errors in the form');
       return;
     }
 
@@ -170,44 +229,39 @@ export default function StaffPage() {
         companyId,
       };
 
-      // Add optional fields
+      // Add optional fields that are supported by CreateUserDto
       if (formData.salary !== undefined && formData.salary !== null) {
         payload.salary = formData.salary;
       }
-      if (formData.hourlyRate !== undefined && formData.hourlyRate !== null) {
-        payload.hourlyRate = formData.hourlyRate;
-      }
-      if (formData.department) {
-        payload.department = formData.department;
-      }
-      if (formData.emergencyContact) {
-        payload.emergencyContact = formData.emergencyContact;
-      }
-      if (formData.address) {
-        payload.address = formData.address;
-      }
-      if (formData.skills && formData.skills.length > 0) {
-        payload.skills = formData.skills;
-      }
-      if (formData.certifications && formData.certifications.length > 0) {
-        payload.certifications = formData.certifications;
-      }
-      if (formData.notes) {
-        payload.notes = formData.notes;
-      }
+      // Note: hourlyRate, department, emergencyContact, address, skills, certifications, notes
+      // are NOT supported by CreateUserDto/User schema, so we don't include them in create
+      // These can be added via update if the schema is extended in the future
 
       await createStaff(payload).unwrap();
       toast.success('Staff member created successfully');
       setIsCreateModalOpen(false);
       resetForm();
+      setFormErrors({});
+      refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to create staff member');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to create staff member';
+      toast.error(errorMessage);
+      
+      // Set field-specific errors if available
+      if (error?.data?.errors) {
+        setFormErrors(error.data.errors);
+      }
     }
   };
 
   const handleUpdate = async () => {
-    if (!selectedStaffId || !formData.firstName || !formData.lastName || !formData.email) {
-      toast.error('Please fill in all required fields');
+    if (!selectedStaffId) {
+      toast.error('No staff member selected');
+      return;
+    }
+
+    if (!validateForm(true)) {
+      toast.error('Please fix the errors in the form');
       return;
     }
 
@@ -234,52 +288,29 @@ export default function StaffPage() {
         payload.pin = formData.pin;
       }
 
-      // Include salary if set
+      // Include salary if set (supported by UpdateUserDto)
       if (formData.salary !== undefined && formData.salary !== null) {
         payload.salary = formData.salary;
       }
 
-      // Include hourly rate if set
-      if (formData.hourlyRate !== undefined && formData.hourlyRate !== null) {
-        payload.hourlyRate = formData.hourlyRate;
-      }
-
-      // Include department if set
-      if (formData.department) {
-        payload.department = formData.department;
-      }
-
-      // Include emergency contact if set
-      if (formData.emergencyContact) {
-        payload.emergencyContact = formData.emergencyContact;
-      }
-
-      // Include address if set
-      if (formData.address) {
-        payload.address = formData.address;
-      }
-
-      // Include skills if set
-      if (formData.skills && formData.skills.length > 0) {
-        payload.skills = formData.skills;
-      }
-
-      // Include certifications if set
-      if (formData.certifications && formData.certifications.length > 0) {
-        payload.certifications = formData.certifications;
-      }
-
-      // Include notes if set
-      if (formData.notes) {
-        payload.notes = formData.notes;
-      }
+      // Note: hourlyRate, department, emergencyContact, address, skills, certifications, notes
+      // are NOT supported by UpdateUserDto/User schema, so we don't include them
+      // These can be added via update if the schema is extended in the future
 
       await updateStaff({ id: selectedStaffId, ...payload }).unwrap();
       toast.success('Staff member updated successfully');
       setIsEditModalOpen(false);
       resetForm();
+      setFormErrors({});
+      refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to update staff member');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to update staff member';
+      toast.error(errorMessage);
+      
+      // Set field-specific errors if available
+      if (error?.data?.errors) {
+        setFormErrors(error.data.errors);
+      }
     }
   };
 
@@ -289,6 +320,7 @@ export default function StaffPage() {
     try {
       await deleteStaff(staffId).unwrap();
       toast.success('Staff member deleted successfully');
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to delete staff member');
     }
@@ -308,6 +340,7 @@ export default function StaffPage() {
         } as any).unwrap();
         toast.success('Staff member activated successfully');
       }
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to update staff status');
     }
@@ -321,6 +354,26 @@ export default function StaffPage() {
   const openEditModal = (staff: Staff) => {
     setSelectedStaffId(staff.id);
     setIsEditModalOpen(true);
+    
+    // Populate form immediately with available data from the list
+    setFormData({
+      firstName: staff.firstName || '',
+      lastName: staff.lastName || '',
+      email: staff.email || '',
+      phoneNumber: staff.phoneNumber || '',
+      role: staff.role || 'waiter',
+      salary: staff.salary,
+      hourlyRate: staff.hourlyRate,
+      department: staff.department || '',
+      emergencyContact: staff.emergencyContact,
+      address: staff.address,
+      skills: staff.skills || [],
+      certifications: staff.certifications || [],
+      notes: staff.notes || '',
+      pin: '',
+      password: '',
+    });
+    setFormErrors({});
   };
 
   const getRoleBadge = (role: string) => {
@@ -477,6 +530,22 @@ export default function StaffPage() {
     },
   ];
 
+  // Show warning if branchId is missing
+  if (!branchId && !isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-red-600 dark:text-red-400 mb-2">Unable to load staff</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Branch ID is missing. Please ensure you are logged in and have selected a branch.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -486,6 +555,11 @@ export default function StaffPage() {
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage your restaurant staff and team members
           </p>
+          {error && (
+            <p className="text-red-600 dark:text-red-400 text-sm mt-1">
+              Error loading staff: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
+            </p>
+          )}
         </div>
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <PlusIcon className="w-5 h-5 mr-2" />
@@ -595,6 +669,23 @@ export default function StaffPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-red-600 dark:text-red-400 font-medium">
+            Error loading staff: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => refetch()}
+            className="mt-2"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* Staff Table */}
       {isLoading ? (
@@ -836,32 +927,60 @@ export default function StaffPage() {
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="First Name"
-              value={formData.firstName || ''}
-              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              required
-            />
-            <Input
-              label="Last Name"
-              value={formData.lastName || ''}
-              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              required
-            />
+            <div>
+              <Input
+                label="First Name"
+                value={formData.firstName || ''}
+                onChange={(e) => {
+                  setFormData({ ...formData, firstName: e.target.value });
+                  if (formErrors.firstName) {
+                    setFormErrors({ ...formErrors, firstName: '' });
+                  }
+                }}
+                required
+                error={formErrors.firstName}
+              />
+            </div>
+            <div>
+              <Input
+                label="Last Name"
+                value={formData.lastName || ''}
+                onChange={(e) => {
+                  setFormData({ ...formData, lastName: e.target.value });
+                  if (formErrors.lastName) {
+                    setFormErrors({ ...formErrors, lastName: '' });
+                  }
+                }}
+                required
+                error={formErrors.lastName}
+              />
+            </div>
           </div>
 
           <Input
             label="Email"
             type="email"
             value={formData.email || ''}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, email: e.target.value });
+              if (formErrors.email) {
+                setFormErrors({ ...formErrors, email: '' });
+              }
+            }}
             required
+            error={formErrors.email}
           />
 
           <Input
             label="Phone Number"
             value={formData.phoneNumber || ''}
-            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, phoneNumber: e.target.value });
+              if (formErrors.phoneNumber) {
+                setFormErrors({ ...formErrors, phoneNumber: '' });
+              }
+            }}
+            error={formErrors.phoneNumber}
           />
 
           <div className="grid grid-cols-2 gap-4">
@@ -884,15 +1003,27 @@ export default function StaffPage() {
               label="Monthly Salary (Optional)"
               type="number"
               value={formData.salary?.toString() || ''}
-              onChange={(e) => setFormData({ ...formData, salary: e.target.value ? parseFloat(e.target.value) : undefined })}
+              onChange={(e) => {
+                setFormData({ ...formData, salary: e.target.value ? parseFloat(e.target.value) : undefined });
+                if (formErrors.salary) {
+                  setFormErrors({ ...formErrors, salary: '' });
+                }
+              }}
               placeholder="Monthly salary amount"
+              error={formErrors.salary}
             />
             <Input
               label="Hourly Rate (Optional)"
               type="number"
               value={formData.hourlyRate?.toString() || ''}
-              onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value ? parseFloat(e.target.value) : undefined })}
+              onChange={(e) => {
+                setFormData({ ...formData, hourlyRate: e.target.value ? parseFloat(e.target.value) : undefined });
+                if (formErrors.hourlyRate) {
+                  setFormErrors({ ...formErrors, hourlyRate: '' });
+                }
+              }}
               placeholder="Per hour rate"
+              error={formErrors.hourlyRate}
             />
           </div>
 
@@ -902,17 +1033,29 @@ export default function StaffPage() {
                 label="Password"
                 type="password"
                 value={formData.password || ''}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, password: e.target.value });
+                  if (formErrors.password) {
+                    setFormErrors({ ...formErrors, password: '' });
+                  }
+                }}
                 required={isCreateModalOpen}
-                placeholder="Min 8 characters with uppercase, lowercase, number and special character"
+                placeholder="Min 8 characters"
+                error={formErrors.password}
               />
               <Input
                 label="PIN (Optional, 6 digits)"
                 type="text"
                 maxLength={6}
                 value={formData.pin || ''}
-                onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '') })}
+                onChange={(e) => {
+                  setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '') });
+                  if (formErrors.pin) {
+                    setFormErrors({ ...formErrors, pin: '' });
+                  }
+                }}
                 placeholder="6 digit PIN"
+                error={formErrors.pin}
               />
             </>
           )}
@@ -1108,6 +1251,16 @@ export default function StaffPage() {
               {isCreating || isUpdating ? 'Saving...' : isEditModalOpen ? 'Update' : 'Add'} Staff Member
             </Button>
           </div>
+          {Object.keys(formErrors).length > 0 && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mt-4">
+              <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-1">Please fix the following errors:</p>
+              <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400 space-y-1">
+                {Object.values(formErrors).map((error, idx) => (
+                  <li key={idx}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

@@ -7,9 +7,18 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { InventoryItem, useAddStockMutation, useCreateInventoryItemMutation, useDeleteInventoryItemMutation, useGetInventoryItemsQuery, useRemoveStockMutation, useUpdateInventoryItemMutation } from '@/lib/api/endpoints/inventoryApi';
+import {
+  InventoryItem,
+  useAddStockMutation,
+  useCreateInventoryItemMutation,
+  useDeleteInventoryItemMutation,
+  useGetInventoryItemsQuery,
+  useRemoveStockMutation,
+  useUpdateInventoryItemMutation,
+} from '@/lib/api/endpoints/inventoryApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   ArchiveBoxIcon,
   BeakerIcon,
@@ -17,9 +26,9 @@ import {
   EyeIcon,
   PencilIcon,
   PlusIcon,
-  TrashIcon
+  TrashIcon,
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function IngredientsPage() {
@@ -34,6 +43,10 @@ export default function IngredientsPage() {
   const [stockFilter, setStockFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Notifications (topbar bell)
+  const { addNotification } = useNotifications();
+  const hasNotifiedLowStockRef = useRef(false);
 
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
@@ -126,6 +139,41 @@ export default function IngredientsPage() {
       resetForm();
     }
   }, [isCreateModalOpen, isEditModalOpen]);
+
+  // Trigger a notification when there are low/out-of-stock ingredients
+  useEffect(() => {
+    if (hasNotifiedLowStockRef.current) return;
+    if (!ingredients || ingredients.length === 0) return;
+
+    const lowOrOut = ingredients.filter((ing) => {
+      const status = getStockStatus(ing);
+      return status.status === 'low' || status.status === 'out';
+    });
+
+    if (lowOrOut.length === 0) return;
+
+    const first: any = lowOrOut[0];
+
+    addNotification({
+      type: 'system',
+      title:
+        lowOrOut.length === 1
+          ? 'Low stock ingredient'
+          : 'Multiple ingredients low on stock',
+      message:
+        lowOrOut.length === 1
+          ? `${first.name} is ${
+              first.isOutOfStock ? 'out of stock' : 'low on stock'
+            } (${first.currentStock} ${first.unit}).`
+          : `${lowOrOut.length} ingredients are low or out of stock. Open Inventory to review details.`,
+      data: {
+        source: 'inventory',
+        ingredientIds: lowOrOut.map((ing: any) => ing.id),
+      },
+    });
+
+    hasNotifiedLowStockRef.current = true;
+  }, [ingredients, addNotification]);
 
   const resetForm = () => {
     setFormData({
@@ -458,10 +506,14 @@ export default function IngredientsPage() {
   const stats = useMemo(() => {
     return {
       total: totalIngredients,
-      inStock: ingredients.filter(i => !i.isLowStock && !i.isOutOfStock).length,
-      lowStock: ingredients.filter(i => i.isLowStock && !i.isOutOfStock).length,
-      outOfStock: ingredients.filter(i => i.isOutOfStock).length,
-      totalValue: ingredients.reduce((sum, item) => sum + ((item.unitCost || item.unitPrice || 0) * (item.currentStock || 0)), 0),
+      inStock: ingredients.filter((i) => getStockStatus(i).status === 'good').length,
+      lowStock: ingredients.filter((i) => getStockStatus(i).status === 'low').length,
+      outOfStock: ingredients.filter((i) => getStockStatus(i).status === 'out').length,
+      totalValue: ingredients.reduce(
+        (sum, item) =>
+          sum + ((item.unitCost || (item as any).unitPrice || 0) * (item.currentStock || 0)),
+        0,
+      ),
     };
   }, [ingredients, totalIngredients]);
 

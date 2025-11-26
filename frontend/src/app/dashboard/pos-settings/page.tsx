@@ -223,8 +223,8 @@ export default function POSSettingsPage() {
     if (settings) {
       const settingsData = settings as any;
       setFormData({
-        taxRate: settingsData.taxRate || 10,
-        serviceCharge: settingsData.serviceCharge || 0,
+        taxRate: settingsData.taxRate ?? 10, // Use ?? to allow 0 as valid value
+        serviceCharge: settingsData.serviceCharge ?? 0, // Use ?? to allow 0 as valid value
         currency: settingsData.currency || 'USD',
         receiptHeader: settingsData.receiptSettings?.header || 'Welcome to Our Restaurant',
         receiptFooter: settingsData.receiptSettings?.footer || 'Thank you for your visit!',
@@ -309,7 +309,8 @@ export default function POSSettingsPage() {
 
       toast.success('Settings saved successfully');
       setIsEditModalOpen(false);
-      refetchSettings();
+      // Refetch settings to ensure UI updates
+      await refetchSettings();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to save settings');
     }
@@ -400,7 +401,7 @@ export default function POSSettingsPage() {
                 Tax Rate (%)
               </label>
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {settings?.taxRate || 10}%
+                {settings?.taxRate ?? 10}%
               </div>
             </div>
             <div>
@@ -1206,12 +1207,12 @@ export default function POSSettingsPage() {
                 <span>$25.00</span>
               </div>
               <div className="flex justify-between">
-                <span>Tax ({settings?.taxRate || 10}%):</span>
-                <span>${((25 * (settings?.taxRate || 10)) / 100).toFixed(2)}</span>
+                <span>Tax ({settings?.taxRate ?? 10}%):</span>
+                <span>${((25 * (settings?.taxRate ?? 10)) / 100).toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-bold">
                 <span>Total:</span>
-                <span>${(25 + (25 * (settings?.taxRate || 10)) / 100).toFixed(2)}</span>
+                <span>${(25 + (25 * (settings?.taxRate ?? 10)) / 100).toFixed(2)}</span>
               </div>
             </div>
             <div className="text-center text-xs mt-4">

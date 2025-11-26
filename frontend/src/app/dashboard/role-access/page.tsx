@@ -152,6 +152,7 @@ const roleAccess: RoleAccess[] = [
 
 export default function RoleAccessPage() {
   const { user } = useAppSelector((state) => state.auth);
+  const companyId = user?.companyId || '';
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -159,9 +160,15 @@ export default function RoleAccessPage() {
   const [newRole, setNewRole] = useState<string>('');
   
   // Get all staff members
-  const { data: staffData, isLoading, refetch } = useGetStaffQuery({ 
-    branchId: user?.branchId || undefined 
-  });
+  const { data: staffData, isLoading, refetch } = useGetStaffQuery(
+    {
+      companyId,
+      limit: 500,
+      includeOwners: true,
+      includeSuperAdmins: true,
+    },
+    { skip: !companyId },
+  );
   const [updateStaff] = useUpdateStaffMutation();
 
   const staff = useMemo(() => staffData?.staff || [], [staffData?.staff]);
@@ -290,6 +297,21 @@ export default function RoleAccessPage() {
       ),
     },
   ];
+
+  if (!companyId) {
+    return (
+      <div className="flex items-center justify-center h-96 text-center">
+        <div>
+          <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+            No company selected
+          </p>
+          <p className="text-gray-500 dark:text-gray-400">
+            Please select a company to manage role access.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

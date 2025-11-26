@@ -28,6 +28,7 @@ import toast from 'react-hot-toast';
 
 export default function BranchesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  const companyId = companyContext?.companyId || user?.companyId || '';
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -37,13 +38,16 @@ export default function BranchesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const { data, isLoading, refetch } = useGetBranchesQuery({
-    companyId: companyContext?.companyId,
-    search: searchQuery || undefined,
-    isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
-    page: currentPage,
-    limit: itemsPerPage,
-  });
+  const { data, isLoading, refetch } = useGetBranchesQuery(
+    {
+      companyId,
+      search: searchQuery || undefined,
+      status: statusFilter === 'all' ? undefined : statusFilter,
+      page: currentPage,
+      limit: itemsPerPage,
+    },
+    { skip: !companyId },
+  );
 
   const [createBranch] = useCreateBranchMutation();
   const [updateBranch] = useUpdateBranchMutation();
@@ -51,7 +55,15 @@ export default function BranchesPage() {
   const [toggleBranchStatus] = useToggleBranchStatusMutation();
 
   // Get staff for manager selection
-  const { data: staffData } = useGetStaffQuery({ branchId: user?.branchId || undefined });
+  const { data: staffData } = useGetStaffQuery(
+    {
+      companyId,
+      role: 'manager',
+      isActive: true,
+      limit: 200,
+    },
+    { skip: !companyId },
+  );
   
   const managers = staffData?.staff?.filter((s: Staff) => s.role === 'manager' && s.isActive) || [];
 
@@ -78,7 +90,7 @@ export default function BranchesPage() {
     ],
     totalTables: 0,
     totalSeats: 0,
-    companyId: companyContext?.companyId || '',
+    companyId: companyId || '',
   });
 
   const resetForm = () => {
@@ -105,7 +117,7 @@ export default function BranchesPage() {
       ],
       totalTables: 0,
       totalSeats: 0,
-      companyId: companyContext?.companyId || '',
+      companyId: companyId || '',
     });
   };
 
@@ -118,7 +130,7 @@ export default function BranchesPage() {
       toast.error('Address information is required');
       return;
     }
-    if (!companyContext?.companyId) {
+    if (!companyId) {
       toast.error('Company ID is required');
       return;
     }
@@ -126,7 +138,7 @@ export default function BranchesPage() {
     try {
       await createBranch({
         ...formData,
-        companyId: companyContext.companyId,
+        companyId,
       } as any).unwrap();
       toast.success('Branch created successfully');
       setIsCreateModalOpen(false);
@@ -365,6 +377,21 @@ export default function BranchesPage() {
       ),
     },
   ];
+
+  if (!companyId) {
+    return (
+      <div className="flex items-center justify-center h-96 text-center">
+        <div>
+          <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+            No company selected
+          </p>
+          <p className="text-gray-500 dark:text-gray-400">
+            Please select a company to manage branches.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

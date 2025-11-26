@@ -4,56 +4,71 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import {
-  useExportReportMutation,
-  useGetDashboardQuery,
-  useGetPeakHoursQuery,
-  useGetRevenueByCategoryQuery,
-  useGetSalesAnalyticsQuery,
-  useGetTopSellingItemsQuery
+    useExportReportMutation,
+    useGetDashboardQuery,
+    useGetDueSettlementsQuery,
+    useGetPeakHoursQuery,
+    useGetRevenueByCategoryQuery,
+    useGetSalesAnalyticsQuery,
+    useGetTopSellingItemsQuery
 } from '@/lib/api/endpoints/reportsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-  ArrowTrendingDownIcon,
-  ArrowTrendingUpIcon,
-  ChartBarIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  ShoppingCartIcon,
-  UsersIcon,
+    ArrowPathIcon,
+    ArrowTrendingDownIcon,
+    ArrowTrendingUpIcon,
+    CakeIcon,
+    ChartBarIcon,
+    ClockIcon,
+    CurrencyDollarIcon,
+    ExclamationTriangleIcon,
+    ShoppingCartIcon,
+    TrashIcon,
+    UsersIcon,
 } from '@heroicons/react/24/outline';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
 } from 'recharts';
 
 const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
 
 export default function ReportsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('week');
+  const [activeReport, setActiveReport] = useState<'sales' | 'wastage' | 'food' | 'settlement'>('sales');
+  const [mounted, setMounted] = useState(false);
   
-  const companyId = (user as any)?.companyId || 
-                    (companyContext as any)?.companyId ||
-                    (companyContext as any)?._id ||
-                    (companyContext as any)?.id;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const companyId = useMemo(() => {
+    return (user as any)?.companyId || 
+           (companyContext as any)?.companyId ||
+           (companyContext as any)?._id ||
+           (companyContext as any)?.id;
+  }, [user, companyContext]);
   
-  const branchId = (user as any)?.branchId || 
-                   (companyContext as any)?.branchId ||
-                   (companyContext as any)?.branches?.[0]?._id ||
-                   (companyContext as any)?.branches?.[0]?.id;
+  const branchId = useMemo(() => {
+    return (user as any)?.branchId || 
+           (companyContext as any)?.branchId ||
+           (companyContext as any)?.branches?.[0]?._id ||
+           (companyContext as any)?.branches?.[0]?.id;
+  }, [user, companyContext]);
 
   // Calculate date ranges based on period
   const { startDate, endDate } = useMemo(() => {
@@ -83,30 +98,85 @@ export default function ReportsPage() {
     };
   }, [selectedPeriod]);
 
-  const { data: dashboardData, isLoading: isLoadingDashboard } = useGetDashboardQuery({ 
+  const { 
+    data: dashboardData, 
+    isLoading: isLoadingDashboard,
+    error: dashboardError,
+    refetch: refetchDashboard
+  } = useGetDashboardQuery({ 
     branchId: branchId || undefined, 
     companyId: companyId || undefined
-  }, { skip: !companyId });
+  }, { 
+    skip: !companyId && !branchId,
+    refetchOnMountOrArgChange: true,
+  });
 
-  const { data: salesAnalytics, isLoading: isLoadingAnalytics } = useGetSalesAnalyticsQuery({
+  const { 
+    data: salesAnalytics, 
+    isLoading: isLoadingAnalytics,
+    error: salesAnalyticsError,
+    refetch: refetchSalesAnalytics
+  } = useGetSalesAnalyticsQuery({
     branchId: branchId || undefined,
-    period: selectedPeriod as 'day' | 'week' | 'month' | 'year',
-  }, { skip: !branchId });
+    period: selectedPeriod,
+    startDate,
+    endDate,
+  }, { 
+    skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
+  });
 
-  const { data: topSellingItems, isLoading: isLoadingTopItems } = useGetTopSellingItemsQuery({
+  const { 
+    data: topSellingItems, 
+    isLoading: isLoadingTopItems,
+    error: topItemsError,
+    refetch: refetchTopItems
+  } = useGetTopSellingItemsQuery({
     branchId: branchId || undefined,
     limit: 5,
-  }, { skip: !branchId });
+  }, { 
+    skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
+  });
 
-  const { data: revenueByCategory, isLoading: isLoadingCategory } = useGetRevenueByCategoryQuery({
+  const { 
+    data: revenueByCategory, 
+    isLoading: isLoadingCategory,
+    error: categoryError,
+    refetch: refetchCategory
+  } = useGetRevenueByCategoryQuery({
     branchId: branchId || undefined,
-  }, { skip: !branchId });
+  }, { 
+    skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
+  });
 
-  const { data: peakHoursData, isLoading: isLoadingPeakHours } = useGetPeakHoursQuery({
+  const { 
+    data: peakHoursData, 
+    isLoading: isLoadingPeakHours,
+    error: peakHoursError,
+    refetch: refetchPeakHours
+  } = useGetPeakHoursQuery({
     branchId: branchId || undefined,
     startDate,
     endDate,
-  }, { skip: !branchId });
+  }, { 
+    skip: !branchId || !startDate || !endDate,
+    refetchOnMountOrArgChange: true,
+  });
+
+  const { 
+    data: dueSettlementsData, 
+    isLoading: isLoadingSettlements,
+    error: settlementsError,
+    refetch: refetchSettlements
+  } = useGetDueSettlementsQuery({
+    branchId: branchId || undefined,
+    companyId: companyId || undefined,
+  }, { 
+    skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
+  });
 
   const [exportReport, { isLoading: isExporting }] = useExportReportMutation();
 
@@ -170,18 +240,30 @@ export default function ReportsPage() {
     };
   }, [salesAnalytics, dashboardData, selectedPeriod]);
 
-  const categoryData = revenueByCategory?.map((item, index) => ({
-    name: item.category || 'Unknown',
-    value: item.percentage || 0,
-    sales: item.sales || 0,
-    color: COLORS[index % COLORS.length],
-  })) || [];
+  const categoryData = useMemo(() => {
+    if (!revenueByCategory || !Array.isArray(revenueByCategory)) return [];
+    return revenueByCategory.map((item: any, index: number) => ({
+      name: item.category || item.categoryId || 'Unknown',
+      value: item.percentage || 0,
+      sales: item.sales || item.revenue || 0,
+      color: COLORS[index % COLORS.length],
+    }));
+  }, [revenueByCategory]);
 
-  const hourlyData = peakHoursData?.hourlyData?.map((item: any) => ({
-    hour: item.hour >= 12 ? `${item.hour > 12 ? item.hour - 12 : item.hour} PM` : `${item.hour || 0} AM`,
-    orders: item.orders || 0,
-    sales: item.sales || 0,
-  })) || [];
+  const hourlyData = useMemo(() => {
+    if (!peakHoursData?.hourlyData || !Array.isArray(peakHoursData.hourlyData)) return [];
+    return peakHoursData.hourlyData.map((item: any) => {
+      const hour = item.hour ?? 0;
+      const hour12 = hour >= 12 
+        ? `${hour > 12 ? hour - 12 : hour} PM` 
+        : `${hour === 0 ? 12 : hour} AM`;
+      return {
+        hour: hour12,
+        orders: item.orders || 0,
+        sales: item.sales || item.revenue || 0,
+      };
+    });
+  }, [peakHoursData]);
 
   // Calculate peak hours
   const peakHours = useMemo(() => {
@@ -218,16 +300,33 @@ export default function ReportsPage() {
     return topItems[0];
   }, [topItems]);
 
-  const isLoading = isLoadingDashboard || isLoadingAnalytics || isLoadingTopItems || isLoadingCategory || isLoadingPeakHours;
+  const isLoading = isLoadingDashboard || isLoadingAnalytics || isLoadingTopItems || isLoadingCategory || isLoadingPeakHours || isLoadingSettlements;
+  
+  const hasError = dashboardError || salesAnalyticsError || topItemsError || categoryError || peakHoursError || settlementsError;
+
+  const handleRefresh = () => {
+    refetchDashboard();
+    refetchSalesAnalytics();
+    refetchTopItems();
+    refetchCategory();
+    refetchPeakHours();
+    refetchSettlements();
+    toast.success('Reports refreshed');
+  };
 
   const handleExport = async (type: 'sales' | 'inventory' | 'customers' | 'staff', format: 'pdf' | 'excel' | 'csv') => {
+    if (!branchId && !companyId) {
+      toast.error('Branch or Company ID is required for export');
+      return;
+    }
+    
     try {
       const result = await exportReport({
         type,
         format,
         params: {
-          branchId: branchId,
-          companyId: companyId,
+          branchId: branchId || undefined,
+          companyId: companyId || undefined,
           period: selectedPeriod,
           startDate,
           endDate,
@@ -235,10 +334,13 @@ export default function ReportsPage() {
       }).unwrap();
       if (result.downloadUrl) {
         window.open(result.downloadUrl, '_blank');
+        toast.success(`Report exported as ${format.toUpperCase()}`);
+      } else {
+        toast.error('Export URL not received from server');
       }
-      toast.success(`Report exported as ${format.toUpperCase()}`);
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to export report');
+      console.error('Export error:', error);
+      toast.error(error?.data?.message || error?.message || 'Failed to export report');
     }
   };
 
@@ -263,7 +365,7 @@ export default function ReportsPage() {
     );
   };
 
-  if (isLoading) {
+  if (!mounted) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -271,17 +373,75 @@ export default function ReportsPage() {
     );
   }
 
+  if (!companyId && !branchId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Reports & Analytics</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Comprehensive insights into your restaurant performance
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <ExclamationTriangleIcon className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Company or Branch Required
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Please ensure you are logged in with a valid company or branch context to view reports.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading && !dashboardData && !salesAnalytics) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading reports...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Error Banner */}
+      {hasError && (
+        <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <ExclamationTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <div>
+                <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                  Some data failed to load. Please refresh the page or try again later.
+                </p>
+              </div>
+              <Button
+                onClick={handleRefresh}
+                variant="secondary"
+                size="sm"
+                className="ml-auto"
+              >
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Reports & Analytics</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Comprehensive insights into your restaurant performance
-          </p>
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-            ⚠️ Note: Sales reports show completed orders only. Pending orders will appear after completion.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -293,12 +453,20 @@ export default function ReportsPage() {
               { value: 'year', label: 'Last Year' },
             ]}
             value={selectedPeriod}
-            onChange={(value) => setSelectedPeriod(value)}
+            onChange={(value) => setSelectedPeriod(value as typeof selectedPeriod)}
           />
           <Button
-            onClick={() => handleExport('sales', 'pdf')}
+            onClick={handleRefresh}
             variant="secondary"
-            disabled={isExporting}
+            disabled={isLoading}
+          >
+            <ArrowPathIcon className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button
+            onClick={() => handleExport(activeReport === 'sales' ? 'sales' : 'sales', 'pdf')}
+            variant="secondary"
+            disabled={isExporting || isLoading}
           >
             <ChartBarIcon className="w-4 h-4 mr-2" />
             {isExporting ? 'Exporting...' : 'Export Report'}
@@ -306,8 +474,99 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Report Type Selection */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card 
+          className={`cursor-pointer transition-all ${activeReport === 'sales' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          onClick={() => setActiveReport('sales')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'sales' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <CurrencyDollarIcon className={`w-6 h-6 ${activeReport === 'sales' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+              </div>
+              <div>
+                <h3 className={`font-semibold ${activeReport === 'sales' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+                  Sales Report
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Revenue & orders
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all ${activeReport === 'wastage' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          onClick={() => setActiveReport('wastage')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'wastage' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <TrashIcon className={`w-6 h-6 ${activeReport === 'wastage' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+              </div>
+              <div>
+                <h3 className={`font-semibold ${activeReport === 'wastage' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+                  Wastage Report
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Inventory losses
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all ${activeReport === 'food' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          onClick={() => setActiveReport('food')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'food' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <CakeIcon className={`w-6 h-6 ${activeReport === 'food' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+              </div>
+              <div>
+                <h3 className={`font-semibold ${activeReport === 'food' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+                  Food Report
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Menu performance
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all ${activeReport === 'settlement' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          onClick={() => setActiveReport('settlement')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'settlement' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <ArrowPathIcon className={`w-6 h-6 ${activeReport === 'settlement' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+              </div>
+              <div>
+                <h3 className={`font-semibold ${activeReport === 'settlement' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+                  Due Settlement
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Pending payments
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Report Content Based on Selection */}
+      {/* Report Content Based on Selection */}
+      {activeReport === 'sales' && (
+        <>
+          {/* Key Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -418,9 +677,16 @@ export default function ReportsPage() {
             <CardTitle>Sales by Category</CardTitle>
           </CardHeader>
           <CardContent>
-            {categoryData.length === 0 ? (
+            {isLoadingCategory ? (
               <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mx-auto mb-2"></div>
+                <p className="text-gray-500 dark:text-gray-400">Loading category data...</p>
+              </div>
+            ) : categoryData.length === 0 ? (
+              <div className="text-center py-12">
+                <CakeIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-500 dark:text-gray-400">No category data available</p>
+                <p className="text-sm text-gray-400 mt-1">Complete some orders to see category breakdown</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
@@ -452,9 +718,16 @@ export default function ReportsPage() {
             <CardTitle>Orders by Hour</CardTitle>
           </CardHeader>
           <CardContent>
-            {hourlyData.length === 0 ? (
+            {isLoadingPeakHours ? (
               <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mx-auto mb-2"></div>
+                <p className="text-gray-500 dark:text-gray-400">Loading hourly data...</p>
+              </div>
+            ) : hourlyData.length === 0 ? (
+              <div className="text-center py-12">
+                <ClockIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-500 dark:text-gray-400">No hourly data available</p>
+                <p className="text-sm text-gray-400 mt-1">Complete some orders to see peak hours</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
@@ -482,9 +755,16 @@ export default function ReportsPage() {
             <CardTitle>Top Selling Items</CardTitle>
           </CardHeader>
           <CardContent>
-            {topItems.length === 0 ? (
+            {isLoadingTopItems ? (
               <div className="text-center py-8">
-                <p className="text-gray-500 dark:text-gray-400">No data available</p>
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mx-auto mb-2"></div>
+                <p className="text-gray-500 dark:text-gray-400">Loading top items...</p>
+              </div>
+            ) : topItems.length === 0 ? (
+              <div className="text-center py-8">
+                <ShoppingCartIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500 dark:text-gray-400">No top selling items data available</p>
+                <p className="text-sm text-gray-400 mt-1">Complete some orders to see top sellers</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -617,6 +897,256 @@ export default function ReportsPage() {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
+
+      {activeReport === 'wastage' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Wastage Report</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-12">
+              <TrashIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Wastage Report</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Track inventory losses, expired items, and waste management
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                <Card>
+                  <CardContent className="p-6">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Wastage</p>
+                    <p className="text-3xl font-bold text-red-600">0</p>
+                    <p className="text-xs text-gray-500 mt-1">Items wasted</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Wastage Value</p>
+                    <p className="text-3xl font-bold text-orange-600">{formatCurrency(0)}</p>
+                    <p className="text-xs text-gray-500 mt-1">Total loss</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Wastage Rate</p>
+                    <p className="text-3xl font-bold text-purple-600">0%</p>
+                    <p className="text-xs text-gray-500 mt-1">Of inventory</p>
+                  </CardContent>
+                </Card>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-6">
+                Wastage tracking will be available once inventory wastage data is recorded.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeReport === 'food' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Food Report</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Menu Items</p>
+                    <p className="text-3xl font-bold text-blue-600">
+                      {topItems.length || 0}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Total items</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Top Seller</p>
+                    <p className="text-xl font-bold text-green-600">
+                      {mostPopularItem?.name || 'N/A'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {mostPopularItem?.orders || 0} orders
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Food Revenue</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {formatCurrency(salesAnalytics?.totalSales || 0)}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Total sales</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Top Selling Items */}
+              {topItems.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Selling Items</h4>
+                  <div className="space-y-3">
+                    {topItems.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                            item.index === 0 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                            item.index === 1 ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' :
+                            item.index === 2 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                            'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
+                            {item.index + 1}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {item.orders} orders • Avg: {formatCurrency(item.avgRevenue)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {formatCurrency(item.revenue)}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Revenue</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sales by Category */}
+              {categoryData.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sales by Category</h4>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeReport === 'settlement' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Due Settlement</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingSettlements ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mx-auto mb-2"></div>
+                <p className="text-gray-500 dark:text-gray-400">Loading settlement data...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card>
+                    <CardContent className="p-6">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Pending Settlements</p>
+                      <p className="text-3xl font-bold text-orange-600">
+                        {dueSettlementsData?.pendingSettlements || 0}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Unpaid orders</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Total Due Amount</p>
+                      <p className="text-3xl font-bold text-red-600">
+                        {formatCurrency(dueSettlementsData?.totalDueAmount || 0)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Outstanding</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Settled Today</p>
+                      <p className="text-3xl font-bold text-green-600">
+                        {formatCurrency(dueSettlementsData?.settledTodayAmount || 0)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {dueSettlementsData?.settledToday || 0} orders paid today
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {dueSettlementsData?.pendingSettlements === 0 ? (
+                  <div className="text-center py-8">
+                    <ArrowPathIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Pending Settlements</h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      All orders have been settled. Check back later for new pending payments.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      Pending Orders ({dueSettlementsData?.pendingOrders?.length || 0})
+                    </h4>
+                    <div className="space-y-3">
+                      {dueSettlementsData?.pendingOrders?.map((order: any) => (
+                        <div
+                          key={order.id}
+                          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
+                              <ShoppingCartIcon className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white">
+                                Order #{order.orderNumber}
+                              </p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {order.orderType} • {new Date(order.createdAt).toLocaleDateString()}
+                                {order.customerInfo?.name && ` • ${order.customerInfo.name}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              {formatCurrency(order.totalAmount)}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Pending</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-400">
+                    <strong>Note:</strong> Due settlements track orders that have been completed but payment is still pending or needs to be reconciled.
+                  </p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

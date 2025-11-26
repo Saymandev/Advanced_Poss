@@ -294,8 +294,11 @@ export default function OrdersPage() {
     }
     
     try {
-      await cancelPOSOrder(orderId).unwrap();
-      toast.success('Order cancelled successfully');
+      await cancelPOSOrder({ 
+        id: orderId, 
+        reason: 'Cancelled from order history page' 
+      }).unwrap();
+      toast.success('Order cancelled successfully. Table has been freed if applicable.');
       refetch();
       if (selectedOrderId === orderId) {
         setIsViewModalOpen(false);

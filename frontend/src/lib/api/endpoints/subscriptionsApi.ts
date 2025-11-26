@@ -40,6 +40,7 @@ export interface Subscription {
   companyId: string;
   planId: string;
   plan: SubscriptionPlan;
+  planKey?: string;
   status: 'active' | 'cancelled' | 'expired' | 'suspended';
   currentPeriodStart: string;
   currentPeriodEnd: string;
@@ -82,11 +83,29 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Subscription'],
       transformResponse: (response: SubscriptionPlan[] | { plans: SubscriptionPlan[]; total: number }) => {
-        // Handle both array and object responses
+        const normalize = (plans: SubscriptionPlan[]) =>
+          plans.map((plan) => ({
+            ...plan,
+            featureList:
+              plan.featureList && plan.featureList.length > 0
+                ? plan.featureList
+                : [
+                    plan.features.pos ? 'POS & Ordering' : null,
+                    plan.features.inventory ? 'Inventory Management' : null,
+                    plan.features.crm ? 'Customer CRM' : null,
+                    plan.features.multiBranch ? 'Multi-branch Support' : null,
+                    plan.features.aiInsights ? 'AI Insights' : null,
+                  ].filter(Boolean) as string[],
+          }));
+
         if (Array.isArray(response)) {
-          return response;
+          return normalize(response);
         }
-        return response;
+
+        return {
+          ...response,
+          plans: normalize(response.plans),
+        };
       },
     }),
     getCurrentSubscription: builder.query<Subscription, { companyId: string }>({

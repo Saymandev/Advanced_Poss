@@ -1,8 +1,9 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeftIcon, MinusIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
@@ -24,7 +25,6 @@ export default function CartPage() {
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
 
-  const { data: company } = useGetCompanyBySlugQuery(companySlug);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
 

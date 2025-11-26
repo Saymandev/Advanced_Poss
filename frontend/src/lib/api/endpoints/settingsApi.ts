@@ -70,6 +70,13 @@ export const settingsApi = apiSlice.injectEndpoints({
     getTaxSettings: builder.query<TaxSettings[], string>({
       query: (companyId) => `/settings/taxes?companyId=${companyId}`,
       providesTags: ['Settings'],
+      transformResponse: (response: any) => {
+        const data = response?.data ?? response;
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.taxes)) return data.taxes;
+        if (Array.isArray(data?.items)) return data.items;
+        return [];
+      },
     }),
     createTaxSetting: builder.mutation<TaxSettings, Omit<TaxSettings, 'id' | 'createdAt' | 'updatedAt'>>({
       query: (data) => ({
@@ -99,6 +106,13 @@ export const settingsApi = apiSlice.injectEndpoints({
     getServiceChargeSettings: builder.query<ServiceChargeSettings[], string>({
       query: (companyId) => `/settings/service-charges?companyId=${companyId}`,
       providesTags: ['Settings'],
+      transformResponse: (response: any) => {
+        const data = response?.data ?? response;
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.serviceCharges)) return data.serviceCharges;
+        if (Array.isArray(data?.items)) return data.items;
+        return [];
+      },
     }),
     createServiceChargeSetting: builder.mutation<ServiceChargeSettings, Omit<ServiceChargeSettings, 'id' | 'createdAt' | 'updatedAt'>>({
       query: (data) => ({

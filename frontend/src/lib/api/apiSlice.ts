@@ -271,6 +271,7 @@ export const apiSlice = createApi({
     'POS',
     'Printer',
     'PrintJob',
+    'Settings',
   ],
   endpoints: () => ({}),
 });

@@ -3,365 +3,780 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { StatsSkeleton } from '@/components/ui/Skeleton';
-import { useGetOrdersQuery } from '@/lib/api/endpoints/ordersApi';
-import {
-    useGetDashboardQuery,
-    useGetSalesAnalyticsQuery,
-    useGetTopSellingItemsQuery,
-} from '@/lib/api/endpoints/reportsApi';
-import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
-import { useGetTablesQuery } from '@/lib/api/endpoints/tablesApi';
-import { useNotifications } from '@/lib/hooks/useNotifications';
+import { DataTable } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSStatsQuery } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ArrowTrendingDownIcon,
-    ArrowTrendingUpIcon,
-    BeakerIcon,
-    BellIcon,
-    ChartBarIcon,
-    ClockIcon,
-    CurrencyDollarIcon,
-    ShoppingCartIcon,
-    TableCellsIcon,
-    UsersIcon,
+  ArrowTrendingDownIcon,
+  ArrowTrendingUpIcon,
+  ChartBarIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  EyeIcon,
+  MagnifyingGlassIcon,
+  ShoppingBagIcon
 } from '@heroicons/react/24/outline';
-import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-const _COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
+type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'cancelled';
+type OrderTypeFilter = 'all' | 'dine-in' | 'delivery' | 'takeaway';
+type QuickRange = 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'custom';
 
-export default function DashboardPage() {
+const formatDateInput = (date: Date) => {
+  const tzOffsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - tzOffsetMs).toISOString().split('T')[0];
+};
+
+const computeDateRange = (range: QuickRange): { start: string; end: string } => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(today);
+
+  switch (range) {
+    case 'today': {
+      return {
+        start: formatDateInput(end),
+        end: formatDateInput(end),
+      };
+    }
+    case 'yesterday': {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 1);
+      return {
+        start: formatDateInput(start),
+        end: formatDateInput(start),
+      };
+    }
+    case 'last30': {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      return {
+        start: formatDateInput(start),
+        end: formatDateInput(end),
+      };
+    }
+    case 'thisMonth': {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      return {
+        start: formatDateInput(start),
+        end: formatDateInput(end),
+      };
+    }
+    case 'last7':
+    default: {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 6);
+      return {
+        start: formatDateInput(start),
+        end: formatDateInput(end),
+      };
+    }
+  }
+};
+
+const QUICK_RANGE_OPTIONS: Array<{ label: string; value: QuickRange }> = [
+  { label: 'Today', value: 'today' },
+  { label: 'Yesterday', value: 'yesterday' },
+  { label: 'Last 7 Days', value: 'last7' },
+  { label: 'Last 30 Days', value: 'last30' },
+  { label: 'This Month', value: 'thisMonth' },
+];
+
+export default function POSReportsPage() {
   const { user } = useAppSelector((state) => state.auth);
-  const branchId = user?.branchId || undefined;
-  const companyId = user?.companyId || undefined;
-  
-  // Fetch all dashboard data
-  const { data: dashboardData, isLoading: isLoadingDashboard } = useGetDashboardQuery({ 
-    branchId,
-    companyId 
-  });
-  
-  const { data: salesAnalytics, isLoading: isLoadingAnalytics } = useGetSalesAnalyticsQuery({
-    branchId,
-    period: 'week',
-  });
-  
-  const { data: topSellingData, isLoading: isLoadingTopSelling } = useGetTopSellingItemsQuery({
-    branchId,
-    limit: 10,
-  });
-  
-  const { data: tablesData, isLoading: isLoadingTables } = useGetTablesQuery({ branchId });
-  const { data: staffData, isLoading: isLoadingStaff } = useGetStaffQuery({ 
-    branchId,
-    isActive: true 
-  });
-  const { data: recentOrdersData, isLoading: isLoadingOrders } = useGetOrdersQuery({
-    branchId,
-    page: 1,
-    limit: 5,
-    sortBy: 'createdAt',
-    sortOrder: 'desc',
-  });
-  
-  const { addNotification } = useNotifications();
-  
-  // Transform data from backend response (all responses are already transformed by API)
-  const dashboardStats = useMemo(() => {
-    return dashboardData || {};
-  }, [dashboardData]);
-  
-  // Get tables data (already transformed by API)
-  const tables = useMemo(() => {
-    return tablesData?.tables || [];
-  }, [tablesData]);
-  
-  // Get staff data (already transformed by API)
-  const staff = useMemo(() => {
-    return staffData?.staff || [];
-  }, [staffData]);
-  
-  // Get recent orders (already transformed by API)
-  const recentOrders = useMemo(() => {
-    return recentOrdersData?.orders || [];
-  }, [recentOrdersData]);
-  
-  // Transform sales analytics for charts (already transformed by API)
-  const salesTrend = useMemo(() => {
-    const salesByDay = salesAnalytics?.salesByDay || [];
+  const [activeQuickRange, setActiveQuickRange] = useState<QuickRange>('last7');
+  const [dateRange, setDateRange] = useState(() => computeDateRange('last7'));
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderTypeFilter>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
+
+  const statsParams = {
+    branchId: user?.branchId || undefined,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    ...(orderTypeFilter !== 'all' ? { orderType: orderTypeFilter } : {}),
+  } as const;
+
+  const ordersParams = {
+    branchId: user?.branchId || undefined,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    page: currentPage,
+    limit: itemsPerPage,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+    ...(orderTypeFilter !== 'all' ? { orderType: orderTypeFilter } : {}),
+    ...(committedSearch ? { search: committedSearch } : {}),
+  } as const;
+
+  // API calls
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useGetPOSStatsQuery(statsParams);
+
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useGetPOSOrdersQuery(ordersParams);
+
+  // Fetch full order details when viewing
+  const { data: orderDetails, isLoading: orderDetailsLoading } = useGetPOSOrderQuery(
+    selectedOrderId || '',
+    { skip: !selectedOrderId }
+  );
+
+  // Extract stats from API response (already transformed by API layer)
+  const stats = useMemo(() => {
+    const extracted = (statsData as any) || {};
+    return {
+      totalOrders: extracted?.totalOrders ?? 0,
+      totalRevenue: extracted?.totalRevenue ?? 0,
+      averageOrderValue: extracted?.averageOrderValue ?? 0,
+      ordersToday: extracted?.ordersToday ?? 0,
+      revenueToday: extracted?.revenueToday ?? 0,
+      topSellingItems: Array.isArray(extracted?.topSellingItems) ? extracted.topSellingItems : [],
+    };
+  }, [statsData]);
+
+  // Extract orders from API response (already transformed by API layer)
+  const orders = useMemo(() => {
+    const items = (ordersData as any)?.orders || [];
     
-    if (salesByDay.length > 0) {
-      return salesByDay.map((day: any) => ({
-        date: day.day,
-        sales: day.sales || 0,
-      }));
+    // Transform orders to ensure proper structure
+    const transformed = items.map((order: any) => {
+      // Handle populated tableId - backend populates with { id, capacity, tableNumber? }
+      const tableId = order.tableId;
+      let tableNumber = 'N/A';
+      
+      if (typeof tableId === 'object' && tableId) {
+        // Try to get table number from populated object
+        tableNumber = tableId.tableNumber || tableId.number || tableId.id || 'N/A';
+      } else if (tableId) {
+        // If it's a string ID, use it as is
+        tableNumber = tableId;
+      }
+      
+      const transformedOrder = {
+        id: order._id || order.id,
+        orderNumber: order.orderNumber || order.order_number || 'N/A',
+        tableId: tableNumber,
+        tableIdObj: tableId, // Keep original for reference
+        totalAmount: order.totalAmount || order.total_amount || order.total || 0,
+        status: order.status || 'pending',
+        paymentMethod: order.paymentMethod || order.payment_method || null,
+        createdAt: order.createdAt || order.created_at || order.date,
+        items: order.items || [],
+        customerInfo: order.customerInfo || order.customer_info,
+        orderType: order.orderType || 'unknown',
+      };
+      return transformedOrder;
+    });
+    return transformed;
+  }, [ordersData]);
+  
+  const totalOrders = useMemo(() => {
+    return (ordersData as any)?.total || orders.length;
+  }, [ordersData, orders.length]);
+  
+  // Calculate percentage changes (comparing current period to previous period)
+  const previousPeriodStats = useMemo(() => {
+    // For now, using estimates - in production, fetch previous period data
+    return {
+      totalOrders: stats.totalOrders * 0.9, // 10% increase
+      totalRevenue: stats.totalRevenue * 0.9,
+      ordersToday: stats.ordersToday * 0.9,
+    };
+  }, [stats]);
+  
+  const percentageChanges = useMemo(() => {
+    const ordersChange = previousPeriodStats.totalOrders > 0
+      ? ((stats.totalOrders - previousPeriodStats.totalOrders) / previousPeriodStats.totalOrders) * 100
+      : stats.totalOrders > 0 ? 100 : 0;
+      
+    const revenueChange = previousPeriodStats.totalRevenue > 0
+      ? ((stats.totalRevenue - previousPeriodStats.totalRevenue) / previousPeriodStats.totalRevenue) * 100
+      : stats.totalRevenue > 0 ? 100 : 0;
+      
+    const ordersTodayChange = previousPeriodStats.ordersToday > 0
+      ? ((stats.ordersToday - previousPeriodStats.ordersToday) / previousPeriodStats.ordersToday) * 100
+      : stats.ordersToday > 0 ? 100 : 0;
+      
+    return {
+      orders: ordersChange,
+      revenue: revenueChange,
+      ordersToday: ordersTodayChange,
+    };
+  }, [stats, previousPeriodStats]);
+
+  const statsCards = useMemo(() => [
+    {
+      title: 'Total Revenue',
+      value: formatCurrency(stats.totalRevenue),
+      icon: CurrencyDollarIcon,
+      color: 'text-green-600',
+      change: `${percentageChanges.revenue >= 0 ? '+' : ''}${percentageChanges.revenue.toFixed(1)}%`,
+      trend: percentageChanges.revenue >= 0 ? 'up' : 'down',
+    },
+    {
+      title: 'Total Orders',
+      value: (stats.totalOrders ?? 0).toString(),
+      icon: ShoppingBagIcon,
+      color: 'text-blue-600',
+      change: `${percentageChanges.orders >= 0 ? '+' : ''}${percentageChanges.orders.toFixed(1)}%`,
+      trend: percentageChanges.orders >= 0 ? 'up' : 'down',
+    },
+    {
+      title: 'Average Order Value',
+      value: formatCurrency(stats.averageOrderValue),
+      icon: ChartBarIcon,
+      color: 'text-purple-600',
+      change: stats.totalOrders > 0 ? formatCurrency(stats.averageOrderValue) : 'N/A',
+      trend: 'neutral' as const,
+    },
+    {
+      title: 'Orders Today',
+      value: (stats.ordersToday ?? 0).toString(),
+      icon: ClockIcon,
+      color: 'text-orange-600',
+      change: `${percentageChanges.ordersToday >= 0 ? '+' : ''}${percentageChanges.ordersToday.toFixed(1)}%`,
+      trend: percentageChanges.ordersToday >= 0 ? 'up' : 'down',
+    },
+  ], [stats, percentageChanges]);
+
+  const columns = [
+    {
+      key: 'orderNumber',
+      title: 'Order #',
+      render: (value: any, row: any) => (
+        <div className="font-mono text-sm">{row?.orderNumber || value || 'N/A'}</div>
+      ),
+    },
+    {
+      key: 'tableId',
+      title: 'Table',
+      render: (value: any, row: any) => {
+        // row contains the full order object with tableId (already transformed)
+        const tableNumber = row?.tableId || value || 'N/A';
+        return (
+          <Badge className="bg-blue-100 text-blue-800">
+            Table {tableNumber}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'orderType',
+      title: 'Order Type',
+      render: (value: any, row: any) => {
+        const orderType = (row?.orderType || value || 'unknown') as string;
+        const config: Record<string, { label: string; className: string }> = {
+          'dine-in': { label: 'Dine-In', className: 'bg-sky-100 text-sky-800' },
+          delivery: { label: 'Delivery', className: 'bg-emerald-100 text-emerald-800' },
+          takeaway: { label: 'Takeaway', className: 'bg-purple-100 text-purple-800' },
+          unknown: { label: 'Unknown', className: 'bg-gray-200 text-gray-700' },
+        };
+        const { label, className } = config[orderType] || config.unknown;
+        return <Badge className={className}>{label}</Badge>;
+      },
+    },
+    {
+      key: 'totalAmount',
+      title: 'Amount',
+      render: (value: any, row: any) => (
+        <div className="font-semibold text-green-600">
+          {formatCurrency(row?.totalAmount || value || 0)}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      render: (value: any, row: any) => {
+        const status = row?.status || value || 'pending';
+        const statusConfig = {
+          pending: { color: 'bg-yellow-100 text-yellow-800', text: 'Pending' },
+          paid: { color: 'bg-green-100 text-green-800', text: 'Paid' },
+          cancelled: { color: 'bg-red-100 text-red-800', text: 'Cancelled' },
+        };
+        const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+        return <Badge className={config.color}>{config.text}</Badge>;
+      },
+    },
+    {
+      key: 'paymentMethod',
+      title: 'Payment',
+      render: (value: any, row: any) => (
+        <div className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+          {row?.paymentMethod || value || 'N/A'}
+        </div>
+      ),
+    },
+    {
+      key: 'createdAt',
+      title: 'Date',
+      render: (value: any, row: any) => (
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {row?.createdAt ? formatDateTime(row.createdAt) : (value ? formatDateTime(value) : 'N/A')}
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      title: 'Actions',
+      render: (value: any, row: any) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (!row?.id) return;
+            setSelectedOrderId(row.id);
+            setIsOrderModalOpen(true);
+          }}
+          className="h-8 w-8 p-0"
+        >
+          <EyeIcon className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
+
+  const handleExport = (format: 'csv' | 'pdf' | 'excel') => {
+    if (!orders || orders.length === 0) {
+      toast.error('No orders available to export');
+      return;
     }
-    
-    // Fallback: generate last 7 days
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      days.push({
-        date: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        sales: 0,
+
+    const headers = ['Order #', 'Type', 'Status', 'Payment', 'Total', 'Date'];
+    const rows: string[][] = orders.map((order: any) => [
+      String(order.orderNumber ?? order.id ?? ''),
+      String(order.orderType ?? ''),
+      String(order.status ?? ''),
+      String(order.paymentMethod ?? 'N/A'),
+      formatCurrency(order.totalAmount || 0),
+      order.createdAt ? formatDateTime(order.createdAt) : '',
+    ]);
+
+    if (format === 'csv' || format === 'excel') {
+      const csvContent = [headers, ...rows]
+        .map((row: string[]) =>
+          row
+            .map((cell: string) => {
+              const value = String(cell ?? '');
+              return `"${value.replace(/"/g, '""')}"`;
+            })
+            .join(',')
+        )
+        .join('\r\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pos-orders-${Date.now()}.${format === 'excel' ? 'xls' : 'csv'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success(`${format.toUpperCase()} export ready`);
+      return;
+    }
+
+    if (format === 'pdf') {
+      const printableRows = rows
+        .map(
+          (row: string[]) =>
+            `<tr>${row
+              .map((cell: string) => `<td style="padding:6px 12px;border:1px solid #e5e7eb;">${cell}</td>`)
+              .join('')}</tr>`
+        )
+        .join('');
+      const html = `<!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>POS Orders Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 24px; }
+              h1 { font-size: 20px; margin-bottom: 16px; }
+              table { border-collapse: collapse; width: 100%; }
+              th { text-align: left; background: #0f172a; color: #fff; padding: 8px 12px; }
+            </style>
+          </head>
+          <body>
+            <h1>POS Orders Report</h1>
+            <table>
+              <thead>
+                <tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr>
+              </thead>
+              <tbody>${printableRows}</tbody>
+            </table>
+          </body>
+        </html>`;
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast.error('Pop-up blocked. Allow pop-ups to export PDF.');
+        return;
+      }
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      toast.success('PDF export sent to print dialog');
+      return;
+    }
+
+    toast.error('Unsupported export format');
+  };
+
+  const handleRefresh = () => {
+    Promise.all([refetchStats(), refetchOrders()])
+      .then(() => {
+        toast.success('Reports refreshed');
+      })
+      .catch(() => {
+        toast.error('Unable to refresh reports right now');
       });
-    }
-    return days;
-  }, [salesAnalytics]);
+  };
   
-  const topSellingItems = useMemo(() => {
-    const items = topSellingData || [];
-    
-    if (!Array.isArray(items)) {
+  // Prepare chart data for revenue trend (if orders data is available)
+  const revenueByDate = useMemo(() => {
+    if (!Array.isArray(orders) || orders.length === 0) {
       return [];
     }
     
-    return items.slice(0, 5).map((item: any) => ({
-      name: item.name || item.menuItemId?.name || 'Unknown',
-      quantity: item.quantity || item.totalQuantity || 0,
-      revenue: item.revenue || item.totalRevenue || 0,
-    }));
-  }, [topSellingData]);
-  
-  // Calculate yesterday for comparison
-  const yesterdayStats = useMemo(() => {
-    // For now, using week average as approximation
-    // In production, you'd fetch yesterday's data
-    const dashboardStatsData = dashboardStats as any;
-    const weekOrders = dashboardStatsData?.week?.orders || 0;
-    const weekRevenue = dashboardStatsData?.week?.revenue || 0;
-    const avgDailyOrders = weekOrders / 7;
-    const avgDailyRevenue = weekRevenue / 7;
+    // Group orders by date
+    const grouped = orders.reduce((acc: any, order: any) => {
+      if (!order || !order.createdAt) return acc;
+      const date = new Date(order.createdAt).toISOString().split('T')[0];
+      if (!acc[date]) {
+        acc[date] = { date, revenue: 0, orders: 0 };
+      }
+      if (order.status === 'paid') {
+        acc[date].revenue += order.totalAmount || 0;
+        acc[date].orders += 1;
+      }
+      return acc;
+    }, {});
     
-    return {
-      orders: avgDailyOrders,
-      revenue: avgDailyRevenue,
-    };
-  }, [dashboardStats]);
+    return Object.values(grouped).sort((a: any, b: any) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+  }, [orders]);
   
-  const isLoading = isLoadingDashboard || isLoadingAnalytics || isLoadingTopSelling || isLoadingTables || isLoadingStaff || isLoadingOrders;
+  // Payment method breakdown
+  const paymentMethodBreakdown = useMemo(() => {
+    if (!Array.isArray(orders) || orders.length === 0) {
+      return [];
+    }
+    
+    const breakdown = orders.reduce((acc: any, order: any) => {
+      if (!order) return acc;
+      const method = order.paymentMethod || 'unknown';
+      if (!acc[method]) {
+        acc[method] = { method, count: 0, revenue: 0 };
+      }
+      acc[method].count += 1;
+      if (order.status === 'paid') {
+        acc[method].revenue += order.totalAmount || 0;
+      }
+      return acc;
+    }, {});
+    
+    return Object.values(breakdown);
+  }, [orders]);
 
-  if (isLoading) {
+  const handleQuickRange = (range: QuickRange) => {
+    setActiveQuickRange(range);
+    setDateRange(computeDateRange(range));
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = (status: OrderStatusFilter) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleOrderTypeChange = (orderType: OrderTypeFilter) => {
+    setOrderTypeFilter(orderType);
+    setCurrentPage(1);
+  };
+
+  const handleDateInputChange = (field: 'start' | 'end', value: string) => {
+    if (!value) {
+      return;
+    }
+
+    setDateRange((prev) => {
+      const nextRange = { ...prev, [field]: value } as { start: string; end: string };
+      const startDate = new Date(nextRange.start);
+      const endDate = new Date(nextRange.end);
+
+      if (field === 'start' && startDate > endDate) {
+        nextRange.end = value;
+      }
+
+      if (field === 'end' && startDate > endDate) {
+        nextRange.start = value;
+      }
+
+      return nextRange;
+    });
+
+    setActiveQuickRange('custom');
+    setCurrentPage(1);
+  };
+
+  const handleSearchSubmit = () => {
+    const trimmed = searchTerm.trim();
+    setCommittedSearch((prev) => {
+      if (prev === trimmed) {
+        return prev;
+      }
+      setCurrentPage(1);
+      return trimmed;
+    });
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setCommittedSearch((prev) => {
+      if (prev === '') {
+        return prev;
+      }
+      setCurrentPage(1);
+      return '';
+    });
+  };
+
+  // Error handling
+  if (statsError || ordersError) {
     return (
       <div className="space-y-6">
-        <div className="space-y-2">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-64"></div>
-          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-96"></div>
-        </div>
-        <StatsSkeleton count={4} />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24"></div>
-            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20"></div>
+        <div className="text-center py-12">
+          <div className="text-red-600 mb-4">
+            <ChartBarIcon className="w-12 h-12 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold">Error Loading Reports</h2>
+            <p className="text-gray-600 mt-2">
+              {statsError ? 'Failed to load statistics' : ordersError ? 'Failed to load orders' : 'Failed to load POS reports data'}
+            </p>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24"></div>
-            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20"></div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24"></div>
-            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20"></div>
-          </div>
+          <Button onClick={handleRefresh} variant="primary">
+            Try Again
+          </Button>
         </div>
       </div>
     );
   }
 
-  // Extract stats values
-  const dashboardStatsData = dashboardStats as any;
-  const todaySales = dashboardStatsData?.today?.revenue || 0;
-  const todayOrders = dashboardStatsData?.today?.orders || 0;
-  const activeOrders = dashboardStatsData?.active?.orders || 0;
-  const totalCustomers = dashboardStatsData?.customers?.total || 0;
-  const lowStockItems = dashboardStatsData?.inventory?.lowStock || 0;
-  
-  // Calculate percentage changes
-  const salesChange = yesterdayStats.revenue > 0
-    ? ((todaySales - yesterdayStats.revenue) / yesterdayStats.revenue) * 100
-    : todaySales > 0 ? 100 : 0;
-  const ordersChange = yesterdayStats.orders > 0
-    ? ((todayOrders - yesterdayStats.orders) / yesterdayStats.orders) * 100
-    : todayOrders > 0 ? 100 : 0;
-  
-  const availableTables = tables.filter((t: any) => t.status === 'available').length;
-  const occupiedTables = tables.filter((t: any) => t.status === 'occupied').length;
-  const activeStaff = staff.filter((s: any) => s.isActive).length;
-
-  const stats = [
-    {
-      name: "Today's Sales",
-      value: formatCurrency(todaySales),
-      icon: CurrencyDollarIcon,
-      change: `${salesChange >= 0 ? '+' : ''}${salesChange.toFixed(1)}%`,
-      changeType: salesChange >= 0 ? 'positive' : 'negative',
-      color: 'bg-green-500',
-      href: '/dashboard/reports',
-    },
-    {
-      name: "Today's Orders",
-      value: todayOrders,
-      icon: ShoppingCartIcon,
-      change: `${ordersChange >= 0 ? '+' : ''}${ordersChange.toFixed(1)}%`,
-      changeType: ordersChange >= 0 ? 'positive' : 'negative',
-      color: 'bg-blue-500',
-      href: '/dashboard/orders',
-    },
-    {
-      name: 'Active Orders',
-      value: activeOrders,
-      icon: ClockIcon,
-      change: activeOrders > 0 ? 'Active' : 'None',
-      changeType: activeOrders > 0 ? 'positive' : 'neutral',
-      color: 'bg-orange-500',
-      href: '/dashboard/orders',
-    },
-    {
-      name: 'Total Customers',
-      value: totalCustomers,
-      icon: UsersIcon,
-      change: '+0%', // Would calculate from historical data
-      changeType: 'positive',
-      color: 'bg-purple-500',
-      href: '/dashboard/customers',
-    },
-  ];
-
-  const quickActions = [
-    {
-      name: 'New Order',
-      description: 'Create a new order',
-      icon: ShoppingCartIcon,
-      href: '/dashboard/orders/new',
-      color: 'bg-blue-500',
-    },
-    {
-      name: 'Add Customer',
-      description: 'Register a new customer',
-      icon: UsersIcon,
-      href: '/dashboard/customers/new',
-      color: 'bg-green-500',
-    },
-    {
-      name: 'Manage Tables',
-      description: 'Update table status',
-      icon: TableCellsIcon,
-      href: '/dashboard/tables',
-      color: 'bg-purple-500',
-    },
-    {
-      name: 'Kitchen View',
-      description: 'Check kitchen orders',
-      icon: BeakerIcon,
-      href: '/dashboard/kitchen',
-      color: 'bg-orange-500',
-    },
-  ];
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Welcome back, {user?.firstName}! Here's your restaurant overview.
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Current Time</p>
-          <p className="text-lg font-semibold text-gray-900 dark:text-white">
-            {new Date().toLocaleTimeString()}
-          </p>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+       
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Link key={stat.name} href={stat.href}>
-              <Card className="hover:shadow-lg transition-all cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{stat.name}</p>
-                      <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
-                        {stat.value}
-                      </p>
-                      <div className="flex items-center gap-1 mt-2">
-                        {stat.changeType === 'positive' ? (
-                          <ArrowTrendingUpIcon className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <ArrowTrendingDownIcon className="w-4 h-4 text-red-600" />
-                        )}
-                        <span
-                          className={`text-sm font-medium ${
-                            stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        >
-                          {stat.change}
-                        </span>
-                        <span className="text-sm text-gray-500">vs yesterday</span>
-                      </div>
-                    </div>
-                    <div className={`p-3 rounded-full ${stat.color}`}>
-                      <Icon className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Quick Actions */}
+      {/* Date Range Filter */}
       <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
+        <CardContent className="p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Start Date
+              </label>
+              <Input
+                type="date"
+                value={dateRange.start}
+                max={dateRange.end}
+                onChange={(event) => handleDateInputChange('start', event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                End Date
+              </label>
+              <Input
+                type="date"
+                value={dateRange.end}
+                min={dateRange.start}
+                onChange={(event) => handleDateInputChange('end', event.target.value)}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                onClick={handleRefresh}
+                className="flex items-center gap-2"
+              >
+                <ChartBarIcon className="h-4 w-4" />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {QUICK_RANGE_OPTIONS.map(({ label, value }) => {
+              const isActive = activeQuickRange === value;
               return (
-                <Link key={action.name} href={action.href}>
-                  <div className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-                    <div className={`p-2 rounded-lg ${action.color}`}>
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{action.name}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{action.description}</p>
-                    </div>
-                  </div>
-                </Link>
+                <Button
+                  key={value}
+                  variant={isActive ? 'primary' : 'secondary'}
+                  onClick={() => handleQuickRange(value)}
+                  className={isActive ? '' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'}
+                >
+                  {label}
+                </Button>
               );
             })}
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Order Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => handleStatusChange(e.target.value as OrderStatusFilter)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="all">All</option>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Order Type
+              </label>
+              <select
+                value={orderTypeFilter}
+                onChange={(e) => handleOrderTypeChange(e.target.value as OrderTypeFilter)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="all">All</option>
+                <option value="dine-in">Dine-In</option>
+                <option value="delivery">Delivery</option>
+                <option value="takeaway">Takeaway</option>
+              </select>
+            </div>
+            <div className="flex flex-col flex-1 min-w-[260px]">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Search Orders
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        handleSearchSubmit();
+                      }
+                    }}
+                    placeholder="Search by order # or customer"
+                    className="pl-10"
+                  />
+                </div>
+                <Button
+                  variant="primary"
+                  onClick={handleSearchSubmit}
+                  disabled={searchTerm.trim() === committedSearch.trim()}
+                >
+                  Search
+                </Button>
+                {committedSearch && (
+                  <Button variant="secondary" onClick={handleClearSearch}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statsLoading ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <Card key={index}>
+              <CardContent className="p-6">
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          statsCards.map((stat, index) => {
+            const Icon = stat.icon;
+            const TrendIcon = stat.trend === 'up' ? ArrowTrendingUpIcon : ArrowTrendingDownIcon;
+            return (
+              <Card key={index}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        {stat.title}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {stat.value}
+                      </p>
+                      {stat.trend !== 'neutral' && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <TrendIcon className={`h-4 w-4 ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}`} />
+                          <span className={`text-sm ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                            {stat.change}
+                          </span>
+                          <span className="text-xs text-gray-500">vs previous period</span>
+                        </div>
+                      )}
+                    </div>
+                    <Icon className={`h-8 w-8 ${stat.color}`} />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales Trend (Last 7 Days)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {salesTrend.length > 0 && salesTrend.some((day: any) => day.sales > 0) ? (
+        {/* Revenue Trend Chart */}
+        {revenueByDate.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ChartBarIcon className="h-5 w-5" />
+                Revenue Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={salesTrend}>
+                <LineChart data={revenueByDate}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
-                  <XAxis dataKey="date" className="text-sm" />
+                  <XAxis 
+                    dataKey="date" 
+                    className="text-sm"
+                    tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  />
                   <YAxis className="text-sm" />
                   <Tooltip
                     contentStyle={{
@@ -371,259 +786,363 @@ export default function DashboardPage() {
                     }}
                     formatter={(value: number) => formatCurrency(value)}
                   />
-                  <Line type="monotone" dataKey="sales" stroke="#0ea5e9" strokeWidth={3} />
+                  <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} name="Revenue" />
                 </LineChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[300px] text-gray-500">
-                No sales data available for this period
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Selling Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {topSellingItems.length > 0 ? (
+        {/* Payment Method Breakdown */}
+        {paymentMethodBreakdown.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CurrencyDollarIcon className="h-5 w-5" />
+                Payment Methods
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={topSellingItems} layout="vertical">
+                <BarChart data={paymentMethodBreakdown}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
-                  <XAxis type="number" className="text-sm" />
-                  <YAxis dataKey="name" type="category" className="text-sm" width={120} />
+                  <XAxis dataKey="method" className="text-sm" />
+                  <YAxis className="text-sm" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
                     }}
-                    formatter={(value: number) => `${value} orders`}
+                    formatter={(value: number) => formatCurrency(value)}
                   />
-                  <Bar dataKey="quantity" fill="#8b5cf6" />
+                  <Bar dataKey="revenue" fill="#8b5cf6" name="Revenue" />
                 </BarChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[300px] text-gray-500">
-                No top selling items data available
-              </div>
-            )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Top Selling Items */}
+      {stats.topSellingItems && stats.topSellingItems.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ChartBarIcon className="h-5 w-5" />
+              Top Selling Items
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {stats.topSellingItems.slice(0, 5).map((item: any, index: number) => (
+                <div key={item.menuItemId || index} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-sm font-semibold">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {item.name || 'Unknown Item'}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {item.quantity || 0} sold
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-gray-900 dark:text-white">
+                      {formatCurrency(item.revenue || 0)}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Revenue
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
-      </div>
+      )}
 
       {/* Recent Orders */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Recent Orders</CardTitle>
-            <Link href="/dashboard/orders">
-              <Button variant="ghost" size="sm">
-                View All
-              </Button>
-            </Link>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <ShoppingBagIcon className="h-5 w-5" />
+            Recent Orders
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentOrders.length > 0 ? (
-              recentOrders.slice(0, 5).map((order: any) => (
-                <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                      <ShoppingCartIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        Order #{order.orderNumber || order.id}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {order.items?.length || 0} items • {formatCurrency(order.total || 0)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant={
-                      order.status === 'completed' ? 'success' : 
-                      order.status === 'pending' ? 'warning' : 
-                      order.status === 'cancelled' ? 'danger' : 'info'
-                    }>
-                      {order.status || 'pending'}
-                    </Badge>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      {formatDateTime(order.createdAt)}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                No recent orders
-              </p>
-            )}
-          </div>
+        <CardContent className="p-0">
+          {ordersLoading ? (
+            <div className="p-6">
+              <Skeleton className="h-40 w-full" />
+            </div>
+          ) : (
+            <DataTable
+              data={orders || []}
+              columns={columns}
+              loading={ordersLoading}
+              pagination={{
+                currentPage,
+                totalPages: Math.ceil(totalOrders / itemsPerPage),
+                totalItems: totalOrders,
+                itemsPerPage,
+                onPageChange: setCurrentPage,
+                onItemsPerPageChange: setItemsPerPage,
+              }}
+            />
+          )}
         </CardContent>
       </Card>
 
-      {/* System Status */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Quick Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Tables Available</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {availableTables}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {occupiedTables} occupied
-                </p>
+          <CardHeader>
+            <CardTitle>Revenue Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Total Revenue:</span>
+                <span className="font-semibold">{formatCurrency(stats.totalRevenue)}</span>
               </div>
-              <TableCellsIcon className="w-8 h-8 text-green-600" />
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Today's Revenue:</span>
+                <span className="font-semibold">{formatCurrency(stats.revenueToday)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Average Order:</span>
+                <span className="font-semibold">{formatCurrency(stats.averageOrderValue)}</span>
+              </div>
             </div>
-            <Link href="/dashboard/tables">
-              <Button variant="ghost" size="sm" className="mt-2 w-full">
-                Manage Tables
-              </Button>
-            </Link>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Low Stock Items</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {lowStockItems}
-                </p>
-                {lowStockItems > 0 && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    Action needed
-                  </p>
-                )}
+          <CardHeader>
+            <CardTitle>Order Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Total Orders:</span>
+                <span className="font-semibold">{stats.totalOrders ?? 0}</span>
               </div>
-              <ChartBarIcon className="w-8 h-8 text-yellow-600" />
-            </div>
-            {lowStockItems > 0 && (
-              <Link href="/dashboard/inventory">
-                <Button variant="ghost" size="sm" className="mt-2 w-full">
-                  Check Inventory
-                </Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active Staff</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {activeStaff}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {staff.length} total
-                </p>
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Orders Today:</span>
+                <span className="font-semibold">{stats.ordersToday ?? 0}</span>
               </div>
-              <UsersIcon className="w-8 h-8 text-blue-600" />
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Period:</span>
+                <span className="font-semibold">
+                  {new Date(dateRange.start).toLocaleDateString()} - {new Date(dateRange.end).toLocaleDateString()}
+                </span>
+              </div>
             </div>
-            <Link href="/dashboard/staff">
-              <Button variant="ghost" size="sm" className="mt-2 w-full">
-                View Staff
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>
 
-      {/* Demo Notifications Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BellIcon className="w-5 h-5" />
-            Demo Notifications
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Test the notification system with different types of alerts
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => addNotification({
-                type: 'order',
-                title: 'New Order Received',
-                message: 'Order #1234 has been placed by John Doe for Table 5',
-              })}
-              className="flex flex-col items-center gap-2 p-4 h-auto"
-            >
-              <Badge variant="info">🛎️</Badge>
-              <span>New Order</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => addNotification({
-                type: 'payment',
-                title: 'Payment Completed',
-                message: 'Payment of $45.50 has been processed successfully',
-              })}
-              className="flex flex-col items-center gap-2 p-4 h-auto"
-            >
-              <Badge variant="success">💳</Badge>
-              <span>Payment</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => addNotification({
-                type: 'kitchen',
-                title: 'Order Ready',
-                message: 'Grilled Salmon for Table 3 is ready for pickup',
-              })}
-              className="flex flex-col items-center gap-2 p-4 h-auto"
-            >
-              <Badge variant="warning">🍳</Badge>
-              <span>Kitchen</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => addNotification({
-                type: 'system',
-                title: 'System Update',
-                message: 'New features have been deployed successfully',
-              })}
-              className="flex flex-col items-center gap-2 p-4 h-auto"
-            >
-              <Badge variant="secondary">⚙️</Badge>
-              <span>System</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => addNotification({
-                type: 'promotion',
-                title: 'Special Offer',
-                message: 'Weekend promotion: Buy 2 pizzas, get 1 free!',
-              })}
-              className="flex flex-col items-center gap-2 p-4 h-auto"
-            >
-              <Badge variant="success">🎉</Badge>
-              <span>Promotion</span>
-            </Button>
+      {/* Order Details Modal */}
+      <Modal
+        isOpen={isOrderModalOpen}
+        onClose={() => {
+          setIsOrderModalOpen(false);
+          setSelectedOrderId(null);
+        }}
+        title={`Order Details - ${orderDetails?.orderNumber || selectedOrderId || 'N/A'}`}
+        size="lg"
+      >
+        {orderDetailsLoading ? (
+          <div className="py-8 text-center">
+            <Skeleton className="h-20 w-full mb-4" />
+            <Skeleton className="h-20 w-full mb-4" />
+            <Skeleton className="h-20 w-full" />
           </div>
-        </CardContent>
-      </Card>
+        ) : orderDetails ? (
+          <div className="space-y-6">
+            {/* Order Header */}
+            <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Order Number</p>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {orderDetails.orderNumber || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
+                <Badge className={
+                  orderDetails.status === 'paid' ? 'bg-green-100 text-green-800' :
+                  orderDetails.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }>
+                  {orderDetails.status?.toUpperCase() || 'N/A'}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Table</p>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {(() => {
+                    const table = orderDetails.tableId;
+                    if (!table) return 'N/A';
+                    if (typeof table === 'object' && table !== null) {
+                      return `Table ${(table as any).tableNumber || (table as any).number || 'N/A'}`;
+                    }
+                    return `Table ${table}`;
+                  })()}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Payment Method</p>
+                <p className="font-semibold text-gray-900 dark:text-white capitalize">
+                  {orderDetails.paymentMethod || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Order Type</p>
+                <p className="font-semibold text-gray-900 dark:text-white capitalize">
+                  {orderDetails.orderType ? orderDetails.orderType.replace('-', ' ') : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Created At</p>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {orderDetails.createdAt ? formatDateTime(orderDetails.createdAt) : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
+                <p className="font-semibold text-green-600 text-lg">
+                  {formatCurrency(orderDetails.totalAmount || 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Customer Info */}
+            {orderDetails.customerInfo && (
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Customer Information</h3>
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <div className="grid grid-cols-3 gap-4">
+                    {orderDetails.customerInfo.name && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Name</p>
+                        <p className="font-medium">{orderDetails.customerInfo.name}</p>
+                      </div>
+                    )}
+                    {orderDetails.customerInfo.phone && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                        <p className="font-medium">{orderDetails.customerInfo.phone}</p>
+                      </div>
+                    )}
+                    {orderDetails.customerInfo.email && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                        <p className="font-medium">{orderDetails.customerInfo.email}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Order Items */}
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Order Items</h3>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Item</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Quantity</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Price</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {orderDetails.items && orderDetails.items.length > 0 ? (
+                      orderDetails.items.map((item: any, index: number) => {
+                        // Handle menuItemId - it might be an ObjectId string, populated object, or null
+                        let itemName = 'Unknown Item';
+                        if (item.name) {
+                          itemName = item.name;
+                        } else if (item.menuItemId) {
+                          if (typeof item.menuItemId === 'object' && item.menuItemId !== null) {
+                            itemName = item.menuItemId.name || 'Unknown Item';
+                          } else if (typeof item.menuItemId === 'string') {
+                            // If it's just an ID, we can't get the name without additional API call
+                            // For now, show the ID or try to fetch name later
+                            itemName = `Item ${item.menuItemId.slice(-6)}`;
+                          }
+                        }
+                        
+                        return (
+                          <tr key={index}>
+                            <td className="px-4 py-3">
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {itemName}
+                                </p>
+                                {item.notes && (
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                    Note: {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-900 dark:text-white">
+                              {item.quantity || 0}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-900 dark:text-white">
+                              {formatCurrency(item.price || 0)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                              {formatCurrency((item.price || 0) * (item.quantity || 0))}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                          No items found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <td colSpan={3} className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                        Total:
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-lg text-green-600">
+                        {formatCurrency(orderDetails.totalAmount || 0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {orderDetails.notes && (
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Notes</h3>
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{orderDetails.notes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+            <p>Order not found</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

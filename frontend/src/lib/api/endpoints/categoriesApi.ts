@@ -9,6 +9,7 @@ export interface Category {
   sortOrder?: number;
   isActive: boolean;
   companyId: string;
+  menuItemsCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +58,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
             type: cat.type,
             companyId: cat.companyId || cat.company?.id || cat.company?._id,
             branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+            menuItemsCount: cat.menuItemsCount !== undefined ? cat.menuItemsCount : 0,
             createdAt: cat.createdAt || new Date().toISOString(),
             updatedAt: cat.updatedAt || new Date().toISOString(),
           })) as Category[],
@@ -86,6 +88,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
           type: cat.type,
           companyId: cat.companyId || cat.company?.id || cat.company?._id,
           branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          menuItemsCount: cat.menuItemsCount !== undefined ? cat.menuItemsCount : 0,
           createdAt: cat.createdAt || new Date().toISOString(),
           updatedAt: cat.updatedAt || new Date().toISOString(),
         } as Category;
@@ -108,6 +111,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
           type: cat.type,
           companyId: cat.companyId || cat.company?.id || cat.company?._id,
           branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          menuItemsCount: cat.menuItemsCount !== undefined ? cat.menuItemsCount : 0,
           createdAt: cat.createdAt || new Date().toISOString(),
           updatedAt: cat.updatedAt || new Date().toISOString(),
         })) as Category[];
@@ -160,6 +164,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
           type: cat.type,
           companyId: cat.companyId || cat.company?.id || cat.company?._id,
           branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          menuItemsCount: cat.menuItemsCount !== undefined ? cat.menuItemsCount : 0,
           createdAt: cat.createdAt || new Date().toISOString(),
           updatedAt: cat.updatedAt || new Date().toISOString(),
         })) as Category[];
@@ -185,11 +190,26 @@ export const categoriesApi = apiSlice.injectEndpoints({
           type: cat.type,
           companyId: cat.companyId || cat.company?.id || cat.company?._id,
           branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          menuItemsCount: cat.menuItemsCount !== undefined ? cat.menuItemsCount : 0,
           createdAt: cat.createdAt || new Date().toISOString(),
           updatedAt: cat.updatedAt || new Date().toISOString(),
         } as Category;
       },
-      invalidatesTags: ['Category'],
+      invalidatesTags: (result, error) => {
+        if (error) return [];
+        return ['Category'];
+      },
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Force refetch of categories list
+          dispatch(
+            categoriesApi.util.invalidateTags(['Category'])
+          );
+        } catch (error) {
+          // Handle error
+        }
+      },
     }),
     updateCategory: builder.mutation<Category, UpdateCategoryRequest>({
       query: ({ id, ...data }) => ({
@@ -210,6 +230,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
           type: cat.type,
           companyId: cat.companyId || cat.company?.id || cat.company?._id,
           branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          menuItemsCount: cat.menuItemsCount !== undefined ? cat.menuItemsCount : 0,
           createdAt: cat.createdAt || new Date().toISOString(),
           updatedAt: cat.updatedAt || new Date().toISOString(),
         } as Category;
@@ -229,7 +250,35 @@ export const categoriesApi = apiSlice.injectEndpoints({
         url: `/categories/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Category'],
+      invalidatesTags: ['Category', 'MenuItem'], // Also invalidate menu items as they reference categories
+    }),
+    toggleCategoryStatus: builder.mutation<Category, string>({
+      query: (id) => ({
+        url: `/categories/${id}/toggle-status`,
+        method: 'PATCH',
+      }),
+      transformResponse: (response: any) => {
+        const cat = response.data || response;
+        return {
+          id: cat._id || cat.id,
+          name: cat.name,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          sortOrder: cat.sortOrder,
+          isActive: cat.isActive !== undefined ? cat.isActive : true,
+          type: cat.type,
+          companyId: cat.companyId || cat.company?.id || cat.company?._id,
+          branchId: cat.branchId || cat.branch?.id || cat.branch?._id,
+          createdAt: cat.createdAt || new Date().toISOString(),
+          updatedAt: cat.updatedAt || new Date().toISOString(),
+        } as Category;
+      },
+      invalidatesTags: (result, error, id) => [
+        { type: 'Category', id },
+        'Category',
+        'MenuItem', // Menu items might filter by active categories
+      ],
     }),
   }),
 });
@@ -243,5 +292,6 @@ export const {
   useUpdateCategoryMutation,
   useUpdateCategorySortOrderMutation,
   useDeleteCategoryMutation,
+  useToggleCategoryStatusMutation,
 } = categoriesApi;
 

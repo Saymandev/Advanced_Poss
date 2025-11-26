@@ -9,6 +9,7 @@ interface ModalProps {
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   className?: string;
+  zIndex?: number;
 }
 
 const sizeClasses = {
@@ -29,8 +30,12 @@ export function Modal({
 }: ModalProps) {
   if (!isOpen) return null;
 
+  // Extract z-index from className if provided, otherwise use default z-50
+  const zIndexMatch = className?.match(/z-\[?(\d+)\]?/);
+  const zIndexValue = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 50;
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto animate-fade-in">
+    <div className="fixed inset-0 overflow-y-auto animate-fade-in" style={{ zIndex: zIndexValue }}>
       <div className="flex min-h-full items-center justify-center p-4">
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
@@ -88,12 +93,6 @@ export function ConfirmModal({
   cancelText = 'Cancel',
   variant = 'danger'
 }: ConfirmModalProps) {
-  const variantClasses = {
-    danger: 'text-red-600 bg-red-50 dark:bg-red-900/20',
-    warning: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20',
-    info: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20',
-  };
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="space-y-4">

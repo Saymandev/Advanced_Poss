@@ -130,10 +130,16 @@ export const reportsApi = apiSlice.injectEndpoints({
       endDate?: string; 
       period?: 'day' | 'week' | 'month' | 'year' 
     }>({
-      query: (params) => ({
-        url: '/reports/sales-analytics',
-        params,
-      }),
+      query: (params) => {
+        const queryParams: any = {};
+        if (params.period) queryParams.period = params.period;
+        if (params.branchId) queryParams.branchId = params.branchId;
+        // Note: startDate and endDate are calculated on backend based on period
+        return {
+          url: '/reports/sales-analytics',
+          params: queryParams,
+        };
+      },
       providesTags: ['Report'],
       transformResponse: (response: any) => {
         const data = response.data || response;
@@ -266,6 +272,30 @@ export const reportsApi = apiSlice.injectEndpoints({
         body: { format, params },
       }),
     }),
+    getDueSettlements: builder.query<{
+      pendingSettlements: number;
+      totalDueAmount: number;
+      settledToday: number;
+      settledTodayAmount: number;
+      pendingOrders: Array<{
+        id: string;
+        orderNumber: string;
+        totalAmount: number;
+        orderType: string;
+        createdAt: string;
+        tableId?: string;
+        customerInfo?: any;
+      }>;
+    }, { branchId?: string; companyId?: string }>({
+      query: (params) => ({
+        url: '/reports/due-settlements',
+        params,
+      }),
+      providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
+    }),
   }),
 });
 
@@ -278,5 +308,6 @@ export const {
   useGetStaffReportQuery,
   useGetRevenueByCategoryQuery,
   useGetPeakHoursQuery,
+  useGetDueSettlementsQuery,
   useExportReportMutation,
 } = reportsApi;

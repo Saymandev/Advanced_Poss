@@ -41,17 +41,69 @@ export default function SuppliersPage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const companyId = (user as any)?.companyId || 
-                    (companyContext as any)?.companyId;
+                    (companyContext as any)?.companyId ||
+                    (companyContext as any)?._id ||
+                    (companyContext as any)?.id;
 
-    const { data: suppliersResponse, isLoading, refetch } = useGetSuppliersQuery({
-    companyId,
-    search: searchQuery || undefined,
-    isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
-    type: typeFilter === 'all' ? undefined : typeFilter,
-    rating: ratingFilter === 'all' ? undefined : parseInt(ratingFilter),
-    page: currentPage,
-    limit: itemsPerPage,
-  }, { skip: !companyId });
+  // Debug logging
+  useEffect(() => {
+    console.log('Suppliers Page Debug:', {
+      companyId,
+      user: user ? { id: (user as any)?.id, companyId: (user as any)?.companyId } : null,
+      companyContext: companyContext ? { 
+        companyId: (companyContext as any)?.companyId,
+        _id: (companyContext as any)?._id,
+        id: (companyContext as any)?.id 
+      } : null,
+    });
+  }, [companyId, user, companyContext]);
+
+  const queryParams = useMemo(() => {
+    const params: any = {
+      companyId: companyId || undefined,
+      page: currentPage,
+      limit: itemsPerPage,
+    };
+    
+    // Only add optional params if they have values
+    if (searchQuery) params.search = searchQuery;
+    if (statusFilter !== 'all') params.isActive = statusFilter === 'active';
+    if (typeFilter !== 'all') params.type = typeFilter;
+    if (ratingFilter !== 'all') params.rating = parseInt(ratingFilter);
+    
+    return params;
+  }, [companyId, searchQuery, statusFilter, typeFilter, ratingFilter, currentPage, itemsPerPage]);
+
+  // Debug query params
+  useEffect(() => {
+    console.log('Suppliers Query Params:', queryParams);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, searchQuery, statusFilter, typeFilter, ratingFilter, currentPage, itemsPerPage]);
+
+  const { data: suppliersResponse, isLoading, error, refetch } = useGetSuppliersQuery(queryParams, { 
+    skip: !companyId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
+
+  // Debug API response and auto-retry if needed
+  useEffect(() => {
+    console.log('📊 Suppliers API Response:', {
+      suppliersResponse,
+      isLoading,
+      error,
+      suppliersCount: suppliersResponse?.suppliers?.length || 0,
+      total: suppliersResponse?.total || 0,
+      companyId,
+    });
+    
+    // If we have companyId but no suppliers and no error, try refetching once
+    if (companyId && !isLoading && !error && (!suppliersResponse || suppliersResponse.suppliers?.length === 0)) {
+      console.log('⚠️ No suppliers found but companyId exists, checking if refetch is needed...');
+      // Don't auto-refetch immediately, let user manually refresh if needed
+    }
+  }, [suppliersResponse, isLoading, error, companyId]);
 
   const { data: supplierStats } = useGetSupplierStatsQuery(companyId || '', { skip: !companyId });
 
@@ -65,12 +117,19 @@ export default function SuppliersPage() {
 
   // Extract suppliers from API response
   const suppliers = useMemo(() => {
-    if (!suppliersResponse) return [];
-    return suppliersResponse.suppliers || [];
+    if (!suppliersResponse) {
+      console.log('No suppliersResponse available');
+      return [];
+    }
+    const supplierList = suppliersResponse.suppliers || [];
+    console.log('Extracted suppliers:', supplierList.length, supplierList);
+    return supplierList;
   }, [suppliersResponse]);
 
   const totalSuppliers = useMemo(() => {
-    return suppliersResponse?.total || 0;
+    const total = suppliersResponse?.total || 0;
+    console.log('Total suppliers:', total);
+    return total;
   }, [suppliersResponse]);
 
   const [formData, setFormData] = useState<any>({
@@ -165,7 +224,7 @@ export default function SuppliersPage() {
     }
 
     try {
-      await createSupplier({
+      const result = await createSupplier({
         companyId,
         name: formData.name,
         description: formData.description || undefined,
@@ -192,11 +251,31 @@ export default function SuppliersPage() {
         notes: formData.notes || undefined,
         tags: formData.tags || undefined,
       } as any).unwrap();
+      
+      console.log('Supplier created successfully:', result);
       toast.success('Supplier created successfully');
       setIsCreateModalOpen(false);
       resetForm();
-      refetch();
+      
+      // Manually refetch to ensure the list updates immediately
+      // Only refetch if the query is not skipped (companyId exists)
+      if (companyId) {
+        console.log('Refetching suppliers list...');
+        console.log('Current query params:', queryParams);
+        try {
+          const refetchResult = await refetch();
+          console.log('Refetch result:', refetchResult);
+          console.log('Refetch data:', refetchResult.data);
+          if (refetchResult.data) {
+            console.log('Suppliers after refetch:', refetchResult.data.suppliers?.length || 0);
+            console.log('Total after refetch:', refetchResult.data.total || 0);
+          }
+        } catch (refetchError) {
+          console.error('Refetch error:', refetchError);
+        }
+      }
     } catch (error: any) {
+      console.error('Error creating supplier:', error);
       toast.error(error?.data?.message || error?.message || 'Failed to create supplier');
     }
   };
@@ -241,7 +320,6 @@ export default function SuppliersPage() {
       toast.success('Supplier updated successfully');
       setIsEditModalOpen(false);
       resetForm();
-      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to update supplier');
     }
@@ -253,7 +331,6 @@ export default function SuppliersPage() {
     try {
       await deleteSupplier(supplier.id).unwrap();
       toast.success('Supplier deleted successfully');
-      refetch();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to delete supplier');
     }
@@ -268,7 +345,6 @@ export default function SuppliersPage() {
         await activateSupplier(supplier.id).unwrap();
         toast.success('Supplier activated successfully');
       }
-      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to toggle supplier status');
     }
@@ -283,7 +359,6 @@ export default function SuppliersPage() {
         await makePreferred(supplier.id).unwrap();
         toast.success('Added to preferred suppliers');
       }
-      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to toggle preferred status');
     }
@@ -512,6 +587,30 @@ export default function SuppliersPage() {
     };
   }, [suppliers, totalSuppliers, supplierStats]);
 
+  // Show error if query failed
+  if (error) {
+    console.error('Suppliers API Error:', error);
+  }
+
+  // Show warning if companyId is missing
+  if (!companyId && !isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-red-600 dark:text-red-400 mb-2">Unable to load suppliers</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Company ID is missing. Please ensure you are logged in and have selected a company.
+            </p>
+            <p className="text-xs text-gray-500 mt-2">
+              Debug: User ID: {(user as any)?.id}, Company ID: {(user as any)?.companyId || 'Not found'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -521,6 +620,31 @@ export default function SuppliersPage() {
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage your suppliers and vendor relationships
           </p>
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mt-2">
+              <p className="text-red-600 dark:text-red-400 text-sm font-medium">
+                Error loading suppliers: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => refetch()}
+                className="mt-2"
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          {!isLoading && !error && suppliers.length === 0 && companyId && (
+            <p className="text-yellow-600 dark:text-yellow-400 text-sm mt-1">
+              No suppliers found for company ID: {companyId}. Click "Add Supplier" to create your first supplier.
+            </p>
+          )}
+          {!isLoading && !error && suppliers.length === 0 && !companyId && (
+            <p className="text-red-600 dark:text-red-400 text-sm mt-1">
+              Company ID is missing. Please ensure you are logged in and have selected a company.
+            </p>
+          )}
         </div>
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <PlusIcon className="w-5 h-5 mr-2" />

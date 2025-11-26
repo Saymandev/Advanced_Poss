@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { usePinLoginMutation } from '@/lib/api/endpoints/authApi';

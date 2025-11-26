@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { Card } from '@/components/ui/Card';
 import { useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
 import { EnvelopeIcon, GlobeAltIcon, MapPinIcon, PhoneIcon } from '@heroicons/react/24/outline';

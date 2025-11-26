@@ -1,7 +1,9 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { Card } from '@/components/ui/Card';
-import { useGetCompanyBySlugQuery, useGetCompanyGalleryQuery } from '@/lib/api/endpoints/publicApi';
+import { useGetCompanyGalleryQuery } from '@/lib/api/endpoints/publicApi';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -9,7 +11,6 @@ import { useState } from 'react';
 export default function GalleryPage() {
   const params = useParams();
   const companySlug = params.companySlug as string;
-  const { data: company } = useGetCompanyBySlugQuery(companySlug);
   const { data: gallery = [], isLoading } = useGetCompanyGalleryQuery(companySlug);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 

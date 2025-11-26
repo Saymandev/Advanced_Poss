@@ -29,20 +29,26 @@ import toast from 'react-hot-toast';
 
 export default function SubscriptionsPage() {
   const { user } = useAppSelector((state) => state.auth);
-  const { data: plansData, isLoading } = useGetSubscriptionPlansQuery({});
+  const companyId = user?.companyId || '';
+  const { data: plansData, isLoading: isPlanLoading } = useGetSubscriptionPlansQuery({});
   
   // Normalize plans data to handle both array and object responses
   const plans = Array.isArray(plansData) ? plansData : (plansData as any)?.plans || [];
-  const { data: currentSubscription } = useGetCurrentSubscriptionQuery({
-    companyId: user?.companyId || '',
-  });
-  const { data: usageStats } = useGetUsageStatsQuery({
-    companyId: user?.companyId || '',
-  });
-  const { data: billingHistory } = useGetBillingHistoryQuery({
-    companyId: user?.companyId || '',
-    limit: 10,
-  });
+  const { data: currentSubscription, isFetching: isSubscriptionLoading } = useGetCurrentSubscriptionQuery(
+    { companyId },
+    { skip: !companyId },
+  );
+  const { data: usageStats } = useGetUsageStatsQuery(
+    { companyId },
+    { skip: !companyId },
+  );
+  const { data: billingHistory, isFetching: isBillingLoading } = useGetBillingHistoryQuery(
+    {
+      companyId,
+      limit: 10,
+    },
+    { skip: !companyId },
+  );
   
   const [updateSubscription, { isLoading: isUpdating }] = useUpdateSubscriptionMutation();
   const [cancelSubscription, { isLoading: isCancelling }] = useCancelSubscriptionMutation();
@@ -162,7 +168,22 @@ export default function SubscriptionsPage() {
     return 'text-green-600 dark:text-green-400';
   };
 
-  if (isLoading) {
+  if (!companyId) {
+    return (
+      <div className="flex items-center justify-center h-96 text-center">
+        <div>
+          <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+            No company selected
+          </p>
+          <p className="text-gray-500 dark:text-gray-400">
+            Please select or create a company to manage subscriptions.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPlanLoading || isSubscriptionLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -331,7 +352,7 @@ export default function SubscriptionsPage() {
             <DataTable
               data={billingHistory.history}
               columns={billingColumns}
-              loading={false}
+              loading={isBillingLoading}
               searchable={false}
               selectable={false}
               emptyMessage="No billing history found"
@@ -378,13 +399,18 @@ export default function SubscriptionsPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Features:</h4>
-                  {plan.features.map((feature: string, idx: number) => (
+                  <h4 className="font-semibold text-gray-900 dark:text-white">Included Features</h4>
+                  {(plan.featureList || []).map((feature: string, idx: number) => (
                     <div key={idx} className="flex items-start gap-2">
                       <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">{feature}</span>
                     </div>
                   ))}
+                  {(!plan.featureList || plan.featureList.length === 0) && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Feature list coming soon
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-700">

@@ -1,5 +1,6 @@
 'use client';
 
+import { SocketProvider } from '@/components/providers/SocketProvider';
 import { restoreAuth } from '@/lib/slices/authSlice';
 import { store } from '@/lib/store';
 import { ThemeProvider } from 'next-themes';
@@ -59,8 +60,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <Provider store={store}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
         <AuthRestorer>
-          {children}
-          <ClientOnlyToaster />
+          <SocketProvider>
+            {children}
+            <ClientOnlyToaster />
+          </SocketProvider>
         </AuthRestorer>
       </ThemeProvider>
     </Provider>

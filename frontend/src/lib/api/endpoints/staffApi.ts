@@ -100,21 +100,30 @@ export interface StaffPerformance {
 }
 
 export const staffApi = apiSlice.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     getStaff: builder.query<{ staff: Staff[]; total: number }, any>({
-      query: (params) => {
-        // Transform isActive to status if provided
+      query: (params = {}) => {
         const queryParams: any = { ...params };
+
+        if ('includeOwners' in queryParams) {
+          delete queryParams.includeOwners;
+        }
+        if ('includeSuperAdmins' in queryParams) {
+          delete queryParams.includeSuperAdmins;
+        }
+
         if (queryParams.isActive !== undefined) {
           queryParams.status = queryParams.isActive ? 'active' : 'inactive';
           delete queryParams.isActive;
         }
+
         return {
           url: '/users',
           params: queryParams,
         };
       },
-      transformResponse: (response: any) => {
+      transformResponse: (response: any, meta, arg) => {
         const data = response.data || response;
         let items = [];
         
@@ -125,11 +134,16 @@ export const staffApi = apiSlice.injectEndpoints({
         } else {
           items = data.items || [];
         }
-        
-        // Filter out owners and super_admins for staff management
-        const staffItems = items.filter((item: any) => 
-          item.role && !['owner', 'super_admin'].includes(item.role)
-        );
+
+        const includeOwners = Boolean(arg?.includeOwners);
+        const includeSuperAdmins = Boolean(arg?.includeSuperAdmins);
+
+        const staffItems = items.filter((item: any) => {
+          if (!item.role) return false;
+          if (item.role === 'owner' && !includeOwners) return false;
+          if (item.role === 'super_admin' && !includeSuperAdmins) return false;
+          return true;
+        });
         
         return {
           staff: staffItems.map((user: any) => ({
@@ -213,14 +227,14 @@ export const staffApi = apiSlice.injectEndpoints({
           body,
         };
       },
-      invalidatesTags: ['Staff'],
+      invalidatesTags: (result, error, { id }) => [{ type: 'Staff', id }, { type: 'Staff', id: 'LIST' }],
     }),
     deleteStaff: builder.mutation<void, string>({
       query: (id) => ({
         url: `/users/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Staff'],
+      invalidatesTags: (result, error, id) => [{ type: 'Staff', id }, { type: 'Staff', id: 'LIST' }],
     }),
     deactivateStaff: builder.mutation<Staff, string>({
       query: (id) => ({

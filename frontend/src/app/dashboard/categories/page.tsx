@@ -13,6 +13,7 @@ import {
   useCreateCategoryMutation,
   useDeleteCategoryMutation,
   useGetCategoriesQuery,
+  useToggleCategoryStatusMutation,
   useUpdateCategoryMutation
 } from '@/lib/api/endpoints/categoriesApi';
 import { useAppSelector } from '@/lib/store';
@@ -23,7 +24,7 @@ import {
   TagIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function CategoriesPage() {
@@ -34,7 +35,11 @@ export default function CategoriesPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [formData, setFormData] = useState<CreateCategoryRequest & { isActive: boolean; type?: string }>({
     name: '',
     description: '',
@@ -48,6 +53,15 @@ export default function CategoriesPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const companyId = useMemo(() => {
     if (!mounted) return undefined;
@@ -82,7 +96,8 @@ export default function CategoriesPage() {
 
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
-  const [deleteCategory] = useDeleteCategoryMutation();
+  const [deleteCategory, { isLoading: isDeleting }] = useDeleteCategoryMutation();
+  const [toggleCategoryStatus] = useToggleCategoryStatusMutation();
 
   // Extract categories from API response (already transformed by API)
   const categories = useMemo(() => {
@@ -109,11 +124,11 @@ export default function CategoriesPage() {
     // Create a copy of the array to avoid mutating read-only array
     let filtered = [...categories];
 
-    // Search filter
-    if (searchQuery) {
+    // Search filter (using debounced query)
+    if (debouncedSearchQuery) {
       filtered = filtered.filter(cat =>
-        cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cat.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        cat.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        cat.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
       );
     }
 
@@ -126,11 +141,45 @@ export default function CategoriesPage() {
 
     // Sort by sortOrder (now safe since we have a copy)
     return filtered.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-  }, [categories, searchQuery, statusFilter]);
+  }, [categories, debouncedSearchQuery, statusFilter]);
+
+  const validateForm = useCallback((): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Name validation
+    if (!formData.name.trim()) {
+      errors.name = 'Category name is required';
+    } else if (formData.name.trim().length < 2) {
+      errors.name = 'Category name must be at least 2 characters';
+    } else if (formData.name.trim().length > 50) {
+      errors.name = 'Category name must be less than 50 characters';
+    }
+
+    // Description validation
+    if (formData.description && formData.description.length > 200) {
+      errors.description = 'Description must be less than 200 characters';
+    }
+
+    // Color validation
+    if (formData.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(formData.color)) {
+      errors.color = 'Invalid color format';
+    }
+
+    // Sort order validation
+    if (formData.sortOrder !== undefined && formData.sortOrder !== null) {
+      if (formData.sortOrder < 0) {
+        errors.sortOrder = 'Sort order must be 0 or greater';
+      } else if (formData.sortOrder > 9999) {
+        errors.sortOrder = 'Sort order must be less than 10000';
+      }
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [formData]);
 
   const handleCreate = async () => {
-    if (!formData.name.trim()) {
-      toast.error('Category name is required');
+    if (!validateForm()) {
       return;
     }
 
@@ -166,12 +215,17 @@ export default function CategoriesPage() {
         payload.branchId = branchId.toString();
       }
 
-      await createCategory(payload).unwrap();
+      const result = await createCategory(payload).unwrap();
+      console.log('✅ Category created:', result);
       toast.success('Category created successfully');
       setIsModalOpen(false);
       resetForm();
-      // RTK Query should auto-refetch due to invalidatesTags
-      await refetch();
+      
+      // Force refetch to ensure new category appears
+      setTimeout(async () => {
+        await refetch();
+        console.log('✅ Categories refetched after creation');
+      }, 100);
     } catch (error: any) {
       const errorMessage = error?.data?.message || 
                           error?.data?.error || 
@@ -183,8 +237,8 @@ export default function CategoriesPage() {
 
   const handleEdit = async () => {
     if (!selectedCategory) return;
-    if (!formData.name.trim()) {
-      toast.error('Category name is required');
+    
+    if (!validateForm()) {
       return;
     }
     
@@ -228,12 +282,19 @@ export default function CategoriesPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category? This action cannot be undone.')) return;
+  const handleDeleteClick = (category: Category) => {
+    setCategoryToDelete(category);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!categoryToDelete) return;
     
     try {
-      await deleteCategory(id).unwrap();
+      await deleteCategory(categoryToDelete.id).unwrap();
       toast.success('Category deleted successfully');
+      setIsDeleteModalOpen(false);
+      setCategoryToDelete(null);
       await refetch();
     } catch (error: any) {
       const errorMessage = error?.data?.message || 
@@ -241,6 +302,11 @@ export default function CategoriesPage() {
                           error?.message || 
                           'Failed to delete category';
       toast.error(errorMessage);
+      
+      // If error is about menu items, show more helpful message
+      if (errorMessage.includes('menu item')) {
+        toast.error(errorMessage, { duration: 6000 });
+      }
     }
   };
 
@@ -335,7 +401,28 @@ export default function CategoriesPage() {
     {
       key: 'isActive',
       title: 'Status',
-      render: (value: boolean) => getStatusBadge(value),
+      render: (value: boolean, row: Category) => (
+        <div className="flex items-center gap-2">
+          {getStatusBadge(value)}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              try {
+                await toggleCategoryStatus(row.id).unwrap();
+                toast.success(`Category ${value ? 'deactivated' : 'activated'} successfully`);
+                await refetch();
+              } catch (error: any) {
+                toast.error(error?.data?.message || 'Failed to toggle category status');
+              }
+            }}
+            title={value ? 'Deactivate' : 'Activate'}
+            className="text-xs"
+          >
+            {value ? 'Deactivate' : 'Activate'}
+          </Button>
+        </div>
+      ),
     },
     {
       key: 'actions',
@@ -361,9 +448,10 @@ export default function CategoriesPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleDelete(row.id)}
+            onClick={() => handleDeleteClick(row)}
             className="text-red-600 hover:text-red-700"
             title="Delete"
+            disabled={isDeleting}
           >
             <TrashIcon className="w-4 h-4" />
           </Button>
@@ -881,6 +969,60 @@ export default function CategoriesPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setCategoryToDelete(null);
+        }}
+        title="Delete Category"
+      >
+        {categoryToDelete && (
+          <div className="space-y-4">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <p className="text-red-800 dark:text-red-200 font-medium">
+                Are you sure you want to delete this category?
+              </p>
+              <p className="text-sm text-red-600 dark:text-red-300 mt-2">
+                This action cannot be undone. If this category has menu items, you'll need to remove or reassign them first.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="font-medium text-gray-900 dark:text-white">
+                Category: <span className="text-gray-600 dark:text-gray-400">{categoryToDelete.name}</span>
+              </p>
+              {(categoryToDelete as any).menuItemsCount > 0 && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  ⚠️ This category has {(categoryToDelete as any).menuItemsCount} menu item(s).
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setCategoryToDelete(null);
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Category'}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

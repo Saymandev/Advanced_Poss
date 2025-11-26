@@ -22,30 +22,68 @@ export interface UseNotificationsReturn {
   clearAll: () => void;
 }
 
-export const useNotifications = (): UseNotificationsReturn => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+// Simple global store so all uses of this hook share the same notifications
+let globalNotifications: Notification[] = [];
+const listeners: Array<(notifications: Notification[]) => void> = [];
+let hasLoadedFromStorage = false;
 
-  // Load notifications from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('restaurant-notifications');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const notificationsWithDates = parsed.map((n: any) => ({
-          ...n,
-          timestamp: new Date(n.timestamp)
-        }));
-        setNotifications(notificationsWithDates);
-      } catch (error) {
-        console.error('Failed to load notifications from localStorage:', error);
-      }
+const notifyListeners = () => {
+  for (const listener of listeners) {
+    listener(globalNotifications);
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(
+        'restaurant-notifications',
+        JSON.stringify(globalNotifications),
+      );
+    } catch (error) {
+      console.warn('Failed to persist notifications:', error);
     }
-  }, []);
+  }
+};
 
-  // Save notifications to localStorage whenever they change
+const loadFromStorageIfNeeded = () => {
+  if (hasLoadedFromStorage) return;
+  hasLoadedFromStorage = true;
+  if (typeof window === 'undefined') return;
+
+  const saved = window.localStorage.getItem('restaurant-notifications');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      globalNotifications = parsed.map((n: any) => ({
+        ...n,
+        timestamp: new Date(n.timestamp),
+      }));
+    } catch (error) {
+      console.error('Failed to load notifications from localStorage:', error);
+    }
+  }
+};
+
+export const useNotifications = (): UseNotificationsReturn => {
+  // Ensure global store is loaded once
+  loadFromStorageIfNeeded();
+
+  const [notifications, setNotifications] = useState<Notification[]>(globalNotifications);
+
+  // Subscribe this hook instance to global changes
   useEffect(() => {
-    localStorage.setItem('restaurant-notifications', JSON.stringify(notifications));
-  }, [notifications]);
+    const listener = (next: Notification[]) => {
+      setNotifications(next);
+    };
+    listeners.push(listener);
+    // Immediately sync with current global state
+    listener(globalNotifications);
+
+    return () => {
+      const index = listeners.indexOf(listener);
+      if (index >= 0) {
+        listeners.splice(index, 1);
+      }
+    };
+  }, []);
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     const newNotification: Notification = {
@@ -55,7 +93,8 @@ export const useNotifications = (): UseNotificationsReturn => {
       read: false,
     };
 
-    setNotifications(prev => [newNotification, ...prev]);
+    globalNotifications = [newNotification, ...globalNotifications];
+    notifyListeners();
 
     // Play notification sound
     playNotificationSound(notification.type);
@@ -71,23 +110,25 @@ export const useNotifications = (): UseNotificationsReturn => {
   }, []);
 
   const markAsRead = useCallback((id: string) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    globalNotifications = globalNotifications.map((n) =>
+      n.id === id ? { ...n, read: true } : n,
     );
+    notifyListeners();
   }, []);
 
   const markAllAsRead = useCallback(() => {
-    setNotifications(prev =>
-      prev.map(n => ({ ...n, read: true }))
-    );
+    globalNotifications = globalNotifications.map((n) => ({ ...n, read: true }));
+    notifyListeners();
   }, []);
 
   const clearNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    globalNotifications = globalNotifications.filter((n) => n.id !== id);
+    notifyListeners();
   }, []);
 
   const clearAll = useCallback(() => {
-    setNotifications([]);
+    globalNotifications = [];
+    notifyListeners();
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;

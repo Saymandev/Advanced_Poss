@@ -83,7 +83,7 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Order', 'POS', 'Table'],
+      invalidatesTags: ['Order', 'POS', 'Table', 'Customer'],
       transformResponse: (response: any) => {
         return response.data || response;
       },
@@ -134,12 +134,13 @@ export const posApi = apiSlice.injectEndpoints({
     }),
 
     // Cancel POS order
-    cancelPOSOrder: builder.mutation<POSOrder, string>({
-      query: (id) => ({
+    cancelPOSOrder: builder.mutation<POSOrder, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({
         url: `/pos/orders/${id}/cancel`,
         method: 'PATCH',
+        body: { reason: reason || 'Cancelled from POS terminal' },
       }),
-      invalidatesTags: (result, error, id) => [{ type: 'POS', id }, 'POS'],
+      invalidatesTags: (result, error, { id }) => [{ type: 'POS', id }, 'POS'],
     }),
 
     // Process payment
@@ -154,7 +155,7 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['POS', 'Payment'],
+      invalidatesTags: ['POS', 'Payment', 'Customer'],
     }),
 
     // Get POS statistics
@@ -182,6 +183,25 @@ export const posApi = apiSlice.injectEndpoints({
       status: 'available' | 'occupied' | 'reserved';
       currentOrderId?: string;
       location?: string;
+      orderDetails?: {
+        currentOrderId?: string;
+        orderNumber: string;
+        tokenNumber: string;
+        totalAmount: number;
+        waiterName?: string;
+        guestCount?: number;
+        holdCount?: number;
+        usedSeats?: number;
+        remainingSeats?: number;
+        orderStatus?: string;
+        allOrders?: Array<{
+          id: string;
+          orderNumber: string;
+          totalAmount: number;
+          guestCount?: number;
+          status: string;
+        }>;
+      };
     }>, void>({
       query: () => {
         // Use POS endpoint which gets tables from branchId in JWT token
@@ -190,7 +210,15 @@ export const posApi = apiSlice.injectEndpoints({
           url: '/pos/tables/available',
         };
       },
-      providesTags: ['Table'],
+      providesTags: (result) => 
+        result 
+          ? [
+              ...result.map(({ id }) => ({ type: 'Table' as const, id })),
+              { type: 'Table' as const, id: 'LIST' },
+              'Table',
+              'POS',
+            ]
+          : ['Table', 'POS'],
       transformResponse: (response: any) => {
         const data = response.data || response;
         let items = [];
@@ -213,6 +241,10 @@ export const posApi = apiSlice.injectEndpoints({
           status: table.status || 'available',
           currentOrderId: table.currentOrderId,
           location: table.location,
+          orderDetails: table.orderDetails ? {
+            ...table.orderDetails,
+            orderStatus: table.orderDetails.orderStatus || table.orderDetails.status,
+          } : undefined,
         }));
       },
     }),
@@ -319,7 +351,7 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['POS', 'Payment'],
+      invalidatesTags: ['POS', 'Payment', 'Customer'],
     }),
 
     // Get order history for table
@@ -559,7 +591,11 @@ export const posApi = apiSlice.injectEndpoints({
         url: '/pos/settings',
         params,
       }),
-      providesTags: ['POS'],
+      providesTags: (result, error, arg) => [
+        { type: 'POS', id: 'SETTINGS' },
+        { type: 'POS', id: `SETTINGS-${arg.branchId || 'default'}` },
+        'POS', // Also tag with general POS tag for broader invalidation
+      ],
       transformResponse: (response: any) => {
         return response.data || response;
       },
@@ -578,7 +614,11 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'PUT',
         body: data,
       }),
-      invalidatesTags: ['POS'],
+      invalidatesTags: () => [
+        { type: 'POS', id: 'SETTINGS' },
+        { type: 'POS', id: 'SETTINGS-default' },
+        'POS', // Invalidate all POS queries to ensure settings refresh everywhere
+      ],
     }),
   }),
 });

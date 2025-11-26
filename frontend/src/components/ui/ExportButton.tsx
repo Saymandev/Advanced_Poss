@@ -155,6 +155,7 @@ export function ExportButton({
           break;
       }
     } catch (error) {
+      console.error(error);
       toast.error('Export failed. Please try again.');
     } finally {
       setIsExporting(false);

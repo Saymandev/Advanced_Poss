@@ -151,7 +151,8 @@ export default function CustomerLoyaltyAIPage() {
     try {
       // TODO: Implement send offer API call
       toast.success(`Offer "${offer.title}" sent to customer`);
-    } catch (error: any) {
+    } catch (error) {
+      console.error(error);
       toast.error('Failed to send offer');
     }
   };
@@ -165,7 +166,8 @@ export default function CustomerLoyaltyAIPage() {
       toast.success(`All ${offerCount} offers sent to customer`);
       setIsOffersModalOpen(false);
       setSelectedCustomer(null);
-    } catch (error: any) {
+    } catch (error) {
+      console.error(error);
       toast.error('Failed to send offers');
     }
   };

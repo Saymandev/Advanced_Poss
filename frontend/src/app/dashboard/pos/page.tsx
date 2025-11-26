@@ -9,46 +9,48 @@ import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
-    useCancelPOSOrderMutation,
-    useCreatePOSOrderMutation,
-    useDownloadReceiptPDFMutation,
-    useGetAvailableTablesQuery,
-    useGetPOSMenuItemsQuery,
-    useGetPOSOrderQuery,
-    useGetPOSOrdersQuery,
-    useGetPOSSettingsQuery,
-    useGetPrintersQuery,
-    useGetReceiptHTMLQuery,
-    usePrintReceiptMutation,
-    usePrintReceiptPDFMutation,
-    useProcessPaymentMutation
+  useCancelPOSOrderMutation,
+  useCreatePOSOrderMutation,
+  useDownloadReceiptPDFMutation,
+  useGetAvailableTablesQuery,
+  useGetPOSMenuItemsQuery,
+  useGetPOSOrderQuery,
+  useGetPOSOrdersQuery,
+  useGetPOSSettingsQuery,
+  useGetPrintersQuery,
+  useGetReceiptHTMLQuery,
+  usePrintReceiptMutation,
+  usePrintReceiptPDFMutation,
+  useProcessPaymentMutation,
+  useUpdatePOSOrderMutation
 } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
+import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ArrowPathIcon,
-    CheckIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    CreditCardIcon,
-    CurrencyDollarIcon,
-    DocumentArrowDownIcon,
-    FunnelIcon,
-    HomeModernIcon,
-    MagnifyingGlassIcon,
-    MinusIcon,
-    PencilSquareIcon,
-    PlusIcon,
-    PrinterIcon,
-    ShoppingBagIcon,
-    ShoppingCartIcon,
-    TableCellsIcon,
-    TrashIcon,
-    TruckIcon,
-    UserGroupIcon,
+  ArrowPathIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  CreditCardIcon,
+  CurrencyDollarIcon,
+  DocumentArrowDownIcon,
+  FunnelIcon,
+  HomeModernIcon,
+  MagnifyingGlassIcon,
+  MinusIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  PrinterIcon,
+  ShoppingBagIcon,
+  ShoppingCartIcon,
+  TableCellsIcon,
+  TrashIcon,
+  TruckIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -214,7 +216,7 @@ const generateClientId = () => {
 };
 
 export default function POSPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   
   // Load from localStorage on mount
   const [orderType, setOrderType] = useState<OrderType>(() => {
@@ -418,9 +420,39 @@ export default function POSPage() {
     return missing;
   }, [requiresTakeawayDetails, takeawayDetails]);
 
+  // Socket.IO for real-time updates
+  const { socket, isConnected } = useSocket();
+
   // API calls
   // Note: branchId is extracted from JWT token in backend, no need to pass it
   const { data: tablesData, isLoading: tablesLoading, error: _tablesError, refetch: refetchTables } = useGetAvailableTablesQuery();
+
+  // Listen for table status changes via Socket.IO
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      console.log('🔌 Socket not ready:', { socket: !!socket, isConnected });
+      return;
+    }
+
+    console.log('✅ Setting up table status listeners');
+
+    const handleTableStatusChanged = (data: any) => {
+      console.log('📢 Table status changed event received:', data);
+      // Refetch tables when status changes
+      refetchTables();
+    };
+
+    socket.on('table:status-changed', handleTableStatusChanged);
+    socket.on('table:available', handleTableStatusChanged);
+    socket.on('table:occupied', handleTableStatusChanged);
+
+    return () => {
+      console.log('🧹 Cleaning up table status listeners');
+      socket.off('table:status-changed', handleTableStatusChanged);
+      socket.off('table:available', handleTableStatusChanged);
+      socket.off('table:occupied', handleTableStatusChanged);
+    };
+  }, [socket, isConnected, refetchTables]);
 
   const { data: categoriesData } = useGetCategoriesQuery({
     branchId: user?.branchId || undefined,
@@ -440,7 +472,8 @@ export default function POSPage() {
     branchId: user?.branchId || undefined,
   });
   
-  const taxRate = posSettings?.taxRate || 10; // Default 10%
+  // Use nullish coalescing (??) instead of || to allow 0 as a valid tax rate
+  const taxRate = posSettings?.taxRate ?? 10; // Default 10% only if undefined/null
   
   // Extract tables array from response (already transformed by API)
   const tables = useMemo(() => {
@@ -465,6 +498,7 @@ export default function POSPage() {
   const [printReceipt] = usePrintReceiptMutation();
   const [printReceiptPDF] = usePrintReceiptPDFMutation();
   const [downloadReceiptPDF] = useDownloadReceiptPDFMutation();
+  const [updateOrder] = useUpdatePOSOrderMutation();
   const { data: printers } = useGetPrintersQuery();
   const {
     data: receiptHTML,
@@ -796,6 +830,30 @@ export default function POSPage() {
     }
   }, [orderType, selectedTable]);
 
+  // Save delivery details to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && orderType === 'delivery') {
+      const hasDeliveryDetails = Object.values(deliveryDetails).some(v => v.trim() !== '') || deliveryFee !== '0';
+      if (hasDeliveryDetails) {
+        localStorage.setItem('pos_deliveryDetails', JSON.stringify(deliveryDetails));
+      } else {
+        localStorage.removeItem('pos_deliveryDetails');
+      }
+    }
+  }, [deliveryDetails, deliveryFee, orderType]);
+
+  // Save takeaway details to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && orderType === 'takeaway') {
+      const hasTakeawayDetails = Object.values(takeawayDetails).some(v => v.trim() !== '');
+      if (hasTakeawayDetails) {
+        localStorage.setItem('pos_takeawayDetails', JSON.stringify(takeawayDetails));
+      } else {
+        localStorage.removeItem('pos_takeawayDetails');
+      }
+    }
+  }, [takeawayDetails, orderType]);
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -838,7 +896,12 @@ export default function POSPage() {
       return;
     }
     const handle = window.setTimeout(() => {
-      triggerCustomerSearch({ query: term, branchId: user?.branchId || undefined });
+      const companyId = (user as any)?.companyId || (companyContext as any)?.companyId;
+      triggerCustomerSearch({ 
+        query: term, 
+        branchId: user?.branchId || undefined,
+        companyId: companyId || undefined
+      });
     }, 250);
     return () => window.clearTimeout(handle);
   }, [customerSearchTerm, isCustomerLookupOpen, triggerCustomerSearch, user?.branchId]);
@@ -1229,6 +1292,8 @@ export default function POSPage() {
     [selectedTable]
   );
 
+  const [occupiedTableModal, setOccupiedTableModal] = useState<{ tableId: string; orderDetails: any } | null>(null);
+
   const handleTableSelection = useCallback(
     (tableId: string) => {
       if (!tableId) {
@@ -1238,8 +1303,16 @@ export default function POSPage() {
       }
 
       const table = tables.find((entry: any) => entry.id === tableId);
-      if (table?.status === 'occupied' || table?.status === 'reserved') {
-        toast.error('This table is not available right now. Please choose another table.');
+      
+      // If table is occupied, show modal with options
+      if (table?.status === 'occupied' && table?.orderDetails) {
+        setOccupiedTableModal({ tableId, orderDetails: table.orderDetails });
+        return;
+      }
+
+      // If table is reserved, show error
+      if (table?.status === 'reserved') {
+        toast.error('This table is reserved. Please choose another table.');
         return;
       }
 
@@ -1248,6 +1321,135 @@ export default function POSPage() {
     },
     [tables]
   );
+
+  const handleResumeOrder = useCallback(async () => {
+    if (!occupiedTableModal) return;
+    
+    // Try to get orderId from multiple sources
+    const orderId = occupiedTableModal.orderDetails?.currentOrderId 
+      || occupiedTableModal.orderDetails?.allOrders?.[0]?.id
+      || tables.find((t: any) => t.id === occupiedTableModal.tableId)?.orderDetails?.currentOrderId;
+    
+    if (!orderId) {
+      toast.error('Order ID not found. Please try selecting the table again.');
+      return;
+    }
+
+    try {
+      // Fetch order using RTK Query - get the order data from the API
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
+      
+      const orderResponse = await fetch(`${apiUrl}/pos/orders/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!orderResponse.ok) {
+        const errorData = await orderResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch order');
+      }
+
+      const orderData = await orderResponse.json();
+      const order = orderData.data || orderData;
+      
+      if (!order || !order.items) {
+        throw new Error('Invalid order data received');
+      }
+
+      // Check if order is paid - don't allow editing paid orders
+      if (order.status === 'paid') {
+        toast.error('Cannot edit a paid order. Please create a new order or process a refund.');
+        return;
+      }
+
+      // Load order items into cart
+      if (order.items && Array.isArray(order.items)) {
+        const cartItems: CartItem[] = [];
+        for (const item of order.items) {
+          const menuItemId = item.menuItemId?.toString() || item.menuItemId?._id?.toString() || '';
+          const menuItem = menuItemsArray.find((mi: any) => 
+            mi.id === menuItemId || 
+            mi._id?.toString() === menuItemId ||
+            mi.id === item.menuItemId ||
+            mi._id === item.menuItemId
+          );
+          
+          cartItems.push({
+            id: generateClientId(),
+            menuItemId: menuItemId,
+            name: menuItem?.name || item.menuItemId?.name || 'Unknown Item',
+            basePrice: item.price || 0,
+            price: item.price || 0,
+            quantity: item.quantity || 1,
+            category: typeof menuItem?.category === 'string' ? menuItem.category : (menuItem?.category?.name || ''),
+            notes: item.notes || '',
+          });
+        }
+        setCart(cartItems);
+      }
+
+      // Set table and guest count
+      setSelectedTable(occupiedTableModal.tableId);
+      if (order.guestCount) {
+        setGuestCount(order.guestCount);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pos_guestCount', order.guestCount.toString());
+        }
+      }
+      setHasStartedOrder(true);
+      setIsCartModalOpen(true);
+      setOccupiedTableModal(null);
+      toast.success('Order loaded. You can now edit items.');
+    } catch (error: any) {
+      console.error('Error resuming order:', error);
+      toast.error(error?.message || 'Failed to load order. Please try again.');
+    }
+  }, [occupiedTableModal, menuItemsArray, tables]);
+
+  const handleStartNewOrderOnTable = useCallback(() => {
+    if (!occupiedTableModal) return;
+    const table = tables.find((t: any) => t.id === occupiedTableModal.tableId);
+    if (table?.orderDetails?.remainingSeats && table.orderDetails.remainingSeats > 0) {
+      setSelectedTable(occupiedTableModal.tableId);
+      setGuestCount(Math.min(guestCount, table.orderDetails.remainingSeats));
+      setHasStartedOrder(true);
+      setIsCartModalOpen(true);
+      setOccupiedTableModal(null);
+      toast.success(`Starting new order for ${table.orderDetails.remainingSeats} remaining seats`);
+    } else {
+      toast.error('No remaining seats available on this table');
+    }
+  }, [occupiedTableModal, tables, guestCount]);
+
+  const handleCancelOccupiedOrder = useCallback(async () => {
+    if (!occupiedTableModal?.orderDetails?.currentOrderId) return;
+    
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('Are you sure you want to cancel this order? This will free up the table.');
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    try {
+      // Cancel order with reason
+      const orderId = occupiedTableModal.orderDetails.currentOrderId;
+      await cancelOrder({ 
+        id: orderId,
+        reason: 'Cancelled from POS terminal'
+      }).unwrap();
+      toast.success('Order cancelled successfully. Table is now available.');
+      setOccupiedTableModal(null);
+      refetchTables();
+      refetchQueue();
+    } catch (error: any) {
+      console.error('Error cancelling order:', error);
+      toast.error(error?.data?.message || 'Failed to cancel order');
+    }
+  }, [occupiedTableModal, cancelOrder, refetchTables, refetchQueue]);
 
   // Order functions
   const handleCreateOrder = useCallback(async () => {
@@ -1286,7 +1488,7 @@ export default function POSPage() {
       const orderData: CreatePOSOrderRequest = {
         orderType,
         ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
-        ...(requiresTable && selectedTable && guestCount ? { guestCount } : {}),
+        ...(requiresTable && selectedTable ? { guestCount: guestCount || 1 } : {}),
         ...(isDelivery
           ? {
               deliveryFee: deliveryFeeValue,
@@ -1360,6 +1562,8 @@ export default function POSPage() {
     buildItemNotes,
     selectedCustomerId,
     refetchQueue,
+    guestCount,
+    refetchTables,
   ]);
 
   const handlePayment = async () => {
@@ -1656,7 +1860,7 @@ export default function POSPage() {
 
       try {
         setQueueActionOrderId(orderId);
-        await cancelOrder(orderId).unwrap();
+        await cancelOrder({ id: orderId, reason: 'Cancelled from queue' }).unwrap();
         toast.success('Order cancelled successfully');
         if (queueDetailId === orderId) {
           setQueueDetailId(null);
@@ -1778,6 +1982,7 @@ export default function POSPage() {
                 tables.map((table: any) => {
                   const statusClass = getTableStatus(table);
                   const isSelected = selectedTable === table.id;
+                  const hasOrderDetails = table.orderDetails && table.status === 'occupied';
                   return (
                     <button
                       key={table.id}
@@ -1785,6 +1990,8 @@ export default function POSPage() {
                       className={`rounded-2xl border-2 p-6 text-left transition-all ${
                         isSelected
                           ? 'border-sky-500 bg-sky-500/10 shadow-lg shadow-sky-500/20'
+                          : table.status === 'occupied'
+                          ? 'border-orange-500/50 bg-orange-500/5 hover:border-orange-400/60'
                           : 'border-slate-900 bg-slate-950/60 hover:border-sky-600/60 hover:shadow-lg hover:shadow-sky-900/20'
                       }`}
                     >
@@ -1798,9 +2005,40 @@ export default function POSPage() {
                         <Badge className={`${statusClass} border border-white/10`}>
                           {getTableStatusText(table)}
                         </Badge>
-                        <div className="text-xs text-slate-400 mt-1">
-                          Capacity: {table.capacity || 0} seats
-                        </div>
+                        {hasOrderDetails ? (
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-center justify-between text-slate-300">
+                              <span className="text-slate-400">Token:</span>
+                              <span className="font-semibold">{table.orderDetails.tokenNumber || table.orderDetails.orderNumber}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-slate-300">
+                              <span className="text-slate-400">Amount:</span>
+                              <span className="font-semibold text-emerald-400">{formatCurrency(table.orderDetails.totalAmount || 0)}</span>
+                            </div>
+                            {table.orderDetails.waiterName && (
+                              <div className="flex items-center justify-between text-slate-300">
+                                <span className="text-slate-400">Waiter:</span>
+                                <span className="font-semibold">{table.orderDetails.waiterName}</span>
+                              </div>
+                            )}
+                            {table.orderDetails.holdCount > 0 && (
+                              <div className="flex items-center justify-between text-orange-300">
+                                <span>Held:</span>
+                                <span className="font-semibold">{table.orderDetails.holdCount}x</span>
+                              </div>
+                            )}
+                            {table.orderDetails.remainingSeats > 0 && (
+                              <div className="flex items-center justify-between text-sky-300 mt-2 pt-2 border-t border-slate-800">
+                                <span>Remaining:</span>
+                                <span className="font-semibold">{table.orderDetails.remainingSeats} seats</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-400 mt-1">
+                            Capacity: {table.capacity || 0} seats
+                          </div>
+                        )}
                       </div>
                     </button>
                   );
@@ -2202,14 +2440,60 @@ export default function POSPage() {
                       Print
                     </Button>
                     {order.status === 'pending' && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={async () => {
+                            if (!canAct) return;
+                            try {
+                              await updateOrder({
+                                id: orderId,
+                                data: { status: 'paid' }
+                              }).unwrap();
+                              toast.success('Order marked as paid');
+                              refetchQueue();
+                            } catch (error: any) {
+                              toast.error(error?.data?.message || 'Failed to update order status');
+                            }
+                          }}
+                          disabled={!canAct}
+                          className="rounded-lg bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
+                        >
+                          Mark Paid
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => canAct && handleQueueCancel(orderId)}
+                          disabled={!canAct || queueActionOrderId === orderId}
+                          className="rounded-lg bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
+                        >
+                          {queueActionOrderId === orderId ? 'Cancelling...' : 'Cancel'}
+                        </Button>
+                      </>
+                    )}
+                    {order.status === 'paid' && (
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => canAct && handleQueueCancel(orderId)}
-                        disabled={!canAct || queueActionOrderId === orderId}
-                        className="rounded-lg bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
+                        onClick={async () => {
+                          if (!canAct) return;
+                          try {
+                            await updateOrder({
+                              id: orderId,
+                              data: { status: 'pending' }
+                            }).unwrap();
+                            toast.success('Order marked as pending');
+                            refetchQueue();
+                          } catch (error: any) {
+                            toast.error(error?.data?.message || 'Failed to update order status');
+                          }
+                        }}
+                        disabled={!canAct}
+                        className="rounded-lg bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 disabled:opacity-60"
                       >
-                        {queueActionOrderId === orderId ? 'Cancelling...' : 'Cancel'}
+                        Mark Pending
                       </Button>
                     )}
                   </div>
@@ -2443,13 +2727,26 @@ export default function POSPage() {
                       <option value="">
                         {tablesLoading ? 'Loading tables…' : 'Select a table'}
                       </option>
-                      {tables.map((table: any) => (
-                        <option key={table.id} value={table.id} disabled={table.status === 'occupied' || table.status === 'reserved'}>
-                          {table.number || table.tableNumber || table.name || table.id}
-                          {table.status ? ` • ${getTableStatusText(table)}` : ''}
-                          {table.capacity ? ` • ${table.capacity} seats` : ''}
-                        </option>
-                      ))}
+                      {tables.map((table: any) => {
+                        const remainingSeats = table.orderDetails?.remainingSeats ?? table.capacity ?? 0;
+                        const isFullyOccupied = remainingSeats === 0 && table.status === 'occupied';
+                        const isReserved = table.status === 'reserved';
+                        
+                        return (
+                          <option 
+                            key={table.id} 
+                            value={table.id} 
+                            disabled={isFullyOccupied || isReserved}
+                          >
+                            {table.number || table.tableNumber || table.name || table.id}
+                            {table.status ? ` • ${getTableStatusText(table)}` : ''}
+                            {table.capacity ? ` • ${table.capacity} seats` : ''}
+                            {table.orderDetails?.remainingSeats !== undefined && table.orderDetails.remainingSeats > 0 
+                              ? ` • ${table.orderDetails.remainingSeats} remaining` 
+                              : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                     {selectedTable && activeTable && (
                       <div className="space-y-2">
@@ -2459,10 +2756,13 @@ export default function POSPage() {
                         <input
                           type="number"
                           min="1"
-                          max={activeTable.capacity || 99}
+                          max={activeTable.orderDetails?.remainingSeats ? activeTable.orderDetails.remainingSeats + guestCount : (activeTable.capacity || 99)}
                           value={guestCount}
                           onChange={(e) => {
-                            const value = Math.max(1, Math.min(activeTable.capacity || 99, parseInt(e.target.value) || 1));
+                            const maxSeats = activeTable.orderDetails?.remainingSeats 
+                              ? activeTable.orderDetails.remainingSeats + guestCount 
+                              : (activeTable.capacity || 99);
+                            const value = Math.max(1, Math.min(maxSeats, parseInt(e.target.value) || 1));
                             setGuestCount(value);
                             if (typeof window !== 'undefined') {
                               localStorage.setItem('pos_guestCount', value.toString());
@@ -2472,7 +2772,11 @@ export default function POSPage() {
                           placeholder="Enter guest count"
                         />
                         <p className="text-xs text-slate-500">
-                          {activeTable.capacity ? `${activeTable.capacity - guestCount} seats will remain available` : 'Enter guest count'}
+                          {activeTable.orderDetails?.remainingSeats 
+                            ? `${activeTable.orderDetails.remainingSeats} seats available (${activeTable.orderDetails.usedSeats} already used)` 
+                            : activeTable.capacity 
+                              ? `${activeTable.capacity - guestCount} seats will remain available` 
+                              : 'Enter guest count'}
                         </p>
                       </div>
                     )}
@@ -2585,6 +2889,135 @@ export default function POSPage() {
                 />
               </div>
           </div>
+
+          {/* Delivery Details Section */}
+          {orderType === 'delivery' && (
+            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Delivery Details</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  value={deliveryDetails.contactName}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, contactName: e.target.value })}
+                  placeholder="Contact Name *"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  required
+                />
+                <Input
+                  value={deliveryDetails.contactPhone}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, contactPhone: e.target.value })}
+                  placeholder="Contact Phone *"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  required
+                />
+                <Input
+                  value={deliveryDetails.addressLine1}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, addressLine1: e.target.value })}
+                  placeholder="Address Line 1 *"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                  required
+                />
+                <Input
+                  value={deliveryDetails.addressLine2}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, addressLine2: e.target.value })}
+                  placeholder="Address Line 2"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                />
+                <Input
+                  value={deliveryDetails.city}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, city: e.target.value })}
+                  placeholder="City *"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  required
+                />
+                <Input
+                  value={deliveryDetails.state}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, state: e.target.value })}
+                  placeholder="State/Province"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                />
+                <Input
+                  value={deliveryDetails.postalCode}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, postalCode: e.target.value })}
+                  placeholder="Postal Code"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                />
+                <div className="sm:col-span-2">
+                  <label className="block text-xs text-slate-400 mb-1">Delivery Fee</label>
+                  <Input
+                    value={deliveryFee}
+                    onChange={(e) => {
+                      setDeliveryFee(e.target.value);
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('pos_deliveryFee', e.target.value);
+                      }
+                    }}
+                    placeholder="0.00"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  />
+                </div>
+                <Input
+                  value={deliveryDetails.instructions}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, instructions: e.target.value })}
+                  placeholder="Delivery Instructions"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                />
+                <Input
+                  value={deliveryDetails.assignedDriver}
+                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, assignedDriver: e.target.value })}
+                  placeholder="Assigned Driver"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                />
+              </div>
+              {!deliveryIsValid && (
+                <p className="text-xs text-amber-400 mt-2">
+                  * Required fields: {missingDeliveryFields.join(', ')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Takeaway Details Section */}
+          {orderType === 'takeaway' && (
+            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Takeaway Details</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  value={takeawayDetails.contactName}
+                  onChange={(e) => setTakeawayDetails({ ...takeawayDetails, contactName: e.target.value })}
+                  placeholder="Contact Name *"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  required
+                />
+                <Input
+                  value={takeawayDetails.contactPhone}
+                  onChange={(e) => setTakeawayDetails({ ...takeawayDetails, contactPhone: e.target.value })}
+                  placeholder="Contact Phone *"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  required
+                />
+                <Input
+                  value={takeawayDetails.instructions}
+                  onChange={(e) => setTakeawayDetails({ ...takeawayDetails, instructions: e.target.value })}
+                  placeholder="Pickup Instructions"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                />
+                <Input
+                  value={takeawayDetails.assignedDriver}
+                  onChange={(e) => setTakeawayDetails({ ...takeawayDetails, assignedDriver: e.target.value })}
+                  placeholder="Assigned Staff"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                />
+              </div>
+              {!takeawayIsValid && (
+                <p className="text-xs text-amber-400 mt-2">
+                  * Required fields: {missingTakeawayFields.join(', ')}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
           <div className="space-y-3">
@@ -2776,20 +3209,35 @@ export default function POSPage() {
             <div className="text-xs text-slate-500">
               {selectedWaiterName ? `Assigned waiter: ${selectedWaiterName}` : 'Waiter not set'}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={handleCreateOrder} disabled={checkoutBlocked || cart.length === 0}>
-                <ClockIcon className="mr-2 h-4 w-4" />
-                Create Order
-              </Button>
-                <Button
-                variant="primary"
-                onClick={handlePayment}
-                disabled={checkoutBlocked || cart.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-500"
+            <div className="flex flex-col gap-2">
+              {checkoutBlocked && (
+                <div className="text-xs text-rose-400">
+                  {requiresTable && !selectedTable && 'Please select a table'}
+                  {requiresDeliveryDetails && !deliveryIsValid && `Missing: ${missingDeliveryFields.join(', ')}`}
+                  {requiresTakeawayDetails && !takeawayIsValid && `Missing: ${missingTakeawayFields.join(', ')}`}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  variant="secondary" 
+                  onClick={handleCreateOrder} 
+                  disabled={checkoutBlocked || cart.length === 0}
+                  title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : ''}
                 >
-                <CreditCardIcon className="mr-2 h-4 w-4" />
-                Process Payment
+                  <ClockIcon className="mr-2 h-4 w-4" />
+                  Create Order
                 </Button>
+                <Button
+                  variant="primary"
+                  onClick={handlePayment}
+                  disabled={checkoutBlocked || cart.length === 0}
+                  className="bg-emerald-600 hover:bg-emerald-500"
+                  title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : ''}
+                >
+                  <CreditCardIcon className="mr-2 h-4 w-4" />
+                  Process Payment
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -3371,12 +3819,13 @@ export default function POSPage() {
         )}
       </Modal>
 
-      {/* Receipt Modal */}
+      {/* Receipt Modal - Higher z-index to appear above payment success modal */}
       <Modal
         isOpen={isReceiptModalOpen}
         onClose={() => setIsReceiptModalOpen(false)}
         title="Receipt Preview"
         size="lg"
+        className="z-[100]"
       >
         <div className="space-y-4">
           {receiptLoading ? (
@@ -3669,6 +4118,156 @@ export default function POSPage() {
               </Button>
               <Button onClick={handleModifierConfirm} className="bg-sky-600 hover:bg-sky-500">
                 Add to Cart
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Occupied Table Modal */}
+      <Modal
+        isOpen={Boolean(occupiedTableModal)}
+        onClose={() => setOccupiedTableModal(null)}
+        title="Table is Occupied"
+        size="md"
+      >
+        {occupiedTableModal && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-orange-500/40 bg-orange-500/10 p-4">
+              <p className="text-sm text-orange-200">
+                This table has an active order. Choose an action below:
+              </p>
+            </div>
+            
+            {occupiedTableModal.orderDetails && (
+              <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-slate-400">Token Number</p>
+                    <p className="font-semibold text-slate-100">{occupiedTableModal.orderDetails.tokenNumber || occupiedTableModal.orderDetails.orderNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Order Amount</p>
+                    <p className="font-semibold text-emerald-400">{formatCurrency(occupiedTableModal.orderDetails.totalAmount || 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Order Status</p>
+                    <Badge className={
+                      occupiedTableModal.orderDetails.orderStatus === 'paid' 
+                        ? 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30'
+                        : occupiedTableModal.orderDetails.orderStatus === 'pending'
+                        ? 'bg-amber-500/10 text-amber-200 border border-amber-500/30'
+                        : 'bg-slate-500/10 text-slate-200 border border-slate-500/30'
+                    }>
+                      {occupiedTableModal.orderDetails.orderStatus === 'paid' ? 'Paid' : occupiedTableModal.orderDetails.orderStatus === 'pending' ? 'Pending' : occupiedTableModal.orderDetails.orderStatus || 'Unknown'}
+                    </Badge>
+                  </div>
+                  {occupiedTableModal.orderDetails.waiterName && (
+                    <div>
+                      <p className="text-xs text-slate-400">Waiter</p>
+                      <p className="font-semibold text-slate-100">{occupiedTableModal.orderDetails.waiterName}</p>
+                    </div>
+                  )}
+                  {occupiedTableModal.orderDetails.holdCount > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-400">Times Held</p>
+                      <p className="font-semibold text-orange-400">{occupiedTableModal.orderDetails.holdCount}x</p>
+                    </div>
+                  )}
+                  <div className="col-span-2">
+                    <p className="text-xs text-slate-400">Used Seats</p>
+                    <p className="font-semibold text-slate-100">
+                      {occupiedTableModal.orderDetails.usedSeats || 0} / {tables.find((t: any) => t.id === occupiedTableModal.tableId)?.capacity || 0}
+                    </p>
+                  </div>
+                  {occupiedTableModal.orderDetails.remainingSeats > 0 && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-sky-400">Remaining Seats</p>
+                      <p className="font-semibold text-sky-300">{occupiedTableModal.orderDetails.remainingSeats} seats available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              {occupiedTableModal.orderDetails?.orderStatus !== 'paid' && (
+                <Button
+                  onClick={handleResumeOrder}
+                  className="w-full bg-sky-600 hover:bg-sky-500"
+                >
+                  Resume & Edit Order
+                </Button>
+              )}
+              {occupiedTableModal.orderDetails?.orderStatus === 'pending' && (
+                <Button
+                  onClick={async () => {
+                    if (!occupiedTableModal.orderDetails?.currentOrderId) return;
+                    try {
+                      await updateOrder({
+                        id: occupiedTableModal.orderDetails.currentOrderId,
+                        data: { status: 'paid' }
+                      }).unwrap();
+                      toast.success('Order marked as paid');
+                      setOccupiedTableModal(null);
+                      refetchTables();
+                      refetchQueue();
+                    } catch (error: any) {
+                      toast.error(error?.data?.message || 'Failed to update order status');
+                    }
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500"
+                >
+                  Mark as Paid
+                </Button>
+              )}
+              {occupiedTableModal.orderDetails?.orderStatus === 'paid' && (
+                <Button
+                  onClick={async () => {
+                    if (!occupiedTableModal.orderDetails?.currentOrderId) return;
+                    try {
+                      await updateOrder({
+                        id: occupiedTableModal.orderDetails.currentOrderId,
+                        data: { status: 'pending' }
+                      }).unwrap();
+                      toast.success('Order marked as pending');
+                      setOccupiedTableModal(null);
+                      refetchTables();
+                      refetchQueue();
+                    } catch (error: any) {
+                      toast.error(error?.data?.message || 'Failed to update order status');
+                    }
+                  }}
+                  variant="secondary"
+                  className="w-full"
+                >
+                  Mark as Pending
+                </Button>
+              )}
+              {occupiedTableModal.orderDetails?.remainingSeats > 0 && (
+                <Button
+                  onClick={handleStartNewOrderOnTable}
+                  variant="secondary"
+                  className="w-full"
+                >
+                  Start New Order ({occupiedTableModal.orderDetails.remainingSeats} seats)
+                </Button>
+              )}
+              {occupiedTableModal.orderDetails?.orderStatus !== 'paid' && (
+                <Button
+                  onClick={handleCancelOccupiedOrder}
+                  variant="ghost"
+                  className="w-full text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                >
+                  Cancel Order & Free Table
+                </Button>
+              )}
+              <Button
+                onClick={() => setOccupiedTableModal(null)}
+                variant="secondary"
+                className="w-full"
+              >
+                Close
               </Button>
             </div>
           </div>

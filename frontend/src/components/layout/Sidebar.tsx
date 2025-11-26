@@ -5,26 +5,26 @@ import { Button } from '@/components/ui/Button';
 import { useAppSelector } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-    Bars3Icon,
-    BeakerIcon,
-    BuildingOfficeIcon,
-    ChartBarIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    CogIcon,
-    CurrencyDollarIcon,
-    GiftIcon,
-    HomeIcon,
-    PrinterIcon,
-    ReceiptPercentIcon,
-    ShoppingBagIcon,
-    TableCellsIcon,
-    TagIcon,
-    TruckIcon,
-    UserCircleIcon,
-    UserGroupIcon,
-    UsersIcon,
-    XMarkIcon
+  Bars3Icon,
+  BeakerIcon,
+  BuildingOfficeIcon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  CogIcon,
+  CurrencyDollarIcon,
+  GiftIcon,
+  HomeIcon,
+  PrinterIcon,
+  ReceiptPercentIcon,
+  ShoppingBagIcon,
+  TableCellsIcon,
+  TagIcon,
+  TruckIcon,
+  UserCircleIcon,
+  UserGroupIcon,
+  UsersIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -56,11 +56,6 @@ const navigation: NavigationItem[] = [
         icon: ShoppingBagIcon,
       },
       {
-        name: 'POS Reports',
-        href: '/dashboard/pos-reports',
-        icon: ChartBarIcon,
-      },
-      {
         name: 'POS Settings',
         href: '/dashboard/pos-settings',
         icon: CogIcon,
@@ -73,16 +68,10 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    name: 'Orders',
+    name: 'Order History',
     href: '/dashboard/order-history',
-    icon: ClipboardDocumentListIcon,
-    children: [
-      {
-        name: 'Order History',
-        href: '/dashboard/order-history',
-        icon: ClockIcon,
-      },
-    ],
+    icon: ClockIcon,
+    
   },
   {
     name: 'Menu',

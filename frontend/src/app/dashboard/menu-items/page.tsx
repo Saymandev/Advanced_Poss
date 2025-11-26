@@ -9,13 +9,14 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
-import { useCreateMenuItemMutation, useDeleteMenuItemMutation, useGetMenuItemsQuery, useToggleAvailabilityMutation, useUpdateMenuItemMutation } from '@/lib/api/endpoints/menuItemsApi';
+import { useCreateMenuItemMutation, useDeleteMenuItemMutation, useGetMenuItemsQuery, useToggleAvailabilityMutation, useUpdateMenuItemMutation, useUploadMenuImagesMutation } from '@/lib/api/endpoints/menuItemsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
   ClockIcon,
   EyeIcon,
   PencilIcon,
+  PhotoIcon,
   PlusIcon,
   ShoppingBagIcon,
   TrashIcon,
@@ -83,10 +84,20 @@ export default function MenuItemsPage() {
     categoryId: '',
     preparationTime: 0,
     isAvailable: true,
+    trackInventory: false, // Enable inventory tracking if ingredients are added
     images: [] as string[],
     ingredients: [] as Array<{ ingredientId: string; quantity: number; unit: string }>,
     allergens: [] as string[],
     tags: [] as string[],
+    selections: [] as Array<{
+      name: string;
+      type: 'single' | 'multi' | 'optional';
+      options: Array<{ name: string; price: number }>;
+    }>,
+    variants: [] as Array<{
+      name: string;
+      options: Array<{ name: string; priceModifier: number }>;
+    }>,
     nutritionalInfo: {
       calories: 0,
       protein: 0,
@@ -95,12 +106,20 @@ export default function MenuItemsPage() {
     },
   });
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   // Fetch real menu items from API - try multiple ways to get branchId
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
   
+
+  // Get companyId for query (same as categories page)
+  const companyId = (user as any)?.companyId || 
+                   (companyContext as any)?.companyId || 
+                   (companyContext as any)?._id ||
+                   (companyContext as any)?.id;
 
   // Build API query parameters
   const queryParams = useMemo(() => {
@@ -109,6 +128,11 @@ export default function MenuItemsPage() {
       page: currentPage,
       limit: itemsPerPage,
     };
+    
+    // Always include companyId to ensure proper filtering
+    if (companyId) {
+      params.companyId = companyId;
+    }
     
     // Add search if provided
     if (committedSearch) {
@@ -126,7 +150,7 @@ export default function MenuItemsPage() {
     }
     
     return params;
-  }, [branchId, currentPage, itemsPerPage, committedSearch, categoryFilter, availabilityFilter]);
+  }, [branchId, companyId, currentPage, itemsPerPage, committedSearch, categoryFilter, availabilityFilter]);
 
   const { data: menuItemsResponse, isLoading, error, refetch } = useGetMenuItemsQuery(
     queryParams,
@@ -135,7 +159,7 @@ export default function MenuItemsPage() {
   
   // Get stats - fetch all items for accurate stats (without filters)
   const { data: statsResponse } = useGetMenuItemsQuery(
-    { branchId, limit: 1000 },
+    { branchId, companyId, limit: 1000 },
     { skip: !branchId }
   );
 
@@ -161,12 +185,6 @@ export default function MenuItemsPage() {
     };
   }, [statsResponse]);
   
-  // Get companyId for query (same as categories page)
-  const companyId = (user as any)?.companyId || 
-                   (companyContext as any)?.companyId || 
-                   (companyContext as any)?._id ||
-                   (companyContext as any)?.id;
-  
   // Use the same query as categories page to ensure consistency
   // This shows the same categories that appear on /dashboard/categories
   const { data: categoriesResponse, isLoading: isLoadingCategories, isFetching: isFetchingCategories } = useGetCategoriesQuery(
@@ -174,21 +192,35 @@ export default function MenuItemsPage() {
     { skip: !branchId && !companyId, refetchOnMountOrArgChange: true }
   );
   
-  // Fetch ingredients for the ingredient selector
+  // Fetch ingredients for the ingredient selector - ensure we have companyId or branchId
   const { data: ingredientsResponse, isLoading: isLoadingIngredients } = useGetInventoryItemsQuery(
-    { companyId, branchId, limit: 1000 },
-    { skip: !companyId }
+    { companyId: companyId || undefined, branchId: branchId || undefined, limit: 1000 },
+    { skip: !companyId && !branchId } // Don't skip if we have at least one
   );
   
   const availableIngredients = useMemo(() => {
+    // During initial load, ingredientsResponse will be undefined - that's normal
     if (!ingredientsResponse) {
-      console.log('📦 No ingredients response');
       return [];
     }
     
-    const items = ingredientsResponse.items || [];
-    console.log('📦 Available ingredients:', items.length, items);
-    return items.filter((ing: any) => ing && ing.id && ing.name); // Filter out invalid entries
+    const items = ingredientsResponse.items || (Array.isArray(ingredientsResponse) ? ingredientsResponse : []);
+    if (!Array.isArray(items)) {
+      console.warn('📦 Ingredients items is not an array:', items);
+      return [];
+    }
+    
+    const mapped = items.map((ing: any) => ({
+      id: String(ing.id || ing._id || ''),
+      name: String(ing.name || ''),
+      unit: String(ing.unit || 'pcs'),
+    })).filter((ing: any) => ing && ing.id && ing.name && ing.id !== 'undefined'); // Filter out invalid entries
+    
+    // Only log when ingredients are actually loaded (not during initial undefined state)
+    if (mapped.length > 0) {
+      console.log('📦 Available ingredients:', mapped.length);
+    }
+    return mapped;
   }, [ingredientsResponse]);
   
   const categories = useMemo(() => {
@@ -213,6 +245,7 @@ export default function MenuItemsPage() {
   const [createMenuItem, { isLoading: isCreating }] = useCreateMenuItemMutation();
   const [updateMenuItem, { isLoading: isUpdating }] = useUpdateMenuItemMutation();
   const [deleteMenuItem, { isLoading: isDeleting }] = useDeleteMenuItemMutation();
+  const [uploadImages] = useUploadMenuImagesMutation();
 
   // Transform API response to local format (already transformed by API)
   const menuItems = useMemo(() => {
@@ -374,6 +407,7 @@ export default function MenuItemsPage() {
         categoryId: categoryIdValue,
         preparationTime: itemData.preparationTime || 0,
         isAvailable: itemData.isAvailable !== false,
+        trackInventory: itemData.trackInventory || (ingredientsArray.length > 0),
         images: itemData.images || (itemData.imageUrl ? [itemData.imageUrl] : []),
         ingredients: ingredientsArray,
         allergens: itemData.allergens || [],
@@ -384,6 +418,8 @@ export default function MenuItemsPage() {
           carbs: 0,
           fat: 0,
         },
+        variants: itemData.variants || [],
+        selections: itemData.selections || [],
       });
     }
   }, [isEditModalOpen, selectedMenuItem, categories]);
@@ -398,10 +434,13 @@ export default function MenuItemsPage() {
         categoryId: categories[0]?.id || '',
         preparationTime: 0,
         isAvailable: true,
+        trackInventory: false,
         images: [],
         ingredients: [] as Array<{ ingredientId: string; quantity: number; unit: string }>,
         allergens: [],
         tags: [],
+        selections: [],
+        variants: [],
         nutritionalInfo: {
           calories: 0,
           protein: 0,
@@ -412,9 +451,84 @@ export default function MenuItemsPage() {
     }
   }, [isCreateModalOpen, isEditModalOpen, categories]);
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'Menu item name is required';
+    } else if (formData.name.trim().length < 2) {
+      errors.name = 'Menu item name must be at least 2 characters';
+    } else if (formData.name.trim().length > 100) {
+      errors.name = 'Menu item name must be less than 100 characters';
+    }
+
+    if (!formData.categoryId) {
+      errors.categoryId = 'Please select a category';
+    }
+
+    if (!formData.price || formData.price <= 0) {
+      errors.price = 'Price must be greater than 0';
+    } else if (formData.price > 10000) {
+      errors.price = 'Price cannot exceed 10,000';
+    }
+
+    if (formData.preparationTime < 0) {
+      errors.preparationTime = 'Preparation time cannot be negative';
+    } else if (formData.preparationTime > 480) {
+      errors.preparationTime = 'Preparation time cannot exceed 480 minutes (8 hours)';
+    }
+
+    if (formData.description && formData.description.length > 500) {
+      errors.description = 'Description must be less than 500 characters';
+    }
+
+    // Validate nutritional info if provided
+    if (formData.nutritionalInfo.calories < 0) {
+      errors.nutritionalInfo_calories = 'Calories cannot be negative';
+    }
+    if (formData.nutritionalInfo.protein < 0) {
+      errors.nutritionalInfo_protein = 'Protein cannot be negative';
+    }
+    if (formData.nutritionalInfo.carbs < 0) {
+      errors.nutritionalInfo_carbs = 'Carbs cannot be negative';
+    }
+    if (formData.nutritionalInfo.fat < 0) {
+      errors.nutritionalInfo_fat = 'Fat cannot be negative';
+    }
+
+    // Validate ingredients
+    formData.ingredients.forEach((ing, index) => {
+      if (!ing.ingredientId) {
+        errors[`ingredient_${index}_ingredientId`] = 'Please select an ingredient';
+      }
+      if (ing.quantity <= 0) {
+        errors[`ingredient_${index}_quantity`] = 'Quantity must be greater than 0';
+      }
+      if (!ing.unit || ing.unit.trim() === '') {
+        errors[`ingredient_${index}_unit`] = 'Unit is required';
+      }
+    });
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const clearFormError = (field: string) => {
+    setFormErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
   const handleCreateMenuItem = async () => {
-    if (!formData.name || !formData.price || !formData.categoryId) {
-      toast.error('Please fill in all required fields');
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
+      return;
+    }
+
+    if (!branchId) {
+      toast.error('Branch ID is missing');
       return;
     }
 
@@ -431,6 +545,7 @@ export default function MenuItemsPage() {
         price: formData.price,
         preparationTime: formData.preparationTime || undefined,
         isAvailable: formData.isAvailable !== false,
+        trackInventory: formData.trackInventory || false,
         images: formData.images.filter(Boolean).length > 0 ? formData.images.filter(Boolean) : undefined,
         tags: formData.tags.length > 0 ? formData.tags : undefined,
       };
@@ -466,18 +581,69 @@ export default function MenuItemsPage() {
         payload.ingredients = [];
       }
 
+      // Add variants if provided
+      if (formData.variants.length > 0) {
+        payload.variants = formData.variants.filter(v => v.name && v.options.length > 0);
+      }
+
+      // Add selections if provided
+      if (formData.selections.length > 0) {
+        payload.selections = formData.selections.filter(s => s.name && s.options.length > 0);
+      }
+
       await createMenuItem(payload).unwrap();
       toast.success('Menu item created successfully');
+      
+      // Reset form to default state
+      setFormData({
+        name: '',
+        description: '',
+        price: 0,
+        categoryId: categories[0]?.id || '',
+        preparationTime: 0,
+        isAvailable: true,
+        trackInventory: false,
+        images: [],
+        ingredients: [],
+        allergens: [],
+        tags: [],
+        selections: [],
+        variants: [],
+        nutritionalInfo: {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+        },
+      });
+      setFormErrors({});
       setIsCreateModalOpen(false);
-      refetch();
+      
+      // Refetch menu items to show the new item
+      await refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to create menu item');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to create menu item';
+      toast.error(errorMessage);
+      
+      // Set form-level error if it's a validation error
+      if (error?.data?.errors) {
+        const apiErrors: Record<string, string> = {};
+        Object.keys(error.data.errors).forEach((key) => {
+          apiErrors[key] = error.data.errors[key];
+        });
+        setFormErrors(apiErrors);
+      }
     }
   };
 
   const handleUpdateMenuItem = async () => {
-    if (!selectedMenuItem?.id || !formData.name || !formData.price) {
-      toast.error('Please fill in all required fields');
+    if (!selectedMenuItem?.id) {
+      toast.error('Menu item not selected');
+      return;
+    }
+
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
       return;
     }
 
@@ -520,18 +686,46 @@ export default function MenuItemsPage() {
       const validIngredients = formData.ingredients.filter(ing => ing.ingredientId && ing.quantity > 0);
       if (validIngredients.length > 0) {
         payload.ingredients = validIngredients;
+        // Enable inventory tracking if ingredients are added
+        payload.trackInventory = true;
       } else {
         // Empty ingredients array - clear existing ingredients
         payload.ingredients = [];
+        payload.trackInventory = false;
+      }
+
+      // Add variants if provided
+      if (formData.variants.length > 0) {
+        payload.variants = formData.variants.filter(v => v.name && v.options.length > 0);
+      } else {
+        payload.variants = []; // Clear variants if empty
+      }
+
+      // Add selections if provided
+      if (formData.selections.length > 0) {
+        payload.selections = formData.selections.filter(s => s.name && s.options.length > 0);
+      } else {
+        payload.selections = []; // Clear selections if empty
       }
 
       await updateMenuItem(payload).unwrap();
       toast.success('Menu item updated successfully');
       setIsEditModalOpen(false);
       setSelectedMenuItem(null);
+      setFormErrors({});
       refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to update menu item');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to update menu item';
+      toast.error(errorMessage);
+      
+      // Set form-level error if it's a validation error
+      if (error?.data?.errors) {
+        const apiErrors: Record<string, string> = {};
+        Object.keys(error.data.errors).forEach((key) => {
+          apiErrors[key] = error.data.errors[key];
+        });
+        setFormErrors(apiErrors);
+      }
     }
   };
 
@@ -563,6 +757,7 @@ export default function MenuItemsPage() {
       toast.success('Menu item availability updated');
       refetch();
     } catch (error) {
+      console.error(error);
       toast.error('Failed to update availability');
     }
   };
@@ -585,12 +780,17 @@ export default function MenuItemsPage() {
   };
   
   const updateIngredient = (index: number, field: 'ingredientId' | 'quantity' | 'unit', value: string | number) => {
-    const newIngredients = [...formData.ingredients];
-    newIngredients[index] = {
-      ...newIngredients[index],
-      [field]: field === 'quantity' ? Number(value) : value,
-    };
-    setFormData({ ...formData, ingredients: newIngredients });
+    setFormData((prev) => {
+      const newIngredients = [...prev.ingredients];
+      if (!newIngredients[index]) {
+        newIngredients[index] = { ingredientId: '', quantity: 0, unit: 'pcs' };
+      }
+      newIngredients[index] = {
+        ...newIngredients[index],
+        [field]: field === 'quantity' ? Number(value) : String(value),
+      };
+      return { ...prev, ingredients: newIngredients };
+    });
   };
   
   const removeIngredient = (index: number) => {
@@ -620,6 +820,163 @@ export default function MenuItemsPage() {
     setFormData({ ...formData, allergens: formData.allergens.filter(a => a !== allergen) });
   };
 
+  // Image upload handlers - Upload to Cloudinary
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    
+    if (imageFiles.length === 0) {
+      toast.error('Please upload only image files');
+      e.target.value = '';
+      return;
+    }
+
+    // Check file sizes (10MB limit per image)
+    const maxSizeMB = 10;
+    const oversizedFiles = imageFiles.filter((file) => file.size > maxSizeMB * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      toast.error(`Some images are too large. Maximum size is ${maxSizeMB}MB per image.`);
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      // Create FormData for multipart upload
+      const uploadFormData = new FormData();
+      imageFiles.forEach((file) => {
+        uploadFormData.append('images', file);
+      });
+
+      // Upload to Cloudinary via backend
+      const result = await uploadImages(uploadFormData).unwrap();
+
+      if (result.success && result.images && result.images.length > 0) {
+        // Store Cloudinary URLs instead of base64
+        const imageUrls = result.images.map((img) => img.url);
+        setFormData((prev) => ({
+          ...prev,
+          images: [...prev.images, ...imageUrls],
+        }));
+        
+        toast.success(`Successfully uploaded ${result.images.length} image(s) to Cloudinary`);
+      } else {
+        toast.error('Failed to upload images');
+      }
+    } catch (error: any) {
+      console.error('Error uploading images:', error);
+      toast.error(error?.data?.message || error?.message || 'Failed to upload images to Cloudinary');
+    }
+    
+    // Reset input to allow uploading the same file again
+    e.target.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setFormData({
+      ...formData,
+      images: formData.images.filter((_, i) => i !== index),
+    });
+  };
+
+  // Selections handlers (for customization options like Size, Toppings, etc.)
+  const addSelection = () => {
+    setFormData({
+      ...formData,
+      selections: [...formData.selections, {
+        name: '',
+        type: 'single',
+        options: [],
+      }],
+    });
+  };
+
+  const updateSelection = (index: number, field: 'name' | 'type', value: string) => {
+    const newSelections = [...formData.selections];
+    newSelections[index] = {
+      ...newSelections[index],
+      [field]: value,
+    };
+    setFormData({ ...formData, selections: newSelections });
+  };
+
+  const removeSelection = (index: number) => {
+    setFormData({
+      ...formData,
+      selections: formData.selections.filter((_, i) => i !== index),
+    });
+  };
+
+  const addSelectionOption = (selectionIndex: number) => {
+    const newSelections = [...formData.selections];
+    newSelections[selectionIndex].options.push({ name: '', price: 0 });
+    setFormData({ ...formData, selections: newSelections });
+  };
+
+  const updateSelectionOption = (selectionIndex: number, optionIndex: number, field: 'name' | 'price', value: string | number) => {
+    const newSelections = [...formData.selections];
+    newSelections[selectionIndex].options[optionIndex] = {
+      ...newSelections[selectionIndex].options[optionIndex],
+      [field]: field === 'price' ? Number(value) : value,
+    };
+    setFormData({ ...formData, selections: newSelections });
+  };
+
+  const removeSelectionOption = (selectionIndex: number, optionIndex: number) => {
+    const newSelections = [...formData.selections];
+    newSelections[selectionIndex].options = newSelections[selectionIndex].options.filter((_, i) => i !== optionIndex);
+    setFormData({ ...formData, selections: newSelections });
+  };
+
+  // Variants handlers (for size variants like Small, Medium, Large)
+  const addVariant = () => {
+    setFormData({
+      ...formData,
+      variants: [...formData.variants, {
+        name: '',
+        options: [],
+      }],
+    });
+  };
+
+  const updateVariant = (index: number, field: 'name', value: string) => {
+    const newVariants = [...formData.variants];
+    newVariants[index] = {
+      ...newVariants[index],
+      [field]: value,
+    };
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const removeVariant = (index: number) => {
+    setFormData({
+      ...formData,
+      variants: formData.variants.filter((_, i) => i !== index),
+    });
+  };
+
+  const addVariantOption = (variantIndex: number) => {
+    const newVariants = [...formData.variants];
+    newVariants[variantIndex].options.push({ name: '', priceModifier: 0 });
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const updateVariantOption = (variantIndex: number, optionIndex: number, field: 'name' | 'priceModifier', value: string | number) => {
+    const newVariants = [...formData.variants];
+    newVariants[variantIndex].options[optionIndex] = {
+      ...newVariants[variantIndex].options[optionIndex],
+      [field]: field === 'priceModifier' ? Number(value) : value,
+    };
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const removeVariantOption = (variantIndex: number, optionIndex: number) => {
+    const newVariants = [...formData.variants];
+    newVariants[variantIndex].options = newVariants[variantIndex].options.filter((_, i) => i !== optionIndex);
+    setFormData({ ...formData, variants: newVariants });
+  };
+
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
       <span
@@ -636,17 +993,29 @@ export default function MenuItemsPage() {
       key: 'name',
       title: 'Menu Item',
       sortable: true,
-      render: (value: string, row: MenuItem) => (
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-            <ShoppingBagIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+      render: (value: string, row: MenuItem) => {
+        const imageSrc = row.imageUrl || (Array.isArray((row as any).images) ? (row as any).images[0] : undefined);
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden">
+              {imageSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imageSrc}
+                  alt={value}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <ShoppingBagIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+              )}
+            </div>
+            <div>
+              <p className="font-medium text-gray-900 dark:text-white">{value}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{row.category}</p>
+            </div>
           </div>
-          <div>
-            <p className="font-medium text-gray-900 dark:text-white">{value}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{row.category}</p>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'price',
@@ -755,6 +1124,36 @@ export default function MenuItemsPage() {
     return filtered;
   }, [menuItems, categoryFilter, availabilityFilter]);
 
+  // Error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Menu Management</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Manage your restaurant menu items and pricing
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="text-red-600 dark:text-red-400 mb-4">
+              <ShoppingBagIcon className="w-12 h-12 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold">Error Loading Menu Items</h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
+                {(error as any)?.data?.message || (error as any)?.message || 'Failed to load menu items. Please try again.'}
+              </p>
+            </div>
+            <Button onClick={() => refetch()} variant="primary">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -767,6 +1166,7 @@ export default function MenuItemsPage() {
           </div>
         </div>
         <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
           <p className="text-gray-500 dark:text-gray-400">Loading menu items...</p>
         </div>
       </div>
@@ -1130,9 +1530,16 @@ export default function MenuItemsPage() {
               </label>
               <Input
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  clearFormError('name');
+                }}
                 placeholder="Menu item name"
+                className={formErrors.name ? 'border-red-500' : ''}
               />
+              {formErrors.name && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.name}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1147,12 +1554,21 @@ export default function MenuItemsPage() {
                   No branch selected. Please select a branch first.
                 </div>
               ) : categories.length > 0 ? (
-                <Select
-                  options={categories.map((cat: any) => ({ value: String(cat.id), label: cat.name }))}
-                  value={formData.categoryId ? String(formData.categoryId) : ''}
-                  onChange={(value) => setFormData({ ...formData, categoryId: value })}
-                  placeholder="Select category"
-                />
+                <>
+                  <Select
+                    options={categories.map((cat: any) => ({ value: String(cat.id), label: cat.name }))}
+                    value={formData.categoryId ? String(formData.categoryId) : ''}
+                    onChange={(value) => {
+                      setFormData({ ...formData, categoryId: value });
+                      clearFormError('categoryId');
+                    }}
+                    placeholder="Select category"
+                    className={formErrors.categoryId ? 'border-red-500' : ''}
+                  />
+                  {formErrors.categoryId && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.categoryId}</p>
+                  )}
+                </>
               ) : (
                 <div className="px-3 py-2 border border-red-300 rounded-md bg-red-50 dark:bg-red-900/20 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
                   No categories available. Please create a category first. (Branch ID: {branchId || 'none'})
@@ -1161,17 +1577,62 @@ export default function MenuItemsPage() {
             </div>
           </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => {
+                  setFormData({ ...formData, description: e.target.value });
+                  clearFormError('description');
+                }}
+                placeholder="Menu item description"
+                rows={3}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white ${
+                  formErrors.description ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
+              />
+              {formErrors.description && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.description}</p>
+              )}
+            </div>
+
+          {/* Image Upload Section */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Description
+              Images
             </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Menu item description"
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
+            <div className="grid grid-cols-4 gap-4 mb-2">
+              {formData.images.map((image, index) => (
+                <div key={index} className="relative group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image}
+                    alt={`Menu item ${index + 1}`}
+                    className="w-full h-24 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
+                  />
+                  <button
+                    onClick={() => removeImage(index)}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+              <PhotoIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Upload Images</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </label>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload one or more images for this menu item</p>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
@@ -1182,11 +1643,18 @@ export default function MenuItemsPage() {
               <Input
                 type="number"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                onChange={(e) => {
+                  setFormData({ ...formData, price: Number(e.target.value) });
+                  clearFormError('price');
+                }}
                 placeholder="0.00"
                 min="0"
                 step="0.01"
+                className={formErrors.price ? 'border-red-500' : ''}
               />
+              {formErrors.price && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.price}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1195,10 +1663,17 @@ export default function MenuItemsPage() {
               <Input
                 type="number"
                 value={formData.preparationTime}
-                onChange={(e) => setFormData({ ...formData, preparationTime: Number(e.target.value) })}
+                onChange={(e) => {
+                  setFormData({ ...formData, preparationTime: Number(e.target.value) });
+                  clearFormError('preparationTime');
+                }}
                 placeholder="0"
                 min="0"
+                className={formErrors.preparationTime ? 'border-red-500' : ''}
               />
+              {formErrors.preparationTime && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.preparationTime}</p>
+              )}
             </div>
             <div className="flex items-center pt-6">
               <label className="flex items-center gap-2">
@@ -1227,20 +1702,29 @@ export default function MenuItemsPage() {
                       </div>
                     ) : availableIngredients.length > 0 ? (
                       <Select
-                        options={[
-                          { value: '', label: 'Select ingredient' },
-                          ...availableIngredients.map((ing: any) => ({
-                            value: String(ing.id),
-                            label: `${ing.name} (${ing.unit || 'pcs'})`,
-                          })),
-                        ]}
-                        value={ingredient.ingredientId}
+                        options={availableIngredients.map((ing: any) => ({
+                          value: String(ing.id),
+                          label: `${ing.name} (${ing.unit || 'pcs'})`,
+                        }))}
+                        value={ingredient.ingredientId || ''}
                         onChange={(value) => {
-                          const selectedIng = availableIngredients.find((ing: any) => String(ing.id) === String(value));
-                          updateIngredient(index, 'ingredientId', value);
-                          if (selectedIng) {
-                            updateIngredient(index, 'unit', selectedIng.unit || 'pcs');
+                          if (!value || value === '') {
+                            return; // Don't update if empty value
                           }
+                          const selectedIng = availableIngredients.find((ing: any) => String(ing.id) === String(value));
+                          // Update both ingredientId and unit in a single state update to avoid race conditions
+                          setFormData((prev) => {
+                            const newIngredients = [...prev.ingredients];
+                            if (!newIngredients[index]) {
+                              newIngredients[index] = { ingredientId: '', quantity: 0, unit: 'pcs' };
+                            }
+                            newIngredients[index] = {
+                              ...newIngredients[index],
+                              ingredientId: String(value),
+                              unit: selectedIng ? (selectedIng.unit || 'pcs') : newIngredients[index].unit,
+                            };
+                            return { ...prev, ingredients: newIngredients };
+                          });
                         }}
                         placeholder="Select ingredient"
                       />
@@ -1295,6 +1779,180 @@ export default function MenuItemsPage() {
                 onClick={addIngredient}
               >
                 + Add Ingredient
+              </Button>
+            </div>
+          </div>
+
+          {/* Variants Section (Size variants like Small, Medium, Large) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Variants (e.g., Size: Small, Medium, Large)
+            </label>
+            <div className="space-y-4">
+              {formData.variants.map((variant, variantIndex) => (
+                <div key={variantIndex} className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Input
+                      value={variant.name}
+                      onChange={(e) => updateVariant(variantIndex, 'name', e.target.value)}
+                      placeholder="Variant name (e.g., Size)"
+                      className="max-w-xs"
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => removeVariant(variantIndex)}
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2 pl-4">
+                    {variant.options.map((option, optionIndex) => (
+                      <div key={optionIndex} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <Input
+                            value={option.name}
+                            onChange={(e) => updateVariantOption(variantIndex, optionIndex, 'name', e.target.value)}
+                            placeholder="Option name (e.g., Small)"
+                          />
+                        </div>
+                        <div className="col-span-5">
+                          <Input
+                            type="number"
+                            value={option.priceModifier}
+                            onChange={(e) => updateVariantOption(variantIndex, optionIndex, 'priceModifier', Number(e.target.value))}
+                            placeholder="Price modifier"
+                            step="0.01"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => removeVariantOption(variantIndex, optionIndex)}
+                          >
+                            <XMarkIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => addVariantOption(variantIndex)}
+                    >
+                      + Add Option
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={addVariant}
+              >
+                + Add Variant
+              </Button>
+            </div>
+          </div>
+
+          {/* Selections Section (Customization options like Toppings, Extras) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Selections (Customization options)
+            </label>
+            <div className="space-y-4">
+              {formData.selections.map((selection, selectionIndex) => (
+                <div key={selectionIndex} className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 space-y-3">
+                  <div className="grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-4">
+                      <Input
+                        value={selection.name}
+                        onChange={(e) => updateSelection(selectionIndex, 'name', e.target.value)}
+                        placeholder="Selection name"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Select
+                        options={[
+                          { value: 'single', label: 'Single' },
+                          { value: 'multi', label: 'Multi' },
+                          { value: 'optional', label: 'Optional' },
+                        ]}
+                        value={selection.type}
+                        onChange={(value) => updateSelection(selectionIndex, 'type', value as 'single' | 'multi' | 'optional')}
+                        placeholder="Type"
+                      />
+                    </div>
+                    <div className="col-span-4 flex items-center gap-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selection.type === 'optional'}
+                          onChange={(e) => updateSelection(selectionIndex, 'type', e.target.checked ? 'optional' : 'single')}
+                          className="h-4 w-4"
+                        />
+                        <span>Optional</span>
+                      </label>
+                    </div>
+                    <div className="col-span-1">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => removeSelection(selectionIndex)}
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2 pl-4">
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">Options</label>
+                    {selection.options.map((option, optionIndex) => (
+                      <div key={optionIndex} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <Input
+                            value={option.name}
+                            onChange={(e) => updateSelectionOption(selectionIndex, optionIndex, 'name', e.target.value)}
+                            placeholder="Option name"
+                          />
+                        </div>
+                        <div className="col-span-5">
+                          <Input
+                            type="number"
+                            value={option.price}
+                            onChange={(e) => updateSelectionOption(selectionIndex, optionIndex, 'price', Number(e.target.value))}
+                            placeholder="Price"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => removeSelectionOption(selectionIndex, optionIndex)}
+                          >
+                            <XMarkIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => addSelectionOption(selectionIndex)}
+                    >
+                      + Add Option
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={addSelection}
+              >
+                + Add Selection
               </Button>
             </div>
           </div>
