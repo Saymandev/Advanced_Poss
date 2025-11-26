@@ -1,32 +1,38 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Model, Schema as MongooseSchema } from 'mongoose';
+import { Model, Schema as MongooseSchema, Types } from 'mongoose';
 // import { WinstonLoggerService } from '../../common/logger/winston.logger';
+import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
+import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
+import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+import { Table, TableDocument } from '../tables/schemas/table.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { UpgradeSubscriptionDto } from './dto/upgrade-subscription.dto';
 import {
-    BillingHistory,
-    BillingHistoryDocument,
-    InvoiceStatus,
-    PaymentStatus,
+  BillingHistory,
+  BillingHistoryDocument,
+  InvoiceStatus,
+  PaymentStatus,
 } from './schemas/billing-history.schema';
 import {
-    SubscriptionPlan,
-    SubscriptionPlanDocument,
+  SubscriptionPlanDocument,
+  SubscriptionPlan as SubscriptionPlanEntity,
 } from './schemas/subscription-plan.schema';
 import {
-    BillingCycle,
-    Subscription,
-    SubscriptionDocument,
-    SubscriptionLimits,
-    SubscriptionStatus,
-    UsageMetrics
+  BillingCycle,
+  Subscription,
+  SubscriptionDocument,
+  SubscriptionLimits,
+  SubscriptionPlan,
+  SubscriptionStatus,
+  UsageMetrics,
 } from './schemas/subscription.schema';
 import { StripeService } from './stripe.service';
 
@@ -37,12 +43,133 @@ export class SubscriptionsService {
   constructor(
     @InjectModel(Subscription.name)
     private subscriptionModel: Model<SubscriptionDocument>,
-    @InjectModel(SubscriptionPlan.name)
+    @InjectModel(SubscriptionPlanEntity.name)
     private planModel: Model<SubscriptionPlanDocument>,
     @InjectModel(BillingHistory.name)
     private billingModel: Model<BillingHistoryDocument>,
+    @InjectModel(Branch.name)
+    private branchModel: Model<BranchDocument>,
+    @InjectModel(User.name)
+    private userModel: Model<UserDocument>,
+    @InjectModel(MenuItem.name)
+    private menuItemModel: Model<MenuItemDocument>,
+    @InjectModel(Customer.name)
+    private customerModel: Model<CustomerDocument>,
+    @InjectModel(Table.name)
+    private tableModel: Model<TableDocument>,
     private stripeService: StripeService,
   ) {}
+
+  private toObjectId(id: string | Types.ObjectId): Types.ObjectId {
+    if (id instanceof Types.ObjectId) {
+      return id;
+    }
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid identifier supplied');
+    }
+    return new Types.ObjectId(id);
+  }
+
+  private sanitizePlanPayload(plan: any) {
+    if (!plan) {
+      return undefined;
+    }
+    const plain = { ...plan };
+    plain.id = plain._id ? plain._id.toString() : plain.id;
+    delete plain._id;
+    delete plain.__v;
+    return plain;
+  }
+
+  private async composeSubscriptionResponse(subscription: any) {
+    if (!subscription) {
+      return null;
+    }
+    const plain =
+      typeof subscription.toObject === 'function'
+        ? subscription.toObject({ virtuals: true })
+        : { ...subscription };
+    const planDoc = await this.planModel
+      .findOne({ name: plain.plan })
+      .lean();
+    return {
+      ...plain,
+      id: plain.id || plain._id?.toString(),
+      planKey: plain.plan,
+      plan: planDoc
+        ? this.sanitizePlanPayload(planDoc)
+        : {
+            name: plain.plan,
+            displayName: plain.plan,
+            price: plain.price,
+            billingCycle: plain.billingCycle,
+            limits: plain.limits,
+            featureList: [],
+          },
+    };
+  }
+
+  private buildLimitsFromPlan(plan: SubscriptionPlanDocument) {
+    const maxBranches =
+      plan.limits?.maxBranches ?? plan.features?.maxBranches ?? -1;
+    const maxUsers = plan.limits?.maxUsers ?? plan.features?.maxUsers ?? -1;
+
+    const derive = (value: number, multiplier: number) =>
+      value > 0 ? value * multiplier : -1;
+
+    return {
+      maxBranches,
+      maxUsers,
+      maxMenuItems: plan.limits?.maxMenuItems ?? derive(maxUsers, 10),
+      maxOrders: plan.limits?.maxOrders ?? derive(maxUsers, 50),
+      maxTables: plan.limits?.maxTables ?? derive(maxBranches, 10),
+      maxCustomers: plan.limits?.maxCustomers ?? derive(maxUsers, 100),
+      aiInsightsEnabled: plan.features?.aiInsights ?? false,
+      advancedReportsEnabled: plan.features?.accounting ?? false,
+      multiLocationEnabled: plan.features?.multiBranch ?? false,
+      apiAccessEnabled: plan.features?.crm ?? false,
+      whitelabelEnabled: plan.limits?.whitelabelEnabled ?? false,
+      customDomainEnabled: plan.limits?.customDomainEnabled ?? false,
+      prioritySupportEnabled:
+        plan.limits?.prioritySupportEnabled ??
+        plan.features?.aiInsights ??
+        false,
+      storageGB: plan.limits?.storageGB ?? 0,
+    } as SubscriptionLimits & { storageGB?: number };
+  }
+
+  private async applyPlanChange(
+    subscription: SubscriptionDocument,
+    plan: SubscriptionPlanDocument,
+    billingCycle?: BillingCycle,
+  ) {
+    const resolvedBillingCycle =
+      billingCycle ||
+      (plan.billingCycle as BillingCycle) ||
+      subscription.billingCycle;
+    const newPrice = plan.price;
+
+    if (
+      subscription.status === SubscriptionStatus.ACTIVE &&
+      subscription.stripeSubscriptionId
+    ) {
+      await this.stripeService.updateSubscription(
+        subscription.stripeSubscriptionId,
+        {
+          priceId: plan.stripePriceId,
+          prorationBehavior: 'create_prorations',
+        },
+      );
+    }
+
+    const planKey = this.resolvePlanKey(plan.name);
+    subscription.plan = planKey;
+    subscription.price = newPrice;
+    subscription.limits = this.buildLimitsFromPlan(plan) as SubscriptionLimits;
+    subscription.billingCycle = resolvedBillingCycle;
+
+    return subscription.save();
+  }
 
   // Create a new subscription
   async create(
@@ -50,7 +177,7 @@ export class SubscriptionsService {
   ): Promise<SubscriptionDocument> {
     try {
       const plan = await this.planModel.findOne({
-        plan: createSubscriptionDto.plan,
+        name: createSubscriptionDto.plan,
         isActive: true,
       });
 
@@ -58,8 +185,7 @@ export class SubscriptionsService {
         throw new BadRequestException('Invalid subscription plan');
       }
 
-      // @ts-ignore - Mongoose schema method
-      const price = plan.getPriceForCycle(createSubscriptionDto.billingCycle);
+      const price = plan.price;
 
       // Check if company already has a subscription
       const existingSubscription = await this.subscriptionModel.findOne({
@@ -99,21 +225,7 @@ export class SubscriptionsService {
         currentPeriodStart: trialStartDate,
         currentPeriodEnd: trialEndDate,
         nextBillingDate: trialEndDate,
-        limits: {
-          maxBranches: plan.features.maxBranches,
-          maxUsers: plan.features.maxUsers,
-          maxMenuItems: plan.features.maxUsers * 10,
-          maxOrders: plan.features.maxUsers * 50,
-          maxTables: plan.features.maxBranches * 10,
-          maxCustomers: plan.features.maxUsers * 100,
-          aiInsightsEnabled: plan.features.aiInsights,
-          advancedReportsEnabled: plan.features.accounting,
-          multiLocationEnabled: plan.features.multiBranch,
-          apiAccessEnabled: plan.features.crm,
-          whitelabelEnabled: false,
-          customDomainEnabled: false,
-          prioritySupportEnabled: plan.features.aiInsights,
-        },
+        limits: this.buildLimitsFromPlan(plan),
         usage: this.getInitialUsage(),
         autoRenew: true,
       });
@@ -192,11 +304,89 @@ export class SubscriptionsService {
   async update(
     id: string,
     updateSubscriptionDto: UpdateSubscriptionDto,
-  ): Promise<SubscriptionDocument> {
+  ): Promise<any> {
     const subscription = await this.findById(id);
 
     Object.assign(subscription, updateSubscriptionDto);
-    return await subscription.save();
+    await subscription.save();
+    return this.composeSubscriptionResponse(subscription);
+  }
+
+  async getCurrentSubscription(companyId: string) {
+    const subscription = await this.subscriptionModel
+      .findOne({
+        companyId: this.toObjectId(companyId),
+        isActive: true,
+      })
+      .lean();
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found for this company');
+    }
+
+    return this.composeSubscriptionResponse(subscription);
+  }
+
+  async getUsageStats(companyId: string) {
+    const companyObjectId = this.toObjectId(companyId);
+    const subscription = await this.subscriptionModel
+      .findOne({
+        companyId: companyObjectId,
+        isActive: true,
+      })
+      .lean();
+
+    const branchDocs = await this.branchModel
+      .find({ companyId: companyObjectId })
+      .select('_id')
+      .lean();
+    const branchIds = branchDocs.map((doc) => doc._id);
+
+    const [userCount, menuItemCount, customerCount, tableCount] =
+      await Promise.all([
+        this.userModel.countDocuments({ companyId: companyObjectId }),
+        this.menuItemModel.countDocuments({ companyId: companyObjectId }),
+        this.customerModel.countDocuments({ companyId: companyObjectId }),
+        branchIds.length
+          ? this.tableModel.countDocuments({ branchId: { $in: branchIds } })
+          : Promise.resolve(0),
+      ]);
+
+    if (!subscription) {
+      return {
+        branches: branchIds.length,
+        users: userCount,
+        tables: tableCount,
+        menuItems: menuItemCount,
+        customers: customerCount,
+        storageUsed: 0,
+        storageLimit: 0,
+      };
+    }
+
+    const usageUpdate = {
+      'usage.currentBranches': branchIds.length,
+      'usage.currentUsers': userCount,
+      'usage.currentMenuItems': menuItemCount,
+      'usage.currentCustomers': customerCount,
+      'usage.currentTables': tableCount,
+      'usage.lastUpdated': new Date(),
+    };
+
+    await this.subscriptionModel.updateOne(
+      { _id: subscription._id },
+      { $set: usageUpdate },
+    );
+
+    return {
+      branches: branchIds.length,
+      users: userCount,
+      tables: tableCount,
+      menuItems: menuItemCount,
+      customers: customerCount,
+      storageUsed: subscription.usage?.storageUsed ?? 0,
+      storageLimit: subscription.limits?.storageGB ?? 0,
+    };
   }
 
   // Upgrade/Downgrade subscription
@@ -207,7 +397,7 @@ export class SubscriptionsService {
     const subscription = await this.findById(id);
 
     const newPlan = await this.planModel.findOne({
-      plan: upgradeDto.newPlan,
+      name: upgradeDto.newPlan,
       isActive: true,
     });
 
@@ -215,57 +405,29 @@ export class SubscriptionsService {
       throw new BadRequestException('Invalid subscription plan');
     }
 
-    // @ts-ignore - Mongoose schema method
-    const newPrice = newPlan.getPriceForCycle(
-      upgradeDto.billingCycle || subscription.billingCycle,
-    );
-
-    // Calculate prorated amount if upgrading mid-cycle
-    const proratedAmount = await this.calculateProratedAmount(
+    const updated = await this.applyPlanChange(
       subscription,
-      newPrice,
+      newPlan,
+      upgradeDto.billingCycle,
     );
 
-    // Update Stripe subscription if active
-    if (
-      subscription.status === SubscriptionStatus.ACTIVE &&
-      subscription.stripeSubscriptionId
-    ) {
-      await this.stripeService.updateSubscription(
-        subscription.stripeSubscriptionId,
-        {
-          // @ts-ignore - Mongoose schema method
-          priceId: newPlan.getStripePriceId(
-            upgradeDto.billingCycle || subscription.billingCycle,
-          ),
-          prorationBehavior: 'create_prorations',
-        },
-      );
+    return this.composeSubscriptionResponse(updated);
+  }
+
+  async updatePlanById(
+    id: string,
+    planId: string,
+    billingCycle?: BillingCycle,
+  ) {
+    const subscription = await this.findById(id);
+    const plan = await this.planModel.findById(planId);
+
+    if (!plan || !plan.isActive) {
+      throw new BadRequestException('Invalid subscription plan');
     }
 
-    subscription.plan = upgradeDto.newPlan;
-    subscription.price = newPrice;
-    subscription.limits = {
-      maxBranches: newPlan.features.maxBranches,
-      maxUsers: newPlan.features.maxUsers,
-      maxMenuItems: newPlan.features.maxUsers * 10,
-      maxOrders: newPlan.features.maxUsers * 50,
-      maxTables: newPlan.features.maxBranches * 10,
-      maxCustomers: newPlan.features.maxUsers * 100,
-      aiInsightsEnabled: newPlan.features.aiInsights,
-      advancedReportsEnabled: newPlan.features.accounting,
-      multiLocationEnabled: newPlan.features.multiBranch,
-      apiAccessEnabled: newPlan.features.crm,
-      whitelabelEnabled: false,
-      customDomainEnabled: false,
-      prioritySupportEnabled: newPlan.features.aiInsights,
-    };
-
-    if (upgradeDto.billingCycle) {
-      subscription.billingCycle = upgradeDto.billingCycle;
-    }
-
-    return await subscription.save();
+    const updated = await this.applyPlanChange(subscription, plan, billingCycle);
+    return this.composeSubscriptionResponse(updated);
   }
 
   // Cancel subscription
@@ -535,7 +697,7 @@ export class SubscriptionsService {
 
   // Get billing history
   async getBillingHistory(
-    companyId: MongooseSchema.Types.ObjectId,
+    companyId: string | Types.ObjectId,
     filters?: {
       startDate?: Date;
       endDate?: Date;
@@ -544,7 +706,10 @@ export class SubscriptionsService {
       offset?: number;
     },
   ): Promise<{ history: BillingHistoryDocument[]; total: number }> {
-    const query: any = { companyId, isActive: true };
+    const query: any = {
+      companyId: this.toObjectId(companyId),
+      isActive: true,
+    };
 
     if (filters?.startDate || filters?.endDate) {
       query.billingDate = {};
@@ -652,8 +817,16 @@ export class SubscriptionsService {
       currentOrders: 0,
       currentTables: 0,
       currentCustomers: 0,
+      storageUsed: 0,
       lastUpdated: new Date(),
     };
+  }
+
+  private resolvePlanKey(planName?: string): SubscriptionPlan {
+    const normalized = (planName || '').toLowerCase();
+    const values = Object.values(SubscriptionPlan) as string[];
+    const match = values.find((value) => value === normalized);
+    return (match as SubscriptionPlan) || SubscriptionPlan.BASIC;
   }
 
   private calculatePeriodEnd(startDate: Date, cycle: BillingCycle): Date {

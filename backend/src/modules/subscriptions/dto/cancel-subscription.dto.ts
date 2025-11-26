@@ -8,5 +8,9 @@ export class CancelSubscriptionDto {
   @IsBoolean()
   @IsOptional()
   cancelImmediately?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  cancelAtPeriodEnd?: boolean;
 }
 

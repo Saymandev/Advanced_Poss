@@ -1,11 +1,12 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CustomerFilterDto } from '../../common/dto/pagination.dto';
+import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { Customer, CustomerDocument } from './schemas/customer.schema';
@@ -15,16 +16,24 @@ export class CustomersService {
   constructor(
     @InjectModel(Customer.name)
     private customerModel: Model<CustomerDocument>,
+    @InjectModel(POSOrder.name)
+    private posOrderModel: Model<POSOrderDocument>,
   ) {}
 
   async create(createCustomerDto: CreateCustomerDto): Promise<Customer> {
     // Check if customer already exists
+    const existingConditions: any[] = [
+      { email: createCustomerDto.email },
+    ];
+    
+    // Only check phone if provided
+    if (createCustomerDto.phone && createCustomerDto.phone.trim()) {
+      existingConditions.push({ phone: createCustomerDto.phone });
+    }
+    
     const existingCustomer = await this.customerModel.findOne({
       companyId: new Types.ObjectId(createCustomerDto.companyId),
-      $or: [
-        { email: createCustomerDto.email },
-        { phone: createCustomerDto.phone },
-      ],
+      $or: existingConditions,
     });
 
     if (existingCustomer) {
@@ -38,11 +47,27 @@ export class CustomersService {
       );
     }
 
-    const customer = new this.customerModel({
+    // Convert branchId to ObjectId if provided
+    const customerData: any = {
       ...createCustomerDto,
       loyaltyTier: 'bronze',
       loyaltyTierSince: new Date(),
-    });
+    };
+    
+    if (createCustomerDto.branchId && Types.ObjectId.isValid(createCustomerDto.branchId)) {
+      customerData.branchId = new Types.ObjectId(createCustomerDto.branchId);
+    }
+    
+    if (createCustomerDto.companyId && Types.ObjectId.isValid(createCustomerDto.companyId)) {
+      customerData.companyId = new Types.ObjectId(createCustomerDto.companyId);
+    }
+
+    // Normalize email to lowercase for consistent matching
+    if (customerData.email) {
+      customerData.email = customerData.email.toLowerCase().trim();
+    }
+
+    const customer = new this.customerModel(customerData);
 
     return customer.save();
   }
@@ -54,43 +79,98 @@ export class CustomersService {
       sortBy = 'createdAt', 
       sortOrder = 'desc',
       search,
+      companyId,
+      branchId,
       ...filters 
     } = filterDto;
     
     const skip = (page - 1) * limit;
-    const query: any = { ...filters };
-
-    // Add search functionality
-    if (search) {
+    const query: any = {};
+    
+    // Convert companyId to ObjectId if provided
+    if (companyId && Types.ObjectId.isValid(companyId)) {
+      query.companyId = new Types.ObjectId(companyId);
+    }
+    
+    // Build branchId filter - show customers for this branch OR customers without branchId (company-wide)
+    if (branchId && Types.ObjectId.isValid(branchId)) {
+      const branchObjectId = new Types.ObjectId(branchId);
+      // Use $or to match branchId OR null/undefined branchId
       query.$or = [
+        { branchId: branchObjectId },
+        { branchId: { $exists: false } },
+        { branchId: null }
+      ];
+    }
+
+    // Build search filter
+    if (search) {
+      const searchConditions = [
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } },
-        { address: { $regex: search, $options: 'i' } },
+        { 'address.street': { $regex: search, $options: 'i' } },
+        { 'address.city': { $regex: search, $options: 'i' } },
+        { 'address.state': { $regex: search, $options: 'i' } }
       ];
+      
+      // If we already have $or for branchId, combine with $and
+      if (query.$or) {
+        query.$and = [
+          { $or: query.$or },
+          { $or: searchConditions }
+        ];
+        delete query.$or;
+      } else {
+        query.$or = searchConditions;
+      }
     }
+    
+    // Log query for debugging
+    console.log('🔍 Customer findAll query:', JSON.stringify(query, null, 2));
 
     const sortOptions: any = {};
     sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-    const customers = await this.customerModel
-      .find(query)
-      .populate('companyId', 'name email')
-      .populate('branchId', 'name address')
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit)
-      .exec();
+    try {
+      // Debug logging
+      console.log('🔍 Customer findAll query:', JSON.stringify(query, null, 2));
+      
+      const customers = await this.customerModel
+        .find(query)
+        .populate('companyId', 'name email')
+        .populate('branchId', 'name address')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit)
+        .exec();
 
-    const total = await this.customerModel.countDocuments(query);
+      console.log('📊 Found customers:', customers.length);
+      if (customers.length > 0) {
+        console.log('📋 First customer:', {
+          id: customers[0]._id,
+          firstName: customers[0].firstName,
+          branchId: customers[0].branchId,
+          companyId: customers[0].companyId
+        });
+      }
 
-    return {
-      customers,
-      total,
-      page,
-      limit,
-    };
+      const total = await this.customerModel.countDocuments(query);
+
+      return {
+        customers,
+        total,
+        page,
+        limit,
+      };
+    } catch (error: any) {
+      console.error('Error fetching customers:', error);
+      console.error('Query that caused error:', JSON.stringify(query, null, 2));
+      throw new BadRequestException(
+        `Failed to fetch customers: ${error.message || 'Unknown error'}`
+      );
+    }
   }
 
   async findOrCreate(customerData: any): Promise<Customer> {
@@ -135,10 +215,18 @@ export class CustomersService {
   }
 
   async findByEmail(companyId: string, email: string): Promise<Customer | null> {
-    return this.customerModel.findOne({
+    if (!email) return null;
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log(`🔍 Searching for customer with email: "${normalizedEmail}" in company: ${companyId}`);
+    const customer = await this.customerModel.findOne({
       companyId: new Types.ObjectId(companyId),
-      email,
+      $or: [
+        { email: normalizedEmail },
+        { email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+      ],
     });
+    console.log(customer ? `✅ Found customer: ${customer.email} (ID: ${(customer as any)._id})` : `❌ No customer found for email: ${normalizedEmail}`);
+    return customer;
   }
 
   async findByPhone(companyId: string, phone: string): Promise<Customer | null> {
@@ -146,6 +234,59 @@ export class CustomersService {
       companyId: new Types.ObjectId(companyId),
       phone,
     });
+  }
+
+  async getCustomerOrders(customerId: string): Promise<{ orders: any[]; total: number }> {
+    if (!Types.ObjectId.isValid(customerId)) {
+      throw new BadRequestException('Invalid customer ID');
+    }
+
+    const customer = await this.customerModel.findById(customerId);
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    // Find orders by customer email from POS orders
+    if (!customer.email) {
+      return {
+        orders: [],
+        total: customer.totalOrders || 0,
+      };
+    }
+
+    try {
+      const orders = await this.posOrderModel
+        .find({
+          'customerInfo.email': customer.email.toLowerCase().trim(),
+          status: { $ne: 'cancelled' },
+        })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+
+      const formattedOrders = orders.map((order: any) => ({
+        id: order._id?.toString() || order.id,
+        orderNumber: order.orderNumber,
+        orderType: order.orderType,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        paymentMethod: order.paymentMethod,
+        createdAt: order.createdAt,
+        completedAt: order.completedAt,
+        items: order.items || [],
+      }));
+
+      return {
+        orders: formattedOrders,
+        total: formattedOrders.length,
+      };
+    } catch (error) {
+      console.error('Error fetching customer orders:', error);
+      return {
+        orders: [],
+        total: customer.totalOrders || 0,
+      };
+    }
   }
 
   async findByCompany(companyId: string): Promise<Customer[]> {
@@ -177,20 +318,44 @@ export class CustomersService {
       .exec();
   }
 
-  async search(companyId: string, query: string): Promise<Customer[]> {
-    return this.customerModel
-      .find({
-        companyId: new Types.ObjectId(companyId),
-        $or: [
-          { firstName: { $regex: query, $options: 'i' } },
-          { lastName: { $regex: query, $options: 'i' } },
-          { email: { $regex: query, $options: 'i' } },
-          { phone: { $regex: query, $options: 'i' } },
-        ],
-        isActive: true,
-      })
+  async search(companyId: string, query: string, branchId?: string): Promise<Customer[]> {
+    const searchQuery: any = {
+      companyId: new Types.ObjectId(companyId),
+      $or: [
+        { firstName: { $regex: query, $options: 'i' } },
+        { lastName: { $regex: query, $options: 'i' } },
+        { email: { $regex: query, $options: 'i' } },
+        { phone: { $regex: query, $options: 'i' } },
+      ],
+      isActive: true,
+    };
+
+    // If branchId is provided, show customers for this branch OR customers without branchId (company-wide)
+    if (branchId && Types.ObjectId.isValid(branchId)) {
+      const branchObjectId = new Types.ObjectId(branchId);
+      searchQuery.$and = [
+        { $or: searchQuery.$or },
+        {
+          $or: [
+            { branchId: branchObjectId },
+            { branchId: { $exists: false } },
+            { branchId: null }
+          ]
+        }
+      ];
+      delete searchQuery.$or;
+    }
+
+    console.log('🔍 Customer search query:', JSON.stringify(searchQuery, null, 2));
+
+    const customers = await this.customerModel
+      .find(searchQuery)
       .limit(20)
       .exec();
+
+    console.log('📊 Found customers in search:', customers.length);
+
+    return customers;
   }
 
   async update(
@@ -267,11 +432,19 @@ export class CustomersService {
       throw new BadRequestException('Invalid customer ID');
     }
 
+    console.log(`📊 Updating order stats for customer ID: ${id}, orderAmount: ${orderAmount}`);
+
     const customer = await this.customerModel.findById(id);
 
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
+
+    const oldStats = {
+      totalOrders: customer.totalOrders,
+      totalSpent: customer.totalSpent,
+      loyaltyPoints: customer.loyaltyPoints,
+    };
 
     customer.totalOrders += 1;
     customer.totalSpent += orderAmount;
@@ -295,7 +468,13 @@ export class CustomersService {
       customer.loyaltyTier = 'silver';
     }
 
-    return customer.save();
+    const savedCustomer = await customer.save();
+    
+    console.log(`✅ Customer stats updated:`);
+    console.log(`   Before: Orders=${oldStats.totalOrders}, Spent=$${oldStats.totalSpent}, Points=${oldStats.loyaltyPoints}`);
+    console.log(`   After:  Orders=${savedCustomer.totalOrders}, Spent=$${savedCustomer.totalSpent}, Points=${savedCustomer.loyaltyPoints}`);
+
+    return savedCustomer;
   }
 
   async makeVIP(id: string): Promise<Customer> {

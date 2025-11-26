@@ -8,6 +8,9 @@ export class Customer {
   @Prop({ type: Types.ObjectId, ref: 'Company', required: true })
   companyId: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'Branch' })
+  branchId?: Types.ObjectId;
+
   @Prop({ required: true, trim: true })
   firstName: string;
 
@@ -17,8 +20,8 @@ export class Customer {
   @Prop({ required: true })
   email: string;
 
-  @Prop({ required: true })
-  phone: string;
+  @Prop()
+  phone?: string;
 
   @Prop()
   avatar?: string;
@@ -131,10 +134,12 @@ export const CustomerSchema = SchemaFactory.createForClass(Customer);
 
 // Indexes
 CustomerSchema.index({ companyId: 1 });
+CustomerSchema.index({ branchId: 1 });
 CustomerSchema.index({ email: 1 });
 CustomerSchema.index({ phone: 1 });
 CustomerSchema.index({ companyId: 1, email: 1 }, { unique: true });
 CustomerSchema.index({ companyId: 1, phone: 1 });
+CustomerSchema.index({ companyId: 1, branchId: 1 });
 CustomerSchema.index({ loyaltyPoints: -1 });
 CustomerSchema.index({ totalSpent: -1 });
 CustomerSchema.index({ isVIP: 1 });

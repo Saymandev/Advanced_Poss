@@ -56,6 +56,37 @@ export class SubscriptionPlan {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: false })
+  isPopular?: boolean;
+
+  @Prop({
+    type: {
+      maxBranches: Number,
+      maxUsers: Number,
+      storageGB: Number,
+      maxTables: Number,
+      maxMenuItems: Number,
+      maxOrders: Number,
+      maxCustomers: Number,
+      whitelabelEnabled: Boolean,
+      customDomainEnabled: Boolean,
+      prioritySupportEnabled: Boolean,
+    },
+    default: {},
+  })
+  limits?: {
+    maxBranches?: number;
+    maxUsers?: number;
+    storageGB?: number;
+    maxTables?: number;
+    maxMenuItems?: number;
+    maxOrders?: number;
+    maxCustomers?: number;
+    whitelabelEnabled?: boolean;
+    customDomainEnabled?: boolean;
+    prioritySupportEnabled?: boolean;
+  };
+
   @Prop({ default: 0 })
   sortOrder: number; // For display ordering
 

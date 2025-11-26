@@ -1,9 +1,11 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { CustomersModule } from '../customers/customers.module';
 import { IngredientsModule } from '../ingredients/ingredients.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { TablesModule } from '../tables/tables.module';
+import { WebsocketsModule } from '../websockets/websockets.module';
 import { PDFGeneratorService } from './pdf-generator.service';
 import { POSController } from './pos.controller';
 import { POSService } from './pos.service';
@@ -25,8 +27,10 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
     ]),
     MenuItemsModule,
     IngredientsModule,
+    WebsocketsModule,
     forwardRef(() => TablesModule),
     forwardRef(() => KitchenModule),
+    forwardRef(() => CustomersModule),
   ],
   controllers: [POSController, PrinterManagementController],
   providers: [POSService, ReceiptService, PDFGeneratorService, PrinterService],

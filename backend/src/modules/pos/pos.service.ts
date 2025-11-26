@@ -1,10 +1,12 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { CustomersService } from '../customers/customers.service';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { KitchenService } from '../kitchen/kitchen.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { TablesService } from '../tables/tables.service';
+import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
 import { POSOrderFiltersDto, POSStatsFiltersDto } from './dto/pos-filters.dto';
 import { UpdatePOSSettingsDto } from './dto/pos-settings.dto';
@@ -24,10 +26,13 @@ export class POSService {
     private receiptService: ReceiptService,
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
+    private websocketsGateway: WebsocketsGateway,
     @Inject(forwardRef(() => TablesService))
     private tablesService: TablesService,
     @Inject(forwardRef(() => KitchenService))
     private kitchenService: KitchenService,
+    @Inject(forwardRef(() => CustomersService))
+    private customersService: CustomersService,
   ) {}
 
   // Generate unique order number
@@ -52,7 +57,7 @@ export class POSService {
   }
 
   // Create POS order
-  async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string): Promise<POSOrder> {
+  async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string, companyId?: string): Promise<POSOrder> {
     const baseOrderData: any = {
       ...createOrderDto,
       branchId: new Types.ObjectId(branchId),
@@ -75,6 +80,11 @@ export class POSService {
 
     if (createOrderDto.takeawayDetails) {
       baseOrderData.takeawayDetails = { ...createOrderDto.takeawayDetails };
+    }
+
+    // Include guestCount for dine-in orders (default to 1 if not provided)
+    if (createOrderDto.orderType === 'dine-in') {
+      baseOrderData.guestCount = createOrderDto.guestCount || 1;
     }
 
     const menuItemCache = new Map<string, any>();
@@ -218,6 +228,49 @@ export class POSService {
           console.error('Failed to create kitchen order:', kitchenError);
         }
 
+        // Update customer statistics if customer email is provided and order is paid
+        if (createOrderDto.customerInfo?.email && companyId && savedOrder.status === 'paid') {
+          try {
+            console.log(`📧 Attempting to update customer stats for email: ${createOrderDto.customerInfo.email}, companyId: ${companyId}, orderAmount: ${savedOrder.totalAmount}`);
+            const customer = await this.customersService.findByEmail(companyId, createOrderDto.customerInfo.email);
+            if (customer) {
+              const customerId = (customer as any)._id?.toString() || (customer as any).id?.toString();
+              if (customerId) {
+                console.log(`💰 Updating customer stats for customer ID: ${customerId}, amount: ${savedOrder.totalAmount}`);
+                await this.customersService.updateOrderStats(customerId, savedOrder.totalAmount);
+                console.log(`✅ Successfully updated customer stats for ${customer.email}: +${savedOrder.totalAmount}`);
+              } else {
+                console.error(`❌ Could not extract customer ID from customer object`);
+              }
+            } else {
+              console.warn(`⚠️ Customer not found for email: ${createOrderDto.customerInfo.email}`);
+            }
+          } catch (customerError) {
+            // Log error but don't fail order creation
+            console.error('❌ Failed to update customer statistics:', customerError);
+          }
+        } else {
+          if (!createOrderDto.customerInfo?.email) {
+            console.log('⚠️ No customer email provided in order');
+          }
+          if (!companyId) {
+            console.log('⚠️ No companyId provided');
+          }
+          if (savedOrder.status !== 'paid') {
+            console.log(`⚠️ Order status is "${savedOrder.status}", not "paid" - stats will be updated when payment is processed`);
+          }
+        }
+
+        // Notify via WebSocket: new order created
+        try {
+          this.websocketsGateway.notifyNewOrder(
+            branchId,
+            savedOrder.toObject ? savedOrder.toObject() : savedOrder,
+          );
+        } catch (wsError) {
+          console.error('Failed to emit WebSocket event:', wsError);
+        }
+
         return savedOrder;
       } catch (error: any) {
         lastError = error;
@@ -334,7 +387,26 @@ export class POSService {
       updateData.completedAt = new Date();
     }
 
-    return this.posOrderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+    const updatedOrder = await this.posOrderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+
+    // Notify via WebSocket: order updated
+    try {
+      this.websocketsGateway.notifyOrderUpdated(
+        order.branchId.toString(),
+        updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
+      );
+      
+      if (updateOrderDto.status) {
+        this.websocketsGateway.notifyOrderStatusChanged(
+          order.branchId.toString(),
+          updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
+        );
+      }
+    } catch (wsError) {
+      console.error('Failed to emit WebSocket event:', wsError);
+    }
+
+    return updatedOrder;
   }
 
   // Cancel POS order
@@ -348,7 +420,7 @@ export class POSService {
       throw new ConflictException('Cannot cancel a paid order');
     }
 
-    return this.posOrderModel.findByIdAndUpdate(
+    const cancelledOrder = await this.posOrderModel.findByIdAndUpdate(
       id,
       {
         status: 'cancelled',
@@ -358,10 +430,54 @@ export class POSService {
       },
       { new: true }
     ).exec();
+
+    // Free the table if it's a dine-in order and no other active orders exist on this table
+    if (order.tableId && order.orderType === 'dine-in') {
+      try {
+        // Check if there are any other active (pending or paid) orders on this table
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const otherActiveOrders = await this.posOrderModel.find({
+          tableId: order.tableId,
+          _id: { $ne: order._id }, // Exclude the current order being cancelled
+          createdAt: { $gte: today, $lt: tomorrow },
+          status: { $in: ['pending', 'paid'] },
+          orderType: 'dine-in',
+        }).countDocuments().exec();
+
+        // Only free the table if no other active orders exist
+        if (otherActiveOrders === 0) {
+          await this.tablesService.updateStatus(
+            order.tableId.toString(),
+            {
+              status: 'available',
+            },
+          );
+        }
+      } catch (tableError) {
+        // Log error but don't fail cancellation
+        console.error('Failed to free table after cancellation:', tableError);
+      }
+    }
+
+    // Notify via WebSocket: order cancelled
+    try {
+      this.websocketsGateway.notifyOrderStatusChanged(
+        order.branchId.toString(),
+        cancelledOrder.toObject ? cancelledOrder.toObject() : cancelledOrder,
+      );
+    } catch (wsError) {
+      console.error('Failed to emit WebSocket event:', wsError);
+    }
+
+    return cancelledOrder;
   }
 
   // Process payment
-  async processPayment(processPaymentDto: ProcessPaymentDto, userId: string, branchId: string): Promise<POSPayment> {
+  async processPayment(processPaymentDto: ProcessPaymentDto, userId: string, branchId: string, companyId?: string): Promise<POSPayment> {
     const order = await this.posOrderModel.findById(processPaymentDto.orderId).exec();
     if (!order) {
       throw new NotFoundException('POS order not found');
@@ -396,11 +512,57 @@ export class POSService {
     const savedPayment = await payment.save();
 
     // Update order status
-    await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
+    const updatedOrder = await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
       status: 'paid',
       paymentId: savedPayment._id,
       completedAt: new Date(),
-    }).exec();
+    }, { new: true }).exec();
+
+    // Update customer statistics if customer email is provided
+    if (order.customerInfo?.email && companyId) {
+      try {
+        console.log(`📧 Processing payment - attempting to update customer stats for email: ${order.customerInfo.email}, companyId: ${companyId}, orderAmount: ${order.totalAmount}`);
+        const customer = await this.customersService.findByEmail(companyId, order.customerInfo.email);
+        if (customer) {
+          const customerId = (customer as any)._id?.toString() || (customer as any).id?.toString();
+          if (customerId) {
+            console.log(`💰 Updating customer stats for customer ID: ${customerId}, amount: ${order.totalAmount}`);
+            await this.customersService.updateOrderStats(customerId, order.totalAmount);
+            console.log(`✅ Successfully updated customer stats for ${customer.email}: +${order.totalAmount}`);
+          } else {
+            console.error(`❌ Could not extract customer ID from customer object`);
+          }
+        } else {
+          console.warn(`⚠️ Customer not found for email: ${order.customerInfo.email}`);
+        }
+      } catch (customerError) {
+        // Log error but don't fail payment processing
+        console.error('❌ Failed to update customer statistics:', customerError);
+      }
+    } else {
+      if (!order.customerInfo?.email) {
+        console.log('⚠️ No customer email provided in order');
+      }
+      if (!companyId) {
+        console.log('⚠️ No companyId provided');
+      }
+    }
+
+    // Notify via WebSocket: payment received
+    try {
+      this.websocketsGateway.notifyPaymentReceived(
+        branchId,
+        updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
+        savedPayment.toObject ? savedPayment.toObject() : savedPayment,
+      );
+      
+      this.websocketsGateway.notifyOrderStatusChanged(
+        branchId,
+        updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
+      );
+    } catch (wsError) {
+      console.error('Failed to emit WebSocket event:', wsError);
+    }
 
     return savedPayment;
   }
@@ -775,15 +937,52 @@ export class POSService {
       branchId: new Types.ObjectId(branchId),
       createdAt: { $gte: today, $lt: tomorrow },
       status: { $in: ['pending', 'paid'] },
-    }).select('tableId').exec();
+      orderType: 'dine-in',
+    })
+    .populate('userId', 'firstName lastName name')
+    .select('tableId orderNumber totalAmount guestCount userId notes')
+    .exec();
 
-    const occupiedTableIds = activeOrders.map(order => order.tableId.toString());
+    // Group orders by table to calculate used seats
+    const ordersByTable = new Map<string, any[]>();
+    activeOrders.forEach(order => {
+      if (order.tableId) {
+        const tableId = order.tableId.toString();
+        if (!ordersByTable.has(tableId)) {
+          ordersByTable.set(tableId, []);
+        }
+        ordersByTable.get(tableId)!.push(order);
+      }
+    });
 
-    // Transform tables to include occupation status
+    // Transform tables to include occupation status and order details
     return allTables.map((table: any) => {
       const tableId = table._id?.toString() || table.id;
-      const isOccupied = occupiedTableIds.includes(tableId);
-      const currentOrder = activeOrders.find(order => order.tableId.toString() === tableId);
+      const tableOrders = ordersByTable.get(tableId) || [];
+      const isOccupied = tableOrders.length > 0;
+      
+      // Get the primary order (most recent pending order)
+      const primaryOrder = tableOrders.find((o: any) => o.status === 'pending') || tableOrders[0];
+      
+      // Calculate used seats from all active orders
+      const usedSeats = tableOrders.reduce((sum: number, order: any) => {
+        return sum + (order.guestCount || 0);
+      }, 0);
+      
+      const remainingSeats = Math.max(0, (table.capacity || 0) - usedSeats);
+      
+      // Extract waiter name from notes or userId
+      let waiterName = '';
+      if (primaryOrder) {
+        const notes = primaryOrder.notes || '';
+        const waiterMatch = notes.match(/Waiter:\s*(.+)/i);
+        if (waiterMatch) {
+          waiterName = waiterMatch[1].trim();
+        } else if (primaryOrder.userId) {
+          const user = primaryOrder.userId as any;
+          waiterName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || '';
+        }
+      }
 
       return {
         id: tableId,
@@ -791,8 +990,27 @@ export class POSService {
         tableNumber: table.tableNumber || table.number || '',
         capacity: table.capacity || 0,
         status: isOccupied ? 'occupied' : (table.status || 'available'),
-        currentOrderId: currentOrder?._id?.toString(),
+        currentOrderId: primaryOrder?._id?.toString(),
         location: table.location,
+        // Order details for occupied tables
+        orderDetails: primaryOrder ? {
+          currentOrderId: primaryOrder._id?.toString(),
+          orderNumber: primaryOrder.orderNumber,
+          tokenNumber: primaryOrder.orderNumber,
+          totalAmount: primaryOrder.totalAmount || 0,
+          waiterName: waiterName,
+          guestCount: primaryOrder.guestCount || 0,
+          holdCount: 0, // Placeholder - can be tracked later
+          usedSeats: usedSeats,
+          remainingSeats: remainingSeats,
+          allOrders: tableOrders.map((o: any) => ({
+            id: o._id?.toString(),
+            orderNumber: o.orderNumber,
+            totalAmount: o.totalAmount || 0,
+            guestCount: o.guestCount || 0,
+            status: o.status,
+          })),
+        } : null,
       };
     });
   }
@@ -803,6 +1021,7 @@ export class POSService {
       // Build query filters - pass as strings, not ObjectIds
       const queryFilters: any = {
         branchId: filters.branchId ? filters.branchId.toString() : undefined,
+        companyId: filters.companyId ? filters.companyId.toString() : undefined,
         categoryId: filters.categoryId ? filters.categoryId.toString() : undefined,
         search: filters.search,
         isAvailable: filters.isAvailable !== undefined ? filters.isAvailable : true,

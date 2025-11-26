@@ -101,6 +101,9 @@ export class Expense {
 
   @Prop([String])
   tags?: string[];
+
+  @Prop({ type: Types.ObjectId, ref: 'PurchaseOrder' })
+  purchaseOrderId?: Types.ObjectId;
 }
 
 export const ExpenseSchema = SchemaFactory.createForClass(Expense);

@@ -6,6 +6,7 @@ export type SubscriptionDocument = Subscription & Document;
 export enum SubscriptionPlan {
   FREE = 'free',
   BASIC = 'basic',
+  PREMIUM = 'premium',
   PROFESSIONAL = 'professional',
   ENTERPRISE = 'enterprise',
 }
@@ -39,6 +40,7 @@ export interface SubscriptionLimits {
   whitelabelEnabled: boolean;
   customDomainEnabled: boolean;
   prioritySupportEnabled: boolean;
+  storageGB?: number;
 }
 
 export interface UsageMetrics {
@@ -48,6 +50,7 @@ export interface UsageMetrics {
   currentOrders: number; // Current billing period
   currentTables: number;
   currentCustomers: number;
+  storageUsed?: number;
   lastUpdated: Date;
 }
 

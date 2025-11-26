@@ -30,54 +30,159 @@ export class SuppliersService {
       );
     }
 
-    const supplier = new this.supplierModel(createSupplierDto);
-    return supplier.save();
+    // Ensure companyId is converted to ObjectId
+    const supplierData = {
+      ...createSupplierDto,
+      companyId: new Types.ObjectId(createSupplierDto.companyId),
+    };
+
+    const supplier = new this.supplierModel(supplierData);
+    const savedSupplier = await supplier.save();
+    
+    // Convert to plain object to ensure proper serialization
+    return savedSupplier.toObject ? savedSupplier.toObject() : savedSupplier;
   }
 
-  async findAll(filterDto: SupplierFilterDto): Promise<{ suppliers: Supplier[], total: number, page: number, limit: number }> {
+  async findAll(filterDto: SupplierFilterDto & { isActive?: boolean; rating?: number }): Promise<{ suppliers: Supplier[], total: number, page: number, limit: number }> {
     const { 
       page = 1, 
       limit = 20, 
       sortBy = 'createdAt', 
       sortOrder = 'desc',
       search,
+      companyId,
+      type,
+      status,
+      isActive,
+      rating,
       ...filters 
     } = filterDto;
     
     const skip = (page - 1) * limit;
-    const query: any = { ...filters };
+    const query: any = {};
+    
+    // Convert companyId to ObjectId if provided
+    // IMPORTANT: If companyId is not provided, we should not filter by it
+    // This allows fetching all suppliers when companyId is not specified
+    if (companyId) {
+      if (Types.ObjectId.isValid(companyId)) {
+        query.companyId = new Types.ObjectId(companyId);
+      } else {
+        // If companyId is provided but invalid, return empty results
+        return {
+          suppliers: [],
+          total: 0,
+          page,
+          limit,
+        };
+      }
+    }
+    
+    // Add other filters
+    if (type) {
+      query.type = type;
+    }
+    
+    // Handle isActive filter (prefer boolean over status string)
+    if (isActive !== undefined) {
+      query.isActive = isActive;
+    } else if (status) {
+      if (status === 'active' || status === 'true') {
+        query.isActive = true;
+      } else if (status === 'inactive' || status === 'false') {
+        query.isActive = false;
+      }
+    }
+    
+    // Handle rating filter
+    if (rating !== undefined) {
+      query.rating = rating;
+    }
 
     // Add search functionality
+    // Note: When using $or with other query conditions, we need to combine them properly
     if (search) {
-      query.$or = [
+      const searchConditions = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { contactPerson: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search, $options: 'i' } },
+        ],
+      };
+      
+      // If we have other query conditions, combine them with $and
+      if (Object.keys(query).length > 0) {
+        query.$and = [
+          { ...query },
+          searchConditions,
+        ];
+        // Remove $or from top level if it exists
+        delete query.$or;
+      } else {
+        Object.assign(query, searchConditions);
+      }
+    }
+
+    console.log('🔍 SuppliersService.findAll query:', JSON.stringify(query, null, 2));
+    console.log('🔍 SuppliersService.findAll filters:', { page, limit, sortBy, sortOrder, search, companyId });
+    if (search) {
+      const searchConditions = [
         { name: { $regex: search, $options: 'i' } },
         { contactPerson: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } },
-        { address: { $regex: search, $options: 'i' } },
+        { 'address.street': { $regex: search, $options: 'i' } },
+        { 'address.city': { $regex: search, $options: 'i' } },
+        { 'address.state': { $regex: search, $options: 'i' } },
         { type: { $regex: search, $options: 'i' } },
       ];
+      
+      // If we have other query conditions, combine with $and
+      if (Object.keys(query).length > 0) {
+        query.$and = [
+          ...(query.$and || []),
+          { $or: searchConditions }
+        ];
+        // Remove $or if it was set directly
+        delete query.$or;
+      } else {
+        query.$or = searchConditions;
+      }
     }
 
     const sortOptions: any = {};
     sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-    const suppliers = await this.supplierModel
-      .find(query)
-      .populate('companyId', 'name email')
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit)
-      .exec();
+    try {
+      console.log('Suppliers Query:', JSON.stringify(query, null, 2));
+      
+      const suppliers = await this.supplierModel
+        .find(query)
+        .populate('companyId', 'name email')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit)
+        .lean() // Use lean() to get plain JavaScript objects instead of Mongoose documents
+        .exec();
 
-    const total = await this.supplierModel.countDocuments(query);
+      const total = await this.supplierModel.countDocuments(query);
 
-    return {
-      suppliers,
-      total,
-      page,
-      limit,
-    };
+      console.log(`Found ${suppliers.length} suppliers out of ${total} total for companyId: ${companyId}`);
+
+      return {
+        suppliers,
+        total,
+        page,
+        limit,
+      };
+    } catch (error: any) {
+      console.error('Error fetching suppliers:', error);
+      console.error('Query that caused error:', JSON.stringify(query, null, 2));
+      throw new BadRequestException(
+        `Failed to fetch suppliers: ${error.message || 'Unknown error'}`
+      );
+    }
   }
 
   async findOne(id: string): Promise<Supplier> {

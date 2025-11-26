@@ -1,22 +1,26 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { MenuItemFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
-import { MenuItemFilterDto } from '../../common/dto/pagination.dto';
 import { MenuItemsService } from './menu-items.service';
 
 @ApiTags('Menu')
@@ -24,7 +28,40 @@ import { MenuItemsService } from './menu-items.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('menu-items')
 export class MenuItemsController {
-  constructor(private readonly menuItemsService: MenuItemsService) {}
+  constructor(
+    private readonly menuItemsService: MenuItemsService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
+
+  @Post('upload-images')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Upload images for menu items to Cloudinary' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('images', 10)) // Allow up to 10 images
+  async uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files || files.length === 0) {
+      throw new Error('No files uploaded');
+    }
+
+    try {
+      const uploadPromises = files.map((file) =>
+        this.cloudinaryService.uploadImage(file.buffer, 'menu-items'),
+      );
+      const results = await Promise.all(uploadPromises);
+
+      return {
+        success: true,
+        images: results.map((result) => ({
+          url: result.secure_url,
+          publicId: result.public_id,
+          width: result.width,
+          height: result.height,
+        })),
+      };
+    } catch (error) {
+      throw new Error(`Failed to upload images: ${error.message}`);
+    }
+  }
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)

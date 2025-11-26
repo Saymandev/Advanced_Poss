@@ -188,5 +188,15 @@ export class ReportsController {
     return this.reportsService.getLowStockItems(companyId);
   }
 
+  @Get('due-settlements')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get due settlements (pending payments)' })
+  getDueSettlements(
+    @Query('branchId') branchId?: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    return this.reportsService.getDueSettlements(branchId, companyId);
+  }
+
 }
 

@@ -17,6 +17,11 @@ export class CreateCustomerDto {
   @IsNotEmpty()
   companyId: string;
 
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439012' })
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
   @ApiProperty({ example: 'John' })
   @IsString()
   @IsNotEmpty()
@@ -32,10 +37,10 @@ export class CreateCustomerDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ example: '+1234567890' })
+  @ApiPropertyOptional({ example: '+1234567890' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  phone: string;
+  phone?: string;
 
   @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
   @IsOptional()

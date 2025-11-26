@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { CategoriesModule } from '../categories/categories.module';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { MenuItemsController } from './menu-items.controller';
 import { MenuItemsService } from './menu-items.service';
 import { MenuItem, MenuItemSchema } from './schemas/menu-item.schema';
@@ -10,10 +10,9 @@ import { MenuItem, MenuItemSchema } from './schemas/menu-item.schema';
     MongooseModule.forFeature([
       { name: MenuItem.name, schema: MenuItemSchema },
     ]),
-    CategoriesModule,
   ],
   controllers: [MenuItemsController],
-  providers: [MenuItemsService],
+  providers: [MenuItemsService, CloudinaryService],
   exports: [MenuItemsService],
 })
 export class MenuItemsModule {}

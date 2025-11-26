@@ -129,5 +129,10 @@ export class CreateExpenseDto {
   @IsOptional()
   @IsArray()
   tags?: string[];
+
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439015' })
+  @IsOptional()
+  @IsString()
+  purchaseOrderId?: string;
 }
 

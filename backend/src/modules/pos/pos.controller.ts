@@ -1,18 +1,18 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-  Request,
-  Res,
-  UseGuards
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    Patch,
+    Post,
+    Put,
+    Query,
+    Request,
+    Res,
+    UseGuards
 } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -37,7 +37,8 @@ export class POSController {
   @Post('orders')
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
   async createOrder(@Body() createOrderDto: CreatePOSOrderDto, @Request() req) {
-    return this.posService.createOrder(createOrderDto, req.user.id, req.user.branchId);
+    const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
+    return this.posService.createOrder(createOrderDto, req.user.id, req.user.branchId, companyId);
   }
 
   @Get('orders')
@@ -73,7 +74,8 @@ export class POSController {
   @Post('payments')
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
   async processPayment(@Body() processPaymentDto: ProcessPaymentDto, @Request() req) {
-    return this.posService.processPayment(processPaymentDto, req.user.id, req.user.branchId);
+    const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
+    return this.posService.processPayment(processPaymentDto, req.user.id, req.user.branchId, companyId);
   }
 
   // Statistics
@@ -104,7 +106,11 @@ export class POSController {
   @Get('menu-items')
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
   async getPOSMenuItems(@Query() filters: any, @Request() req) {
-    return this.posService.getPOSMenuItems({ ...filters, branchId: req.user.branchId });
+    return this.posService.getPOSMenuItems({ 
+      ...filters, 
+      branchId: req.user.branchId,
+      companyId: req.user.companyId || req.user.company?._id || req.user.company?.id,
+    });
   }
 
   // Settings

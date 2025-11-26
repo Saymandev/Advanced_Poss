@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BranchesModule } from '../branches/branches.module';
+import { WebsocketsModule } from '../websockets/websockets.module';
 import { Table, TableSchema } from './schemas/table.schema';
 import { TablesController } from './tables.controller';
 import { TablesService } from './tables.service';
@@ -9,6 +10,7 @@ import { TablesService } from './tables.service';
   imports: [
     MongooseModule.forFeature([{ name: Table.name, schema: TableSchema }]),
     BranchesModule,
+    forwardRef(() => WebsocketsModule),
   ],
   controllers: [TablesController],
   providers: [TablesService],

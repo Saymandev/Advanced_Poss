@@ -30,7 +30,39 @@ export class MenuItemsService {
       );
     }
 
-    const menuItem = new this.menuItemModel(createMenuItemDto);
+    // Convert string IDs to ObjectIds to ensure proper MongoDB storage and querying
+    const menuItemData: any = { ...createMenuItemDto };
+    
+    if (menuItemData.companyId && typeof menuItemData.companyId === 'string') {
+      menuItemData.companyId = new Types.ObjectId(menuItemData.companyId);
+    }
+    
+    if (menuItemData.branchId && typeof menuItemData.branchId === 'string') {
+      menuItemData.branchId = new Types.ObjectId(menuItemData.branchId);
+    }
+    
+    if (menuItemData.categoryId && typeof menuItemData.categoryId === 'string') {
+      menuItemData.categoryId = new Types.ObjectId(menuItemData.categoryId);
+    }
+
+    // Convert ingredient IDs to ObjectIds
+    if (menuItemData.ingredients && Array.isArray(menuItemData.ingredients)) {
+      menuItemData.ingredients = menuItemData.ingredients.map((ing: any) => ({
+        ...ing,
+        ingredientId:
+          ing.ingredientId && typeof ing.ingredientId === 'string'
+            ? new Types.ObjectId(ing.ingredientId)
+            : ing.ingredientId,
+      }));
+
+      // If ingredients are defined but trackInventory was not explicitly set to false,
+      // default trackInventory to true so stock is tracked automatically.
+      if (menuItemData.trackInventory === undefined) {
+        menuItemData.trackInventory = true;
+      }
+    }
+
+    const menuItem = new this.menuItemModel(menuItemData);
     return menuItem.save();
   }
 
@@ -48,28 +80,90 @@ export class MenuItemsService {
     const query: any = { ...filters };
 
     // Convert string IDs to ObjectIds for proper MongoDB querying
-    if (query.branchId && typeof query.branchId === 'string') {
-      query.branchId = new Types.ObjectId(query.branchId);
-    }
     if (query.categoryId && typeof query.categoryId === 'string') {
       query.categoryId = new Types.ObjectId(query.categoryId);
     }
-    if (query.companyId && typeof query.companyId === 'string') {
-      query.companyId = new Types.ObjectId(query.companyId);
+    
+    // Convert companyId to ObjectId FIRST (before branchId handling)
+    let companyIdObjectId: Types.ObjectId | undefined;
+    if (query.companyId) {
+      companyIdObjectId = typeof query.companyId === 'string' 
+        ? new Types.ObjectId(query.companyId) 
+        : query.companyId;
+      query.companyId = companyIdObjectId;
     }
 
-    // Add search functionality
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } },
-        { 'category.name': { $regex: search, $options: 'i' } },
+    // Handle branchId: when provided, include both branch-specific AND company-wide items (branchId: null)
+    // IMPORTANT: This ensures each branch sees:
+    // 1. Items created specifically for that branch (branchId matches)
+    // 2. Company-wide items (branchId: null) - available to all branches
+    // 3. Items from OTHER branches are NOT shown (they have different branchId)
+    // This matches the findByBranch logic to ensure consistency
+    
+    if (query.branchId) {
+      const branchIdObjectId = typeof query.branchId === 'string' 
+        ? new Types.ObjectId(query.branchId) 
+        : query.branchId;
+      
+      // Remove branchId from query (we'll add it back in $or)
+      delete query.branchId;
+      
+      // Build branch filter: include items for this branch OR company-wide items
+      // Ensure companyId is applied to both conditions in $or
+      const branchConditions: any[] = [
+        { branchId: branchIdObjectId }, // Items for this specific branch
+        { branchId: null }, // Company-wide items (available to all branches)
       ];
+      
+      // Apply companyId to both conditions if provided
+      if (companyIdObjectId) {
+        branchConditions[0].companyId = companyIdObjectId;
+        branchConditions[1].companyId = companyIdObjectId;
+        // Remove companyId from top level since it's now in $or conditions
+        delete query.companyId;
+      }
+      
+      query.$or = branchConditions;
+    }
+
+    // Build search conditions if provided
+    if (search) {
+      const searchConditions = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { tags: { $regex: search, $options: 'i' } },
+          { 'category.name': { $regex: search, $options: 'i' } },
+        ],
+      };
+      
+      // If we already have $or (from branchId), combine with $and
+      if (query.$or) {
+        query.$and = [
+          { $or: query.$or },
+          searchConditions,
+        ];
+        delete query.$or;
+      } else {
+        Object.assign(query, searchConditions);
+      }
     }
 
     const sortOptions: any = {};
     sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Debug logging to help troubleshoot
+    // Note: JSON.stringify converts ObjectIds to strings, but the actual query uses ObjectIds
+    console.log('🔍 MenuItemsService.findAll query:', JSON.stringify(query, null, 2));
+    console.log('🔍 MenuItemsService.findAll filters:', { page, limit, sortBy, sortOrder, search });
+    
+    // Log actual ObjectId types for debugging
+    if (query.$or && Array.isArray(query.$or)) {
+      console.log('🔍 $or conditions:', query.$or.map((cond: any) => ({
+        branchId: cond.branchId?.toString?.() || cond.branchId,
+        companyId: cond.companyId?.toString?.() || cond.companyId,
+      })));
+    }
 
     const menuItems = await this.menuItemModel
       .find(query)
@@ -79,6 +173,14 @@ export class MenuItemsService {
       .skip(skip)
       .limit(limit)
       .exec();
+
+    console.log(`✅ MenuItemsService.findAll found ${menuItems.length} items`);
+    
+    // Debug: Log the names of found items to verify new items are included
+    if (menuItems.length > 0) {
+      const itemNames = menuItems.map((item: any) => item.name).slice(0, 5);
+      console.log(`📋 First ${Math.min(5, menuItems.length)} items:`, itemNames.join(', '));
+    }
 
     const total = await this.menuItemModel.countDocuments(query);
 
@@ -171,6 +273,23 @@ export class MenuItemsService {
     }
     if (updateData.companyId && typeof updateData.companyId === 'string') {
       updateData.companyId = new Types.ObjectId(updateData.companyId);
+    }
+
+    // Normalize ingredients array and ensure ingredientId is an ObjectId
+    if (Array.isArray(updateData.ingredients)) {
+      updateData.ingredients = updateData.ingredients.map((ing: any) => ({
+        ...ing,
+        ingredientId:
+          ing.ingredientId && typeof ing.ingredientId === 'string'
+            ? new Types.ObjectId(ing.ingredientId)
+            : ing.ingredientId,
+      }));
+
+      // If ingredients are present and trackInventory not explicitly set,
+      // default it to true so stock is tracked.
+      if (updateData.trackInventory === undefined) {
+        updateData.trackInventory = updateData.ingredients.length > 0;
+      }
     }
 
     const menuItem = await this.menuItemModel

@@ -1,10 +1,11 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { BranchFilterDto } from '../../common/dto/pagination.dto';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { CompaniesService } from '../companies/companies.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
@@ -86,12 +87,55 @@ export class BranchesService {
     return branch.save();
   }
 
-  async findAll(filter: any = {}): Promise<Branch[]> {
-    return this.branchModel
-      .find(filter)
-      .populate('companyId', 'name email')
-      .populate('managerId', 'firstName lastName email')
-      .exec();
+  async findAll(
+    filter: BranchFilterDto,
+  ): Promise<{ branches: Branch[]; total: number; page: number; limit: number }> {
+    const query: Record<string, any> = {};
+
+    if (filter.companyId) {
+      query.companyId = filter.companyId;
+    }
+
+    if (filter.status === 'active') {
+      query.isActive = true;
+    } else if (filter.status === 'inactive') {
+      query.isActive = false;
+    }
+
+    if (filter.search) {
+      const searchRegex = new RegExp(filter.search, 'i');
+      query.$or = [
+        { name: searchRegex },
+        { code: searchRegex },
+        { 'address.street': searchRegex },
+        { 'address.city': searchRegex },
+        { 'address.state': searchRegex },
+      ];
+    }
+
+    const page = filter.page && filter.page > 0 ? filter.page : 1;
+    const limit =
+      filter.limit && filter.limit > 0 ? Math.min(filter.limit, 100) : 20;
+    const skip = (page - 1) * limit;
+
+    const [branches, total] = await Promise.all([
+      this.branchModel
+        .find(query)
+        .populate('companyId', 'name email')
+        .populate('managerId', 'firstName lastName email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      this.branchModel.countDocuments(query),
+    ]);
+
+    return {
+      branches: branches as any,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<Branch> {
@@ -187,6 +231,21 @@ export class BranchesService {
     if (!branch) {
       throw new NotFoundException('Branch not found');
     }
+  }
+
+  async toggleStatus(id: string): Promise<Branch> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid branch ID');
+    }
+
+    const branch = await this.branchModel.findById(id);
+
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    branch.isActive = !branch.isActive;
+    return branch.save();
   }
 
   async remove(id: string): Promise<void> {

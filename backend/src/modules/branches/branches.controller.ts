@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { BranchFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -34,9 +35,7 @@ export class BranchesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all branches' })
-  findAll(@Query('companyId') companyId?: string) {
-    const filter: any = {};
-    if (companyId) filter.companyId = companyId;
+  findAll(@Query() filter: BranchFilterDto) {
     return this.branchesService.findAll(filter);
   }
 
@@ -64,6 +63,13 @@ export class BranchesController {
   @ApiOperation({ summary: 'Update branch' })
   update(@Param('id') id: string, @Body() updateBranchDto: UpdateBranchDto) {
     return this.branchesService.update(id, updateBranchDto);
+  }
+
+  @Patch(':id/toggle-status')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Toggle branch status' })
+  toggleStatus(@Param('id') id: string) {
+    return this.branchesService.toggleStatus(id);
   }
 
   @Patch(':id/settings')

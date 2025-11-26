@@ -54,8 +54,11 @@ export class CategoriesController {
 
   @Get('branch/:branchId')
   @ApiOperation({ summary: 'Get categories by branch' })
-  findByBranch(@Param('branchId') branchId: string) {
-    return this.categoriesService.findByBranch(branchId);
+  findByBranch(
+    @Param('branchId') branchId: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    return this.categoriesService.findByBranch(branchId, companyId);
   }
 
   @Get(':id')
@@ -72,6 +75,13 @@ export class CategoriesController {
     @Body() updateCategoryDto: UpdateCategoryDto,
   ) {
     return this.categoriesService.update(id, updateCategoryDto);
+  }
+
+  @Patch(':id/toggle-status')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Toggle category active status' })
+  toggleStatus(@Param('id') id: string) {
+    return this.categoriesService.toggleStatus(id);
   }
 
   @Patch(':id/sort-order')

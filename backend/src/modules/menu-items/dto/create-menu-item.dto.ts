@@ -83,6 +83,29 @@ export class CreateMenuItemDto {
     isAvailable: boolean;
   }>;
 
+  @ApiPropertyOptional({
+    example: [
+      {
+        name: 'Toppings',
+        type: 'multi',
+        options: [
+          { name: 'Extra Cheese', price: 2.00 },
+          { name: 'Bacon', price: 3.00 },
+        ],
+      },
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  selections?: Array<{
+    name: string;
+    type: 'single' | 'multi' | 'optional';
+    options: Array<{
+      name: string;
+      price: number;
+    }>;
+  }>;
+
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @IsBoolean()

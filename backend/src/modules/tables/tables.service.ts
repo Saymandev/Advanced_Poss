@@ -1,12 +1,13 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as QRCode from 'qrcode';
 import { GeneratorUtil } from '../../common/utils/generator.util';
+import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateTableDto } from './dto/create-table.dto';
 import { ReserveTableDto } from './dto/reserve-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
@@ -18,6 +19,7 @@ export class TablesService {
   constructor(
     @InjectModel(Table.name)
     private tableModel: Model<TableDocument>,
+    private websocketsGateway: WebsocketsGateway,
   ) {}
 
   async create(createTableDto: CreateTableDto): Promise<Table> {
@@ -158,6 +160,16 @@ export class TablesService {
       throw new BadRequestException('Invalid table ID');
     }
 
+    // Get the table first to extract branchId before population
+    const existingTable = await this.tableModel.findById(id).exec();
+    if (!existingTable) {
+      throw new NotFoundException('Table not found');
+    }
+
+    // Store branchId before population
+    const branchIdForSocket = existingTable.branchId?.toString() || 
+                               (existingTable.branchId as any)?._id?.toString();
+
     const updateData: any = {
       status: updateStatusDto.status,
     };
@@ -184,6 +196,30 @@ export class TablesService {
 
     if (!table) {
       throw new NotFoundException('Table not found');
+    }
+
+    // Notify via WebSocket: table status changed
+    try {
+      if (branchIdForSocket) {
+        const tableObj = table.toObject ? table.toObject() : table;
+        // Ensure id field exists for socket event
+        if (!tableObj.id && tableObj._id) {
+          tableObj.id = tableObj._id.toString();
+        }
+        
+        console.log(`📢 Emitting table:status-changed for table ${tableObj.id || tableObj._id} in branch ${branchIdForSocket}, status: ${tableObj.status}`);
+        
+        this.websocketsGateway.notifyTableStatusChanged(
+          branchIdForSocket,
+          tableObj,
+        );
+      } else {
+        console.warn('⚠️ Cannot emit table status change: branchId not found', { 
+          tableId: table._id || table.id 
+        });
+      }
+    } catch (wsError) {
+      console.error('❌ Failed to emit WebSocket event:', wsError);
     }
 
     return table;

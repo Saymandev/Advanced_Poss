@@ -1,15 +1,18 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { PurchaseOrderFilterDto } from '../../common/dto/pagination.dto';
 import { PurchaseOrderStatus } from '../../common/enums/purchase-order-status.enum';
+import { ExpensesService } from '../expenses/expenses.service';
 import {
-    Ingredient,
-    IngredientDocument,
+  Ingredient,
+  IngredientDocument,
 } from '../ingredients/schemas/ingredient.schema';
 import { Supplier, SupplierDocument } from '../suppliers/schemas/supplier.schema';
 import { ApprovePurchaseOrderDto } from './dto/approve-purchase-order.dto';
@@ -18,8 +21,8 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import {
-    PurchaseOrder,
-    PurchaseOrderDocument,
+  PurchaseOrder,
+  PurchaseOrderDocument,
 } from './schemas/purchase-order.schema';
 
 @Injectable()
@@ -31,6 +34,8 @@ export class PurchaseOrdersService {
     private readonly supplierModel: Model<SupplierDocument>,
     @InjectModel(Ingredient.name)
     private readonly ingredientModel: Model<IngredientDocument>,
+    @Inject(forwardRef(() => ExpensesService))
+    private readonly expensesService: ExpensesService,
   ) {}
 
   private generateOrderNumber(date = new Date()): string {
@@ -348,6 +353,55 @@ export class PurchaseOrdersService {
     if (fullyReceived) {
       order.status = PurchaseOrderStatus.RECEIVED;
       order.actualDeliveryDate = new Date();
+      
+      // Automatically create an expense entry when purchase order is fully received
+      try {
+        const supplier = await this.supplierModel.findById(order.supplierId).lean();
+        const receivedAmount = order.items.reduce((sum, item) => {
+          const receivedQty = item.receivedQuantity || item.quantity;
+          return sum + (receivedQty * item.unitPrice);
+        }, 0);
+
+        const expenseData = {
+          companyId: order.companyId.toString(),
+          branchId: order.branchId?.toString() || order.companyId.toString(), // Use companyId as fallback if no branchId
+          title: `Purchase Order ${order.orderNumber}`,
+          description: `Purchase order received from ${supplier?.name || 'Supplier'}. Items: ${order.items.map(i => `${i.ingredientName} (${i.receivedQuantity || i.quantity} ${i.unit})`).join(', ')}`,
+          amount: receivedAmount,
+          category: 'ingredient', // Purchase orders are typically for ingredients
+          date: new Date().toISOString().split('T')[0],
+          paymentMethod: 'other', // Default, can be updated later
+          vendorName: supplier?.name,
+          invoiceNumber: order.orderNumber,
+          supplierId: order.supplierId.toString(),
+          notes: `Auto-created from Purchase Order ${order.orderNumber}. ${order.notes || ''}`,
+          createdBy: order.approvedBy?.toString() || order.companyId.toString(), // Use approvedBy if available, otherwise companyId
+          isRecurring: false,
+          purchaseOrderId: order._id.toString(), // Link expense to purchase order
+        };
+
+        console.log('📝 Creating expense from purchase order:', {
+          orderNumber: order.orderNumber,
+          amount: receivedAmount,
+          branchId: expenseData.branchId,
+          companyId: expenseData.companyId,
+        });
+
+        const createdExpense = await this.expensesService.create(expenseData);
+        console.log('✅ Expense created successfully:', {
+          expenseNumber: (createdExpense as any).expenseNumber,
+          id: (createdExpense as any)._id?.toString() || (createdExpense as any).id,
+          amount: createdExpense.amount,
+        });
+      } catch (expenseError: any) {
+        // Log error but don't fail the receive operation
+        console.error('❌ Failed to create expense from purchase order:', {
+          error: expenseError?.message || expenseError,
+          stack: expenseError?.stack,
+          orderNumber: order.orderNumber,
+          orderId: order._id.toString(),
+        });
+      }
     } else {
       order.status = PurchaseOrderStatus.ORDERED;
     }

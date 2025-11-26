@@ -30,10 +30,11 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { POSModule } from './modules/pos/pos.module';
 import { PublicModule } from './modules/public/public.module';
-import { QRCodesModule } from './modules/qr-codes/qr-codes.module';
 import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
+import { QRCodesModule } from './modules/qr-codes/qr-codes.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
@@ -130,6 +131,7 @@ import { AppService } from './app.service';
     SubscriptionPlansModule,
     BackupsModule,
     ReportsModule,
+    SettingsModule,
     QRCodesModule,
     ScheduleModule,
     KitchenModule,

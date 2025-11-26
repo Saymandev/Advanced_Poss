@@ -59,6 +59,35 @@ export class CreateSubscriptionPlanDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isPopular?: boolean;
+
+  @ApiPropertyOptional({
+    example: {
+      maxBranches: 5,
+      maxUsers: 25,
+      storageGB: 25,
+      maxTables: 50,
+      maxMenuItems: 500,
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  limits?: {
+    maxBranches?: number;
+    maxUsers?: number;
+    storageGB?: number;
+    maxTables?: number;
+    maxMenuItems?: number;
+    maxOrders?: number;
+    maxCustomers?: number;
+    whitelabelEnabled?: boolean;
+    customDomainEnabled?: boolean;
+    prioritySupportEnabled?: boolean;
+  };
+
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
   @IsNumber()
@@ -136,6 +165,33 @@ export class UpdateSubscriptionPlanDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isPopular?: boolean;
+
+  @ApiPropertyOptional({
+    example: {
+      maxBranches: 10,
+      maxUsers: 50,
+      storageGB: 50,
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  limits?: {
+    maxBranches?: number;
+    maxUsers?: number;
+    storageGB?: number;
+    maxTables?: number;
+    maxMenuItems?: number;
+    maxOrders?: number;
+    maxCustomers?: number;
+    whitelabelEnabled?: boolean;
+    customDomainEnabled?: boolean;
+    prioritySupportEnabled?: boolean;
+  };
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()

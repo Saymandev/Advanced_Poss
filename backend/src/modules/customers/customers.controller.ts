@@ -49,8 +49,9 @@ export class CustomersController {
   search(
     @Query('companyId') companyId: string,
     @Query('q') query: string,
+    @Query('branchId') branchId?: string,
   ) {
-    return this.customersService.search(companyId, query);
+    return this.customersService.search(companyId, query, branchId);
   }
 
   @Get('company/:companyId')
@@ -85,6 +86,12 @@ export class CustomersController {
   @ApiOperation({ summary: 'Get customer by ID' })
   findOne(@Param('id') id: string) {
     return this.customersService.findOne(id);
+  }
+
+  @Get(':id/orders')
+  @ApiOperation({ summary: 'Get customer orders' })
+  getCustomerOrders(@Param('id') id: string) {
+    return this.customersService.getCustomerOrders(id);
   }
 
   @Patch(':id')

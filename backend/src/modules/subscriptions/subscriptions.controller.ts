@@ -1,13 +1,12 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Put,
-    Query,
-    UseGuards
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { Schema as MongooseSchema } from 'mongoose';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -56,6 +55,43 @@ export class SubscriptionsController {
     });
   }
 
+  // Get current subscription for company
+  @Get('current')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  async getCurrent(@Query('companyId') companyId: string) {
+    return await this.subscriptionsService.getCurrentSubscription(companyId);
+  }
+
+  // Get usage statistics for company
+  @Get('usage')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  async getUsage(@Query('companyId') companyId: string) {
+    return await this.subscriptionsService.getUsageStats(companyId);
+  }
+
+  // Get billing history for company
+  @Get('billing-history')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  async getCompanyBillingHistory(
+    @Query('companyId') companyId: string,
+    @Query('limit') limit?: number,
+    @Query('page') page?: number,
+    @Query('status') status?: PaymentStatus,
+  ) {
+    const take = limit ? Number(limit) : 20;
+    const currentPage = page ? Number(page) : 1;
+    const offset = (currentPage - 1) * take;
+
+    return await this.subscriptionsService.getBillingHistory(
+      companyId,
+      {
+        status,
+        limit: take,
+        offset,
+      },
+    );
+  }
+
   // Get subscription by ID
   @Get(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
@@ -73,12 +109,20 @@ export class SubscriptionsController {
   }
 
   // Update subscription
-  @Put(':id')
+  @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async update(
     @Param('id') id: string,
-    @Body() updateSubscriptionDto: UpdateSubscriptionDto,
+    @Body() updateSubscriptionDto: UpdateSubscriptionDto & { planId?: string },
   ) {
+    if (updateSubscriptionDto?.planId) {
+      return await this.subscriptionsService.updatePlanById(
+        id,
+        updateSubscriptionDto.planId,
+        updateSubscriptionDto.billingCycle,
+      );
+    }
+
     return await this.subscriptionsService.update(id, updateSubscriptionDto);
   }
 
@@ -93,6 +137,7 @@ export class SubscriptionsController {
   }
 
   // Cancel subscription
+  @Post(':id/cancel')
   @Patch(':id/cancel')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async cancel(
@@ -102,11 +147,15 @@ export class SubscriptionsController {
     return await this.subscriptionsService.cancel(
       id,
       cancelDto.reason,
-      cancelDto.cancelImmediately,
+      cancelDto.cancelImmediately ??
+        (cancelDto.cancelAtPeriodEnd !== undefined
+          ? !cancelDto.cancelAtPeriodEnd
+          : false),
     );
   }
 
   // Reactivate subscription
+  @Post(':id/reactivate')
   @Patch(':id/reactivate')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async reactivate(@Param('id') id: string) {
@@ -167,16 +216,13 @@ export class SubscriptionsController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
-    return await this.subscriptionsService.getBillingHistory(
-      companyId as unknown as MongooseSchema.Types.ObjectId,
-      {
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : undefined,
-        status,
-        limit: limit ? Number(limit) : undefined,
-        offset: offset ? Number(offset) : undefined,
-      },
-    );
+    return await this.subscriptionsService.getBillingHistory(companyId, {
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      status,
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined,
+    });
   }
 
   // Get all subscription plans

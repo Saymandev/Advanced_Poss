@@ -1,7 +1,7 @@
 import { Model } from 'mongoose';
 import {
-  SubscriptionPlan,
-  SubscriptionPlanDocument,
+    SubscriptionPlan,
+    SubscriptionPlanDocument,
 } from './schemas/subscription-plan.schema';
 
 export async function seedSubscriptionPlans(
@@ -32,6 +32,14 @@ export async function seedSubscriptionPlans(
         maxUsers: 2,
         maxBranches: 1,
       },
+      limits: {
+        storageGB: 5,
+      },
+      featureList: [
+        'POS module access',
+        'Basic analytics',
+        'Single branch support',
+      ],
       stripePriceId: 'price_free_trial',
       isActive: true,
       sortOrder: 1,
@@ -54,8 +62,18 @@ export async function seedSubscriptionPlans(
         maxUsers: 5,
         maxBranches: 2,
       },
+      limits: {
+        storageGB: 15,
+        maxMenuItems: 250,
+      },
+      featureList: [
+        'POS + Inventory',
+        'Customer CRM lite',
+        'Up to 2 branches',
+      ],
       stripePriceId: 'price_basic_monthly',
       isActive: true,
+      isPopular: true,
       sortOrder: 2,
     },
     {
@@ -76,8 +94,19 @@ export async function seedSubscriptionPlans(
         maxUsers: 10,
         maxBranches: 5,
       },
+      limits: {
+        storageGB: 50,
+        maxMenuItems: 500,
+        maxTables: 200,
+      },
+      featureList: [
+        'Advanced inventory & CRM',
+        'Multi-branch management',
+        'Priority support',
+      ],
       stripePriceId: 'price_premium_monthly',
       isActive: true,
+      isPopular: true,
       sortOrder: 3,
     },
     {
@@ -98,6 +127,18 @@ export async function seedSubscriptionPlans(
         maxUsers: -1, // Unlimited
         maxBranches: -1, // Unlimited
       },
+      limits: {
+        storageGB: 200,
+        maxMenuItems: -1,
+        maxTables: -1,
+        whitelabelEnabled: true,
+        prioritySupportEnabled: true,
+      },
+      featureList: [
+        'Unlimited everything',
+        'AI insights included',
+        'Dedicated success manager',
+      ],
       stripePriceId: 'price_enterprise_monthly',
       isActive: true,
       sortOrder: 4,

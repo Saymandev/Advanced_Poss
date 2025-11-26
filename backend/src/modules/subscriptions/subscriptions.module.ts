@@ -1,5 +1,16 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
+import {
+  Customer,
+  CustomerSchema,
+} from '../customers/schemas/customer.schema';
+import {
+  MenuItem,
+  MenuItemSchema,
+} from '../menu-items/schemas/menu-item.schema';
+import { Table, TableSchema } from '../tables/schemas/table.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 import {
   BillingHistory,
   BillingHistorySchema,
@@ -20,6 +31,11 @@ import { SubscriptionsService } from './subscriptions.service';
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: BillingHistory.name, schema: BillingHistorySchema },
+      { name: Branch.name, schema: BranchSchema },
+      { name: User.name, schema: UserSchema },
+      { name: MenuItem.name, schema: MenuItemSchema },
+      { name: Customer.name, schema: CustomerSchema },
+      { name: Table.name, schema: TableSchema },
     ]),
   ],
   controllers: [SubscriptionsController, SubscriptionsWebhookController],

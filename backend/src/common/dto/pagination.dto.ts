@@ -191,11 +191,19 @@ export class PurchaseOrderFilterDto extends PaginationDto {
 export class ExpenseFilterDto extends PaginationDto {
   @IsOptional()
   @IsString()
+  companyId?: string;
+
+  @IsOptional()
+  @IsString()
   branchId?: string;
 
   @IsOptional()
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 
   @IsOptional()
   @IsDateString()
@@ -207,7 +215,7 @@ export class ExpenseFilterDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
-  search?: string; // Search across description, category, vendor, reference
+  search?: string; // Search across title, description, category, vendorName, invoiceNumber, expenseNumber
 }
 
 export class AttendanceFilterDto extends PaginationDto {

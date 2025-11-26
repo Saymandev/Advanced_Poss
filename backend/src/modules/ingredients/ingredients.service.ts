@@ -6,6 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { IngredientFilterDto } from '../../common/dto/pagination.dto';
+import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
@@ -16,6 +17,7 @@ export class IngredientsService {
   constructor(
     @InjectModel(Ingredient.name)
     private ingredientModel: Model<IngredientDocument>,
+    private websocketsGateway: WebsocketsGateway,
   ) {}
 
   async create(createIngredientDto: CreateIngredientDto): Promise<Ingredient> {
@@ -265,7 +267,37 @@ export class IngredientsService {
         throw new BadRequestException('Invalid adjustment type');
     }
 
-    return ingredient.save();
+    const savedIngredient = await ingredient.save();
+
+    // Notify via WebSocket: stock updated
+    try {
+      const branchId = savedIngredient.branchId?.toString() || 
+                       savedIngredient.companyId?.toString();
+      
+      if (branchId) {
+        this.websocketsGateway.notifyStockUpdated(
+          branchId,
+          savedIngredient.toObject ? savedIngredient.toObject() : savedIngredient,
+        );
+
+        // Check and notify low/out of stock
+        if (savedIngredient.isLowStock && !savedIngredient.isOutOfStock) {
+          this.websocketsGateway.notifyLowStock(
+            branchId,
+            savedIngredient.toObject ? savedIngredient.toObject() : savedIngredient,
+          );
+        } else if (savedIngredient.isOutOfStock) {
+          this.websocketsGateway.notifyOutOfStock(
+            branchId,
+            savedIngredient.toObject ? savedIngredient.toObject() : savedIngredient,
+          );
+        }
+      }
+    } catch (wsError) {
+      console.error('Failed to emit WebSocket event:', wsError);
+    }
+
+    return savedIngredient;
   }
 
   async addStock(id: string, quantity: number): Promise<Ingredient> {

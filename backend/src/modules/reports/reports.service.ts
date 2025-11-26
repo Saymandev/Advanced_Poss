@@ -4,13 +4,13 @@ import { Model, Types } from 'mongoose';
 import { CustomersService } from '../customers/customers.service';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
-import { Order, OrderDocument } from '../orders/schemas/order.schema';
+import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectModel(Order.name)
-    private orderModel: Model<OrderDocument>,
+    @InjectModel(POSOrder.name)
+    private posOrderModel: Model<POSOrderDocument>,
     private customersService: CustomersService,
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
@@ -21,37 +21,37 @@ export class ReportsService {
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
-    const orders = await this.orderModel.find({
+    const orders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
-      status: 'completed',
-      completedAt: { $gte: startDate, $lte: endDate },
+      status: 'paid',
+      createdAt: { $gte: startDate, $lte: endDate },
     });
 
     const totalOrders = orders.length;
-    const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
-    const totalTax = orders.reduce((sum, o) => sum + o.taxAmount, 0);
-    const totalDiscount = orders.reduce((sum, o) => sum + o.discountAmount, 0);
+    const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalTax = 0; // POSOrder doesn't have separate tax field
+    const totalDiscount = 0; // POSOrder doesn't have separate discount field
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     // Group by date
-    const dailySales = orders.reduce((acc, order) => {
-      const date = order.completedAt.toISOString().split('T')[0];
+    const dailySales = orders.reduce((acc, order: any) => {
+      const date = (order.createdAt || new Date()).toISOString().split('T')[0];
       if (!acc[date]) {
         acc[date] = { date, orders: 0, revenue: 0 };
       }
       acc[date].orders += 1;
-      acc[date].revenue += order.total;
+      acc[date].revenue += (order.totalAmount || 0);
       return acc;
     }, {});
 
     // Group by hour
-    const hourlySales = orders.reduce((acc, order) => {
-      const hour = order.completedAt.getHours();
+    const hourlySales = orders.reduce((acc, order: any) => {
+      const hour = (order.createdAt || new Date()).getHours();
       if (!acc[hour]) {
         acc[hour] = { hour, orders: 0, revenue: 0 };
       }
       acc[hour].orders += 1;
-      acc[hour].revenue += order.total;
+      acc[hour].revenue += (order.totalAmount || 0);
       return acc;
     }, {});
 
@@ -81,51 +81,50 @@ export class ReportsService {
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
-    const orders = await this.orderModel.find({
+    const orders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
       createdAt: { $gte: startDate, $lte: endDate },
     });
 
-    const completed = orders.filter((o) => o.status === 'completed');
+    const paid = orders.filter((o) => o.status === 'paid');
     const cancelled = orders.filter((o) => o.status === 'cancelled');
     const pending = orders.filter((o) => o.status === 'pending');
 
     // By type
-    const dineIn = completed.filter((o) => o.type === 'dine-in');
-    const takeaway = completed.filter((o) => o.type === 'takeaway');
-    const delivery = completed.filter((o) => o.type === 'delivery');
+    const dineIn = paid.filter((o) => o.orderType === 'dine-in');
+    const takeaway = paid.filter((o) => o.orderType === 'takeaway');
+    const delivery = paid.filter((o) => o.orderType === 'delivery');
 
-    // By payment method
+    // By payment method - POS orders have paymentMethod field
     const paymentMethods = {};
-    completed.forEach((order) => {
-      order.payments.forEach((payment) => {
-        if (!paymentMethods[payment.method]) {
-          paymentMethods[payment.method] = { count: 0, amount: 0 };
-        }
-        paymentMethods[payment.method].count += 1;
-        paymentMethods[payment.method].amount += payment.amount;
-      });
+    paid.forEach((order) => {
+      const method = order.paymentMethod || 'unknown';
+      if (!paymentMethods[method]) {
+        paymentMethods[method] = { count: 0, amount: 0 };
+      }
+      paymentMethods[method].count += 1;
+      paymentMethods[method].amount += (order.totalAmount || 0);
     });
 
     return {
       total: orders.length,
-      completed: completed.length,
+      completed: paid.length,
       cancelled: cancelled.length,
       pending: pending.length,
-      completionRate: orders.length > 0 ? (completed.length / orders.length) * 100 : 0,
+      completionRate: orders.length > 0 ? (paid.length / orders.length) * 100 : 0,
       cancellationRate: orders.length > 0 ? (cancelled.length / orders.length) * 100 : 0,
       byType: {
         dineIn: {
           count: dineIn.length,
-          revenue: dineIn.reduce((sum, o) => sum + o.total, 0),
+          revenue: dineIn.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
         },
         takeaway: {
           count: takeaway.length,
-          revenue: takeaway.reduce((sum, o) => sum + o.total, 0),
+          revenue: takeaway.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
         },
         delivery: {
           count: delivery.length,
-          revenue: delivery.reduce((sum, o) => sum + o.total, 0),
+          revenue: delivery.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
         },
       },
       paymentMethods,
@@ -138,33 +137,35 @@ export class ReportsService {
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
-    const orders = await this.orderModel
+    const orders = await this.posOrderModel
       .find({
         branchId: new Types.ObjectId(branchId),
-        status: 'completed',
-        completedAt: { $gte: startDate, $lte: endDate },
+        status: 'paid',
+        createdAt: { $gte: startDate, $lte: endDate },
       })
       .populate('items.menuItemId', 'name categoryId');
 
     const categoryStats = {};
 
     orders.forEach((order) => {
-      order.items.forEach((item: any) => {
-        const categoryId = item.menuItemId?.categoryId?.toString();
-        if (!categoryId) return;
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          const categoryId = item.menuItemId?.categoryId?.toString();
+          if (!categoryId) return;
 
-        if (!categoryStats[categoryId]) {
-          categoryStats[categoryId] = {
-            categoryId,
-            items: 0,
-            revenue: 0,
-            orders: new Set(),
-          };
-        }
-        categoryStats[categoryId].items += item.quantity;
-        categoryStats[categoryId].revenue += item.totalPrice;
-        categoryStats[categoryId].orders.add(order._id.toString());
-      });
+          if (!categoryStats[categoryId]) {
+            categoryStats[categoryId] = {
+              categoryId,
+              items: 0,
+              revenue: 0,
+              orders: new Set(),
+            };
+          }
+          categoryStats[categoryId].items += (item.quantity || 0);
+          categoryStats[categoryId].revenue += (item.price || 0) * (item.quantity || 0);
+          categoryStats[categoryId].orders.add(order._id.toString());
+        });
+      }
     });
 
     // Convert Set to count
@@ -183,18 +184,23 @@ export class ReportsService {
   ): Promise<any> {
     const stats = await this.customersService.getStats(companyId);
 
-    const orders = await this.orderModel.find({
-      companyId: new Types.ObjectId(companyId),
-      customerId: { $exists: true, $ne: null },
-      completedAt: { $gte: startDate, $lte: endDate },
+    // POSOrder doesn't have companyId, need to filter by branchId through company
+    // For now, get all orders with customerInfo
+    const orders = await this.posOrderModel.find({
+      customerInfo: { $exists: true, $ne: null },
+      createdAt: { $gte: startDate, $lte: endDate },
     });
 
-    // Customer retention
-    const uniqueCustomers = new Set(orders.map((o) => o.customerId?.toString()));
+    // Customer retention - use customerInfo.phone or customerInfo.email as identifier
+    const uniqueCustomers = new Set(
+      orders
+        .map((o) => o.customerInfo?.phone || o.customerInfo?.email)
+        .filter(Boolean)
+    );
     const repeatCustomers = {};
 
     orders.forEach((order) => {
-      const customerId = order.customerId?.toString();
+      const customerId = order.customerInfo?.phone || order.customerInfo?.email;
       if (!customerId) return;
 
       if (!repeatCustomers[customerId]) {
@@ -214,7 +220,7 @@ export class ReportsService {
         repeatCustomers: repeatCount,
         repeatRate: uniqueCustomers.size > 0 ? (repeatCount / uniqueCustomers.size) * 100 : 0,
         totalOrders: orders.length,
-        revenue: orders.reduce((sum, o) => sum + o.total, 0),
+        revenue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
       },
     };
   }
@@ -224,10 +230,10 @@ export class ReportsService {
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
-    const orders = await this.orderModel.find({
+    const orders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
-      status: 'completed',
-      completedAt: { $gte: startDate, $lte: endDate },
+      status: 'paid',
+      createdAt: { $gte: startDate, $lte: endDate },
     });
 
     const breakdown = {
@@ -241,12 +247,12 @@ export class ReportsService {
     };
 
     orders.forEach((order) => {
-      breakdown.subtotal += order.subtotal;
-      breakdown.tax += order.taxAmount;
-      breakdown.serviceCharge += order.serviceChargeAmount || 0;
-      breakdown.deliveryFee += order.deliveryFee || 0;
-      breakdown.discount += order.discountAmount || 0;
-      breakdown.total += order.total;
+      breakdown.subtotal += (order.totalAmount || 0);
+      breakdown.tax += 0; // POSOrder doesn't have separate tax field
+      breakdown.serviceCharge += 0; // POSOrder doesn't have separate service charge field
+      breakdown.deliveryFee += (order.deliveryFee || 0);
+      breakdown.discount += 0; // POSOrder doesn't have separate discount field
+      breakdown.total += (order.totalAmount || 0);
     });
 
     breakdown.netRevenue = breakdown.total - breakdown.tax;
@@ -259,10 +265,10 @@ export class ReportsService {
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
-    const orders = await this.orderModel.find({
+    const orders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
-      status: 'completed',
-      completedAt: { $gte: startDate, $lte: endDate },
+      status: 'paid',
+      createdAt: { $gte: startDate, $lte: endDate },
     });
 
     const hourlyData = Array.from({ length: 24 }, (_, i) => ({
@@ -271,10 +277,10 @@ export class ReportsService {
       revenue: 0,
     }));
 
-    orders.forEach((order) => {
-      const hour = order.completedAt.getHours();
+    orders.forEach((order: any) => {
+      const hour = (order.createdAt || new Date()).getHours();
       hourlyData[hour].orders += 1;
-      hourlyData[hour].revenue += order.total;
+      hourlyData[hour].revenue += (order.totalAmount || 0);
     });
 
     // Find peak hours
@@ -348,43 +354,43 @@ export class ReportsService {
     if (branchId) {
       todayFilter.branchId = new Types.ObjectId(branchId);
     }
-    const todayOrders = await this.orderModel.find(todayFilter);
+    const todayOrders = await this.posOrderModel.find(todayFilter);
 
-    const todayCompleted = todayOrders.filter((o) => o.status === 'completed');
-    const todayRevenue = todayCompleted.reduce((sum, o) => sum + o.total, 0);
+    const todayPaid = todayOrders.filter((o) => o.status === 'paid');
+    const todayRevenue = todayPaid.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
     // This week
     const weekFilter: any = {
       createdAt: { $gte: thisWeekStart },
-      status: 'completed',
+      status: 'paid',
     };
     if (branchId) {
       weekFilter.branchId = new Types.ObjectId(branchId);
     }
-    const weekOrders = await this.orderModel.find(weekFilter);
+    const weekOrders = await this.posOrderModel.find(weekFilter);
 
-    const weekRevenue = weekOrders.reduce((sum, o) => sum + o.total, 0);
+    const weekRevenue = weekOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
     // This month
     const monthFilter: any = {
       createdAt: { $gte: thisMonthStart },
-      status: 'completed',
+      status: 'paid',
     };
     if (branchId) {
       monthFilter.branchId = new Types.ObjectId(branchId);
     }
-    const monthOrders = await this.orderModel.find(monthFilter);
+    const monthOrders = await this.posOrderModel.find(monthFilter);
 
-    const monthRevenue = monthOrders.reduce((sum, o) => sum + o.total, 0);
+    const monthRevenue = monthOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
     // Active orders
     const activeFilter: any = {
-      status: { $nin: ['completed', 'cancelled'] },
+      status: { $nin: ['paid', 'cancelled'] },
     };
     if (branchId) {
       activeFilter.branchId = new Types.ObjectId(branchId);
     }
-    const activeOrders = await this.orderModel.countDocuments(activeFilter);
+    const activeOrders = await this.posOrderModel.countDocuments(activeFilter);
 
     // Customer stats
     const customerStats = companyId ? await this.customersService.getStats(companyId) : { total: 0, active: 0, vip: 0 };
@@ -396,10 +402,10 @@ export class ReportsService {
     return {
       today: {
         orders: todayOrders.length,
-        completed: todayCompleted.length,
+        completed: todayPaid.length,
         revenue: todayRevenue,
         averageOrderValue:
-          todayCompleted.length > 0 ? todayRevenue / todayCompleted.length : 0,
+          todayPaid.length > 0 ? todayRevenue / todayPaid.length : 0,
       },
       week: {
         orders: weekOrders.length,
@@ -432,20 +438,20 @@ export class ReportsService {
     previousStart: Date,
     previousEnd: Date,
   ): Promise<any> {
-    const currentOrders = await this.orderModel.find({
+    const currentOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
-      status: 'completed',
-      completedAt: { $gte: currentStart, $lte: currentEnd },
+      status: 'paid',
+      createdAt: { $gte: currentStart, $lte: currentEnd },
     });
 
-    const previousOrders = await this.orderModel.find({
+    const previousOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
-      status: 'completed',
-      completedAt: { $gte: previousStart, $lte: previousEnd },
+      status: 'paid',
+      createdAt: { $gte: previousStart, $lte: previousEnd },
     });
 
-    const currentRevenue = currentOrders.reduce((sum, o) => sum + o.total, 0);
-    const previousRevenue = previousOrders.reduce((sum, o) => sum + o.total, 0);
+    const currentRevenue = currentOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const previousRevenue = previousOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
     const revenueChange =
       previousRevenue > 0
@@ -507,14 +513,14 @@ export class ReportsService {
     }
 
     const filter: any = {
-      status: 'completed',
-      completedAt: { $gte: startDate, $lte: endDate },
+      status: 'paid',
+      createdAt: { $gte: startDate, $lte: endDate },
     };
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
 
-    const orders = await this.orderModel.find(filter);
+    const orders = await this.posOrderModel.find(filter);
 
     // Group by date
     const dailyData = {};
@@ -530,10 +536,10 @@ export class ReportsService {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    orders.forEach((order) => {
-      const dateKey = order.completedAt.toISOString().split('T')[0];
+    orders.forEach((order: any) => {
+      const dateKey = (order.createdAt || new Date()).toISOString().split('T')[0];
       if (dailyData[dateKey]) {
-        dailyData[dateKey].revenue += order.total;
+        dailyData[dateKey].revenue += (order.totalAmount || 0);
         dailyData[dateKey].orders += 1;
       }
     });
@@ -547,9 +553,9 @@ export class ReportsService {
       period,
       data: Object.values(dailyData),
       summary: {
-        totalRevenue: orders.reduce((sum, o) => sum + o.total, 0),
+        totalRevenue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
         totalOrders: orders.length,
-        averageOrderValue: orders.length > 0 ? orders.reduce((sum, o) => sum + o.total, 0) / orders.length : 0,
+        averageOrderValue: orders.length > 0 ? orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0) / orders.length : 0,
       },
     };
   }
@@ -560,41 +566,57 @@ export class ReportsService {
     startDate.setDate(now.getDate() - 30); // Last 30 days
 
     const filter: any = {
-      status: 'completed',
-      completedAt: { $gte: startDate },
+      status: 'paid',
+      createdAt: { $gte: startDate },
     };
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
 
-    const orders = await this.orderModel.find(filter);
+    // Use aggregation pipeline to properly join with menu items
+    const pipeline: any[] = [
+      { $match: filter },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.menuItemId',
+          quantity: { $sum: '$items.quantity' },
+          revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          orders: { $sum: 1 },
+        },
+      },
+      { $sort: { quantity: -1 } },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'menuitems',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'menuItem',
+        },
+      },
+      { $unwind: { path: '$menuItem', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          menuItemId: '$_id',
+          name: { $ifNull: ['$menuItem.name', '$items.name', 'Unknown Item'] },
+          quantity: 1,
+          revenue: 1,
+          orders: 1,
+        },
+      },
+    ];
 
-    // Aggregate items
-    const itemStats = {};
+    const topItems = await this.posOrderModel.aggregate(pipeline);
 
-    orders.forEach((order) => {
-      order.items.forEach((item) => {
-        const key = item.menuItemId.toString();
-        if (!itemStats[key]) {
-          itemStats[key] = {
-            menuItemId: item.menuItemId,
-            name: item.name,
-            quantity: 0,
-            revenue: 0,
-            orders: 0,
-          };
-        }
-        itemStats[key].quantity += item.quantity;
-        itemStats[key].revenue += item.totalPrice;
-        itemStats[key].orders += 1;
-      });
-    });
-
-    const topItems = Object.values(itemStats)
-      .sort((a: any, b: any) => b.quantity - a.quantity)
-      .slice(0, limit);
-
-    return topItems;
+    // Transform to match expected format
+    return topItems.map((item: any) => ({
+      menuItemId: item.menuItemId,
+      name: item.name || 'Unknown Item',
+      quantity: item.quantity || 0,
+      revenue: item.revenue || 0,
+      orders: item.orders || 0,
+    }));
   }
 
   async getRevenueByCategory(branchId?: string): Promise<any> {
@@ -603,36 +625,51 @@ export class ReportsService {
     startDate.setDate(now.getDate() - 30); // Last 30 days
 
     const filter: any = {
-      status: 'completed',
-      completedAt: { $gte: startDate },
+      status: 'paid',
+      createdAt: { $gte: startDate },
     };
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
 
-    const orders = await this.orderModel
+    const orders = await this.posOrderModel
       .find(filter)
-      .populate('items.menuItemId', 'name categoryId');
+      .populate({
+        path: 'items.menuItemId',
+        select: 'name categoryId',
+        populate: {
+          path: 'categoryId',
+          select: 'name',
+        },
+      });
 
     const categoryStats = {};
 
     orders.forEach((order) => {
-      order.items.forEach((item: any) => {
-        const categoryId = item.menuItemId?.categoryId?.toString();
-        if (!categoryId) return;
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          const categoryId = item.menuItemId?.categoryId?._id?.toString() || item.menuItemId?.categoryId?.toString();
+          const categoryName = item.menuItemId?.categoryId?.name || 'Uncategorized';
+          
+          if (!categoryId) return;
 
-        if (!categoryStats[categoryId]) {
-          categoryStats[categoryId] = {
-            categoryId,
-            items: 0,
-            revenue: 0,
-            orders: new Set(),
-          };
-        }
-        categoryStats[categoryId].items += item.quantity;
-        categoryStats[categoryId].revenue += item.totalPrice;
-        categoryStats[categoryId].orders.add(order._id.toString());
-      });
+          if (!categoryStats[categoryId]) {
+            categoryStats[categoryId] = {
+              categoryId,
+              category: categoryName,
+              items: 0,
+              revenue: 0,
+              sales: 0,
+              orders: new Set(),
+            };
+          }
+          categoryStats[categoryId].items += (item.quantity || 0);
+          const itemRevenue = (item.price || 0) * (item.quantity || 0);
+          categoryStats[categoryId].revenue += itemRevenue;
+          categoryStats[categoryId].sales += itemRevenue;
+          categoryStats[categoryId].orders.add(order._id.toString());
+        });
+      }
     });
 
     // Convert Set to count and calculate percentages
@@ -645,7 +682,10 @@ export class ReportsService {
 
     return result
       .map((stat: any) => ({
-        ...stat,
+        categoryId: stat.categoryId,
+        category: stat.category,
+        sales: stat.sales || stat.revenue,
+        revenue: stat.revenue,
         percentage: totalRevenue > 0 ? (stat.revenue / totalRevenue) * 100 : 0,
       }))
       .sort((a: any, b: any) => b.revenue - a.revenue);
@@ -654,6 +694,47 @@ export class ReportsService {
   async getLowStockItems(companyId?: string): Promise<any> {
     if (!companyId) return [];
     return this.ingredientsService.findLowStock(companyId);
+  }
+
+  async getDueSettlements(branchId?: string, companyId?: string): Promise<any> {
+    const filter: any = {
+      status: 'pending', // Orders that are completed but payment is pending
+    };
+
+    if (branchId) {
+      filter.branchId = new Types.ObjectId(branchId);
+    }
+
+    // If companyId is provided, we need to filter through branches
+    // For now, we'll just use branchId if available
+    const pendingOrders = await this.posOrderModel.find(filter).sort({ createdAt: -1 });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayFilter = { ...filter, createdAt: { $gte: today } };
+    const settledToday = await this.posOrderModel.find({
+      ...todayFilter,
+      status: 'paid',
+    });
+
+    const totalDueAmount = pendingOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const settledTodayAmount = settledToday.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+    return {
+      pendingSettlements: pendingOrders.length,
+      totalDueAmount,
+      settledToday: settledToday.length,
+      settledTodayAmount,
+      pendingOrders: pendingOrders.map((order: any) => ({
+        id: order._id.toString(),
+        orderNumber: order.orderNumber,
+        totalAmount: order.totalAmount || 0,
+        orderType: order.orderType,
+        createdAt: order.createdAt,
+        tableId: order.tableId?.toString(),
+        customerInfo: order.customerInfo,
+      })),
+    };
   }
 }
 

@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -22,11 +22,30 @@ export class ExpensesService {
       createExpenseDto.branchId,
     );
 
-    const expense = new this.expenseModel({
+    const expenseData: any = {
       ...createExpenseDto,
       expenseNumber,
       status: 'pending',
-    });
+    };
+
+    // Convert string IDs to ObjectIds
+    if (expenseData.companyId && typeof expenseData.companyId === 'string') {
+      expenseData.companyId = new Types.ObjectId(expenseData.companyId);
+    }
+    if (expenseData.branchId && typeof expenseData.branchId === 'string') {
+      expenseData.branchId = new Types.ObjectId(expenseData.branchId);
+    }
+    if (expenseData.createdBy && typeof expenseData.createdBy === 'string') {
+      expenseData.createdBy = new Types.ObjectId(expenseData.createdBy);
+    }
+    if (expenseData.supplierId && typeof expenseData.supplierId === 'string') {
+      expenseData.supplierId = new Types.ObjectId(expenseData.supplierId);
+    }
+    if (expenseData.purchaseOrderId && typeof expenseData.purchaseOrderId === 'string') {
+      expenseData.purchaseOrderId = new Types.ObjectId(expenseData.purchaseOrderId);
+    }
+
+    const expense = new this.expenseModel(expenseData);
 
     return expense.save();
   }
@@ -38,31 +57,83 @@ export class ExpensesService {
       sortBy = 'date', 
       sortOrder = 'desc',
       search,
-      ...filters 
+      companyId,
+      branchId,
+      category,
+      status,
+      startDate,
+      endDate,
     } = filterDto;
     
     const skip = (page - 1) * limit;
-    const query: any = { ...filters };
+    const query: any = {};
+
+    // Convert string IDs to ObjectIds
+    if (companyId) {
+      query.companyId = typeof companyId === 'string' 
+        ? new Types.ObjectId(companyId) 
+        : companyId;
+    }
+
+    if (branchId) {
+      query.branchId = typeof branchId === 'string' 
+        ? new Types.ObjectId(branchId) 
+        : branchId;
+    }
+
+    if (category) {
+      query.category = category;
+    }
+
+    if (status) {
+      query.status = status;
+    }
 
     // Add date range filtering
-    if (filters.startDate || filters.endDate) {
+    if (startDate || endDate) {
       query.date = {};
-      if (filters.startDate) query.date.$gte = new Date(filters.startDate);
-      if (filters.endDate) query.date.$lte = new Date(filters.endDate);
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        query.date.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.date.$lte = end;
+      }
     }
 
     // Add search functionality
     if (search) {
-      query.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
-        { vendor: { $regex: search, $options: 'i' } },
-        { reference: { $regex: search, $options: 'i' } },
-      ];
+      const searchConditions = {
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { category: { $regex: search, $options: 'i' } },
+          { vendorName: { $regex: search, $options: 'i' } },
+          { invoiceNumber: { $regex: search, $options: 'i' } },
+          { expenseNumber: { $regex: search, $options: 'i' } },
+        ],
+      };
+      
+      if (Object.keys(query).length > 0) {
+        query.$and = [
+          { ...query },
+          searchConditions,
+        ];
+        // Remove $or from top level if it exists
+        delete query.$or;
+      } else {
+        Object.assign(query, searchConditions);
+      }
     }
 
     const sortOptions: any = {};
     sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    console.log('🔍 ExpensesService.findAll query:', JSON.stringify(query, null, 2));
+    console.log('🔍 ExpensesService.findAll filters:', { page, limit, sortBy, sortOrder, search });
 
     const expenses = await this.expenseModel
       .find(query)
@@ -74,6 +145,8 @@ export class ExpensesService {
       .skip(skip)
       .limit(limit)
       .exec();
+
+    console.log(`✅ ExpensesService.findAll found ${expenses.length} expenses`);
 
     const total = await this.expenseModel.countDocuments(query);
 
