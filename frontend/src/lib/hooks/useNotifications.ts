@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 export interface Notification {
   id: string;
-  type: 'order' | 'payment' | 'kitchen' | 'system' | 'promotion';
+  type: 'order' | 'payment' | 'kitchen' | 'system' | 'promotion' | 'review';
   title: string;
   message: string;
   timestamp: Date;
@@ -151,12 +151,13 @@ const playNotificationSound = (type: Notification['type']) => {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
 
     // Different frequencies for different notification types
-    const frequencies = {
+    const frequencies: Record<Notification['type'], number> = {
       order: 800,
       payment: 600,
       kitchen: 1000,
       system: 400,
       promotion: 700,
+      review: 500,
     };
 
     const frequency = frequencies[type];

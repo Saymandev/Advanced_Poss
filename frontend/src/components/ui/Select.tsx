@@ -40,7 +40,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <div className="relative">
           <select
             ref={ref}
-            value={value || ''}
+            value={value !== undefined ? value : ''}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             className={cn(
@@ -53,7 +53,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               className
             )}
           >
-            {placeholder && (
+            {placeholder && !value && (
               <option value="" disabled>
                 {placeholder}
               </option>

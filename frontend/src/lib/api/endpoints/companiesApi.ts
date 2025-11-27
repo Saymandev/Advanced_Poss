@@ -111,6 +111,16 @@ export const companiesApi = apiSlice.injectEndpoints({
     getCompanyById: builder.query<Company, string>({
       query: (id) => `/companies/${id}`,
       providesTags: ['Company'],
+      transformResponse: (response: any) => {
+        // Ensure logo field is included
+        const data = response?.data ?? response;
+        console.log('getCompanyById response:', {
+          hasLogo: !!data?.logo,
+          logoValue: data?.logo?.substring(0, 50) + '...' || 'null',
+          allKeys: Object.keys(data || {}),
+        });
+        return data;
+      },
     }),
     getCompanyStats: builder.query<CompanyStats, string>({
       query: (id) => `/companies/${id}/stats`,
@@ -154,6 +164,18 @@ export const companiesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Company'],
     }),
+    uploadCompanyLogo: builder.mutation<{ logoUrl: string }, File>({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append('logo', file);
+        return {
+          url: `/company/upload-logo`,
+          method: 'POST',
+          body: formData,
+        };
+      },
+      invalidatesTags: ['Company'],
+    }),
   }),
 });
 
@@ -167,4 +189,5 @@ export const {
   useUpdateCompanySettingsMutation,
   useDeactivateCompanyMutation,
   useDeleteCompanyMutation,
+  useUploadCompanyLogoMutation,
 } = companiesApi;

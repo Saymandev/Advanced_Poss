@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { DigitalReceipt, useEmailDigitalReceiptMutation, useGenerateDigitalReceiptMutation, useGetDigitalReceiptsQuery } from '@/lib/api/endpoints/aiApi';
 import { useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
@@ -19,11 +20,11 @@ import {
   ShoppingCartIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function DigitalReceiptsPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<DigitalReceipt | null>(null);
@@ -33,22 +34,50 @@ export default function DigitalReceiptsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
-  const { data: receiptsData, isLoading, refetch } = useGetDigitalReceiptsQuery({
-    branchId: user?.branchId || undefined,
-    startDate: dateRange.start || undefined,
-    endDate: dateRange.end || undefined,
-    customerId: searchQuery || undefined,
+  // Extract companyId and branchId
+  const companyId = (user as any)?.companyId || 
+                   (companyContext as any)?.companyId;
+  
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  // Form error states
+  const [formErrors, setFormErrors] = useState<{
+    generate?: { orderId?: string; customerEmail?: string };
+    email?: { email?: string };
+  }>({});
+
+  // Query parameters
+  const queryParams = useMemo(() => {
+    const params: any = {};
+    if (branchId) params.branchId = branchId;
+    if (dateRange.start) params.startDate = dateRange.start;
+    if (dateRange.end) params.endDate = dateRange.end;
+    if (searchQuery.trim()) params.customerId = searchQuery.trim();
+    return params;
+  }, [branchId, dateRange.start, dateRange.end, searchQuery]);
+
+  const { data: receiptsData, isLoading, error, refetch } = useGetDigitalReceiptsQuery(queryParams, {
+    skip: !branchId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   });
 
   // Get completed POS orders that don't have receipts yet
-  const { data: completedOrders } = useGetPOSOrdersQuery({
-    branchId: user?.branchId || undefined,
-    status: 'completed',
+  const { data: completedOrders, isLoading: isLoadingOrders } = useGetPOSOrdersQuery({
+    branchId: branchId || undefined,
+    status: 'paid',
     limit: 100,
+  }, {
+    skip: !branchId,
+    refetchOnMountOrArgChange: true,
   });
 
-  const [generateReceipt] = useGenerateDigitalReceiptMutation();
-  const [emailReceipt] = useEmailDigitalReceiptMutation();
+  const [generateReceipt, { isLoading: isGenerating }] = useGenerateDigitalReceiptMutation();
+  const [emailReceipt, { isLoading: isEmailing }] = useEmailDigitalReceiptMutation();
 
   const [emailForm, setEmailForm] = useState({
     email: '',
@@ -61,58 +90,150 @@ export default function DigitalReceiptsPage() {
 
   const resetEmailForm = () => {
     setEmailForm({ email: '' });
+    setFormErrors(prev => ({ ...prev, email: {} }));
   };
 
   const resetGenerateForm = () => {
     setGenerateForm({ orderId: '', customerEmail: '' });
+    setFormErrors(prev => ({ ...prev, generate: {} }));
+  };
+
+  // Validation functions
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateGenerateForm = (): boolean => {
+    const errors: { orderId?: string; customerEmail?: string } = {};
+
+    if (!generateForm.orderId || !generateForm.orderId.trim()) {
+      errors.orderId = 'Please select an order';
+    }
+
+    if (generateForm.customerEmail && generateForm.customerEmail.trim() && !validateEmail(generateForm.customerEmail)) {
+      errors.customerEmail = 'Please enter a valid email address';
+    }
+
+    setFormErrors(prev => ({ ...prev, generate: errors }));
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateEmailForm = (): boolean => {
+    const errors: { email?: string } = {};
+
+    if (!emailForm.email.trim()) {
+      errors.email = 'Email address is required';
+    } else if (!validateEmail(emailForm.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    setFormErrors(prev => ({ ...prev, email: errors }));
+    return Object.keys(errors).length === 0;
   };
 
   const handleGenerateReceipt = async () => {
-    if (!generateForm.orderId) {
-      toast.error('Please select an order');
+    if (!validateGenerateForm()) {
+      const firstError = Object.values(formErrors.generate || {})[0];
+      if (firstError) {
+        toast.error(firstError);
+      }
       return;
     }
 
     try {
+      // Find the order to get the proper ID format
+      const selectedOrder = completedOrders?.orders?.find(
+        (o: any) => 
+          (o.id === generateForm.orderId) || 
+          (o._id === generateForm.orderId) || 
+          (o.id?.toString() === generateForm.orderId) || 
+          (o._id?.toString() === generateForm.orderId)
+      );
+
+      const orderId = selectedOrder 
+        ? (selectedOrder.id || selectedOrder._id || generateForm.orderId).toString()
+        : generateForm.orderId.trim();
+
       await generateReceipt({
-        orderId: generateForm.orderId,
-        customerEmail: generateForm.customerEmail || undefined,
+        orderId: orderId,
+        customerEmail: generateForm.customerEmail.trim() || undefined,
       }).unwrap();
 
       toast.success('Digital receipt generated successfully');
       setIsGenerateModalOpen(false);
       resetGenerateForm();
-      refetch();
+      setTimeout(() => {
+        refetch();
+      }, 500);
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to generate digital receipt');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to generate digital receipt';
+      toast.error(errorMessage);
+      
+      // Set field-specific errors if available
+      if (error?.data?.errors) {
+        setFormErrors(prev => ({
+          ...prev,
+          generate: error.data.errors,
+        }));
+      }
     }
   };
 
   const handleDownloadReceipt = (receipt: DigitalReceipt) => {
-    // Generate receipt HTML and download as PDF
-    const receiptWindow = window.open('', '_blank');
-    if (receiptWindow) {
-      receiptWindow.document.write(generateReceiptHTML(receipt));
-      receiptWindow.document.close();
-      receiptWindow.print();
+    try {
+      // Generate receipt HTML and download as PDF
+      const receiptWindow = window.open('', '_blank');
+      if (receiptWindow) {
+        receiptWindow.document.write(generateReceiptHTML(receipt));
+        receiptWindow.document.close();
+        receiptWindow.print();
+      } else {
+        toast.error('Please allow popups to print receipts');
+      }
+    } catch (error) {
+      toast.error('Failed to open print dialog');
     }
   };
 
   const handleEmailReceipt = async () => {
-    if (!selectedReceipt || !emailForm.email) return;
+    if (!selectedReceipt) {
+      toast.error('No receipt selected');
+      return;
+    }
+
+    if (!validateEmailForm()) {
+      const firstError = Object.values(formErrors.email || {})[0];
+      if (firstError) {
+        toast.error(firstError);
+      }
+      return;
+    }
 
     try {
       await emailReceipt({
         receiptId: selectedReceipt.id,
-        email: emailForm.email,
+        email: emailForm.email.trim(),
       }).unwrap();
 
       toast.success('Receipt emailed successfully');
       setIsEmailModalOpen(false);
       resetEmailForm();
       setSelectedReceipt(null);
+      setTimeout(() => {
+        refetch();
+      }, 500);
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to email receipt');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to email receipt';
+      toast.error(errorMessage);
+      
+      // Set field-specific errors if available
+      if (error?.data?.errors) {
+        setFormErrors(prev => ({
+          ...prev,
+          email: error.data.errors,
+        }));
+      }
     }
   };
 
@@ -142,17 +263,25 @@ export default function DigitalReceiptsPage() {
       key: 'receiptNumber',
       title: 'Receipt #',
       sortable: true,
-      render: (value: string, row: DigitalReceipt) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-            <ReceiptRefundIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+      render: (value: string, row: DigitalReceipt) => {
+        // Safely extract orderId as string
+        const orderIdStr = typeof row.orderId === 'string' 
+          ? row.orderId 
+          : (row.orderId as any)?._id?.toString() || (row.orderId as any)?.toString() || String(row.orderId || '');
+        const orderIdDisplay = orderIdStr.length >= 8 ? orderIdStr.slice(-8) : orderIdStr;
+        
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+              <ReceiptRefundIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900 dark:text-white">{value}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Order #{orderIdDisplay}</p>
+            </div>
           </div>
-          <div>
-            <p className="font-medium text-gray-900 dark:text-white">{value}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Order #{row.orderId.slice(-8)}</p>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'customerEmail',
@@ -241,14 +370,19 @@ export default function DigitalReceiptsPage() {
     },
   ];
 
-  const receipts = receiptsData || [];
+  const receipts = useMemo(() => {
+    if (!receiptsData) return [];
+    return Array.isArray(receiptsData) ? receiptsData : [];
+  }, [receiptsData]);
   
-  const stats = {
-    total: receipts.length,
-    totalRevenue: receipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0),
-    loyaltyPoints: receipts.reduce((sum, receipt) => sum + (receipt.loyaltyPointsEarned || 0), 0),
-    avgOrderValue: receipts.length ? (receipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0) / receipts.length) : 0,
-  };
+  const stats = useMemo(() => {
+    return {
+      total: receipts.length,
+      totalRevenue: receipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0),
+      loyaltyPoints: receipts.reduce((sum, receipt) => sum + (receipt.loyaltyPointsEarned || 0), 0),
+      avgOrderValue: receipts.length ? (receipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0) / receipts.length) : 0,
+    };
+  }, [receipts]);
 
   // Generate receipt HTML for print/download
   const generateReceiptHTML = (receipt: DigitalReceipt) => {
@@ -384,7 +518,7 @@ export default function DigitalReceiptsPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Input
-                placeholder="Search receipts..."
+                placeholder="Search by customer ID or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -392,20 +526,38 @@ export default function DigitalReceiptsPage() {
             <div className="flex gap-2">
               <Input
                 type="date"
-                placeholder="Start Date"
+                label="Start Date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                className="w-32"
+                className="w-40"
               />
               <Input
                 type="date"
-                placeholder="End Date"
+                label="End Date"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                className="w-32"
+                className="w-40"
               />
+              {(dateRange.start || dateRange.end || searchQuery) && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setDateRange({ start: '', end: '' });
+                    setSearchQuery('');
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           </div>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm text-red-600 dark:text-red-400">
+                Error loading receipts: {(error as any)?.data?.message || 'Unknown error occurred'}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -657,9 +809,18 @@ export default function DigitalReceiptsPage() {
             label="Customer Email Address"
             type="email"
             value={emailForm.email}
-            onChange={(e) => setEmailForm({ email: e.target.value })}
+            onChange={(e) => {
+              setEmailForm({ email: e.target.value });
+              if (formErrors.email?.email) {
+                setFormErrors(prev => ({
+                  ...prev,
+                  email: { ...prev.email, email: undefined },
+                }));
+              }
+            }}
             placeholder="customer@example.com"
             required
+            error={formErrors.email?.email}
           />
 
           <div className="flex justify-end gap-3 pt-4">
@@ -670,11 +831,12 @@ export default function DigitalReceiptsPage() {
                 resetEmailForm();
                 setSelectedReceipt(null);
               }}
+              disabled={isEmailing}
             >
               Cancel
             </Button>
-            <Button onClick={handleEmailReceipt}>
-              Send Email
+            <Button onClick={handleEmailReceipt} disabled={isEmailing}>
+              {isEmailing ? 'Sending...' : 'Send Email'}
             </Button>
           </div>
         </div>
@@ -695,38 +857,77 @@ export default function DigitalReceiptsPage() {
             Select a completed order to generate a digital receipt.
           </p>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select Order *
-            </label>
-            <select
-              value={generateForm.orderId}
-              onChange={(e) => {
-                const orderId = e.target.value;
-                setGenerateForm({ ...generateForm, orderId });
-                const selectedOrder = completedOrders?.orders?.find((o: any) => o.id === orderId);
-                if (selectedOrder?.customerInfo?.email) {
-                  setGenerateForm(prev => ({ ...prev, customerEmail: selectedOrder.customerInfo?.email || '' }));
-                }
-              }}
-              className="input w-full"
-              required
-            >
-              <option value="">Select an order...</option>
-              {completedOrders?.orders?.map((order: any) => (
-                <option key={order.id} value={order.id}>
-                  Order #{order.orderNumber} - {formatCurrency(order.totalAmount)} - {new Date(order.createdAt).toLocaleDateString()}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Select Order *"
+            value={generateForm.orderId}
+            onChange={(value) => {
+              // Clear error when value changes
+              if (formErrors.generate?.orderId) {
+                setFormErrors(prev => ({
+                  ...prev,
+                  generate: { ...prev.generate, orderId: undefined },
+                }));
+              }
+              
+              // Find the selected order - handle both id and _id
+              const selectedOrder = completedOrders?.orders?.find(
+                (o: any) => (o.id === value) || (o._id === value) || (o.id?.toString() === value) || (o._id?.toString() === value)
+              );
+              
+              if (selectedOrder && value) {
+                // Extract the proper ID (could be id or _id)
+                const orderId = selectedOrder.id || selectedOrder._id || value;
+                setGenerateForm({ 
+                  ...generateForm, 
+                  orderId: orderId.toString(),
+                  customerEmail: selectedOrder.customerInfo?.email || generateForm.customerEmail,
+                });
+              } else if (value) {
+                // If value exists but order not found, still set it
+                setGenerateForm({ ...generateForm, orderId: value });
+              }
+            }}
+            options={
+              isLoadingOrders
+                ? [{ value: '', label: 'Loading orders...' }]
+                : completedOrders?.orders?.length
+                ? completedOrders.orders.map((order: any) => {
+                    // Extract proper ID
+                    const orderId = order.id || order._id || '';
+                    // Build customer info string
+                    const customerInfo = order.customerInfo 
+                      ? (order.customerInfo.name 
+                          ? `${order.customerInfo.name}${order.customerInfo.email ? ` (${order.customerInfo.email})` : ''}`
+                          : order.customerInfo.email || '')
+                      : 'Walk-in Customer';
+                    
+                    return {
+                      value: orderId.toString(),
+                      label: `Order #${order.orderNumber} - ${formatCurrency(order.totalAmount)} - ${customerInfo} - ${new Date(order.createdAt).toLocaleDateString()}`,
+                    };
+                  })
+                : [{ value: '', label: 'No completed orders available' }]
+            }
+            error={formErrors.generate?.orderId}
+            disabled={isLoadingOrders}
+            placeholder="Select an order..."
+          />
 
           <Input
             label="Customer Email (Optional)"
             type="email"
             value={generateForm.customerEmail}
-            onChange={(e) => setGenerateForm({ ...generateForm, customerEmail: e.target.value })}
+            onChange={(e) => {
+              setGenerateForm({ ...generateForm, customerEmail: e.target.value });
+              if (formErrors.generate?.customerEmail) {
+                setFormErrors(prev => ({
+                  ...prev,
+                  generate: { ...prev.generate, customerEmail: undefined },
+                }));
+              }
+            }}
             placeholder="customer@example.com"
+            error={formErrors.generate?.customerEmail}
           />
 
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
@@ -735,6 +936,20 @@ export default function DigitalReceiptsPage() {
             </p>
           </div>
 
+          {isLoadingOrders && (
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              Loading available orders...
+            </div>
+          )}
+
+          {!isLoadingOrders && (!completedOrders?.orders || completedOrders.orders.length === 0) && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                No completed orders available. Complete an order in the POS system first.
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -742,11 +957,12 @@ export default function DigitalReceiptsPage() {
                 setIsGenerateModalOpen(false);
                 resetGenerateForm();
               }}
+              disabled={isGenerating}
             >
               Cancel
             </Button>
-            <Button onClick={handleGenerateReceipt}>
-              Generate Receipt
+            <Button onClick={handleGenerateReceipt} disabled={isGenerating || isLoadingOrders}>
+              {isGenerating ? 'Generating...' : 'Generate Receipt'}
             </Button>
           </div>
         </div>
@@ -754,3 +970,4 @@ export default function DigitalReceiptsPage() {
     </div>
   );
 }
+

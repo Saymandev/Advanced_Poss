@@ -148,6 +148,7 @@ export interface DeliveryIntegration {
 }
 
 export const aiApi = apiSlice.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     // AI Menu Optimization
     getMenuOptimization: builder.query<MenuOptimizationSuggestion[], { branchId?: string; category?: string }>({
@@ -200,11 +201,54 @@ export const aiApi = apiSlice.injectEndpoints({
 
     // QR Code Menus
     getQRCodes: builder.query<QRCodeMenu[], { branchId?: string; tableNumber?: number }>({
-      query: (params) => ({
-        url: '/qr-codes',
-        params,
-      }),
+      query: (params) => {
+        // Filter out undefined/null/empty values
+        const cleanParams: any = {};
+        if (params.branchId) cleanParams.branchId = params.branchId;
+        if (params.tableNumber !== undefined && params.tableNumber !== null) {
+          cleanParams.tableNumber = params.tableNumber;
+        }
+        
+        return {
+          url: '/qr-codes',
+          params: cleanParams,
+        };
+      },
       providesTags: ['QRCode'],
+      transformResponse: (response: any) => {
+        // Helper function to extract ID
+        const extractId = (obj: any): string => {
+          if (!obj) return '';
+          if (typeof obj === 'string') return obj;
+          if (obj._id) return obj._id.toString();
+          if (obj.id) return obj.id.toString();
+          return String(obj);
+        };
+
+        // Handle different response structures
+        if (Array.isArray(response)) {
+          return response.map((qr: any) => ({
+            ...qr,
+            id: extractId(qr),
+            branchId: extractId(qr.branchId),
+          }));
+        }
+        if (response?.data && Array.isArray(response.data)) {
+          return response.data.map((qr: any) => ({
+            ...qr,
+            id: extractId(qr),
+            branchId: extractId(qr.branchId),
+          }));
+        }
+        if (response?.qrCodes && Array.isArray(response.qrCodes)) {
+          return response.qrCodes.map((qr: any) => ({
+            ...qr,
+            id: extractId(qr),
+            branchId: extractId(qr.branchId),
+          }));
+        }
+        return [];
+      },
     }),
     generateQRCode: builder.mutation<QRCodeMenu, { branchId: string; tableNumber?: number; menuType: QRCodeMenu['menuType'] }>({
       query: (data) => ({
@@ -213,6 +257,15 @@ export const aiApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ['QRCode'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Refetch QR codes list after generating
+          dispatch(aiApi.util.invalidateTags(['QRCode']));
+        } catch {
+          // Error handling is done by the mutation
+        }
+      },
     }),
     updateQRCode: builder.mutation<QRCodeMenu, { id: string; data: Partial<QRCodeMenu> }>({
       query: ({ id, data }) => ({
@@ -238,13 +291,68 @@ export const aiApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ['DigitalReceipt'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Refetch receipts list after generating
+          dispatch(aiApi.util.invalidateTags(['DigitalReceipt']));
+        } catch {
+          // Error handling is done by the mutation
+        }
+      },
     }),
     getDigitalReceipts: builder.query<DigitalReceipt[], { branchId?: string; customerId?: string; startDate?: string; endDate?: string }>({
-      query: (params) => ({
-        url: '/digital-receipts',
-        params,
-      }),
+      query: (params) => {
+        // Filter out undefined/null/empty values
+        const cleanParams: any = {};
+        if (params.branchId) cleanParams.branchId = params.branchId;
+        if (params.customerId) cleanParams.customerId = params.customerId;
+        if (params.startDate) cleanParams.startDate = params.startDate;
+        if (params.endDate) cleanParams.endDate = params.endDate;
+        
+        return {
+          url: '/digital-receipts',
+          params: cleanParams,
+        };
+      },
       providesTags: ['DigitalReceipt'],
+      transformResponse: (response: any) => {
+        // Helper function to extract ID
+        const extractId = (obj: any): string => {
+          if (!obj) return '';
+          if (typeof obj === 'string') return obj;
+          if (obj._id) return obj._id.toString();
+          if (obj.id) return obj.id.toString();
+          return String(obj);
+        };
+
+        // Handle different response structures
+        if (Array.isArray(response)) {
+          return response.map((receipt: any) => ({
+            ...receipt,
+            id: extractId(receipt),
+            orderId: extractId(receipt.orderId),
+            customerId: receipt.customerId ? extractId(receipt.customerId) : undefined,
+          }));
+        }
+        if (response?.data && Array.isArray(response.data)) {
+          return response.data.map((receipt: any) => ({
+            ...receipt,
+            id: extractId(receipt),
+            orderId: extractId(receipt.orderId),
+            customerId: receipt.customerId ? extractId(receipt.customerId) : undefined,
+          }));
+        }
+        if (response?.receipts && Array.isArray(response.receipts)) {
+          return response.receipts.map((receipt: any) => ({
+            ...receipt,
+            id: extractId(receipt),
+            orderId: extractId(receipt.orderId),
+            customerId: receipt.customerId ? extractId(receipt.customerId) : undefined,
+          }));
+        }
+        return [];
+      },
     }),
     emailDigitalReceipt: builder.mutation<{ success: boolean; messageId?: string }, { receiptId: string; email: string }>({
       query: ({ receiptId, email }) => ({

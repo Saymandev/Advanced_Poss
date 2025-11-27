@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
 import { useAppSelector } from '@/lib/store';
-import toast from 'react-hot-toast';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useNotifications } from './useNotifications';
 
 // Get socket URL from environment or default to API URL
@@ -87,6 +86,28 @@ export const useSocket = (): UseSocketReturn => {
         message: `Order #${data.orderNumber || data.id} has been created`,
         data: { orderId: data.id || data._id, order: data },
       });
+    });
+
+    // Review events
+    newSocket.on('system:notification', (data: any) => {
+      if (data.type === 'review') {
+        console.log('⭐ New review received:', data);
+        addNotification({
+          type: 'review',
+          title: data.title || 'New Review',
+          message: data.message || 'A customer left a review',
+          data: data.data || {},
+        });
+      } else {
+        // Handle other system notifications
+        console.log('🔔 System notification:', data);
+        addNotification({
+          type: data.type || 'info',
+          title: data.title || 'Notification',
+          message: data.message || '',
+          data: data.data || {},
+        });
+      }
     });
 
     newSocket.on('order:updated', (data: any) => {
@@ -244,7 +265,7 @@ export const useSocket = (): UseSocketReturn => {
 
   const leaveKitchen = useCallback((branchId: string) => {
     if (socket && socket.connected) {
-      socket.leave(`kitchen:${branchId}`);
+      socket.emit('leave-kitchen', { branchId });
     }
   }, [socket]);
 
@@ -257,7 +278,7 @@ export const useSocket = (): UseSocketReturn => {
 
   const leaveTable = useCallback((tableId: string) => {
     if (socket && socket.connected) {
-      socket.leave(`table:${tableId}`);
+      socket.emit('leave-table', { tableId });
       tableIdRef.current = null;
     }
   }, [socket]);

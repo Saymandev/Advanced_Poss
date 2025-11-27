@@ -85,6 +85,30 @@ export const publicApi = apiSlice.injectEndpoints({
       },
     }),
     
+    getBranchMenuById: builder.query<{
+      branch?: {
+        id: string;
+        name: string;
+        address?: any;
+      };
+      categories: PublicCategory[];
+      menuItems: PublicMenuItem[];
+    }, { branchId: string; menuType?: string }>({
+      query: ({ branchId, menuType }) => {
+        const params = new URLSearchParams();
+        if (menuType) params.append('type', menuType);
+        return `/public/branches/${branchId}/menu${params.toString() ? `?${params.toString()}` : ''}`;
+      },
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        return {
+          branch: data.branch,
+          categories: data.categories || [],
+          menuItems: Array.isArray(data.menuItems) ? data.menuItems : (data.menuItems?.menuItems || []),
+        };
+      },
+    }),
+
     getBranchMenu: builder.query<{
       categories: PublicCategory[];
       menuItems: PublicMenuItem[];
@@ -181,6 +205,7 @@ export const {
   useGetCompanyBySlugQuery,
   useGetCompanyBranchesQuery,
   useGetBranchBySlugQuery,
+  useGetBranchMenuByIdQuery,
   useGetBranchMenuQuery,
   useGetProductQuery,
   useCreatePublicOrderMutation,

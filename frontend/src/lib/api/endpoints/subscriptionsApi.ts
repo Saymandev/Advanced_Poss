@@ -102,9 +102,18 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
           return normalize(response);
         }
 
+        // Handle case where response.plans might be undefined
+        if (!response || !response.plans) {
+          console.warn('Subscription plans response is missing plans array:', response);
+          return {
+            plans: [],
+            total: 0,
+          };
+        }
+
         return {
           ...response,
-          plans: normalize(response.plans),
+          plans: normalize(response.plans || []),
         };
       },
     }),

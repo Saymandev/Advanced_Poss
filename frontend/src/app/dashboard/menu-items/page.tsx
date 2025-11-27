@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
 import { useCreateMenuItemMutation, useDeleteMenuItemMutation, useGetMenuItemsQuery, useToggleAvailabilityMutation, useUpdateMenuItemMutation, useUploadMenuImagesMutation } from '@/lib/api/endpoints/menuItemsApi';
+import { useGetMenuItemsRatingsMutation } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -163,6 +164,10 @@ export default function MenuItemsPage() {
     { skip: !branchId }
   );
 
+  // Fetch ratings for menu items - declare before stats calculation
+  const [getMenuItemsRatings] = useGetMenuItemsRatingsMutation();
+  const [menuItemsRatings, setMenuItemsRatings] = useState<Record<string, { averageRating: number; totalReviews: number }>>({});
+
   // Calculate stats from real API data
   const stats = useMemo(() => {
     const statsItems = (statsResponse as any)?.menuItems || [];
@@ -172,9 +177,21 @@ export default function MenuItemsPage() {
     const avgPrepTime = total > 0 
       ? Math.round(statsItems.reduce((sum: number, item: any) => sum + (item.preparationTime || 0), 0) / total)
       : 0;
-    const avgPopularity = total > 0
-      ? Number((statsItems.reduce((sum: number, item: any) => sum + (item.popularity || 4.0), 0) / total).toFixed(1))
-      : 0;
+    
+    // Calculate average rating from real review data
+    let avgPopularity = 0;
+    if (total > 0 && Object.keys(menuItemsRatings).length > 0) {
+      const ratingsWithValues = statsItems
+        .map((item: any) => {
+          const rating = menuItemsRatings[item.id]?.averageRating || 0;
+          return rating > 0 ? rating : null;
+        })
+        .filter((rating: number | null) => rating !== null) as number[];
+      
+      if (ratingsWithValues.length > 0) {
+        avgPopularity = Number((ratingsWithValues.reduce((sum, rating) => sum + rating, 0) / ratingsWithValues.length).toFixed(1));
+      }
+    }
     
     return {
       total,
@@ -183,7 +200,7 @@ export default function MenuItemsPage() {
       avgPrepTime,
       avgPopularity,
     };
-  }, [statsResponse]);
+  }, [statsResponse, menuItemsRatings]);
   
   // Use the same query as categories page to ensure consistency
   // This shows the same categories that appear on /dashboard/categories
@@ -330,6 +347,32 @@ export default function MenuItemsPage() {
       };
     });
   }, [menuItemsResponse]);
+
+  // Fetch ratings for menu items (including stats items)
+  useEffect(() => {
+    const statsItems = (statsResponse as any)?.menuItems || [];
+    const allMenuItemIds = [
+      ...menuItems.map((item: MenuItem) => item.id),
+      ...statsItems.map((item: any) => item.id),
+    ].filter(Boolean);
+    const uniqueMenuItemIds = Array.from(new Set(allMenuItemIds));
+
+    if (uniqueMenuItemIds.length > 0 && branchId) {
+      getMenuItemsRatings({
+        menuItemIds: uniqueMenuItemIds,
+        branchId,
+        companyId: (companyContext as any)?.companyId || (companyContext as any)?.id || (companyContext as any)?._id,
+      })
+        .unwrap()
+        .then((ratings) => {
+          setMenuItemsRatings(ratings);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch menu items ratings:', error);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuItems, statsResponse, branchId, companyContext]);
   
   // Extract total from API response (already transformed)
   const totalItems = useMemo(() => {
@@ -1044,18 +1087,27 @@ export default function MenuItemsPage() {
     },
     {
       key: 'popularity',
-      title: 'Popularity',
+      title: 'Rating',
       align: 'center' as const,
-      render: (value: number) => (
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-1">
-            {renderStars(value || 0)}
-            <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
-              ({value?.toFixed(1) || '0.0'})
-            </span>
+      render: (value: number, row: MenuItem) => {
+        const rating = menuItemsRatings[row.id]?.averageRating || 0;
+        const totalReviews = menuItemsRatings[row.id]?.totalReviews || 0;
+        return (
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1">
+              {renderStars(rating)}
+              <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
+                ({rating.toFixed(1)})
+              </span>
+            </div>
+            {totalReviews > 0 && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
+              </span>
+            )}
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'isAvailable',
@@ -1190,63 +1242,85 @@ export default function MenuItemsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Items</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
               </div>
-              <ShoppingBagIcon className="w-8 h-8 text-blue-600" />
+              <ShoppingBagIcon className="w-7 h-7 md:w-8 md:h-8 text-blue-600 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Available</p>
-                <p className="text-3xl font-bold text-green-600">{stats.available}</p>
+                <p className="text-2xl md:text-3xl font-bold text-green-600">{stats.available}</p>
               </div>
-              <ShoppingBagIcon className="w-8 h-8 text-green-600" />
+              <ShoppingBagIcon className="w-7 h-7 md:w-8 md:h-8 text-green-600 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Unavailable</p>
-                <p className="text-3xl font-bold text-red-600">{stats.unavailable}</p>
+                <p className="text-2xl md:text-3xl font-bold text-red-600">{stats.unavailable}</p>
               </div>
-              <ShoppingBagIcon className="w-8 h-8 text-red-600" />
+              <ShoppingBagIcon className="w-7 h-7 md:w-8 md:h-8 text-red-600 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Prep Time</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.avgPrepTime.toFixed(0)} min</p>
+                <p className="text-2xl md:text-3xl font-bold text-purple-600">{stats.avgPrepTime.toFixed(0)} min</p>
               </div>
-              <ClockIcon className="w-8 h-8 text-purple-600" />
+              <ClockIcon className="w-7 h-7 md:w-8 md:h-8 text-purple-600 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Popularity</p>
-                <p className="text-3xl font-bold text-yellow-600">{typeof stats.avgPopularity === 'number' ? stats.avgPopularity.toFixed(1) : stats.avgPopularity}⭐</p>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Rating</p>
+                <p className="text-2xl md:text-3xl font-bold text-yellow-600">
+                  {stats.avgPopularity > 0 ? stats.avgPopularity.toFixed(1) : '0.0'}
+                </p>
+                {stats.avgPopularity > 0 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Based on reviews
+                  </p>
+                )}
               </div>
-              <ShoppingBagIcon className="w-8 h-8 text-yellow-600" />
+              <div className="flex flex-col items-center shrink-0">
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      className={`text-lg md:text-xl lg:text-2xl ${
+                        star <= Math.round(stats.avgPopularity)
+                          ? 'text-yellow-400'
+                          : 'text-gray-300 dark:text-gray-600'
+                      }`}
+                    >
+                      ⭐
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1365,10 +1439,23 @@ export default function MenuItemsPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    {renderStars(selectedMenuItem.popularity || 0)}
-                    <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
-                      ({selectedMenuItem.popularity?.toFixed(1) || '0.0'})
-                    </span>
+                    {(() => {
+                      const rating = menuItemsRatings[selectedMenuItem.id]?.averageRating || 0;
+                      const totalReviews = menuItemsRatings[selectedMenuItem.id]?.totalReviews || 0;
+                      return (
+                        <>
+                          {renderStars(rating)}
+                          <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
+                            ({rating.toFixed(1)})
+                          </span>
+                          {totalReviews > 0 && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                              {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

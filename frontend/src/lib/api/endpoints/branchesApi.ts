@@ -3,6 +3,8 @@ import { apiSlice } from '../apiSlice';
 export interface Branch {
   id: string;
   name: string;
+  slug?: string;
+  publicUrl?: string;
   address: string | {
     street: string;
     city: string;
@@ -120,10 +122,26 @@ export const branchesApi = apiSlice.injectEndpoints({
             companyId: branch.companyId || branch.company?.id || branch.company?._id,
             name: branch.name,
             slug: branch.slug,
+            publicUrl: branch.publicUrl,
             phone: branch.phone,
             email: branch.email,
             address: branch.address,
-            managerId: branch.managerId || branch.manager?.id || branch.manager?._id,
+            managerId: branch.managerId || branch.manager?.id || branch.manager?._id || branch.managerId?._id || branch.managerId?.id,
+            manager: branch.managerId && typeof branch.managerId === 'object' && 'firstName' in branch.managerId
+              ? {
+                  id: branch.managerId._id || branch.managerId.id,
+                  firstName: branch.managerId.firstName,
+                  lastName: branch.managerId.lastName,
+                  email: branch.managerId.email,
+                }
+              : branch.manager && typeof branch.manager === 'object' && 'firstName' in branch.manager
+              ? {
+                  id: branch.manager._id || branch.manager.id,
+                  firstName: branch.manager.firstName,
+                  lastName: branch.manager.lastName,
+                  email: branch.manager.email,
+                }
+              : undefined,
             isActive: branch.isActive !== undefined ? branch.isActive : true,
             openingHours: branch.openingHours || [],
             totalTables: branch.totalTables,
@@ -145,19 +163,35 @@ export const branchesApi = apiSlice.injectEndpoints({
           companyId: branch.companyId || branch.company?.id || branch.company?._id,
           name: branch.name,
           slug: branch.slug,
+          publicUrl: branch.publicUrl,
           phone: branch.phone,
           email: branch.email,
           address: branch.address,
-          managerId: branch.managerId || branch.manager?.id || branch.manager?._id,
+          managerId: branch.managerId || branch.manager?.id || branch.manager?._id || branch.managerId?._id || branch.managerId?.id,
+          manager: branch.managerId && typeof branch.managerId === 'object' && 'firstName' in branch.managerId
+            ? {
+                id: branch.managerId._id || branch.managerId.id,
+                firstName: branch.managerId.firstName,
+                lastName: branch.managerId.lastName,
+                email: branch.managerId.email,
+              }
+            : branch.manager && typeof branch.manager === 'object' && 'firstName' in branch.manager
+            ? {
+                id: branch.manager._id || branch.manager.id,
+                firstName: branch.manager.firstName,
+                lastName: branch.manager.lastName,
+                email: branch.manager.email,
+              }
+            : undefined,
           isActive: branch.isActive !== undefined ? branch.isActive : true,
           openingHours: branch.openingHours || [],
-          totalTables: branch.totalTables,
-          totalSeats: branch.totalSeats,
+          totalTables: branch.totalTables !== undefined ? branch.totalTables : undefined,
+          totalSeats: branch.totalSeats !== undefined ? branch.totalSeats : undefined,
           createdAt: branch.createdAt || new Date().toISOString(),
           updatedAt: branch.updatedAt || new Date().toISOString(),
         } as Branch;
       },
-      providesTags: ['Branch'],
+      providesTags: (result, error, id) => [{ type: 'Branch', id }],
     }),
     createBranch: builder.mutation<Branch, CreateBranchRequest>({
       query: (data) => ({
@@ -189,6 +223,77 @@ export const branchesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Branch'],
     }),
+    updateBranchPublicUrl: builder.mutation<Branch, { id: string; publicUrl: string }>({
+      query: ({ id, publicUrl }) => ({
+        url: `/branches/${id}/public-url`,
+        method: 'PATCH',
+        body: { publicUrl },
+      }),
+      invalidatesTags: ['Branch'],
+    }),
+    getBranchStats: builder.query<{
+      branch: Branch;
+      stats: {
+        totalTables: number;
+        totalSeats: number;
+        totalStaff: number;
+        totalOrders: number;
+        todayRevenue: number;
+        actualTablesCount?: number;
+        actualUsersCount?: number;
+      };
+    }, string>({
+      query: (id) => `/branches/${id}/stats`,
+      transformResponse: (response: any) => {
+        console.log('Branch Stats API Response (raw):', response);
+        // Handle both wrapped { data: {...} } and direct response
+        const data = response.data || response;
+        const stats = data.stats || {};
+        console.log('Transformed Branch Stats:', { 
+          response, 
+          data, 
+          stats,
+          'stats.actualTablesCount': stats.actualTablesCount,
+          'stats.actualUsersCount': stats.actualUsersCount,
+          'stats.totalOrders': stats.totalOrders,
+          'stats.todayRevenue': stats.todayRevenue,
+        });
+        
+        // Transform the branch object to include manager if populated
+        const branch = data.branch || {};
+        const transformedBranch = {
+          ...branch,
+          // Extract manager from populated managerId
+          manager: branch.managerId && typeof branch.managerId === 'object' && 'firstName' in branch.managerId
+            ? {
+                id: branch.managerId._id?.toString() || branch.managerId.id?.toString() || '',
+                firstName: branch.managerId.firstName || '',
+                lastName: branch.managerId.lastName || '',
+                email: branch.managerId.email || '',
+              }
+            : undefined,
+          // Ensure totalTables and totalSeats are included
+          totalTables: branch.totalTables !== undefined ? branch.totalTables : undefined,
+          totalSeats: branch.totalSeats !== undefined ? branch.totalSeats : undefined,
+        };
+        
+        const result = {
+          branch: transformedBranch,
+          stats: {
+            totalTables: stats.totalTables ?? 0,
+            totalSeats: stats.totalSeats ?? 0,
+            totalStaff: stats.totalStaff ?? stats.actualUsersCount ?? 0,
+            totalOrders: stats.totalOrders ?? 0,
+            todayRevenue: stats.todayRevenue ?? 0,
+            actualTablesCount: stats.actualTablesCount ?? 0,
+            actualUsersCount: stats.actualUsersCount ?? stats.totalStaff ?? 0,
+          },
+        };
+        console.log('Final transformed result:', result);
+        return result;
+      },
+      providesTags: ['Branch'],
+    }),
   }),
 });
 
@@ -199,4 +304,6 @@ export const {
   useUpdateBranchMutation,
   useDeleteBranchMutation,
   useToggleBranchStatusMutation,
+  useUpdateBranchPublicUrlMutation,
+  useGetBranchStatsQuery,
 } = branchesApi;

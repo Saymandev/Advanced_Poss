@@ -272,6 +272,11 @@ export const apiSlice = createApi({
     'Printer',
     'PrintJob',
     'Settings',
+    'QRCode',
+    'DigitalReceipt',
+    'DeliveryIntegration',
+    'PurchaseOrder',
+    'Review',
   ],
   endpoints: () => ({}),
 });

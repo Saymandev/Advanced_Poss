@@ -13,6 +13,11 @@ export interface Staff {
   salary?: number;
   hourlyRate?: number;
   isActive: boolean;
+  branchId?: string;
+  branch?: {
+    id: string;
+    name: string;
+  };
   emergencyContact: {
     name: string;
     relationship: string;
@@ -158,6 +163,11 @@ export const staffApi = apiSlice.injectEndpoints({
             salary: user.salary,
             hourlyRate: user.hourlyRate,
             isActive: user.isActive !== undefined ? user.isActive : true,
+            branchId: user.branchId?._id || user.branchId?.id || user.branchId || undefined,
+            branch: user.branchId?.name ? {
+              id: user.branchId._id || user.branchId.id || user.branchId,
+              name: user.branchId.name,
+            } : undefined,
             address: user.address,
             emergencyContact: user.emergencyContact,
             skills: user.skills || [],
@@ -187,6 +197,11 @@ export const staffApi = apiSlice.injectEndpoints({
           salary: data.salary,
           hourlyRate: data.hourlyRate,
           isActive: data.isActive !== undefined ? data.isActive : true,
+          branchId: data.branchId?._id || data.branchId?.id || data.branchId || undefined,
+          branch: data.branchId?.name ? {
+            id: data.branchId._id || data.branchId.id || data.branchId,
+            name: data.branchId.name,
+          } : undefined,
           address: data.address,
           emergencyContact: data.emergencyContact,
           skills: data.skills || [],

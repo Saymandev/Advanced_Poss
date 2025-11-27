@@ -1724,6 +1724,7 @@ export default function POSPage() {
         status: 'pending' as const,
         paymentMethod: paymentMethodForBackend,
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
+        ...(selectedWaiterId ? { waiterId: selectedWaiterId } : {}),
       };
 
       const orderResponse = await createOrderWithRetry(orderData);

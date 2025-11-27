@@ -15,13 +15,14 @@ import {
   ChartBarIcon,
   EyeIcon,
   LinkIcon,
+  PencilIcon,
   PlusIcon,
   QrCodeIcon,
   TableCellsIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 const MENU_TYPES = [
@@ -32,32 +33,75 @@ const MENU_TYPES = [
 ];
 
 export default function QRCodesPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedQR, setSelectedQR] = useState<QRCodeMenu | null>(null);
+  const [qrToDelete, setQrToDelete] = useState<QRCodeMenu | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    menuType: 'full' as QRCodeMenu['menuType'],
+    isActive: true,
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [tableFilter, setTableFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const { data: qrCodesData, isLoading, refetch } = useGetQRCodesQuery({
-    branchId: user?.branchId || undefined,
-    tableNumber: tableFilter === 'all' || !tableFilter ? undefined : parseInt(tableFilter),
+  // Extract branchId
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  // Form error states
+  const [formErrors, setFormErrors] = useState<{
+    tableNumber?: string;
+    menuType?: string;
+  }>({});
+
+  // Query parameters
+  const queryParams = useMemo(() => {
+    const params: any = {};
+    if (branchId) params.branchId = branchId;
+    if (tableFilter && tableFilter !== 'all') {
+      const tableNum = parseInt(tableFilter, 10);
+      if (!isNaN(tableNum) && tableNum > 0) {
+        params.tableNumber = tableNum;
+      }
+    }
+    return params;
+  }, [branchId, tableFilter]);
+
+  const { data: qrCodesData, isLoading, error, refetch } = useGetQRCodesQuery(queryParams, {
+    skip: !branchId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   });
 
   // Filter QR codes by type and search
-  const filteredQRCodes = (qrCodesData || []).filter((qr) => {
-    if (typeFilter !== 'all' && qr.menuType !== typeFilter) return false;
-    if (searchQuery && !qr.tableNumber?.toString().includes(searchQuery)) return false;
-    return true;
+  const filteredQRCodes = useMemo(() => {
+    if (!qrCodesData) return [];
+    return (qrCodesData || []).filter((qr) => {
+      if (typeFilter !== 'all' && qr.menuType !== typeFilter) return false;
+      if (searchQuery && !qr.tableNumber?.toString().includes(searchQuery)) return false;
+      return true;
+    });
+  }, [qrCodesData, typeFilter, searchQuery]);
+
+  const { data: tables, isLoading: isLoadingTables } = useGetTablesQuery({ 
+    branchId: branchId || undefined 
+  }, {
+    skip: !branchId,
+    refetchOnMountOrArgChange: true,
   });
 
-  const { data: tables } = useGetTablesQuery({ branchId: user?.branchId || undefined });
-  const [generateQR] = useGenerateQRCodeMutation();
-  const [updateQR] = useUpdateQRCodeMutation();
-  const [deleteQR] = useDeleteQRCodeMutation();
+  const [generateQR, { isLoading: isGenerating }] = useGenerateQRCodeMutation();
+  const [updateQR, { isLoading: isUpdating }] = useUpdateQRCodeMutation();
+  const [deleteQR, { isLoading: isDeleting }] = useDeleteQRCodeMutation();
 
   const [formData, setFormData] = useState({
     tableNumber: '',
@@ -69,23 +113,65 @@ export default function QRCodesPage() {
       tableNumber: '',
       menuType: 'full',
     });
+    setFormErrors({});
     setSelectedQR(null);
   };
 
+  // Validation function
+  const validateForm = (): boolean => {
+    const errors: { tableNumber?: string; menuType?: string } = {};
+
+    // Menu type is always required and has a default, so no validation needed
+    // Table number is optional, so no validation needed
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCreate = async () => {
+    if (!validateForm()) {
+      const firstError = Object.values(formErrors)[0];
+      if (firstError) {
+        toast.error(firstError);
+      }
+      return;
+    }
+
+    if (!branchId) {
+      toast.error('Branch ID is required');
+      return;
+    }
+
     try {
+      // Parse tableNumber safely - only include if it's a valid positive number
+      let tableNumber: number | undefined = undefined;
+      if (formData.tableNumber && formData.tableNumber.trim()) {
+        const parsed = parseInt(formData.tableNumber.trim(), 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          tableNumber = parsed;
+        }
+      }
+
       await generateQR({
-        branchId: user?.branchId || '',
-        tableNumber: formData.tableNumber ? parseInt(formData.tableNumber) : undefined,
+        branchId: branchId,
+        tableNumber: tableNumber,
         menuType: formData.menuType,
       }).unwrap();
 
       toast.success('QR code generated successfully');
       setIsCreateModalOpen(false);
       resetForm();
-      refetch();
+      setTimeout(() => {
+        refetch();
+      }, 500);
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to generate QR code');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to generate QR code';
+      toast.error(errorMessage);
+      
+      // Set field-specific errors if available
+      if (error?.data?.errors) {
+        setFormErrors(error.data.errors);
+      }
     }
   };
 
@@ -97,27 +183,73 @@ export default function QRCodesPage() {
       }).unwrap();
 
       toast.success(`QR code ${qr.isActive ? 'deactivated' : 'activated'} successfully`);
-      refetch();
+      setTimeout(() => {
+        refetch();
+      }, 500);
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update QR code status');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to update QR code status';
+      toast.error(errorMessage);
     }
   };
 
-  const handleDelete = async (qr: QRCodeMenu) => {
-    if (!confirm(`Are you sure you want to delete this QR code?`)) return;
+  const handleDeleteClick = (qr: QRCodeMenu) => {
+    setQrToDelete(qr);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!qrToDelete) return;
 
     try {
-      await deleteQR(qr.id).unwrap();
+      await deleteQR(qrToDelete.id).unwrap();
       toast.success('QR code deleted successfully');
-      refetch();
+      setIsDeleteModalOpen(false);
+      setQrToDelete(null);
+      setTimeout(() => {
+        refetch();
+      }, 500);
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to delete QR code');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to delete QR code';
+      toast.error(errorMessage);
     }
   };
 
   const openViewModal = (qr: QRCodeMenu) => {
     setSelectedQR(qr);
     setIsViewModalOpen(true);
+  };
+
+  const openEditModal = (qr: QRCodeMenu) => {
+    setSelectedQR(qr);
+    setEditFormData({
+      menuType: qr.menuType,
+      isActive: qr.isActive,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEdit = async () => {
+    if (!selectedQR) return;
+
+    try {
+      await updateQR({
+        id: selectedQR.id,
+        data: {
+          menuType: editFormData.menuType,
+          isActive: editFormData.isActive,
+        },
+      }).unwrap();
+
+      toast.success('QR code updated successfully');
+      setIsEditModalOpen(false);
+      setSelectedQR(null);
+      setTimeout(() => {
+        refetch();
+      }, 500);
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || error?.message || 'Failed to update QR code';
+      toast.error(errorMessage);
+    }
   };
 
   const getMenuTypeBadge = (type: QRCodeMenu['menuType']) => {
@@ -214,22 +346,35 @@ export default function QRCodesPage() {
             variant="ghost"
             size="sm"
             onClick={() => openViewModal(row)}
+            title="View QR Code"
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => openEditModal(row)}
+            title="Edit QR Code"
+          >
+            <PencilIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => handleToggleActive(row)}
             className={row.isActive ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+            disabled={isUpdating}
+            title={row.isActive ? 'Disable QR Code' : 'Enable QR Code'}
           >
             {row.isActive ? 'Disable' : 'Enable'}
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleDelete(row)}
+            onClick={() => handleDeleteClick(row)}
             className="text-red-600 hover:text-red-700"
+            disabled={isDeleting}
+            title="Delete QR Code"
           >
             <TrashIcon className="w-4 h-4" />
           </Button>
@@ -238,14 +383,19 @@ export default function QRCodesPage() {
     },
   ];
 
-  const qrCodes = qrCodesData || [];
+  const qrCodes = useMemo(() => {
+    if (!qrCodesData) return [];
+    return Array.isArray(qrCodesData) ? qrCodesData : [];
+  }, [qrCodesData]);
   
-  const stats = {
-    total: qrCodes.length,
-    active: qrCodes.filter(qr => qr.isActive).length,
-    totalScans: qrCodes.reduce((sum, qr) => sum + (qr.scanCount || 0), 0),
-    avgScans: qrCodes.length ? (qrCodes.reduce((sum, qr) => sum + (qr.scanCount || 0), 0) / qrCodes.length).toFixed(1) : '0',
-  };
+  const stats = useMemo(() => {
+    return {
+      total: qrCodes.length,
+      active: qrCodes.filter(qr => qr.isActive).length,
+      totalScans: qrCodes.reduce((sum, qr) => sum + (qr.scanCount || 0), 0),
+      avgScans: qrCodes.length ? (qrCodes.reduce((sum, qr) => sum + (qr.scanCount || 0), 0) / qrCodes.length).toFixed(1) : '0',
+    };
+  }, [qrCodes]);
 
   return (
     <div className="space-y-6">
@@ -320,7 +470,7 @@ export default function QRCodesPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Input
-                placeholder="Search QR codes..."
+                placeholder="Search by table number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -338,16 +488,43 @@ export default function QRCodesPage() {
             </div>
             <div className="w-full sm:w-48">
               <Select
-                options={[
-                  { value: 'all', label: 'All Tables' },
-                  ...(tables?.tables?.map(t => ({ value: t.number.toString(), label: `Table ${t.number}` })) || []),
-                ]}
+                options={
+                  isLoadingTables
+                    ? [{ value: 'all', label: 'Loading tables...' }]
+                    : [
+                        { value: 'all', label: 'All Tables' },
+                        ...(tables?.tables?.map(t => ({ 
+                          value: t.number.toString(), 
+                          label: `Table ${t.number}` 
+                        })) || []),
+                      ]
+                }
                 value={tableFilter}
                 onChange={setTableFilter}
                 placeholder="Filter by table"
+                disabled={isLoadingTables}
               />
             </div>
+            {(typeFilter !== 'all' || tableFilter !== 'all' || searchQuery) && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setTypeFilter('all');
+                  setTableFilter('all');
+                  setSearchQuery('');
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
           </div>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm text-red-600 dark:text-red-400">
+                Error loading QR codes: {(error as any)?.data?.message || 'Unknown error occurred'}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -397,24 +574,44 @@ export default function QRCodesPage() {
               Table (Optional)
             </label>
             <Select
-              options={[
-                { value: '', label: 'General Menu (No specific table)' },
-                ...(tables?.tables?.map(t => ({ value: t.number.toString(), label: `Table ${t.number}` })) || []),
-              ]}
+              options={
+                isLoadingTables
+                  ? [{ value: '', label: 'Loading tables...' }]
+                  : [
+                      { value: '', label: 'General Menu (No specific table)' },
+                      ...(tables?.tables?.map(t => ({ 
+                        value: t.number.toString(), 
+                        label: `Table ${t.number}` 
+                      })) || []),
+                    ]
+              }
               value={formData.tableNumber}
-              onChange={(value) => setFormData({ ...formData, tableNumber: value })}
+              onChange={(value) => {
+                setFormData({ ...formData, tableNumber: value });
+                if (formErrors.tableNumber) {
+                  setFormErrors(prev => ({ ...prev, tableNumber: undefined }));
+                }
+              }}
               placeholder="Select table or leave empty for general menu"
+              disabled={isLoadingTables}
+              error={formErrors.tableNumber}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Menu Type
+              Menu Type *
             </label>
             <Select
               options={MENU_TYPES}
               value={formData.menuType}
-              onChange={(value) => setFormData({ ...formData, menuType: value as QRCodeMenu['menuType'] })}
+              onChange={(value) => {
+                setFormData({ ...formData, menuType: value as QRCodeMenu['menuType'] });
+                if (formErrors.menuType) {
+                  setFormErrors(prev => ({ ...prev, menuType: undefined }));
+                }
+              }}
+              error={formErrors.menuType}
             />
           </div>
 
@@ -428,6 +625,12 @@ export default function QRCodesPage() {
             </ul>
           </div>
 
+          {isLoadingTables && (
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              Loading available tables...
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -435,11 +638,12 @@ export default function QRCodesPage() {
                 setIsCreateModalOpen(false);
                 resetForm();
               }}
+              disabled={isGenerating}
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>
-              Generate QR Code
+            <Button onClick={handleCreate} disabled={isGenerating || isLoadingTables || !branchId}>
+              {isGenerating ? 'Generating...' : 'Generate QR Code'}
             </Button>
           </div>
         </div>
@@ -611,13 +815,165 @@ export default function QRCodesPage() {
                 <Button
                   onClick={() => handleToggleActive(selectedQR)}
                   variant={selectedQR.isActive ? 'danger' : 'secondary'}
+                  disabled={isUpdating}
                 >
-                  {selectedQR.isActive ? 'Disable' : 'Enable'}
+                  {isUpdating ? 'Updating...' : (selectedQR.isActive ? 'Disable' : 'Enable')}
                 </Button>
               </div>
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setQrToDelete(null);
+        }}
+        title="Delete QR Code"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete this QR code? This action cannot be undone.
+          </p>
+
+          {qrToDelete && (
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Table:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {qrToDelete.tableNumber ? `Table ${qrToDelete.tableNumber}` : 'General Menu'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Menu Type:</span>
+                  {getMenuTypeBadge(qrToDelete.menuType)}
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Total Scans:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {qrToDelete.scanCount || 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setQrToDelete(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteConfirm}
+              variant="danger"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete QR Code'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit QR Code Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedQR(null);
+        }}
+        title="Edit QR Code"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          {selectedQR && (
+            <>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">QR Code Information</h4>
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Table:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {selectedQR.tableNumber ? `Table ${selectedQR.tableNumber}` : 'General Menu'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Total Scans:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {selectedQR.scanCount || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Menu Type *
+                </label>
+                <Select
+                  options={MENU_TYPES}
+                  value={editFormData.menuType}
+                  onChange={(value) => setEditFormData({ ...editFormData, menuType: value as QRCodeMenu['menuType'] })}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  <strong>Where menu types are defined:</strong>
+                </p>
+                <ul className="text-xs text-gray-500 dark:text-gray-400 mt-1 space-y-1 list-disc list-inside">
+                  <li>Frontend: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">frontend/src/app/dashboard/qr-code-menus/page.tsx</code> - MENU_TYPES constant (line 27-32)</li>
+                  <li>Backend Schema: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">backend/src/modules/qr-codes/schemas/qr-code.schema.ts</code> - enum on line 14</li>
+                  <li>Backend DTOs: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">backend/src/modules/qr-codes/dto/create-qr-code.dto.ts</code> and <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">update-qr-code.dto.ts</code></li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Status
+                </label>
+                <Select
+                  options={[
+                    { value: 'true', label: 'Active' },
+                    { value: 'false', label: 'Inactive' },
+                  ]}
+                  value={editFormData.isActive.toString()}
+                  onChange={(value) => setEditFormData({ ...editFormData, isActive: value === 'true' })}
+                />
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                <h4 className="font-medium text-yellow-800 dark:text-yellow-400 mb-2">Note</h4>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  Changing the menu type will update the QR code URL. Customers will need to scan the updated QR code to see the new menu type.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedQR(null);
+                  }}
+                  disabled={isUpdating}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleEdit} disabled={isUpdating}>
+                  {isUpdating ? 'Updating...' : 'Update QR Code'}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
       </Modal>
     </div>
   );

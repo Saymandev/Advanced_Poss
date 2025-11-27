@@ -2,6 +2,7 @@ import { apiSlice } from '../apiSlice';
 
 export interface POSOrderItem {
   menuItemId: string;
+  name?: string; // Menu item name (stored for easier access)
   quantity: number;
   price: number;
   notes?: string;
@@ -39,6 +40,7 @@ export interface CreatePOSOrderRequest {
   paymentMethod?: 'cash' | 'card' | 'split';
   notes?: string;
   guestCount?: number;
+  waiterId?: string; // Optional waiter/user ID to assign the order to
 }
 
 export interface POSOrder extends CreatePOSOrderRequest {

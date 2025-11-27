@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useGetBranchesQuery } from '@/lib/api/endpoints/branchesApi';
 import { Staff, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
@@ -18,7 +19,9 @@ import {
   ClockIcon,
   CogIcon,
   CurrencyDollarIcon,
+  ExclamationTriangleIcon,
   EyeIcon,
+  MapPinIcon,
   PencilIcon,
   ReceiptPercentIcon,
   ShieldCheckIcon,
@@ -86,7 +89,8 @@ const features: Feature[] = [
   { id: 'notifications', name: 'Notifications', description: 'Manage system notifications', icon: BellIcon, category: 'System' },
 ];
 
-const roleAccess: RoleAccess[] = [
+// Base role access definitions (includes all roles for reference)
+const allRoleAccess: RoleAccess[] = [
   {
     role: UserRole.SUPER_ADMIN,
     name: 'Super Admin',
@@ -150,6 +154,9 @@ const roleAccess: RoleAccess[] = [
   },
 ];
 
+// Company-level roles only (exclude SUPER_ADMIN for company dashboards)
+const companyRoleAccess = allRoleAccess.filter(role => role.role !== UserRole.SUPER_ADMIN);
+
 export default function RoleAccessPage() {
   const { user } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || '';
@@ -157,21 +164,50 @@ export default function RoleAccessPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
   const [newRole, setNewRole] = useState<string>('');
+  const [newBranchId, setNewBranchId] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
-  // Get all staff members
+  // Get all staff members (exclude super admins - they're system-level, not company-level)
   const { data: staffData, isLoading, refetch } = useGetStaffQuery(
     {
       companyId,
       limit: 500,
       includeOwners: true,
-      includeSuperAdmins: true,
+      includeSuperAdmins: false, // Exclude super admins from company dashboard
     },
     { skip: !companyId },
   );
+  
+  // Get all branches for branch assignment (include both active and inactive)
+  const { data: branchesData, isLoading: isLoadingBranches, error: branchesError } = useGetBranchesQuery(
+    { companyId, limit: 100 }, // Removed isActive filter to show all branches
+    { skip: !companyId },
+  );
+  
   const [updateStaff] = useUpdateStaffMutation();
+  
+  // Extract branches with proper error handling
+  const branches = useMemo(() => {
+    if (!branchesData) return [];
+    // Handle response structure
+    if (branchesData.branches && Array.isArray(branchesData.branches)) {
+      return branchesData.branches;
+    }
+    return [];
+  }, [branchesData]);
 
-  const staff = useMemo(() => staffData?.staff || [], [staffData?.staff]);
+  // Filter out super admins from staff list (they shouldn't appear in company dashboard)
+  // Note: Staff type already excludes super_admin, but keeping filter for safety
+  const staff = useMemo(() => {
+    const allStaff = staffData?.staff || [];
+    return allStaff;
+  }, [staffData?.staff]);
+
+  // Use company-level roles only (exclude SUPER_ADMIN)
+  const roleAccess = companyRoleAccess;
 
   // Filter staff by selected role
   const filteredStaff = useMemo(() => {
@@ -186,7 +222,7 @@ export default function RoleAccessPage() {
       counts[role.role] = staff.filter((s: Staff) => s.role === role.role && s.isActive).length;
     });
     return counts;
-  }, [staff]);
+  }, [staff, roleAccess]);
 
   const getFeatureById = (id: string) => features.find(f => f.id === id);
 
@@ -208,8 +244,27 @@ export default function RoleAccessPage() {
   };
 
   const handleUpdateRole = async () => {
-    if (!selectedStaff || !newRole) return;
+    if (!selectedStaff || !newRole) {
+      setFormErrors({ role: 'Please select a role' });
+      return;
+    }
 
+    // Clear previous errors
+    setFormErrors({});
+
+    // Security check: Prevent assigning super_admin role from company dashboard
+    if (newRole === 'super_admin' || newRole === UserRole.SUPER_ADMIN) {
+      toast.error('Super Admin role cannot be assigned from company dashboard');
+      return;
+    }
+
+    // Security check: Only owners can assign owner role
+    if (newRole === 'owner' && user?.role !== 'owner') {
+      toast.error('Only owners can assign owner role');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       await updateStaff({
         id: selectedStaff.id,
@@ -218,9 +273,49 @@ export default function RoleAccessPage() {
       toast.success(`Role updated successfully`);
       setIsRoleModalOpen(false);
       setSelectedStaff(null);
+      setNewRole('');
+      setFormErrors({});
       refetch();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to update role');
+      setFormErrors({ role: error.data?.message || 'Failed to update role' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleChangeBranch = (staffMember: Staff) => {
+    setSelectedStaff(staffMember);
+    // Set to empty string if no branch assigned, otherwise use branchId
+    setNewBranchId(staffMember.branchId || '');
+    setIsBranchModalOpen(true);
+  };
+
+  const handleUpdateBranch = async () => {
+    if (!selectedStaff) {
+      setFormErrors({ branch: 'Staff member not selected' });
+      return;
+    }
+
+    setFormErrors({});
+    setIsSubmitting(true);
+
+    try {
+      await updateStaff({
+        id: selectedStaff.id,
+        branchId: newBranchId || undefined, // undefined to unassign
+      }).unwrap();
+      toast.success(`Branch assignment updated successfully`);
+      setIsBranchModalOpen(false);
+      setSelectedStaff(null);
+      setNewBranchId('');
+      setFormErrors({});
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update branch assignment');
+      setFormErrors({ branch: error.data?.message || 'Failed to update branch assignment' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -255,6 +350,26 @@ export default function RoleAccessPage() {
       },
     },
     {
+      key: 'branch',
+      title: 'Branch',
+      render: (value: any, row: Staff) => (
+        <div className="flex items-center gap-2">
+          {row.branch ? (
+            <>
+              <MapPinIcon className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {row.branch.name}
+              </span>
+            </>
+          ) : (
+            <span className="text-sm text-gray-400 dark:text-gray-500 italic">
+              Not assigned
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
       key: 'department',
       title: 'Department',
       render: (value: string) => (
@@ -284,14 +399,26 @@ export default function RoleAccessPage() {
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
-          {(user?.role === 'super_admin' || user?.role === 'owner') && row.isActive && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleChangeRole(row)}
-            >
-              <PencilIcon className="w-4 h-4" />
-            </Button>
+          {/* Only owners and managers can change roles and branches */}
+          {(user?.role === 'owner' || user?.role === 'manager') && row.isActive && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleChangeRole(row)}
+                title="Change role"
+              >
+                <PencilIcon className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleChangeBranch(row)}
+                title="Assign branch"
+              >
+                <MapPinIcon className="w-4 h-4" />
+              </Button>
+            </>
           )}
         </div>
       ),
@@ -701,17 +828,119 @@ export default function RoleAccessPage() {
                   setIsRoleModalOpen(false);
                   setSelectedStaff(null);
                   setNewRole('');
+                  setFormErrors({});
                 }}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleUpdateRole}
-                disabled={!newRole || newRole === selectedStaff.role}
+                disabled={isSubmitting || !newRole || newRole === selectedStaff.role}
               >
-                Update Role
+                {isSubmitting ? 'Updating...' : 'Update Role'}
               </Button>
             </div>
+            {formErrors.role && (
+              <div className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                <ExclamationTriangleIcon className="w-4 h-4" />
+                {formErrors.role}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Change Branch Modal */}
+      <Modal
+        isOpen={isBranchModalOpen}
+        onClose={() => {
+          setIsBranchModalOpen(false);
+          setSelectedStaff(null);
+          setNewBranchId('');
+          setFormErrors({});
+        }}
+        title="Assign Branch"
+        className="max-w-md"
+      >
+        {selectedStaff && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Assign branch for <strong>{selectedStaff.firstName} {selectedStaff.lastName}</strong>
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
+                Current branch: {selectedStaff.branch?.name || 'Not assigned'}
+              </p>
+            </div>
+
+            <div>
+              <Select
+                label="Branch"
+                options={[
+                  { value: '', label: 'Unassign (No branch)' },
+                  ...branches.map((branch: any) => ({
+                    value: branch.id,
+                    label: `${branch.name}${branch.isActive === false ? ' (Inactive)' : ''}`
+                  }))
+                ]}
+                value={newBranchId}
+                onChange={setNewBranchId}
+                error={formErrors.branch}
+                disabled={isLoadingBranches}
+              />
+              {isLoadingBranches && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Loading branches...</p>
+              )}
+              {!isLoadingBranches && branches.length === 0 && (
+                <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+                  No active branches found. Please create a branch first.
+                </p>
+              )}
+              {branchesError && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  Error loading branches. Please try again.
+                </p>
+              )}
+            </div>
+
+            {newBranchId !== (selectedStaff.branchId || '') && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">
+                  Branch Assignment Change
+                </p>
+                <p className="text-xs text-blue-800 dark:text-blue-400">
+                  {selectedStaff.branch?.name || 'Not assigned'} → {newBranchId ? (branches.find((b: any) => b.id === newBranchId)?.name || 'Unknown') : 'Unassigned'}
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsBranchModalOpen(false);
+                  setSelectedStaff(null);
+                  setNewBranchId('');
+                  setFormErrors({});
+                }}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleUpdateBranch}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Updating...' : 'Update Branch'}
+              </Button>
+            </div>
+            {formErrors.branch && (
+              <div className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                <ExclamationTriangleIcon className="w-4 h-4" />
+                {formErrors.branch}
+              </div>
+            )}
           </div>
         )}
       </Modal>

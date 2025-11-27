@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
+import { useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -23,6 +24,7 @@ import {
   UserIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
+import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -87,67 +89,130 @@ const computeDateRange = (range: QuickRange): { start: string; end: string } => 
   }
 };
 
-// Mock data for demonstration (not used - replaced by API)
-const _mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'ORD-2024-001',
-    customerName: 'John Doe',
-    customerPhone: '+1 (555) 123-4567',
-    tableNumber: 5,
-    status: 'preparing',
-    items: [
-      { id: '1', name: 'Grilled Salmon', quantity: 1, price: 24.99, notes: 'Medium rare' },
-      { id: '2', name: 'Caesar Salad', quantity: 1, price: 12.99 },
-      { id: '3', name: 'House Wine', quantity: 2, price: 8.99 },
-    ],
-    total: 55.96,
-    tax: 4.48,
-    tip: 8.39,
-    paymentMethod: 'card',
-    paymentStatus: 'paid',
-    createdAt: '2024-01-20T18:30:00Z',
-    updatedAt: '2024-01-20T18:45:00Z',
-  },
-  {
-    id: '2',
-    orderNumber: 'ORD-2024-002',
-    customerName: 'Jane Smith',
-    tableNumber: 8,
-    status: 'pending',
-    items: [
-      { id: '4', name: 'Chicken Parmesan', quantity: 1, price: 18.99 },
-      { id: '5', name: 'Garlic Bread', quantity: 1, price: 6.99 },
-      { id: '6', name: 'Soft Drink', quantity: 1, price: 2.99 },
-    ],
-    total: 28.97,
-    tax: 2.32,
-    paymentMethod: 'cash',
-    paymentStatus: 'pending',
-    createdAt: '2024-01-20T18:35:00Z',
-    updatedAt: '2024-01-20T18:35:00Z',
-  },
-  {
-    id: '3',
-    orderNumber: 'ORD-2024-003',
-    tableNumber: 12,
-    status: 'ready',
-    items: [
-      { id: '7', name: 'Margherita Pizza', quantity: 1, price: 16.99 },
-      { id: '8', name: 'Caesar Salad', quantity: 1, price: 12.99 },
-    ],
-    total: 29.98,
-    tax: 2.40,
-    paymentStatus: 'paid',
-    createdAt: '2024-01-20T18:20:00Z',
-    updatedAt: '2024-01-20T18:40:00Z',
-    servedAt: '2024-01-20T18:40:00Z',
-  },
-];
+// Component to display rating for a specific menu item in an order
+function OrderItemRating({ orderId, menuItemId }: { orderId: string; menuItemId: string }) {
+  const { data: review } = useGetReviewByOrderQuery(orderId, { skip: !orderId });
+  
+  if (!review || !review.itemReviews || review.itemReviews.length === 0) {
+    return (
+      <div className="flex items-center justify-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <StarIcon key={star} className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+        ))}
+      </div>
+    );
+  }
+
+  const itemReview = review.itemReviews.find((ir: any) => {
+    const id = ir.menuItemId?.toString() || ir.menuItemId;
+    return id === menuItemId;
+  });
+
+  if (!itemReview || !itemReview.rating) {
+    return (
+      <div className="flex items-center justify-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <StarIcon key={star} className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <StarIcon
+          key={star}
+          className={`w-4 h-4 ${
+            star <= itemReview.rating
+              ? 'text-yellow-400 fill-yellow-400'
+              : 'text-gray-300 dark:text-gray-600'
+          }`}
+        />
+      ))}
+      <span className="text-xs text-gray-600 dark:text-gray-400 ml-1">
+        {itemReview.rating.toFixed(1)}
+      </span>
+    </div>
+  );
+}
+
+// Component to display overall review for an order
+function OrderReview({ orderId }: { orderId: string }) {
+  const { data: review } = useGetReviewByOrderQuery(orderId, { skip: !orderId });
+  
+  if (!review) {
+    return <span className="text-gray-600 dark:text-gray-400">—</span>;
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-600 dark:text-gray-400">Overall:</span>
+        <div className="flex items-center gap-0.5">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <StarIcon
+              key={star}
+              className={`w-3 h-3 ${
+                star <= review.overallRating
+                  ? 'text-yellow-400 fill-yellow-400'
+                  : 'text-gray-300 dark:text-gray-600'
+              }`}
+            />
+          ))}
+          <span className="text-xs text-gray-600 dark:text-gray-400 ml-1">
+            {review.overallRating.toFixed(1)}
+          </span>
+        </div>
+      </div>
+      {review.waiterRating && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Waiter:</span>
+          <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <StarIcon
+                key={star}
+                className={`w-3 h-3 ${
+                  star <= review.waiterRating!
+                    ? 'text-yellow-400 fill-yellow-400'
+                    : 'text-gray-300 dark:text-gray-600'
+                }`}
+              />
+            ))}
+            <span className="text-xs text-gray-600 dark:text-gray-400 ml-1">
+              {review.waiterRating.toFixed(1)}
+            </span>
+          </div>
+        </div>
+      )}
+      {review.foodRating && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Food:</span>
+          <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <StarIcon
+                key={star}
+                className={`w-3 h-3 ${
+                  star <= review.foodRating
+                    ? 'text-yellow-400 fill-yellow-400'
+                    : 'text-gray-300 dark:text-gray-600'
+                }`}
+              />
+            ))}
+            <span className="text-xs text-gray-600 dark:text-gray-400 ml-1">
+              {review.foodRating.toFixed(1)}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function OrdersPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -287,6 +352,202 @@ export default function OrdersPage() {
     }
     return orders.length;
   }, [ordersResponse, orders.length]);
+
+  const getOrderReviewURL = (order: Order): string => {
+    // Link to customer review page using order ID
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    return `${baseUrl}/display/customerreview/${order.id}`;
+  };
+
+  const handleKOTPrint = (order: Order) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Please allow popups to print KOT');
+      return;
+    }
+
+    const kotHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>KOT - ${order.orderNumber}</title>
+          <style>
+            @media print {
+              @page { margin: 0.5cm; }
+            }
+            body {
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              margin: 0;
+              padding: 10px;
+              max-width: 80mm;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px dashed #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .header h2 {
+              margin: 5px 0;
+              font-size: 14px;
+            }
+            .info {
+              margin: 10px 0;
+              padding: 5px 0;
+              border-bottom: 1px dashed #ccc;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 3px 0;
+            }
+            .items {
+              margin: 10px 0;
+            }
+            .item {
+              margin: 8px 0;
+              padding: 5px 0;
+              border-bottom: 1px dotted #ccc;
+            }
+            .item-header {
+              display: flex;
+              justify-content: space-between;
+              font-weight: bold;
+            }
+            .item-notes {
+              font-size: 10px;
+              color: #666;
+              margin-top: 2px;
+              font-style: italic;
+            }
+            .total {
+              margin-top: 10px;
+              padding-top: 10px;
+              border-top: 2px dashed #000;
+              text-align: right;
+            }
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 5px 0;
+            }
+            .total-final {
+              font-weight: bold;
+              font-size: 14px;
+              margin-top: 5px;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              padding-top: 10px;
+              border-top: 1px dashed #000;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>KITCHEN ORDER TICKET</h1>
+            <h2>Token #${order.orderNumber.split('-').pop() || order.orderNumber}</h2>
+          </div>
+          
+          <div class="info">
+            <div class="info-row">
+              <span>Order #:</span>
+              <span>${order.orderNumber}</span>
+            </div>
+            <div class="info-row">
+              <span>Table:</span>
+              <span>${order.tableNumber === '—' ? 'N/A' : order.tableNumber}</span>
+            </div>
+            <div class="info-row">
+              <span>Type:</span>
+              <span>${(order.orderType || 'Dine-In').toUpperCase()}</span>
+            </div>
+            <div class="info-row">
+              <span>Waiter:</span>
+              <span>${order.waiterName || 'N/A'}</span>
+            </div>
+            <div class="info-row">
+              <span>Time:</span>
+              <span>${new Date(order.createdAt).toLocaleTimeString()}</span>
+            </div>
+            ${order.customerName ? `
+            <div class="info-row">
+              <span>Customer:</span>
+              <span>${order.customerName}</span>
+            </div>
+            ` : ''}
+          </div>
+
+          <div class="items">
+            <h3 style="margin: 10px 0 5px 0; font-size: 14px;">ITEMS:</h3>
+            ${order.items.map(item => `
+              <div class="item">
+                <div class="item-header">
+                  <span>${item.quantity}x ${item.name}</span>
+                  <span>${formatCurrency(item.quantity * item.price)}</span>
+                </div>
+                ${item.notes ? `<div class="item-notes">Note: ${item.notes}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="total">
+            <div class="total-row">
+              <span>Subtotal:</span>
+              <span>${formatCurrency(order.total - order.tax - (order.total * 0.05))}</span>
+            </div>
+            <div class="total-row">
+              <span>SC (5%):</span>
+              <span>${formatCurrency((order.total - order.tax) * 0.05)}</span>
+            </div>
+            <div class="total-row">
+              <span>Tax:</span>
+              <span>${formatCurrency(order.tax)}</span>
+            </div>
+            ${order.tip ? `
+            <div class="total-row">
+              <span>Tip:</span>
+              <span>${formatCurrency(order.tip)}</span>
+            </div>
+            ` : ''}
+            ${order.discount ? `
+            <div class="total-row">
+              <span>Discount:</span>
+              <span>-${formatCurrency(order.discount)}</span>
+            </div>
+            ` : ''}
+            <div class="total-row total-final">
+              <span>TOTAL:</span>
+              <span>${formatCurrency(order.total + (order.tip || 0) - (order.discount || 0))}</span>
+            </div>
+          </div>
+
+          <div class="footer">
+            <div>${new Date(order.createdAt).toLocaleString()}</div>
+            <div style="margin-top: 5px;">Thank you!</div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(kotHTML);
+    printWindow.document.close();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.onafterprint = () => printWindow.close();
+    }, 250);
+    
+    toast.success('KOT sent to printer');
+  };
 
   const handleDeleteOrder = async (orderId: string) => {
     if (!confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
@@ -707,10 +968,7 @@ export default function OrdersPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    // TODO: Implement QR review
-                    toast('QR Review feature coming soon', { icon: 'ℹ️' });
-                  }}
+                  onClick={() => setIsQRModalOpen(true)}
                   className="flex items-center gap-2"
                 >
                   <QrCodeIcon className="w-4 h-4" />
@@ -719,10 +977,7 @@ export default function OrdersPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    // TODO: Implement KOT print
-                    toast('KOT Print feature coming soon', { icon: 'ℹ️' });
-                  }}
+                  onClick={() => handleKOTPrint(selectedOrder)}
                   className="flex items-center gap-2"
                 >
                   <PrinterIcon className="w-4 h-4" />
@@ -918,20 +1173,123 @@ export default function OrdersPage() {
                           <span className="text-gray-600 dark:text-gray-400">{item.notes || '—'}</span>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <StarIcon key={star} className="w-4 h-4 text-gray-300 dark:text-gray-600" />
-                            ))}
-                          </div>
+                          <OrderItemRating orderId={selectedOrder.id} menuItemId={item.id} />
                         </td>
                         <td className="py-3 px-4">
-                          <span className="text-gray-600 dark:text-gray-400">—</span>
+                          <OrderReview orderId={selectedOrder.id} />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* QR Code Review Modal */}
+      <Modal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+        title="Order QR Code"
+        className="max-w-md"
+      >
+        {selectedOrder && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Customers can scan this QR code to review their order details
+              </p>
+              {getOrderReviewURL(selectedOrder) ? (
+                <>
+                  <div className="flex justify-center p-4 bg-white rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                    <QRCodeSVG
+                      value={getOrderReviewURL(selectedOrder)}
+                      size={256}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 break-all">
+                    {getOrderReviewURL(selectedOrder)}
+                  </p>
+                </>
+              ) : (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 text-center">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                    Unable to generate QR code: Table information not available for this order.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+              <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">Order Information</h4>
+              <div className="text-sm space-y-1 text-blue-700 dark:text-blue-300">
+                <div className="flex justify-between">
+                  <span>Order Number:</span>
+                  <span className="font-medium">{selectedOrder.orderNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Token:</span>
+                  <span className="font-medium">#{selectedOrder.orderNumber.split('-').pop() || selectedOrder.orderNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Table:</span>
+                  <span className="font-medium">{selectedOrder.tableNumber === '—' ? 'N/A' : selectedOrder.tableNumber}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              {getOrderReviewURL(selectedOrder) && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    navigator.clipboard.writeText(getOrderReviewURL(selectedOrder));
+                    toast.success('Review URL copied to clipboard');
+                  }}
+                >
+                  Copy URL
+                </Button>
+              )}
+              {getOrderReviewURL(selectedOrder) && (
+                <Button
+                  onClick={() => {
+                    // Find QR code SVG within the modal
+                    const modal = document.querySelector('[role="dialog"]');
+                    const qrElement = modal?.querySelector('svg');
+                    if (qrElement) {
+                      const svgData = new XMLSerializer().serializeToString(qrElement);
+                      const canvas = document.createElement('canvas');
+                      const ctx = canvas.getContext('2d');
+                      const img = new Image();
+                      img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx?.drawImage(img, 0, 0);
+                        canvas.toBlob((blob) => {
+                          if (blob) {
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `order-qr-${selectedOrder.orderNumber}.png`;
+                            link.click();
+                            URL.revokeObjectURL(url);
+                            toast.success('QR code downloaded');
+                          }
+                        });
+                      };
+                      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+                    } else {
+                      toast.error('QR code not found');
+                    }
+                  }}
+                >
+                  Download QR
+                </Button>
+              )}
             </div>
           </div>
         )}
