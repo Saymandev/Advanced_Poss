@@ -190,6 +190,38 @@ export class UsersService {
       throw new BadRequestException('Invalid user ID');
     }
 
+    // Get existing user to check companyId
+    const existingUser = await this.userModel.findById(id);
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Validate branch assignment if branchId is being updated
+    if (updateUserDto.branchId !== undefined) {
+      if (updateUserDto.branchId === null || updateUserDto.branchId === '') {
+        // Allow unassigning branch (set to null)
+        updateUserDto.branchId = null as any;
+      } else {
+        // Validate branch exists and belongs to same company
+        if (!Types.ObjectId.isValid(updateUserDto.branchId)) {
+          throw new BadRequestException('Invalid branch ID');
+        }
+
+        const branch = await this.branchesService.findOne(updateUserDto.branchId);
+        if (!branch) {
+          throw new NotFoundException('Branch not found');
+        }
+
+        // Ensure branch belongs to same company as user
+        const userCompanyId = existingUser.companyId?.toString() || updateUserDto.companyId;
+        const branchCompanyId = branch.companyId?.toString() || (branch.companyId as any)?._id?.toString();
+        
+        if (userCompanyId && branchCompanyId && userCompanyId !== branchCompanyId) {
+          throw new BadRequestException('Branch does not belong to the same company as the user');
+        }
+      }
+    }
+
     // If password is being updated, hash it
     if (updateUserDto.password) {
       updateUserDto.password = await PasswordUtil.hash(updateUserDto.password);
@@ -202,7 +234,8 @@ export class UsersService {
 
     const user = await this.userModel
       .findByIdAndUpdate(id, updateUserDto, { new: true })
-      .select('-password -pin');
+      .select('-password -pin')
+      .populate('branchId', 'name address');
 
     if (!user) {
       throw new NotFoundException('User not found');

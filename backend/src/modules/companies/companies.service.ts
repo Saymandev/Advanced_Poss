@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -84,7 +84,14 @@ export class CompaniesService {
       throw new NotFoundException('Company not found');
     }
 
-    // Return company with subscription data
+    // Log logo for debugging
+    console.log('Company findOne - Logo:', {
+      companyId: id,
+      hasLogo: !!company.logo,
+      logoValue: company.logo?.substring(0, 50) + '...' || 'null',
+    });
+
+    // Return company with subscription data (logo should be included automatically)
     return company as any;
   }
 

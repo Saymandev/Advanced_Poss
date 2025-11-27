@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { BranchesService } from '../branches/branches.service';
+import { CompaniesService } from '../companies/companies.service';
 import { PDFGeneratorService } from './pdf-generator.service';
 import { PrinterService, PrintJob } from './printer.service';
 import { POSOrder, POSOrderDocument } from './schemas/pos-order.schema';
@@ -13,6 +15,8 @@ export class ReceiptService {
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
     private pdfGeneratorService: PDFGeneratorService,
     private printerService: PrinterService,
+    private companiesService: CompaniesService,
+    private branchesService: BranchesService,
   ) {}
 
   // Generate receipt data
@@ -32,6 +36,88 @@ export class ReceiptService {
       .findOne({ branchId: order.branchId })
       .exec();
 
+    // Get branch and company to find public URL and logo
+    let publicUrl: string | undefined;
+    let companyLogo: string | undefined;
+    try {
+      const branch = await this.branchesService.findOne(order.branchId.toString());
+      // Use branch's publicUrl if available, otherwise fallback to company slug
+      if (branch?.publicUrl) {
+        publicUrl = branch.publicUrl;
+      }
+      
+      // Get company for logo and slug
+      // branch.companyId might be populated (object) or ObjectId
+      let companyIdStr: string | undefined;
+      if (branch?.companyId) {
+        // If populated, it's an object with _id
+        if (typeof branch.companyId === 'object' && branch.companyId !== null) {
+          // Check if it's a populated object with _id
+          if ((branch.companyId as any)._id) {
+            companyIdStr = (branch.companyId as any)._id.toString();
+          } else if ((branch.companyId as any).id) {
+            companyIdStr = (branch.companyId as any).id.toString();
+          } else {
+            // Try to get the ID from the object itself
+            const branchCompanyId = branch.companyId as any;
+            companyIdStr = branchCompanyId.toString ? branchCompanyId.toString() : String(branchCompanyId);
+          }
+        } else if (typeof branch.companyId === 'string') {
+          companyIdStr = branch.companyId;
+        } else {
+          companyIdStr = branch.companyId.toString();
+        }
+        
+        // Validate ObjectId format before calling findOne
+        if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
+          try {
+            const company = await this.companiesService.findOne(companyIdStr);
+            // Get company logo
+            if (company?.logo) {
+              companyLogo = company.logo;
+              console.log('Company logo found for receipt:', {
+                companyId: companyIdStr,
+                hasLogo: !!company.logo,
+                logoUrl: company.logo?.substring(0, 50) + '...',
+              });
+            } else {
+              console.log('No company logo found:', {
+                companyId: companyIdStr,
+                hasCompany: !!company,
+                companyKeys: company ? Object.keys(company) : [],
+              });
+            }
+            // Fallback: generate from company slug if branch doesn't have publicUrl
+            if (!publicUrl && company?.slug) {
+              const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+              publicUrl = `${baseUrl}/${company.slug}`;
+              // If branch has slug, use it too
+              if (branch.slug) {
+                publicUrl = `${baseUrl}/${company.slug}/${branch.slug}`;
+              }
+            }
+          } catch (companyError) {
+            console.error('Error fetching company for logo:', {
+              companyId: companyIdStr,
+              error: companyError.message,
+              branchCompanyId: branch.companyId,
+              branchCompanyIdType: typeof branch.companyId,
+              branchCompanyIdKeys: typeof branch.companyId === 'object' ? Object.keys(branch.companyId) : [],
+            });
+          }
+        } else {
+          console.warn('Invalid company ID format:', {
+            companyId: companyIdStr,
+            branchCompanyId: branch.companyId,
+            branchCompanyIdType: typeof branch.companyId,
+          });
+        }
+      }
+    } catch (error) {
+      // If we can't get the URL, continue without it
+      console.warn('Could not retrieve public URL or logo for receipt:', error);
+    }
+
     const safeItems = Array.isArray(order.items)
       ? order.items.map((item: any) => ({
           name: item?.name ?? '',
@@ -44,6 +130,7 @@ export class ReceiptService {
     const receiptData = {
       orderNumber: order.orderNumber,
       orderId: order._id,
+      branchId: order.branchId,
       tableNumber: (order.tableId as any)?.number || 'N/A',
       customerInfo: order.customerInfo || undefined,
       items: safeItems,
@@ -60,10 +147,61 @@ export class ReceiptService {
       paymentDetails: order.paymentId || undefined,
       createdAt: (order as any)?.createdAt || new Date(),
       completedAt: (order as any)?.completedAt || undefined,
-      receiptSettings: settings?.receiptSettings || {
-        header: 'Restaurant Receipt',
-        footer: 'Thank you for your visit!',
-        showLogo: false,
+      receiptSettings: {
+        header: settings?.receiptSettings?.header || 'Restaurant Receipt',
+        footer: settings?.receiptSettings?.footer || 'Thank you for your visit!',
+        fontSize: settings?.receiptSettings?.fontSize || 12,
+        paperWidth: settings?.receiptSettings?.paperWidth || 80,
+        // Determine logo URL: use custom logoUrl if provided, otherwise use company logo if showLogo is enabled
+        logoUrl: (() => {
+          const customLogoUrl = settings?.receiptSettings?.logoUrl;
+          const showLogoEnabled = settings?.receiptSettings?.showLogo === true;
+          
+          // If custom logo URL exists and is not empty, use it
+          if (customLogoUrl && typeof customLogoUrl === 'string' && customLogoUrl.trim() !== '') {
+            console.log('Receipt: Using custom logo URL from POS settings');
+            return customLogoUrl.trim();
+          }
+          
+          // If showLogo is enabled and company logo exists, use company logo
+          if (showLogoEnabled && companyLogo) {
+            console.log('Receipt: Using company logo (showLogo enabled)');
+            return companyLogo;
+          }
+          
+          // If showLogo is not explicitly false and company logo exists, use it
+          if (settings?.receiptSettings?.showLogo !== false && companyLogo) {
+            console.log('Receipt: Using company logo (showLogo not disabled)');
+            return companyLogo;
+          }
+          
+          console.log('Receipt: No logo URL set', {
+            customLogoUrl: customLogoUrl || 'none',
+            showLogoEnabled,
+            hasCompanyLogo: !!companyLogo,
+            posShowLogo: settings?.receiptSettings?.showLogo,
+          });
+          return undefined;
+        })(),
+        // Show logo if explicitly enabled in POS settings, or if company logo exists and not disabled
+        showLogo: (() => {
+          const posShowLogo = settings?.receiptSettings?.showLogo;
+          const shouldShow = posShowLogo === true || 
+                           (companyLogo && posShowLogo !== false);
+          console.log('Receipt showLogo decision:', {
+            posShowLogo,
+            hasCompanyLogo: !!companyLogo,
+            finalShowLogo: shouldShow,
+            logoUrl: (() => {
+              const customLogoUrl = settings?.receiptSettings?.logoUrl;
+              if (customLogoUrl && typeof customLogoUrl === 'string' && customLogoUrl.trim() !== '') {
+                return customLogoUrl.trim();
+              }
+              return companyLogo || undefined;
+            })(),
+          });
+          return shouldShow;
+        })(),
       },
       printerSettings: settings?.printerSettings || {
         enabled: false,
@@ -71,6 +209,7 @@ export class ReceiptService {
         autoPrint: false,
       },
       notes: order?.notes || undefined,
+      publicUrl,
     };
 
     return receiptData;
@@ -107,6 +246,17 @@ export class ReceiptService {
             padding-bottom: 10px;
             margin-bottom: 20px;
             color: #111827;
+        }
+        .header .logo {
+            max-width: 150px;
+            max-height: 150px;
+            width: 150px;
+            height: 150px;
+            display: block;
+            margin: 0 auto 15px auto;
+            object-fit: contain;
+            border-radius: 50%;
+            border: 2px solid #e5e7eb;
         }
         .header h1 {
             margin: 0;
@@ -186,9 +336,9 @@ export class ReceiptService {
 </head>
 <body>
     <div class="header">
-        <h1>${receiptData.receiptSettings.header}</h1>
         ${receiptData.receiptSettings.showLogo && receiptData.receiptSettings.logoUrl ? 
-          `<img src="${receiptData.receiptSettings.logoUrl}" alt="Logo" style="max-width: 100px; max-height: 50px;">` : ''}
+          `<img src="${receiptData.receiptSettings.logoUrl}" alt="Logo" class="logo">` : ''}
+        <h1>${receiptData.receiptSettings.header}</h1>
     </div>
 
     <div class="order-info">
@@ -253,6 +403,14 @@ export class ReceiptService {
 
     <div class="footer">
         <div>${receiptData.receiptSettings.footer}</div>
+        ${receiptData.publicUrl ? `
+        <div style="margin-top: 10px; font-size: 11px; color: #0066cc;">
+            <strong>Visit us online:</strong><br>
+            <a href="${receiptData.publicUrl}" style="color: #0066cc; text-decoration: underline;">
+                ${receiptData.publicUrl}
+            </a>
+        </div>
+        ` : ''}
         <div style="margin-top: 10px; font-size: 10px;">
             Generated on ${new Date().toLocaleString()}
         </div>
@@ -267,9 +425,10 @@ export class ReceiptService {
   async generateReceiptPDF(orderId: string): Promise<Buffer> {
     try {
       const receiptData = await this.generateReceiptData(orderId);
-      const settings = await this.posSettingsModel
-        .findOne({ branchId: receiptData.branchId })
-        .exec();
+      // Use receiptSettings from receiptData which already includes company logo
+      const settings = {
+        receiptSettings: receiptData.receiptSettings,
+      };
 
       return await this.pdfGeneratorService.generateReceiptPDFFromOrder(receiptData, settings);
     } catch (error) {

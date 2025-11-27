@@ -1,5 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { BranchesModule } from '../branches/branches.module';
+import { CompaniesModule } from '../companies/companies.module';
 import { CustomersModule } from '../customers/customers.module';
 import { IngredientsModule } from '../ingredients/ingredients.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
@@ -28,6 +30,8 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
     MenuItemsModule,
     IngredientsModule,
     WebsocketsModule,
+    CompaniesModule,
+    BranchesModule,
     forwardRef(() => TablesModule),
     forwardRef(() => KitchenModule),
     forwardRef(() => CustomersModule),

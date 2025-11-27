@@ -21,6 +21,7 @@ import { CompaniesModule } from './modules/companies/companies.module';
 import { CompanyModule } from './modules/company/company.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { DeliveryZonesModule } from './modules/delivery-zones/delivery-zones.module';
+import { DigitalReceiptsModule } from './modules/digital-receipts/digital-receipts.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { IngredientsModule } from './modules/ingredients/ingredients.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
@@ -33,6 +34,7 @@ import { PublicModule } from './modules/public/public.module';
 import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
 import { QRCodesModule } from './modules/qr-codes/qr-codes.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
@@ -122,6 +124,7 @@ import { AppService } from './app.service';
     POSModule,
     CustomersModule,
     DeliveryZonesModule,
+    DigitalReceiptsModule,
     IngredientsModule,
     SuppliersModule,
     ExpensesModule,
@@ -131,6 +134,7 @@ import { AppService } from './app.service';
     SubscriptionPlansModule,
     BackupsModule,
     ReportsModule,
+    ReviewsModule,
     SettingsModule,
     QRCodesModule,
     ScheduleModule,

@@ -23,7 +23,7 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get('PORT') || 5000;
-  const frontendUrl = configService.get('FRONTEND_URL');
+  const frontendUrl = configService.get('APP_URL');
 
   // Security
   app.use(helmet({

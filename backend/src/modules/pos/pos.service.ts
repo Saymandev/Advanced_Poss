@@ -58,14 +58,40 @@ export class POSService {
 
   // Create POS order
   async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string, companyId?: string): Promise<POSOrder> {
+    // Cache menu items to fetch names efficiently
+    const menuItemCache = new Map<string, any>();
+    
+    // Fetch menu item names for all items
+    const itemsWithNames = await Promise.all(
+      createOrderDto.items.map(async (item) => {
+        let menuItem = menuItemCache.get(item.menuItemId);
+        if (!menuItem) {
+          try {
+            menuItem = await this.menuItemsService.findOne(item.menuItemId);
+            if (menuItem) {
+              menuItemCache.set(item.menuItemId, menuItem);
+            }
+          } catch (error) {
+            console.error(`Failed to fetch menu item ${item.menuItemId}:`, error);
+          }
+        }
+        
+        return {
+          menuItemId: new Types.ObjectId(item.menuItemId),
+          name: menuItem?.name || 'Unknown Item',
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes,
+        };
+      })
+    );
+
     const baseOrderData: any = {
       ...createOrderDto,
       branchId: new Types.ObjectId(branchId),
       userId: new Types.ObjectId(userId),
-      items: createOrderDto.items.map((item) => ({
-        ...item,
-        menuItemId: new Types.ObjectId(item.menuItemId),
-      })),
+      companyId: companyId ? new Types.ObjectId(companyId) : undefined,
+      items: itemsWithNames,
     };
 
     if (createOrderDto.tableId) {
@@ -87,7 +113,6 @@ export class POSService {
       baseOrderData.guestCount = createOrderDto.guestCount || 1;
     }
 
-    const menuItemCache = new Map<string, any>();
     const ingredientUsage = new Map<
       string,
       { quantity: number; name?: string; unit?: string }
@@ -99,11 +124,8 @@ export class POSService {
         continue;
       }
 
-      let menuItem = menuItemCache.get(menuItemId);
-      if (!menuItem) {
-        menuItem = await this.menuItemsService.findOne(menuItemId);
-        menuItemCache.set(menuItemId, menuItem);
-      }
+      // menuItemCache is already populated above, so just get from cache
+      const menuItem = menuItemCache.get(menuItemId);
 
       if (
         !menuItem ||

@@ -127,9 +127,15 @@ export class PDFGeneratorService {
         }
         
         .receipt-header .logo {
-            max-width: 60px;
-            max-height: 40px;
-            margin-bottom: 5px;
+            max-width: 150px;
+            max-height: 150px;
+            width: 150px;
+            height: 150px;
+            display: block;
+            margin: 0 auto 15px auto;
+            object-fit: contain;
+            border-radius: 50%;
+            border: 2px solid #e5e7eb;
         }
         
         .order-info {
@@ -301,6 +307,14 @@ export class PDFGeneratorService {
 
     <div class="receipt-footer">
         <div>${receiptSettings?.footer || 'Thank you for your visit!'}</div>
+        ${orderData.publicUrl ? `
+        <div style="margin-top: 8px; font-size: 9px; color: #0066cc;">
+            <strong>Visit us online:</strong><br>
+            <a href="${orderData.publicUrl}" style="color: #0066cc; text-decoration: underline;">
+                ${orderData.publicUrl}
+            </a>
+        </div>
+        ` : ''}
         <div style="margin-top: 5px; font-size: 8px;">
             Generated on ${new Date().toLocaleString()}
         </div>

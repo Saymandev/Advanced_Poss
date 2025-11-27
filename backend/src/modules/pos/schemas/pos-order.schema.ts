@@ -5,6 +5,7 @@ export type POSOrderDocument = POSOrder & Document;
 
 export interface POSOrderItem {
   menuItemId: Types.ObjectId;
+  name?: string; // Store menu item name for easier access
   quantity: number;
   price: number;
   notes?: string;

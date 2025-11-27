@@ -146,5 +146,9 @@ export class CreatePOSOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  waiterId?: string; // Optional waiter/user ID to assign the order to
 }
 

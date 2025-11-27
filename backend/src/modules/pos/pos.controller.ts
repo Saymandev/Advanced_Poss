@@ -38,7 +38,9 @@ export class POSController {
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
   async createOrder(@Body() createOrderDto: CreatePOSOrderDto, @Request() req) {
     const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
-    return this.posService.createOrder(createOrderDto, req.user.id, req.user.branchId, companyId);
+    // Use selected waiterId if provided, otherwise use logged-in user
+    const userId = createOrderDto.waiterId || req.user.id;
+    return this.posService.createOrder(createOrderDto, userId, req.user.branchId, companyId);
   }
 
   @Get('orders')

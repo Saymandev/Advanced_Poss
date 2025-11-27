@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as QRCode from 'qrcode';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { Company, CompanyDocument } from './schemas/company.schema';
 
@@ -9,6 +11,8 @@ import { Company, CompanyDocument } from './schemas/company.schema';
 export class CompanyService {
   constructor(
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
+    private cloudinaryService: CloudinaryService,
+    private configService: ConfigService,
   ) {}
 
   async getSettings(companyId: string) {
@@ -63,17 +67,92 @@ export class CompanyService {
       throw new Error('No file uploaded');
     }
 
-    // In a real application, you would upload to cloud storage (AWS S3, Cloudinary, etc.)
-    // For now, we'll just store the file path
-    const logoUrl = `/uploads/company-logos/${file.filename}`;
+    console.log('Upload logo - File received:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      hasBuffer: !!file.buffer,
+      bufferLength: file.buffer?.length,
+    });
 
-    await this.companyModel.findByIdAndUpdate(
-      companyId,
-      { logo: logoUrl },
-      { new: true },
-    ).exec();
+    // Get current company to check for existing logo
+    const company = await this.companyModel.findById(companyId).exec();
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
 
-    return { logoUrl };
+    // Check if Cloudinary is configured
+    const cloudName = this.configService.get<string>('cloudinary.cloudName');
+    const apiKey = this.configService.get<string>('cloudinary.apiKey');
+    const apiSecret = this.configService.get<string>('cloudinary.apiSecret');
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new Error(
+        'Cloudinary is not configured. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.',
+      );
+    }
+
+    // Delete old logo from Cloudinary if it exists
+    if (company.logo) {
+      try {
+        const publicId = this.cloudinaryService.extractPublicId(company.logo);
+        if (publicId) {
+          await this.cloudinaryService.deleteImage(publicId);
+        }
+      } catch (error) {
+        // Log error but don't fail the upload if deletion fails
+        console.warn('Failed to delete old logo from Cloudinary:', error);
+      }
+    }
+
+    // Upload new logo to Cloudinary
+    try {
+      // Ensure we have a buffer
+      if (!file.buffer) {
+        throw new Error('File buffer is missing. Multer must be configured with memory storage.');
+      }
+
+      console.log('Uploading to Cloudinary...', {
+        folder: 'company-logos',
+        publicId: `company-${companyId}-logo`,
+        bufferSize: file.buffer.length,
+      });
+
+      const uploadResult = await this.cloudinaryService.uploadImage(
+        file.buffer,
+        'company-logos',
+        `company-${companyId}-logo`, // Use company ID as public ID for easy replacement
+      );
+
+      console.log('Cloudinary upload result:', {
+        hasResult: !!uploadResult,
+        hasSecureUrl: !!uploadResult?.secure_url,
+        secureUrl: uploadResult?.secure_url?.substring(0, 50) + '...',
+      });
+
+      if (!uploadResult || !uploadResult.secure_url) {
+        throw new Error('Cloudinary upload failed: No secure URL returned');
+      }
+
+      // Update company with Cloudinary URL
+      await this.companyModel.findByIdAndUpdate(
+        companyId,
+        { logo: uploadResult.secure_url },
+        { new: true },
+      ).exec();
+
+      return { logoUrl: uploadResult.secure_url };
+    } catch (error) {
+      console.error('Cloudinary upload error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+      throw new Error(
+        `Failed to upload logo to Cloudinary: ${error.message || 'Unknown error'}`,
+      );
+    }
   }
 
   async generateQRCode(companyId: string) {
@@ -82,7 +161,7 @@ export class CompanyService {
       throw new NotFoundException('Company not found');
     }
 
-    const onlineUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/order/${companyId}`;
+    const onlineUrl = `${process.env.APP_URL || 'http://localhost:3000'}/order/${companyId}`;
     
     try {
       const qrCodeUrl = await QRCode.toDataURL(onlineUrl, {

@@ -4,7 +4,8 @@ import {
   Get,
   NotFoundException,
   Param,
-  Post
+  Post,
+  Query
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
@@ -70,6 +71,69 @@ export class PublicController {
     return {
       success: true,
       data: branch,
+    };
+  }
+
+  @Public()
+  @Get('branches/:branchId/menu')
+  @ApiOperation({ summary: 'Get menu items for a branch by ID (public, for QR codes)' })
+  async getBranchMenuById(
+    @Param('branchId') branchId: string,
+    @Query('type') menuType?: string,
+  ) {
+    const branch = await this.branchesService.findOne(branchId);
+    if (!branch || !(branch as any).isActive) {
+      throw new NotFoundException('Branch not found or inactive');
+    }
+
+    const categories = await this.categoriesService.findAll({ branchId } as any);
+    const menuItemsResult = await this.menuItemsService.findAll({ 
+      branchId,
+      isAvailable: true 
+    } as any);
+
+    // Extract menuItems array from result (it might be wrapped in an object)
+    let menuItems = Array.isArray(menuItemsResult) 
+      ? menuItemsResult 
+      : (menuItemsResult as any).menuItems || [];
+
+    // Filter by menu type if provided
+    if (menuType && menuType !== 'full') {
+      const categoryTypes: Record<string, string[]> = {
+        food: ['food', 'main', 'appetizer', 'entree'],
+        drinks: ['beverage', 'drink', 'beverages'],
+        desserts: ['dessert', 'sweets'],
+      };
+      
+      const allowedTypes = categoryTypes[menuType] || [];
+      if (allowedTypes.length > 0) {
+        const filteredCategories = (categories as any[]).filter((cat: any) => {
+          const catType = (cat as any).type?.toLowerCase();
+          return allowedTypes.some(type => catType?.includes(type));
+        });
+        const categoryIds = filteredCategories.map((cat: any) => 
+          (cat as any)._id?.toString() || (cat as any).id
+        );
+        menuItems = menuItems.filter((item: any) => {
+          const itemCategoryId = (item as any).categoryId?._id?.toString() || 
+                                (item as any).categoryId?.id ||
+                                (item as any).categoryId;
+          return categoryIds.includes(itemCategoryId);
+        });
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        branch: {
+          id: (branch as any)._id?.toString() || (branch as any).id,
+          name: (branch as any).name,
+          address: (branch as any).address,
+        },
+        categories: Array.isArray(categories) ? categories : [],
+        menuItems: Array.isArray(menuItems) ? menuItems : [],
+      },
     };
   }
 

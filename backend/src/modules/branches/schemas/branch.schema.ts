@@ -17,6 +17,10 @@ export class Branch {
   @Prop({ trim: true, lowercase: true })
   slug?: string;
 
+  // Public URL for online ordering/menu
+  @Prop({ trim: true })
+  publicUrl?: string;
+
   // Contact
   @Prop()
   phone?: string;

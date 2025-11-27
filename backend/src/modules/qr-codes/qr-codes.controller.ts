@@ -26,9 +26,17 @@ export class QRCodesController {
   @ApiOperation({ summary: 'Get all QR codes' })
   async findAll(
     @Query('branchId') branchId?: string,
-    @Query('tableNumber') tableNumber?: number,
+    @Query('tableNumber') tableNumber?: string,
   ) {
-    return this.qrCodesService.findAll(branchId, tableNumber);
+    // Parse tableNumber safely - convert string to number if provided
+    let tableNum: number | undefined = undefined;
+    if (tableNumber && tableNumber !== 'all' && tableNumber.trim() !== '') {
+      const parsed = parseInt(tableNumber, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        tableNum = parsed;
+      }
+    }
+    return this.qrCodesService.findAll(branchId, tableNum);
   }
 
   @Get(':id')

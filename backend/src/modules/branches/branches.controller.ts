@@ -92,5 +92,15 @@ export class BranchesController {
   deactivate(@Param('id') id: string) {
     return this.branchesService.deactivate(id);
   }
+
+  @Patch(':id/public-url')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update branch public URL (Super Admin only)' })
+  updatePublicUrl(
+    @Param('id') id: string,
+    @Body() body: { publicUrl: string },
+  ) {
+    return this.branchesService.updatePublicUrl(id, body.publicUrl);
+  }
 }
 

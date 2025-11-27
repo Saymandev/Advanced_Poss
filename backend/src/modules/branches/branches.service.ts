@@ -1,14 +1,17 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { BranchFilterDto } from '../../common/dto/pagination.dto';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { CompaniesService } from '../companies/companies.service';
+import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
+import { Table, TableDocument } from '../tables/schemas/table.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { Branch, BranchDocument } from './schemas/branch.schema';
@@ -17,6 +20,9 @@ import { Branch, BranchDocument } from './schemas/branch.schema';
 export class BranchesService {
   constructor(
     @InjectModel(Branch.name) private branchModel: Model<BranchDocument>,
+    @InjectModel(Table.name) private tableModel: Model<TableDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
     private companiesService: CompaniesService,
     private subscriptionPlansService: SubscriptionPlansService,
   ) {}
@@ -60,6 +66,13 @@ export class BranchesService {
       slug = GeneratorUtil.generateUniqueSlug(createBranchDto.name, slugsList);
     }
 
+    // Auto-generate publicUrl if not provided (using company slug + branch slug)
+    let publicUrl = createBranchDto.publicUrl;
+    if (!publicUrl && company.slug && slug) {
+      const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+      publicUrl = `${baseUrl}/${company.slug}/${slug}`;
+    }
+
     // Set default opening hours if not provided
     const defaultOpeningHours = [
       { day: 'monday', open: '09:00', close: '22:00', isClosed: false },
@@ -75,6 +88,7 @@ export class BranchesService {
       ...createBranchDto,
       code,
       slug,
+      publicUrl,
       openingHours: createBranchDto.openingHours || defaultOpeningHours,
       settings: {
         autoAcceptOrders: true,
@@ -248,6 +262,26 @@ export class BranchesService {
     return branch.save();
   }
 
+  async updatePublicUrl(id: string, publicUrl: string): Promise<Branch> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid branch ID');
+    }
+
+    const branch = await this.branchModel.findByIdAndUpdate(
+      id,
+      { publicUrl },
+      { new: true }
+    )
+      .populate('companyId', 'name email')
+      .populate('managerId', 'firstName lastName email');
+
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    return branch;
+  }
+
   async remove(id: string): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid branch ID');
@@ -266,16 +300,62 @@ export class BranchesService {
     }
 
     const branch = await this.findOne(id);
+    const branchObjectId = new Types.ObjectId(id);
 
-    // TODO: Aggregate stats from orders, tables, etc.
+    // Calculate today's date range
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Get actual counts from database
+    // Tables store branchId as string, so we query with both formats to be safe
+    const branchIdString = id.toString();
+    
+    // Query tables - try string first (most common), then ObjectId
+    const [tablesWithString, tablesWithObjectId] = await Promise.all([
+      this.tableModel.find({ branchId: branchIdString }).lean(),
+      this.tableModel.find({ branchId: branchObjectId }).lean(),
+    ]);
+    
+    // Use whichever query found tables (string format is preferred)
+    const actualTablesCount = tablesWithString.length || tablesWithObjectId.length;
+    
+    // Query users and orders - try both formats for consistency
+    const [usersWithString, usersWithObjectId, ordersWithString, ordersWithObjectId, todayOrders] = await Promise.all([
+      this.userModel.countDocuments({ branchId: branchIdString }),
+      this.userModel.countDocuments({ branchId: branchObjectId }),
+      this.posOrderModel.countDocuments({ branchId: branchIdString, status: { $ne: 'cancelled' } }),
+      this.posOrderModel.countDocuments({ branchId: branchObjectId, status: { $ne: 'cancelled' } }),
+      this.posOrderModel.find({
+        $or: [
+          { branchId: branchIdString },
+          { branchId: branchObjectId },
+        ],
+        status: { $ne: 'cancelled' },
+        createdAt: { $gte: today, $lt: tomorrow },
+      }).lean(),
+    ]);
+    
+    // Use whichever query found more results
+    const actualUsersCount = Math.max(usersWithString, usersWithObjectId);
+    const totalOrdersCount = Math.max(ordersWithString, ordersWithObjectId);
+
+    // Calculate today's revenue
+    const todayRevenue = todayOrders.reduce((sum, order) => {
+      return sum + (Number(order.totalAmount) || 0);
+    }, 0);
+
     return {
       branch,
       stats: {
         totalTables: branch.totalTables || 0,
         totalSeats: branch.totalSeats || 0,
-        totalStaff: 0,
-        totalOrders: 0,
-        todayRevenue: 0,
+        totalStaff: actualUsersCount,
+        totalOrders: totalOrdersCount,
+        todayRevenue,
+        actualTablesCount,
+        actualUsersCount,
       },
     };
   }
