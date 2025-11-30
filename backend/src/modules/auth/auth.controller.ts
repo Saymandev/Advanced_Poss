@@ -13,6 +13,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ChangePinDto } from './dto/change-pin.dto';
 import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
 import { FindCompanyDto } from './dto/find-company.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -276,6 +277,21 @@ export class AuthController {
       userId,
       changePasswordDto.currentPassword,
       changePasswordDto.newPassword,
+    );
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('change-pin')
+  @ApiOperation({ summary: 'Change PIN (authenticated)' })
+  changePin(
+    @CurrentUser('id') userId: string,
+    @Body() changePinDto: ChangePinDto,
+  ) {
+    return this.authService.changePin(
+      userId,
+      changePinDto.currentPin,
+      changePinDto.newPin,
     );
   }
 }

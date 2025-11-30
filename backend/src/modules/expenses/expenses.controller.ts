@@ -11,37 +11,39 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
 import { ExpenseFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { ExpensesService } from './expenses.service';
 
 @ApiTags('Expenses')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RoleFeatureGuard)
 @Controller('expenses')
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Create new expense' })
   create(@Body() createExpenseDto: CreateExpenseDto) {
     return this.expensesService.create(createExpenseDto);
   }
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get all expenses with pagination, filtering, and search' })
   findAll(@Query() filterDto: ExpenseFilterDto) {
     return this.expensesService.findAll(filterDto);
   }
 
   @Get('branch/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get expenses by branch' })
   findByBranch(
     @Param('branchId') branchId: string,
@@ -56,7 +58,7 @@ export class ExpensesController {
   }
 
   @Get('branch/:branchId/category/:category')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get expenses by category' })
   findByCategory(
     @Param('branchId') branchId: string,
@@ -66,21 +68,21 @@ export class ExpensesController {
   }
 
   @Get('branch/:branchId/pending')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get pending expenses' })
   findPending(@Param('branchId') branchId: string) {
     return this.expensesService.findPending(branchId);
   }
 
   @Get('branch/:branchId/recurring')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get recurring expenses' })
   findRecurring(@Param('branchId') branchId: string) {
     return this.expensesService.findRecurring(branchId);
   }
 
   @Get('branch/:branchId/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get expense statistics' })
   getStats(
     @Param('branchId') branchId: string,
@@ -95,7 +97,7 @@ export class ExpensesController {
   }
 
   @Get('branch/:branchId/breakdown')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get category breakdown' })
   getCategoryBreakdown(
     @Param('branchId') branchId: string,
@@ -110,7 +112,7 @@ export class ExpensesController {
   }
 
   @Get('branch/:branchId/trend/:year')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get monthly expense trend' })
   getMonthlyTrend(
     @Param('branchId') branchId: string,
@@ -120,28 +122,28 @@ export class ExpensesController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get expense by ID' })
   findOne(@Param('id') id: string) {
     return this.expensesService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Update expense' })
   update(@Param('id') id: string, @Body() updateExpenseDto: UpdateExpenseDto) {
     return this.expensesService.update(id, updateExpenseDto);
   }
 
   @Post(':id/approve')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Approve expense' })
   approve(@Param('id') id: string, @Body('approverId') approverId: string) {
     return this.expensesService.approve(id, approverId);
   }
 
   @Post(':id/reject')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Reject expense' })
   reject(
     @Param('id') id: string,
@@ -152,15 +154,16 @@ export class ExpensesController {
   }
 
   @Post(':id/mark-paid')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Mark expense as paid' })
   markAsPaid(@Param('id') id: string) {
     return this.expensesService.markAsPaid(id);
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
-  @ApiOperation({ summary: 'Delete expense' })
+  @ApiOperation({ summary: 'Delete expense (owner only)' })
   remove(@Param('id') id: string) {
     return this.expensesService.remove(id);
   }

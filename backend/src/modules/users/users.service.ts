@@ -4,9 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { UserFilterDto } from '../../common/dto/pagination.dto';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
@@ -25,6 +27,8 @@ export class UsersService {
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
     private subscriptionPlansService: SubscriptionPlansService,
+    private cloudinaryService: CloudinaryService,
+    private configService: ConfigService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -168,13 +172,28 @@ export class UsersService {
       throw new BadRequestException('Invalid user ID');
     }
 
-    const user = await this.userModel.findById(id).select('-password -pin');
+    const user = await this.userModel
+      .findById(id)
+      .select('-password -pin')
+      .populate('companyId', 'name email')
+      .populate('branchId', 'name address')
+      .lean()
+      .exec();
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    // Ensure id field is present (transform _id to id)
+    const userData = user as any;
+    return {
+      ...userData,
+      id: userData._id?.toString() || userData.id || userData._id,
+      companyId: userData.companyId?._id?.toString() || userData.companyId?.toString() || userData.companyId,
+      branchId: userData.branchId?._id?.toString() || userData.branchId?.toString() || userData.branchId,
+      company: userData.companyId,
+      branch: userData.branchId,
+    } as User;
   }
 
   async findByEmail(email: string): Promise<UserDocument | null> {
@@ -278,6 +297,7 @@ export class UsersService {
     const user = await this.userModel
       .findByIdAndUpdate(id, updateUserDto, { new: true })
       .select('-password -pin')
+      .populate('companyId', 'name email')
       .populate('branchId', 'name address');
 
     if (!user) {
@@ -355,6 +375,84 @@ export class UsersService {
     });
   }
 
+  async updatePin(userId: string, newPin: string): Promise<void> {
+    const hashedPin = await PasswordUtil.hash(newPin);
+    await this.userModel.findByIdAndUpdate(userId, {
+      pin: hashedPin,
+    });
+  }
+
+  async uploadAvatar(userId: string, file: Express.Multer.File): Promise<{ avatarUrl: string }> {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Please upload an image (JPEG, PNG, GIF, or WebP)');
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('File size must be less than 5MB');
+    }
+
+    // Get current user to check for existing avatar
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Check if Cloudinary is configured
+    const cloudName = this.configService.get<string>('cloudinary.cloudName');
+    const apiKey = this.configService.get<string>('cloudinary.apiKey');
+    const apiSecret = this.configService.get<string>('cloudinary.apiSecret');
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new Error(
+        'Cloudinary is not configured. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.',
+      );
+    }
+
+    // Delete old avatar from Cloudinary if it exists
+    if (user.avatar) {
+      try {
+        const publicId = this.cloudinaryService.extractPublicId(user.avatar);
+        if (publicId) {
+          await this.cloudinaryService.deleteImage(publicId);
+        }
+      } catch (error) {
+        // Log error but don't fail the upload if deletion fails
+        console.warn('Failed to delete old avatar from Cloudinary:', error);
+      }
+    }
+
+    // Upload new avatar to Cloudinary
+    if (!file.buffer) {
+      throw new Error('File buffer is missing. Multer must be configured with memory storage.');
+    }
+
+    const uploadResult = await this.cloudinaryService.uploadImage(
+      file.buffer,
+      'user-avatars',
+      `user-${userId}-avatar`,
+    );
+
+    if (!uploadResult || !uploadResult.secure_url) {
+      throw new Error('Cloudinary upload failed: No secure URL returned');
+    }
+
+    // Update user with Cloudinary URL
+    await this.userModel.findByIdAndUpdate(
+      userId,
+      { avatar: uploadResult.secure_url },
+      { new: true },
+    ).exec();
+
+    return { avatarUrl: uploadResult.secure_url };
+  }
+
   async verifyEmail(userId: string): Promise<void> {
     await this.userModel.findByIdAndUpdate(userId, {
       isEmailVerified: true,
@@ -393,6 +491,22 @@ export class UsersService {
     const user = await this.userModel.findByIdAndUpdate(
       id,
       { isActive: false },
+      { new: true },
+    );
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+  }
+
+  async activate(id: string): Promise<void> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    const user = await this.userModel.findByIdAndUpdate(
+      id,
+      { isActive: true },
       { new: true },
     );
 

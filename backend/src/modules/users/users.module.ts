@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
@@ -19,7 +20,7 @@ import { UsersService } from './users.service';
     SubscriptionPlansModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [UsersService, CloudinaryService],
   exports: [UsersService],
 })
 export class UsersModule {}

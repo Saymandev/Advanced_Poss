@@ -369,15 +369,36 @@ export class POSService {
     if (filters.startDate || filters.endDate) {
       query.createdAt = {};
       if (filters.startDate) {
-        query.createdAt.$gte = new Date(filters.startDate);
+        try {
+          const startDate = new Date(filters.startDate);
+          if (isNaN(startDate.getTime())) {
+            throw new BadRequestException(`Invalid startDate format: ${filters.startDate}`);
+          }
+          query.createdAt.$gte = startDate;
+        } catch (error) {
+          throw new BadRequestException(`Invalid startDate: ${filters.startDate}`);
+        }
       }
       if (filters.endDate) {
-        // Check if endDate is already a full ISO string (contains 'T')
-        // If it is, use it directly; otherwise append time
-        const endDate = filters.endDate.includes('T') 
-          ? new Date(filters.endDate)
-          : new Date(filters.endDate + 'T23:59:59.999Z');
-        query.createdAt.$lte = endDate;
+        try {
+          // Check if endDate is already a full ISO string (contains 'T')
+          // If it is, use it directly; otherwise append time
+          const endDateStr = filters.endDate.includes('T') 
+            ? filters.endDate
+            : filters.endDate + 'T23:59:59.999Z';
+          const endDate = new Date(endDateStr);
+          
+          if (isNaN(endDate.getTime())) {
+            throw new BadRequestException(`Invalid endDate format: ${filters.endDate}`);
+          }
+          
+          query.createdAt.$lte = endDate;
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(`Invalid endDate: ${filters.endDate}`);
+        }
       }
     }
 
@@ -642,10 +663,37 @@ export class POSService {
     if (filters.startDate || filters.endDate) {
       matchQuery.createdAt = {};
       if (filters.startDate) {
-        matchQuery.createdAt.$gte = new Date(filters.startDate);
+        try {
+          const startDate = new Date(filters.startDate);
+          if (isNaN(startDate.getTime())) {
+            throw new BadRequestException(`Invalid startDate format: ${filters.startDate}`);
+          }
+          matchQuery.createdAt.$gte = startDate;
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(`Invalid startDate: ${filters.startDate}`);
+        }
       }
       if (filters.endDate) {
-        matchQuery.createdAt.$lte = new Date(filters.endDate + 'T23:59:59.999Z');
+        try {
+          const endDateStr = filters.endDate.includes('T') 
+            ? filters.endDate
+            : filters.endDate + 'T23:59:59.999Z';
+          const endDate = new Date(endDateStr);
+          
+          if (isNaN(endDate.getTime())) {
+            throw new BadRequestException(`Invalid endDate format: ${filters.endDate}`);
+          }
+          
+          matchQuery.createdAt.$lte = endDate;
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(`Invalid endDate: ${filters.endDate}`);
+        }
       }
     }
 
@@ -701,9 +749,24 @@ export class POSService {
         },
         { $unwind: '$menuItem' },
         {
+          $lookup: {
+            from: 'categories',
+            localField: 'menuItem.categoryId',
+            foreignField: '_id',
+            as: 'category',
+          },
+        },
+        {
+          $unwind: {
+            path: '$category',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
           $project: {
             menuItemId: '$_id',
             name: '$menuItem.name',
+            category: { $ifNull: ['$category.name', 'N/A'] },
             quantity: 1,
             revenue: 1,
           },

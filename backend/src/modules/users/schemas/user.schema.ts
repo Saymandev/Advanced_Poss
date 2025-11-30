@@ -116,8 +116,8 @@ UserSchema.virtual('fullName').get(function () {
 // Transform output
 UserSchema.set('toJSON', {
   virtuals: true,
-  transform: function (doc, ret) {
-    // @ts-ignore - Mongoose transform`n    // @ts-ignore - Mongoose transform`n    ret.id = ret._id;
+  transform: function (doc, ret: any) {
+    ret.id = ret._id?.toString() || ret._id;
     delete ret._id;
     delete ret.__v;
     delete ret.password;

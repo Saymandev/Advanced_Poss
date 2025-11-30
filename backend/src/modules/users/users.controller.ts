@@ -7,15 +7,20 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { AdminUpdatePasswordDto } from './dto/admin-update-password.dto';
+import { AdminUpdatePinDto } from './dto/admin-update-pin.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
@@ -82,6 +87,33 @@ export class UsersController {
     return this.usersService.deactivate(id);
   }
 
+  @Patch(':id/activate')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Activate user' })
+  activate(@Param('id') id: string) {
+    return this.usersService.activate(id);
+  }
+
+  @Patch(':id/admin-update-pin')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Update user PIN (admin - no current PIN required)' })
+  adminUpdatePin(
+    @Param('id') id: string,
+    @Body() dto: AdminUpdatePinDto,
+  ) {
+    return this.usersService.updatePin(id, dto.newPin);
+  }
+
+  @Patch(':id/admin-update-password')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Update user password (admin - no current password required)' })
+  adminUpdatePassword(
+    @Param('id') id: string,
+    @Body() dto: AdminUpdatePasswordDto,
+  ) {
+    return this.usersService.updatePassword(id, dto.newPassword);
+  }
+
   @Get('branch/:branchId/role/:role')
   @ApiOperation({ summary: 'Get employees by branch and role' })
   getEmployeesByBranchAndRole(
@@ -89,6 +121,17 @@ export class UsersController {
     @Param('role') role: string,
   ) {
     return this.usersService.findByBranchAndRole(branchId, role);
+  }
+
+  @Post('upload-avatar')
+  @ApiOperation({ summary: 'Upload user avatar' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('avatar'))
+  uploadAvatar(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.usersService.uploadAvatar(userId, file);
   }
 }
 

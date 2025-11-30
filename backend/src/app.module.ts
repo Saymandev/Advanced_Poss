@@ -26,6 +26,7 @@ import { ExpensesModule } from './modules/expenses/expenses.module';
 import { IngredientsModule } from './modules/ingredients/ingredients.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { LoginActivityModule } from './modules/login-activity/login-activity.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
 import { MenuItemsModule } from './modules/menu-items/menu-items.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -35,6 +36,7 @@ import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.
 import { QRCodesModule } from './modules/qr-codes/qr-codes.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { RolePermissionsModule } from './modules/role-permissions/role-permissions.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
@@ -133,8 +135,10 @@ import { AppService } from './app.service';
     LoginActivityModule,
     SubscriptionPlansModule,
     BackupsModule,
+    MarketingModule,
     ReportsModule,
     ReviewsModule,
+    RolePermissionsModule,
     SettingsModule,
     QRCodesModule,
     ScheduleModule,

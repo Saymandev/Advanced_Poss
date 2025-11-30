@@ -701,6 +701,34 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
+  async changePin(
+    userId: string,
+    currentPin: string,
+    newPin: string,
+  ) {
+    const user = await this.usersService.findByEmail(
+      (await this.usersService.findOne(userId)).email,
+    );
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.pin) {
+      throw new UnauthorizedException('PIN not set for this user');
+    }
+
+    const isPinValid = await PasswordUtil.compare(currentPin, user.pin);
+
+    if (!isPinValid) {
+      throw new UnauthorizedException('Current PIN is incorrect');
+    }
+
+    await this.usersService.updatePin(userId, newPin);
+
+    return { message: 'PIN changed successfully' };
+  }
+
   async findCompany(email?: string, companyId?: string) {
     this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     this.logger.log(`🔍 FIND COMPANY - Starting search`);
