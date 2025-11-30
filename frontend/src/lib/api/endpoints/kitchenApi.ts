@@ -140,10 +140,11 @@ export const kitchenApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Kitchen', 'Order'],
     }),
-    markKitchenOrderUrgent: builder.mutation<KitchenOrder, string>({
-      query: (id) => ({
+    markKitchenOrderUrgent: builder.mutation<KitchenOrder, { id: string; isUrgent: boolean }>({
+      query: ({ id, isUrgent }) => ({
         url: `/kitchen/${id}/urgent`,
         method: 'PATCH',
+        body: { isUrgent },
       }),
       invalidatesTags: ['Kitchen'],
     }),

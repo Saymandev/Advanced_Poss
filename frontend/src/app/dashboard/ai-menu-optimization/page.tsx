@@ -48,16 +48,21 @@ export default function AIMenuOptimizationPage() {
     category: selectedCategory === 'all' ? undefined : selectedCategory,
   }, {
     skip: !user?.branchId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: false,
   });
 
   const { 
     data: demandData, 
     isLoading: demandLoading,
-    error: demandError 
+    error: demandError,
+    refetch: refetchDemand 
   } = useGetDemandPredictionsQuery({
     branchId: user?.branchId || undefined,
   }, {
     skip: !user?.branchId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: false,
   });
 
   const { data: menuItemsData } = useGetMenuItemsQuery({ branchId: user?.branchId || undefined });
@@ -77,6 +82,17 @@ export default function AIMenuOptimizationPage() {
     ];
   }, [menuItems]);
 
+  // Debug logging (after menuItems is defined)
+  if (typeof window !== 'undefined') {
+    console.log('[AI Menu Optimization] Debug:', {
+      branchId: user?.branchId,
+      optimizationData,
+      optimizationError,
+      menuItemsCount: menuItems?.length || 0,
+      optimizationDataCount: Array.isArray(optimizationData) ? optimizationData.length : 0,
+    });
+  }
+
   const openDetailsModal = (suggestion: MenuOptimizationSuggestion) => {
     setSelectedSuggestion(suggestion);
     setIsDetailsModalOpen(true);
@@ -84,6 +100,10 @@ export default function AIMenuOptimizationPage() {
 
   const handleApplySuggestion = async () => {
     if (!selectedSuggestion) return;
+
+    if (!confirm(`Are you sure you want to update the price from ${formatCurrency(selectedSuggestion.currentPrice)} to ${formatCurrency(selectedSuggestion.suggestedPrice)}?`)) {
+      return;
+    }
 
     try {
       await updateMenuItem({
@@ -94,9 +114,12 @@ export default function AIMenuOptimizationPage() {
       toast.success(`Price updated successfully to ${formatCurrency(selectedSuggestion.suggestedPrice)}`);
       setIsDetailsModalOpen(false);
       setSelectedSuggestion(null);
+      // Refetch both optimization and menu items to get updated data
       refetchOptimization();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to apply suggestion');
+      const errorMessage = error?.data?.message || error?.message || 'Failed to apply suggestion';
+      toast.error(errorMessage);
+      console.error('Failed to apply suggestion:', error);
     }
   };
 
@@ -361,6 +384,53 @@ export default function AIMenuOptimizationPage() {
     };
   }, [optimizationData]);
 
+  // Show loading state for initial load
+  if ((optimizationLoading || demandLoading) && (!optimizationData && !demandData)) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Menu Optimization</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              AI-powered insights to optimize your menu pricing and performance
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading AI analysis...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if no branch ID
+  if (!user?.branchId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Menu Optimization</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              AI-powered insights to optimize your menu pricing and performance
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-8">
+              <p className="text-gray-600 dark:text-gray-400">
+                Please select a branch to view AI optimization suggestions.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -371,10 +441,18 @@ export default function AIMenuOptimizationPage() {
             AI-powered insights to optimize your menu pricing and performance
           </p>
         </div>
-        <Button onClick={() => refetchOptimization()}>
-          <SparklesIcon className="w-5 h-5 mr-2" />
-          Refresh AI Analysis
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => {
+              refetchOptimization();
+              refetchDemand();
+            }}
+            disabled={optimizationLoading || demandLoading}
+          >
+            <SparklesIcon className="w-5 h-5 mr-2" />
+            {optimizationLoading || demandLoading ? 'Refreshing...' : 'Refresh AI Analysis'}
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -518,8 +596,30 @@ export default function AIMenuOptimizationPage() {
         <CardContent>
           {optimizationError && (
             <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-4">
-              <p className="text-red-800 dark:text-red-400 text-sm">
-                Error loading optimization data. Please try refreshing.
+              <p className="text-red-800 dark:text-red-400 text-sm font-medium">
+                Error loading optimization data
+              </p>
+              <p className="text-red-600 dark:text-red-500 text-xs mt-1">
+                {(optimizationError as any)?.data?.message || (optimizationError as any)?.message || 'Please try refreshing or contact support if the issue persists.'}
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2"
+                onClick={() => refetchOptimization()}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          {!optimizationError && !optimizationLoading && (!optimizationData || (Array.isArray(optimizationData) && optimizationData.length === 0)) && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 mb-4">
+              <p className="text-yellow-800 dark:text-yellow-400 text-sm">
+                No optimization suggestions available. 
+                {menuItems.length === 0 
+                  ? ' Please add menu items first.' 
+                  : ' The AI will analyze your menu data and provide suggestions. Make sure you have active menu items and sales data.'}
+                {!user?.branchId && ' Please ensure you have selected a branch.'}
               </p>
             </div>
           )}
@@ -547,8 +647,27 @@ export default function AIMenuOptimizationPage() {
         <CardContent>
           {demandError && (
             <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-4">
-              <p className="text-red-800 dark:text-red-400 text-sm">
-                Error loading demand predictions. Please try refreshing.
+              <p className="text-red-800 dark:text-red-400 text-sm font-medium">
+                Error loading demand predictions
+              </p>
+              <p className="text-red-600 dark:text-red-500 text-xs mt-1">
+                {(demandError as any)?.data?.message || (demandError as any)?.message || 'Please try refreshing or contact support if the issue persists.'}
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2"
+                onClick={() => refetchDemand()}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          {!demandError && !demandLoading && (!demandData || (Array.isArray(demandData) && demandData.length === 0)) && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 mb-4">
+              <p className="text-yellow-800 dark:text-yellow-400 text-sm">
+                No demand predictions available. The AI needs more sales data to generate accurate predictions.
+                {!user?.branchId && ' Please ensure you have selected a branch.'}
               </p>
             </div>
           )}

@@ -157,6 +157,16 @@ export const aiApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['AI'],
+      transformResponse: (response: any) => {
+        // Handle different response structures
+        if (Array.isArray(response)) {
+          return response;
+        }
+        if (response?.data && Array.isArray(response.data)) {
+          return response.data;
+        }
+        return [];
+      },
     }),
     getDemandPredictions: builder.query<DemandPrediction[], { branchId?: string; itemIds?: string[] }>({
       query: (params) => ({
@@ -164,6 +174,16 @@ export const aiApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['AI'],
+      transformResponse: (response: any) => {
+        // Handle different response structures
+        if (Array.isArray(response)) {
+          return response;
+        }
+        if (response?.data && Array.isArray(response.data)) {
+          return response.data;
+        }
+        return [];
+      },
     }),
 
     // Customer Loyalty AI

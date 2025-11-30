@@ -620,10 +620,25 @@ export default function POSPage() {
 
   const waiterOptions = useMemo<Array<{ id: string; name: string }>>(() => {
     const staffList = staffData?.staff || [];
+    const currentBranchId = user?.branchId || branchId;
+    
     return staffList
       .filter((staffMember: any) => {
+        // CRITICAL: Only show employees with "waiter" role (or "server" as alias)
         const role = (staffMember.role || '').toLowerCase();
-        return ['waiter', 'server', 'cashier', 'manager'].includes(role);
+        const isWaiter = role === 'waiter' || role === 'server';
+        
+        if (!isWaiter) {
+          return false; // Only waiter/server roles allowed
+        }
+        
+        // CRITICAL: Filter by branch assignment - only show waiters assigned to current branch
+        const staffBranchId = staffMember.branchId || (staffMember.branch as any)?.id;
+        const isAssignedToBranch = currentBranchId && staffBranchId && 
+          (staffBranchId.toString() === currentBranchId.toString() || 
+           staffBranchId === currentBranchId);
+        
+        return isAssignedToBranch;
       })
       .map((staffMember: any) => ({
         id: staffMember.id,
@@ -632,7 +647,7 @@ export default function POSPage() {
           staffMember.email ||
           staffMember.id,
       }));
-  }, [staffData]);
+  }, [staffData, user?.branchId, branchId]);
 
   const selectedWaiterName = useMemo(() => {
     return waiterOptions.find((option) => option.id === selectedWaiterId)?.name || '';

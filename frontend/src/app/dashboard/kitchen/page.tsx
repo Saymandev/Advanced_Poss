@@ -14,7 +14,6 @@ import {
     useGetKitchenPendingOrdersQuery,
     useGetKitchenPreparingOrdersQuery,
     useGetKitchenReadyOrdersQuery,
-    useGetKitchenStatsQuery,
     useGetKitchenUrgentOrdersQuery,
     useMarkKitchenOrderUrgentMutation,
     useStartKitchenOrderItemMutation,
@@ -40,6 +39,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import ElapsedTime from '@/components/kitchen/ElapsedTime';
 
 export default function KitchenPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
@@ -58,12 +58,35 @@ export default function KitchenPage() {
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
 
-  // Fetch chefs for assignment
+  // Fetch chefs and cooks for assignment
   const { data: chefsData } = useGetStaffQuery(
     { role: 'chef', branchId, isActive: true },
     { skip: !branchId }
   );
-  const chefs = useMemo(() => chefsData?.staff || [], [chefsData]);
+  const { data: cooksData } = useGetStaffQuery(
+    { role: 'cook', branchId, isActive: true },
+    { skip: !branchId }
+  );
+  const chefs = useMemo(() => {
+    const chefList = chefsData?.staff || [];
+    const cookList = cooksData?.staff || [];
+    // Combine and deduplicate by ID to prevent duplicate keys
+    const combined = [...chefList, ...cookList];
+    const uniqueMap = new Map();
+    combined.forEach((staff) => {
+      const id = staff.id || staff._id;
+      if (id && !uniqueMap.has(id)) {
+        uniqueMap.set(id, staff);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [chefsData, cooksData]);
+  
+  // Check if current user can update orders (owner, chef, cook, manager)
+  const canUpdateOrders = useMemo(() => {
+    const userRole = (user as any)?.role?.toLowerCase();
+    return ['owner', 'chef', 'cook', 'manager'].includes(userRole);
+  }, [user]);
 
   // Update time every second
   useEffect(() => {
@@ -74,10 +97,6 @@ export default function KitchenPage() {
   }, []);
 
   // API calls with polling for real-time updates
-  const { data: statsResponse, isLoading: statsLoading } = useGetKitchenStatsQuery(branchId || '', {
-    skip: !branchId,
-    pollingInterval: 30000, // Refresh every 30 seconds
-  });
 
   const { data: pendingResponse, isLoading: pendingLoading, refetch: refetchPending } = useGetKitchenPendingOrdersQuery(branchId || '', {
     skip: !branchId,
@@ -160,11 +179,6 @@ export default function KitchenPage() {
   }, [soundEnabled]);
 
   // Extract data from API responses (already transformed by API)
-  const kitchenStats = useMemo(() => {
-    if (!statsResponse) return null;
-    return statsResponse;
-  }, [statsResponse]);
-
   const pendingOrders = useMemo(() => {
     return pendingResponse || [];
   }, [pendingResponse]);
@@ -214,11 +228,26 @@ export default function KitchenPage() {
     }
   }, [isFullScreen]);
 
-  // Calculate elapsed time for orders
+  // Calculate elapsed time for orders in HH:MM:SS format
+  // Use useMemo to prevent recalculation on every render
   const getElapsedTime = useCallback((order: any) => {
+    if (!order.receivedAt && !order.createdAt) return '00:00:00';
+    const startTime = new Date(order.receivedAt || order.createdAt).getTime();
+    const now = Date.now(); // Use Date.now() directly instead of state
+    const elapsedMs = now - startTime;
+    
+    const hours = Math.floor(elapsedMs / (1000 * 60 * 60));
+    const minutes = Math.floor((elapsedMs % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((elapsedMs % (1000 * 60)) / 1000);
+    
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }, []);
+  
+  // Calculate elapsed minutes for comparison (used for urgent/delayed detection)
+  const getElapsedMinutes = useCallback((order: any) => {
     if (!order.receivedAt && !order.createdAt) return 0;
     const startTime = new Date(order.receivedAt || order.createdAt).getTime();
-    const now = Date.now();
+    const now = Date.now(); // Use Date.now() directly instead of state
     return Math.floor((now - startTime) / 60000); // minutes
   }, []);
 
@@ -305,6 +334,42 @@ export default function KitchenPage() {
     }
   };
 
+  const handleMarkOrderReady = async (orderId: string) => {
+    try {
+      // Find the order to get its items
+      const allOrders = [...pendingOrders, ...preparingOrders, ...readyOrders];
+      const order = allOrders.find(o => (o.id || o._id) === orderId);
+      
+      if (!order) {
+        toast.error('Order not found');
+        return;
+      }
+
+      // Mark all items that are still preparing as ready
+      const itemsToComplete = order.items?.filter(item => item.status === 'preparing') || [];
+      
+      if (itemsToComplete.length === 0) {
+        toast.error('No items are currently being prepared');
+        return;
+      }
+
+      // Complete all preparing items
+      for (const item of itemsToComplete) {
+        const itemId = item.itemId || item.id || item._id;
+        if (!itemId) {
+          console.warn('Item missing ID:', item);
+          continue;
+        }
+        await completeItem({ id: orderId, itemId }).unwrap();
+      }
+
+      toast.success('Order marked as ready');
+      refetchAll();
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to mark order as ready');
+    }
+  };
+
   const handleOrderStatusChange = async (orderId: string, newStatus: 'pending' | 'preparing' | 'ready' | 'completed', chefId?: string) => {
     try {
       if (newStatus === 'preparing') {
@@ -316,9 +381,13 @@ export default function KitchenPage() {
         await startOrder({ id: orderId, chefId: chef }).unwrap();
         toast.success('Order preparation started');
         refetchAll();
-      } else if (newStatus === 'ready' || newStatus === 'completed') {
+      } else if (newStatus === 'ready') {
+        // Mark all items as ready (which will automatically set order to ready)
+        await handleMarkOrderReady(orderId);
+      } else if (newStatus === 'completed') {
+        // Only complete orders that are already ready
         await completeOrder(orderId).unwrap();
-        toast.success(newStatus === 'ready' ? 'Order marked as ready' : 'Order completed');
+        toast.success('Order completed');
         refetchAll();
       }
     } catch (error: any) {
@@ -327,14 +396,14 @@ export default function KitchenPage() {
   };
 
 
-  const handleMarkUrgent = async (orderId: string) => {
-    if (!confirm('Mark this order as urgent?')) return;
+  const handleMarkUrgent = async (orderId: string, isUrgent: boolean = true) => {
+    if (!confirm(isUrgent ? 'Mark this order as urgent?' : 'Remove urgent status from this order?')) return;
     try {
-      await markUrgent(orderId).unwrap();
-      toast.success('Order marked as urgent');
+      await markUrgent({ id: orderId, isUrgent }).unwrap();
+      toast.success(isUrgent ? 'Order marked as urgent' : 'Urgent status removed');
       refetchAll();
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to mark order as urgent');
+      toast.error(error?.data?.message || error?.message || 'Failed to update urgent status');
     }
   };
 
@@ -406,7 +475,7 @@ export default function KitchenPage() {
   };
 
   // Use API data instead of filtered local state
-  const isLoading = pendingLoading || preparingLoading || readyLoading || statsLoading;
+  const isLoading = pendingLoading || preparingLoading || readyLoading;
 
   return (
     <div className="space-y-6">
@@ -528,210 +597,6 @@ export default function KitchenPage() {
         </CardContent>
       </Card>
 
-      {/* Kitchen Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Pending Orders</p>
-                <p className="text-3xl font-bold text-yellow-600">
-                  {isLoading ? '...' : pendingOrders.length}
-                </p>
-              </div>
-              <ClockIcon className="w-8 h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Preparing</p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {isLoading ? '...' : preparingOrders.length}
-                </p>
-              </div>
-              <FireIcon className="w-8 h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Ready for Service</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {isLoading ? '...' : readyOrders.length}
-                </p>
-              </div>
-              <CheckCircleIcon className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Prep Time</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {isLoading ? '...' : `${Math.round(kitchenStats?.avgPrepTime || 0)} min`}
-                </p>
-              </div>
-              <ClockIcon className="w-8 h-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Kitchen Performance Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Performance Metrics</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Orders Completed Today</span>
-              <span className="text-xl font-bold text-gray-900 dark:text-white">
-                {isLoading ? '...' : kitchenStats?.ordersCompleted || 0}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Urgent Orders</span>
-              <span className="text-xl font-bold text-red-600">
-                {isLoading ? '...' : urgentOrders.length}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Delayed Orders</span>
-              <span className="text-xl font-bold text-orange-600">
-                {isLoading ? '...' : delayedOrders.length}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Total Active Orders</span>
-              <span className="text-xl font-bold text-blue-600">
-                {isLoading ? '...' : (pendingOrders.length + preparingOrders.length + readyOrders.length)}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Preparation Time Analytics</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Average Prep Time</span>
-                <span className="text-xl font-bold text-purple-600">
-                  {isLoading ? '...' : `${Math.round(kitchenStats?.avgPrepTime || 0)} min`}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
-                  className="bg-purple-600 h-2 rounded-full transition-all"
-                  style={{ width: `${Math.min((kitchenStats?.avgPrepTime || 0) / 60 * 100, 100)}%` }}
-                />
-              </div>
-            </div>
-            {preparingOrders.length > 0 && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Current Prep Times</p>
-                <div className="space-y-2">
-                  {preparingOrders.slice(0, 5).map((order: any) => {
-                    const elapsed = getElapsedTime(order);
-                    return (
-                      <div key={order.id || order._id} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">#{order.orderNumber}</span>
-                        <span className={`font-semibold ${elapsed > 30 ? 'text-red-600' : elapsed > 20 ? 'text-orange-600' : 'text-green-600'}`}>
-                          {elapsed} min
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Order Status Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Pending</span>
-                  <span className="text-sm font-semibold text-yellow-600">
-                    {pendingOrders.length} ({pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
-                      ? Math.round((pendingOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100) 
-                      : 0}%)
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-yellow-600 h-2 rounded-full transition-all"
-                    style={{ 
-                      width: `${pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
-                        ? (pendingOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100 
-                        : 0}%` 
-                    }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Preparing</span>
-                  <span className="text-sm font-semibold text-blue-600">
-                    {preparingOrders.length} ({pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
-                      ? Math.round((preparingOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100) 
-                      : 0}%)
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all"
-                    style={{ 
-                      width: `${pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
-                        ? (preparingOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100 
-                        : 0}%` 
-                    }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Ready</span>
-                  <span className="text-sm font-semibold text-green-600">
-                    {readyOrders.length} ({pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
-                      ? Math.round((readyOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100) 
-                      : 0}%)
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-green-600 h-2 rounded-full transition-all"
-                    style={{ 
-                      width: `${pendingOrders.length + preparingOrders.length + readyOrders.length > 0 
-                        ? (readyOrders.length / (pendingOrders.length + preparingOrders.length + readyOrders.length)) * 100 
-                        : 0}%` 
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Order Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Pending Orders */}
@@ -757,7 +622,8 @@ export default function KitchenPage() {
               </div>
             ) : (
               filteredPendingOrders.map((order: any) => {
-                const elapsedMinutes = getElapsedTime(order);
+                const elapsedTime = getElapsedTime(order);
+                const elapsedMinutes = getElapsedMinutes(order);
                 const isUrgent = order.isUrgent || order.priority === 'urgent' || elapsedMinutes > 20;
                 const isDelayed = order.isDelayed || elapsedMinutes > 30;
                 return (
@@ -794,7 +660,7 @@ export default function KitchenPage() {
                     </p>
                     {order.receivedAt && (
                       <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mt-1">
-                        Elapsed: {getElapsedTime(order)} min
+                        Elapsed: <ElapsedTime startTime={order.receivedAt || order.createdAt} />
                       </p>
                     )}
                   </div>
@@ -848,22 +714,24 @@ export default function KitchenPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {chefs.length > 0 && (
-                            <Select
-                              options={chefs.map((chef) => ({
-                                value: chef.id,
-                                label: `${chef.firstName} ${chef.lastName}`,
-                              }))}
-                              value=""
-                              onChange={(chefId) => {
-                                if (chefId) {
-                                  handleItemStatusChange(order.id || order._id, item.id || item._id || item.itemId, 'preparing', chefId);
-                                }
-                              }}
-                              placeholder="Assign Chef"
-                              className="w-32"
-                            />
-                          )}
+                          {canUpdateOrders && (
+                            <>
+                              {chefs.length > 0 && (
+                                <Select
+                                  options={chefs.map((chef) => ({
+                                    value: chef.id || chef._id,
+                                    label: `${chef.firstName} ${chef.lastName}`,
+                                  }))}
+                                  value=""
+                                  onChange={(chefId) => {
+                                    if (chefId) {
+                                      handleItemStatusChange(order.id || order._id, item.id || item._id || item.itemId, 'preparing', chefId);
+                                    }
+                                  }}
+                                  placeholder={chefs.length > 0 ? "Assign Chef/Cook" : "Assign"}
+                                  className="w-32"
+                                />
+                              )}
                           {!chefs.length && (
                             <Button
                               size="sm"
@@ -871,6 +739,8 @@ export default function KitchenPage() {
                             >
                               Start
                             </Button>
+                          )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -884,50 +754,63 @@ export default function KitchenPage() {
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  {chefs.length > 0 ? (
-                    <Select
-                      options={chefs.map((chef) => ({
-                        value: chef.id,
-                        label: `${chef.firstName} ${chef.lastName}`,
-                      }))}
-                      value=""
-                      onChange={(chefId) => {
-                        if (chefId) {
-                          handleOrderStatusChange(order.id || order._id, 'preparing', chefId);
-                        }
-                      }}
-                      placeholder="Assign Chef & Start"
-                      className="flex-1"
-                    />
-                  ) : (
+                {canUpdateOrders && (
+                  <div className="flex gap-2">
+                    {chefs.length > 0 ? (
+                      <Select
+                        options={chefs.map((chef) => ({
+                          value: chef.id || chef._id,
+                          label: `${chef.firstName} ${chef.lastName}`,
+                        }))}
+                        value=""
+                        onChange={(chefId) => {
+                          if (chefId) {
+                            handleOrderStatusChange(order.id || order._id, 'preparing', chefId);
+                          }
+                        }}
+                        placeholder="Assign Chef/Cook & Start"
+                        className="flex-1"
+                      />
+                    ) : (
+                      <Button
+                        onClick={() => handleOrderStatusChange(order.id || order._id, 'preparing')}
+                        className="flex-1"
+                      >
+                        Start Preparing
+                      </Button>
+                    )}
+                    {order.priority !== 'urgent' && !order.isUrgent && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleMarkUrgent(order.id || order._id, true)}
+                        title="Mark as Urgent"
+                      >
+                        <FireIcon className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {(order.priority === 'urgent' || order.isUrgent) && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleMarkUrgent(order.id || order._id, false)}
+                        title="Remove Urgent Status"
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        <FireIcon className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
-                      onClick={() => handleOrderStatusChange(order.id || order._id, 'preparing')}
-                      className="flex-1"
-                    >
-                      Start Preparing
-                    </Button>
-                  )}
-                  {order.priority !== 'urgent' && (
-                    <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
-                      onClick={() => handleMarkUrgent(order.id || order._id)}
-                      title="Mark as Urgent"
+                      onClick={() => handleCancelOrder(order.id || order._id)}
+                      className="text-red-600"
+                      title="Cancel Order"
                     >
-                      <FireIcon className="w-4 h-4" />
+                      <XCircleIcon className="w-4 h-4" />
                     </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCancelOrder(order.id || order._id)}
-                    className="text-red-600"
-                    title="Cancel Order"
-                  >
-                    <XCircleIcon className="w-4 h-4" />
-                  </Button>
-                </div>
+                  </div>
+                )}
                   </div>
                 );
               })
@@ -958,13 +841,15 @@ export default function KitchenPage() {
               </div>
             ) : (
               filteredPreparingOrders.map((order: any) => {
-                const elapsedMinutes = getElapsedTime(order);
+                const elapsedTime = getElapsedTime(order);
+                const elapsedMinutes = getElapsedMinutes(order);
+                const isUrgent = order.isUrgent || order.priority === 'urgent';
                 return (
                   <div 
                     key={order.id || order._id} 
                     className={`border rounded-lg p-4 ${
-                      order.priority === 'urgent' 
-                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' 
+                      isUrgent
+                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
                         : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
                     }`}
                   >
@@ -989,8 +874,12 @@ export default function KitchenPage() {
                       Est: {order.estimatedTime ? `${order.estimatedTime} min` : 'TBD'}
                     </p>
                     {order.startedAt && (
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-1">
-                        Prep time: {elapsedMinutes} min
+                      <p className={`text-xs font-semibold mt-1 ${
+                        elapsedMinutes > 30 ? 'text-red-600 dark:text-red-400' : 
+                        elapsedMinutes > 20 ? 'text-orange-600 dark:text-orange-400' : 
+                        'text-blue-600 dark:text-blue-400'
+                      }`}>
+                        Prep time: <ElapsedTime startTime={order.startedAt || order.receivedAt || order.createdAt} />
                       </p>
                     )}
                   </div>
@@ -1057,7 +946,7 @@ export default function KitchenPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           {getItemStatusBadge(item.status)}
-                          {item.status !== 'ready' && (
+                          {canUpdateOrders && item.status !== 'ready' && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -1072,26 +961,39 @@ export default function KitchenPage() {
                   ))}
                 </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleOrderStatusChange(order.id || order._id, 'ready')}
-                    className="flex-1"
-                  >
-                    Mark Ready
-                  </Button>
-                  {order.priority !== 'urgent' && (
+                {canUpdateOrders && (
+                  <div className="flex gap-2">
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => handleMarkUrgent(order.id || order._id)}
-                      title="Mark as Urgent"
+                      onClick={() => handleOrderStatusChange(order.id || order._id, 'ready')}
+                      className="flex-1"
                     >
-                      <FireIcon className="w-4 h-4" />
+                      Mark Ready
                     </Button>
-                  )}
-                </div>
+                    {!isUrgent && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleMarkUrgent(order.id || order._id, true)}
+                        title="Mark as Urgent"
+                      >
+                        <FireIcon className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {isUrgent && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleMarkUrgent(order.id || order._id, false)}
+                        title="Remove Urgent Status"
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        <FireIcon className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
                   </div>
                 );
               })
@@ -1192,12 +1094,14 @@ export default function KitchenPage() {
                   ))}
                 </div>
 
-                <Button
-                  onClick={() => handleOrderStatusChange(order.id || order._id, 'completed')}
-                  className="w-full"
-                >
-                  Mark as Served
-                </Button>
+                {canUpdateOrders && (
+                  <Button
+                    onClick={() => handleOrderStatusChange(order.id || order._id, 'completed')}
+                    className="w-full"
+                  >
+                    Mark as Served
+                  </Button>
+                )}
                   </div>
                 );
               })

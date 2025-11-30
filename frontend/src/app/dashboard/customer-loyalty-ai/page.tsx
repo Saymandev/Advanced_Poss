@@ -21,7 +21,7 @@ import {
   UserIcon,
   UsersIcon
 } from '@heroicons/react/24/outline';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 const LOYALTY_TIERS = [
@@ -32,15 +32,34 @@ const LOYALTY_TIERS = [
 ];
 
 export default function CustomerLoyaltyAIPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const [selectedTier, setSelectedTier] = useState('all');
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerLoyaltyInsight | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: customersData, isLoading, error: loyaltyError, refetch } = useGetCustomersQuery({
-    branchId: user?.branchId || undefined,
+  const companyId = (user as any)?.companyId || 
+                   (companyContext as any)?.companyId;
+  
+  const branchId = (user as any)?.branchId || 
+                   (companyContext as any)?.branchId || 
+                   (companyContext as any)?.branches?.[0]?._id ||
+                   (companyContext as any)?.branches?.[0]?.id;
+
+  const queryParams = useMemo(() => {
+    const params: any = {};
+    
+    if (branchId) params.branchId = branchId;
+    if (companyId) params.companyId = companyId;
+    
+    return params;
+  }, [branchId, companyId]);
+
+  const { data: customersData, isLoading, error: loyaltyError, refetch } = useGetCustomersQuery(queryParams, {
+    skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
   });
 
   const [generateOffers, { isLoading: offersLoading }] = useGetPersonalizedOffersMutation();

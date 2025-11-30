@@ -147,7 +147,27 @@ export default function PinLoginPage() {
                       <div className="relative">
                         <div className="font-bold text-white text-lg mb-2">{branch.name}</div>
                         <div className="text-sm text-gray-400">
-                          {branch.address.street}, {branch.address.city}
+                          {(() => {
+                            // Backend returns formatted address as string in 'address' field
+                            // Use addressObject only if address is not a string
+                            if (typeof branch.address === 'string' && branch.address && branch.address !== '[object Object]') {
+                              return branch.address;
+                            }
+                            // Fallback to addressObject if address is not properly formatted
+                            const addr = (branch as any).addressObject || branch.address;
+                            if (!addr) return 'Address not available';
+                            if (typeof addr === 'string') return addr;
+                            if (typeof addr === 'object' && addr !== null) {
+                              const parts = [
+                                addr.street,
+                                addr.city && addr.city !== 'Unknown' ? addr.city : null,
+                                addr.state && addr.state !== 'Unknown' ? addr.state : null,
+                                addr.zipCode && addr.zipCode !== '00000' ? addr.zipCode : null
+                              ].filter(Boolean);
+                              return parts.length > 0 ? parts.join(', ') : (addr.street || 'Address not available');
+                            }
+                            return 'Address not available';
+                          })()}
                         </div>
                         {branch.availableRoles && (
                           <div className="mt-3 flex flex-wrap gap-2">

@@ -71,8 +71,18 @@ export default function CheckoutPage() {
     }
 
     try {
-      const successUrl = `${window.location.origin}/dashboard/subscriptions/success`;
-      const cancelUrl = `${window.location.origin}/dashboard/subscriptions/checkout?plan=${planName}`;
+      // Ensure URLs are properly formatted with protocol
+      const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+      const successUrl = `${origin}/dashboard/subscriptions/success`;
+      const cancelUrl = `${origin}/dashboard/subscriptions/checkout?plan=${planName}`;
+      
+      // Validate URLs are properly formatted
+      if (!successUrl.startsWith('http://') && !successUrl.startsWith('https://')) {
+        throw new Error('Invalid success URL format');
+      }
+      if (!cancelUrl.startsWith('http://') && !cancelUrl.startsWith('https://')) {
+        throw new Error('Invalid cancel URL format');
+      }
       
       const response = await createCheckoutSession({
         companyId: user.companyId,

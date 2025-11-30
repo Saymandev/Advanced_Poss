@@ -82,7 +82,7 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['Subscription'],
-      transformResponse: (response: SubscriptionPlan[] | { plans: SubscriptionPlan[]; total: number }) => {
+      transformResponse: (response: any) => {
         const normalize = (plans: SubscriptionPlan[]) =>
           plans.map((plan) => ({
             ...plan,
@@ -90,31 +90,46 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
               plan.featureList && plan.featureList.length > 0
                 ? plan.featureList
                 : [
-                    plan.features.pos ? 'POS & Ordering' : null,
-                    plan.features.inventory ? 'Inventory Management' : null,
-                    plan.features.crm ? 'Customer CRM' : null,
-                    plan.features.multiBranch ? 'Multi-branch Support' : null,
-                    plan.features.aiInsights ? 'AI Insights' : null,
+                    plan.features?.pos ? 'POS & Ordering' : null,
+                    plan.features?.inventory ? 'Inventory Management' : null,
+                    plan.features?.crm ? 'Customer CRM' : null,
+                    plan.features?.multiBranch ? 'Multi-branch Support' : null,
+                    plan.features?.aiInsights ? 'AI Insights' : null,
+                    plan.features?.accounting ? 'Accounting & Reports' : null,
                   ].filter(Boolean) as string[],
           }));
 
+        // Handle { success: true, data: [...] } format (from backend interceptor)
+        if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
+          const data = response.data;
+          if (Array.isArray(data)) {
+            return normalize(data);
+          }
+          // If data is an object with plans property
+          if (data && typeof data === 'object' && 'plans' in data) {
+            return {
+              ...data,
+              plans: normalize(data.plans || []),
+            };
+          }
+        }
+
+        // Handle direct array format
         if (Array.isArray(response)) {
           return normalize(response);
         }
 
-        // Handle case where response.plans might be undefined
-        if (!response || !response.plans) {
-          console.warn('Subscription plans response is missing plans array:', response);
+        // Handle { plans: [...] } format
+        if (response && typeof response === 'object' && 'plans' in response) {
           return {
-            plans: [],
-            total: 0,
+            ...response,
+            plans: normalize(response.plans || []),
           };
         }
 
-        return {
-          ...response,
-          plans: normalize(response.plans || []),
-        };
+        // Fallback: return empty array
+        console.warn('Subscription plans response format not recognized:', response);
+        return [];
       },
     }),
     getCurrentSubscription: builder.query<Subscription, { companyId: string }>({
@@ -124,10 +139,19 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Subscription'],
     }),
+    getSubscriptionByCompany: builder.query<Subscription, { companyId: string }>({
+      query: ({ companyId }) => ({
+        url: `/subscriptions/company/${companyId}`,
+      }),
+      providesTags: ['Subscription'],
+    }),
     createSubscription: builder.mutation<Subscription, { 
-      planId: string; 
-      paymentMethodId: string;
       companyId: string;
+      plan: string; // SubscriptionPlan enum value (e.g., 'basic', 'premium', 'enterprise') - REQUIRED
+      billingCycle: string; // BillingCycle enum value (e.g., 'monthly', 'yearly') - REQUIRED
+      email: string; // REQUIRED
+      companyName: string; // REQUIRED
+      paymentMethodId?: string; // Optional
     }>({
       query: (data) => ({
         url: '/subscriptions',
@@ -215,6 +239,7 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
 export const {
   useGetSubscriptionPlansQuery,
   useGetCurrentSubscriptionQuery,
+  useGetSubscriptionByCompanyQuery,
   useCreateSubscriptionMutation,
   useUpdateSubscriptionMutation,
   useCancelSubscriptionMutation,

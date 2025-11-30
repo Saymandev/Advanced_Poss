@@ -5,26 +5,27 @@ import { Button } from '@/components/ui/Button';
 import { useAppSelector } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-  Bars3Icon,
-  BeakerIcon,
-  BuildingOfficeIcon,
-  ChartBarIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  CogIcon,
-  CurrencyDollarIcon,
-  GiftIcon,
-  HomeIcon,
-  PrinterIcon,
-  ReceiptPercentIcon,
-  ShoppingBagIcon,
-  TableCellsIcon,
-  TagIcon,
-  TruckIcon,
-  UserCircleIcon,
-  UserGroupIcon,
-  UsersIcon,
-  XMarkIcon
+    Bars3Icon,
+    BeakerIcon,
+    BuildingOfficeIcon,
+    ChartBarIcon,
+    ClipboardDocumentListIcon,
+    ClockIcon,
+    CogIcon,
+    ComputerDesktopIcon,
+    CurrencyDollarIcon,
+    GiftIcon,
+    HomeIcon,
+    PrinterIcon,
+    ReceiptPercentIcon,
+    ShoppingBagIcon,
+    TableCellsIcon,
+    TagIcon,
+    TruckIcon,
+    UserCircleIcon,
+    UserGroupIcon,
+    UsersIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -99,6 +100,11 @@ const navigation: NavigationItem[] = [
     name: 'Kitchen',
     href: '/dashboard/kitchen',
     icon: BeakerIcon,
+  },
+  {
+    name: 'Customer Display',
+    href: '/dashboard/customer-display',
+    icon: ComputerDesktopIcon,
   },
   {
     name: 'Customers',

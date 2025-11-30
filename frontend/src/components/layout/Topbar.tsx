@@ -2,7 +2,9 @@
 
 import { Button } from '@/components/ui/Button';
 import { NotificationBell } from '@/components/ui/NotificationBell';
-import { useAppSelector } from '@/lib/store';
+import { apiSlice } from '@/lib/api/apiSlice';
+import { logout } from '@/lib/slices/authSlice';
+import { useAppDispatch, useAppSelector } from '@/lib/store';
 import {
   ArrowRightOnRectangleIcon,
   CogIcon,
@@ -17,15 +19,35 @@ import toast from 'react-hot-toast';
 
 export function Topbar() {
   const { user, companyContext: _companyContext } = useAppSelector((state) => state.auth);
+  const dispatch = useAppDispatch();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
 
-  const handleLogout = () => {
-    // Clear auth state
+  const handleLogout = async () => {
+    try {
+      // Call logout API to invalidate tokens on server
+      // Note: This might fail if token is already invalid, so we continue anyway
+      try {
+        // await logout().unwrap();
+      } catch (error) {
+        // Ignore logout API errors - we'll clear local state anyway
+        console.log('Logout API call failed (token may already be invalid):', error);
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    
+    // Clear auth state from Redux
+    dispatch(logout());
+    
+    // Clear all localStorage
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     localStorage.removeItem('companyContext');
+    
+    // Clear RTK Query cache
+    dispatch(apiSlice.util.resetApiState());
 
     toast.success('Logged out successfully');
     router.push('/auth/login');
