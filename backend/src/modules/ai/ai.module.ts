@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { OpenAIService } from '../../common/services/openai.service';
+import { CategoriesModule } from '../categories/categories.module';
 import { Customer, CustomerSchema } from '../customers/schemas/customer.schema';
 import { MenuItem, MenuItemSchema } from '../menu-items/schemas/menu-item.schema';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
+import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 
@@ -10,12 +13,14 @@ import { AiService } from './ai.service';
   imports: [
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
+      { name: POSOrder.name, schema: POSOrderSchema },
       { name: MenuItem.name, schema: MenuItemSchema },
       { name: Customer.name, schema: CustomerSchema },
     ]),
+    CategoriesModule,
   ],
   controllers: [AiController],
-  providers: [AiService],
+  providers: [AiService, OpenAIService],
   exports: [AiService],
 })
 export class AiModule {}

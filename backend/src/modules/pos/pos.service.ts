@@ -6,6 +6,7 @@ import { IngredientsService } from '../ingredients/ingredients.service';
 import { KitchenService } from '../kitchen/kitchen.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { TablesService } from '../tables/tables.service';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
 import { POSOrderFiltersDto, POSStatsFiltersDto } from './dto/pos-filters.dto';
@@ -23,6 +24,7 @@ export class POSService {
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
     @InjectModel(POSPayment.name) private posPaymentModel: Model<POSPaymentDocument>,
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private receiptService: ReceiptService,
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
@@ -57,7 +59,43 @@ export class POSService {
   }
 
   // Create POS order
-  async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string, companyId?: string): Promise<POSOrder> {
+  async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string, companyId?: string, userBranchId?: string): Promise<POSOrder> {
+    // Validate the user creating the order is assigned to the branch (owners can work across branches)
+    const creatingUser = await this.userModel.findById(userId).select('role branchId companyId');
+    if (!creatingUser) {
+      throw new NotFoundException('User not found');
+    }
+    
+    const creatingUserBranchId = creatingUser.branchId?.toString();
+    const orderBranchId = branchId.toString();
+    
+    // Owners can create orders for any branch in their company, but other roles must be assigned to the branch
+    if (creatingUser.role !== 'owner' && creatingUserBranchId !== orderBranchId) {
+      throw new BadRequestException(`You are not assigned to branch ${orderBranchId}. Please assign yourself to this branch first.`);
+    }
+    
+    // Validate waiter/employee assignment if waiterId is provided
+    if (createOrderDto.waiterId && createOrderDto.waiterId !== userId) {
+      const waiter = await this.userModel.findById(createOrderDto.waiterId).select('role branchId firstName lastName');
+      if (!waiter) {
+        throw new NotFoundException('Selected waiter/employee not found');
+      }
+      
+      const waiterBranchId = waiter.branchId?.toString();
+      if (waiterBranchId !== orderBranchId) {
+        throw new BadRequestException(
+          `${waiter.firstName} ${waiter.lastName} is not assigned to this branch. Please select an employee assigned to this branch.`
+        );
+      }
+      
+      // Validate waiter role - only waiters can be assigned as waiters
+      const waiterRole = waiter.role.toLowerCase();
+      if (waiterRole !== 'waiter' && waiterRole !== 'server') {
+        throw new BadRequestException(
+          `Selected employee (${waiter.role}) cannot be assigned as waiter. Only employees with "waiter" role can be assigned.`
+        );
+      }
+    }
     // Cache menu items to fetch names efficiently
     const menuItemCache = new Map<string, any>();
     

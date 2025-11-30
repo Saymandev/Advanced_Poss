@@ -1,18 +1,18 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Param,
-    Patch,
-    Post,
-    Put,
-    Query,
-    Request,
-    Res,
-    UseGuards
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Request,
+  Res,
+  UseGuards
 } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -40,7 +40,8 @@ export class POSController {
     const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
     // Use selected waiterId if provided, otherwise use logged-in user
     const userId = createOrderDto.waiterId || req.user.id;
-    return this.posService.createOrder(createOrderDto, userId, req.user.branchId, companyId);
+    // Pass user's branchId for validation
+    return this.posService.createOrder(createOrderDto, userId, req.user.branchId, companyId, req.user.branchId);
   }
 
   @Get('orders')

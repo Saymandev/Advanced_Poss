@@ -28,6 +28,7 @@ export class KitchenController {
     UserRole.OWNER,
     UserRole.MANAGER,
     UserRole.CHEF,
+    UserRole.COOK,
   )
   @ApiOperation({ summary: 'Get all kitchen orders for branch' })
   findAll(@Param('branchId') branchId: string, @Query('status') status?: string) {
@@ -40,6 +41,7 @@ export class KitchenController {
     UserRole.OWNER,
     UserRole.MANAGER,
     UserRole.CHEF,
+    UserRole.COOK,
   )
   @ApiOperation({ summary: 'Get pending orders' })
   findPending(@Param('branchId') branchId: string) {
@@ -52,6 +54,7 @@ export class KitchenController {
     UserRole.OWNER,
     UserRole.MANAGER,
     UserRole.CHEF,
+    UserRole.COOK,
   )
   @ApiOperation({ summary: 'Get orders being prepared' })
   findPreparing(@Param('branchId') branchId: string) {
@@ -77,6 +80,7 @@ export class KitchenController {
     UserRole.OWNER,
     UserRole.MANAGER,
     UserRole.CHEF,
+    UserRole.COOK,
   )
   @ApiOperation({ summary: 'Get delayed orders (> 30 min)' })
   findDelayed(@Param('branchId') branchId: string) {
@@ -89,6 +93,7 @@ export class KitchenController {
     UserRole.OWNER,
     UserRole.MANAGER,
     UserRole.CHEF,
+    UserRole.COOK,
   )
   @ApiOperation({ summary: 'Get urgent orders' })
   findUrgent(@Param('branchId') branchId: string) {
@@ -101,6 +106,7 @@ export class KitchenController {
     UserRole.OWNER,
     UserRole.MANAGER,
     UserRole.CHEF,
+    UserRole.COOK,
   )
   @ApiOperation({ summary: 'Get kitchen statistics' })
   getStats(@Param('branchId') branchId: string) {
@@ -126,6 +132,7 @@ export class KitchenController {
     UserRole.OWNER,
     UserRole.MANAGER,
     UserRole.CHEF,
+    UserRole.COOK,
   )
   @ApiOperation({ summary: 'Get kitchen order by ID' })
   findOne(@Param('id') id: string) {
@@ -133,14 +140,14 @@ export class KitchenController {
   }
 
   @Post(':id/start')
-  @Roles(UserRole.CHEF, UserRole.MANAGER)
+  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER)
   @ApiOperation({ summary: 'Start preparing order' })
   startOrder(@Param('id') id: string, @Body('chefId') chefId: string) {
     return this.kitchenService.startOrder(id, chefId);
   }
 
   @Post(':id/items/:itemId/start')
-  @Roles(UserRole.CHEF, UserRole.MANAGER)
+  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER)
   @ApiOperation({ summary: 'Start preparing specific item' })
   startItem(
     @Param('id') id: string,
@@ -151,14 +158,14 @@ export class KitchenController {
   }
 
   @Post(':id/items/:itemId/complete')
-  @Roles(UserRole.CHEF, UserRole.MANAGER)
+  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER)
   @ApiOperation({ summary: 'Mark item as ready' })
   completeItem(@Param('id') id: string, @Param('itemId') itemId: string) {
     return this.kitchenService.completeItem(id, itemId);
   }
 
   @Post(':id/complete')
-  @Roles(UserRole.CHEF, UserRole.MANAGER, UserRole.WAITER)
+  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Mark entire order as served' })
   completeOrder(@Param('id') id: string) {
     return this.kitchenService.completeOrder(id);
@@ -172,7 +179,7 @@ export class KitchenController {
   }
 
   @Patch(':id/items/:itemId/priority')
-  @Roles(UserRole.CHEF, UserRole.MANAGER)
+  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER)
   @ApiOperation({ summary: 'Set item priority' })
   setPriority(
     @Param('id') id: string,

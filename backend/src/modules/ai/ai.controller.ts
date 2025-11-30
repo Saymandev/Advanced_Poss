@@ -1,7 +1,10 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -124,6 +127,67 @@ export class AiController {
       new Date(startDate),
       new Date(endDate),
     );
+  }
+
+  // Get menu optimization suggestions
+  @Get('menu-optimization')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  async getMenuOptimization(
+    @Query('branchId') branchId?: string,
+    @Query('category') category?: string,
+  ) {
+    if (!branchId) {
+      throw new BadRequestException('Branch ID is required');
+    }
+    const suggestions = await this.aiService.getMenuOptimization(
+      branchId,
+      category,
+    );
+    return {
+      success: true,
+      data: suggestions,
+      count: suggestions.length,
+    };
+  }
+
+  // Get demand predictions
+  @Get('demand-predictions')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  async getDemandPredictions(
+    @Query('branchId') branchId?: string,
+  ) {
+    if (!branchId) {
+      throw new BadRequestException('Branch ID is required');
+    }
+    const predictions = await this.aiService.getDemandPredictions(branchId);
+    return {
+      success: true,
+      data: predictions,
+      count: predictions.length,
+    };
+  }
+
+  // Generate personalized offers for a customer
+  @Post('personalized-offers')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  async getPersonalizedOffers(
+    @Body() body: { customerId: string; branchId: string },
+  ) {
+    if (!body.customerId) {
+      throw new BadRequestException('Customer ID is required');
+    }
+    if (!body.branchId) {
+      throw new BadRequestException('Branch ID is required');
+    }
+    const offers = await this.aiService.generatePersonalizedOffers(
+      body.customerId,
+      body.branchId,
+    );
+    return {
+      success: true,
+      offers,
+      count: offers.length,
+    };
   }
 }
 

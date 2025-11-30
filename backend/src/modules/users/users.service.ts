@@ -10,6 +10,7 @@ import { UserFilterDto } from '../../common/dto/pagination.dto';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
+import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
 import { CompaniesService } from '../companies/companies.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -20,6 +21,7 @@ import { User, UserDocument } from './schemas/user.schema';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Branch.name) private branchModel: Model<BranchDocument>,
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
     private subscriptionPlansService: SubscriptionPlansService,
@@ -100,17 +102,33 @@ export class UsersService {
       delete query.status;
     }
 
-    // Convert branchId string to ObjectId if provided (same as findByBranch)
+    // CRITICAL: Filter out super_admin users unless explicitly requested
+    if (!query.includeSuperAdmins) {
+      query.role = { $ne: 'super_admin' };
+    } else {
+      delete query.includeSuperAdmins;
+    }
+
+    // CRITICAL: Filter by branchId - only show employees assigned to this specific branch
+    // This ensures that when working at Branch X, you only see employees assigned to Branch X
+    // Employees without a branchId assignment will be excluded
     if (query.branchId) {
       try {
-        query.branchId = new Types.ObjectId(query.branchId);
+        // Try both string and ObjectId formats for branchId filtering
+        const branchIdStr = query.branchId.toString();
+        const branchIdObj = new Types.ObjectId(query.branchId);
+        // Use $in to match either string or ObjectId format
+        // This ensures only employees assigned to this branch are returned
+        query.branchId = { $in: [branchIdStr, branchIdObj] };
       } catch (error) {
-        // If branchId is not a valid ObjectId, remove it from query
-        delete query.branchId;
+        // If branchId is not a valid ObjectId, use string format
+        const branchIdStr = query.branchId.toString();
+        query.branchId = branchIdStr;
       }
     }
 
     // Add search functionality
+    // MongoDB will automatically AND the branchId condition (if exists) with search $or conditions
     if (search) {
       query.$or = [
         { firstName: { $regex: search, $options: 'i' } },
@@ -190,8 +208,8 @@ export class UsersService {
       throw new BadRequestException('Invalid user ID');
     }
 
-    // Get existing user to check companyId
-    const existingUser = await this.userModel.findById(id);
+    // Get existing user to check companyId (without population to get raw ID)
+    const existingUser = await this.userModel.findById(id).select('companyId');
     if (!existingUser) {
       throw new NotFoundException('User not found');
     }
@@ -212,15 +230,40 @@ export class UsersService {
           throw new NotFoundException('Branch not found');
         }
 
-        // Ensure branch belongs to same company as user
-        const userCompanyId = existingUser.companyId?.toString() || updateUserDto.companyId;
-        const branchCompanyId = branch.companyId?.toString() || (branch.companyId as any)?._id?.toString();
+        // Extract companyId from user (handle both ObjectId and populated object)
+        let userCompanyId: string | undefined;
+        if (existingUser.companyId) {
+          userCompanyId = (existingUser.companyId as any)?._id?.toString() || 
+                         existingUser.companyId.toString();
+        }
         
-        if (userCompanyId && branchCompanyId && userCompanyId !== branchCompanyId) {
+        // Extract companyId from branch (it's populated, so it's an object with _id)
+        let branchCompanyId: string | undefined;
+        if (branch.companyId) {
+          branchCompanyId = (branch.companyId as any)?._id?.toString() || 
+                          branch.companyId.toString();
+        }
+        
+        // Validate company match
+        if (!userCompanyId) {
+          throw new BadRequestException('User must belong to a company to be assigned to a branch');
+        }
+        
+        if (!branchCompanyId) {
+          throw new BadRequestException('Branch must belong to a company');
+        }
+        
+        if (userCompanyId !== branchCompanyId) {
           throw new BadRequestException('Branch does not belong to the same company as the user');
         }
       }
     }
+
+    // Get user before update to check role and old branchId
+    const userBeforeUpdate = await this.userModel.findById(id).select('role branchId');
+    const oldBranchId = userBeforeUpdate?.branchId?.toString();
+    const currentRole = userBeforeUpdate?.role;
+    const newRole = updateUserDto.role || currentRole;
 
     // If password is being updated, hash it
     if (updateUserDto.password) {
@@ -239,6 +282,58 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    // Handle manager assignment to branch
+    const newBranchId = updateUserDto.branchId?.toString() || (user.branchId?.toString() || null);
+    const isManager = newRole === 'manager';
+    const wasManager = currentRole === 'manager';
+    const branchChanged = newBranchId !== oldBranchId;
+    const roleChangedToManager = !wasManager && isManager;
+    
+    // Case 1: Manager assigned to a branch (branch changed OR role changed to manager)
+    if (isManager && newBranchId && (branchChanged || roleChangedToManager)) {
+      // Clear managerId from old branch if branch changed
+      if (oldBranchId && branchChanged) {
+        await this.branchModel.updateOne(
+          { _id: new Types.ObjectId(oldBranchId) },
+          { $unset: { managerId: '' } }
+        );
+      }
+      
+      // Set managerId on new branch (or current branch if role just changed to manager)
+      // First, clear any existing manager from this branch
+      await this.branchModel.updateOne(
+        { _id: new Types.ObjectId(newBranchId) },
+        { $unset: { managerId: '' } }
+      );
+      
+      // Then set this user as the manager
+      await this.branchModel.updateOne(
+        { _id: new Types.ObjectId(newBranchId) },
+        { managerId: new Types.ObjectId(id) }
+      );
+    }
+    // Case 2: Manager unassigned from branch OR role changed from manager
+    else if ((isManager && !newBranchId && oldBranchId) || (wasManager && !isManager && oldBranchId)) {
+      // Clear managerId from old branch
+      await this.branchModel.updateOne(
+        { _id: new Types.ObjectId(oldBranchId) },
+        { $unset: { managerId: '' } }
+      );
+    }
+    // Case 3: User is already a manager, already assigned to branch, but managerId might not be set
+    // This handles cases where managerId was not set due to previous bugs
+    else if (isManager && newBranchId && !branchChanged && !roleChangedToManager) {
+      // Ensure managerId is set on the branch
+      const branch = await this.branchModel.findById(newBranchId).select('managerId');
+      if (branch && branch.managerId?.toString() !== id) {
+        // Only update if current managerId is different or null
+        await this.branchModel.updateOne(
+          { _id: new Types.ObjectId(newBranchId) },
+          { managerId: new Types.ObjectId(id) }
+        );
+      }
     }
 
     return user;
@@ -327,14 +422,34 @@ export class UsersService {
   }
 
   async findByBranch(branchId: string): Promise<User[]> {
+    // Handle both string and ObjectId formats
+    const branchObjectId = Types.ObjectId.isValid(branchId) 
+      ? new Types.ObjectId(branchId) 
+      : branchId;
+    
     return this.userModel
-      .find({ branchId: new Types.ObjectId(branchId) })
+      .find({ 
+        branchId: { $in: [branchObjectId, branchId] }, // Try both formats
+        isActive: { $ne: false } // Include if isActive is true or undefined
+      })
       .select('-password -pin')
       .exec();
   }
 
+  async findByBranchAndRole(branchId: string, role: string): Promise<User[]> {
+    return this.userModel
+      .find({ 
+        branchId: new Types.ObjectId(branchId), 
+        role: role.toLowerCase(),
+        isActive: true 
+      })
+      .select('-password -pin')
+      .populate('branchId', 'name')
+      .exec();
+  }
+
   async findByRole(role: string): Promise<User[]> {
-    return this.userModel.find({ role }).select('-password -pin').exec();
+    return this.userModel.find({ role, isActive: true }).select('-password -pin').exec();
   }
 
   async countByCompany(companyId: string): Promise<number> {

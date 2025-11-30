@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
@@ -9,7 +10,10 @@ import { UsersService } from './users.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: Branch.name, schema: BranchSchema },
+    ]),
     forwardRef(() => CompaniesModule),
     BranchesModule,
     SubscriptionPlansModule,

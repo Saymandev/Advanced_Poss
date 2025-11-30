@@ -7,6 +7,7 @@ import { IngredientsModule } from '../ingredients/ingredients.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { TablesModule } from '../tables/tables.module';
+import { UsersModule } from '../users/users.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
 import { PDFGeneratorService } from './pdf-generator.service';
 import { POSController } from './pos.controller';
@@ -18,6 +19,7 @@ import { POSOrder, POSOrderSchema } from './schemas/pos-order.schema';
 import { POSPayment, POSPaymentSchema } from './schemas/pos-payment.schema';
 import { POSSettings, POSSettingsSchema } from './schemas/pos-settings.schema';
 import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 
 @Module({
   imports: [
@@ -26,12 +28,14 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
       { name: POSPayment.name, schema: POSPaymentSchema },
       { name: POSSettings.name, schema: POSSettingsSchema },
       { name: PrinterConfig.name, schema: PrinterConfigSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     MenuItemsModule,
     IngredientsModule,
     WebsocketsModule,
     CompaniesModule,
     BranchesModule,
+    UsersModule,
     forwardRef(() => TablesModule),
     forwardRef(() => KitchenModule),
     forwardRef(() => CustomersModule),

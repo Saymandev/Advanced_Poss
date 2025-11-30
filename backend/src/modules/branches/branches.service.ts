@@ -30,6 +30,24 @@ export class BranchesService {
   async create(createBranchDto: CreateBranchDto): Promise<Branch> {
     // Verify company exists
     const company = await this.companiesService.findOne(createBranchDto.companyId);
+    
+    // Ensure company has slug - if not, generate it
+    if (!company.slug) {
+      const companySlug = GeneratorUtil.generateSlug(company.name);
+      const existingSlugs = await this.companiesService.findAll({});
+      const slugsList = existingSlugs.map((c: any) => c.slug).filter(Boolean);
+      const uniqueSlug = GeneratorUtil.generateUniqueSlug(company.name, slugsList);
+      
+      // Update company with slug
+      await this.companiesService.update(createBranchDto.companyId, { slug: uniqueSlug } as any);
+      // Refresh company object to get updated slug
+      const updatedCompany = await this.companiesService.findOne(createBranchDto.companyId);
+      if (updatedCompany) {
+        (company as any).slug = updatedCompany.slug || uniqueSlug;
+      } else {
+        (company as any).slug = uniqueSlug;
+      }
+    }
 
     // Check subscription limits for multi-branch feature
     if (company.subscriptionPlan) {
@@ -68,9 +86,14 @@ export class BranchesService {
 
     // Auto-generate publicUrl if not provided (using company slug + branch slug)
     let publicUrl = createBranchDto.publicUrl;
-    if (!publicUrl && company.slug && slug) {
+    // Use the slug from the company object (which may have been updated above)
+    const companySlug = (company as any).slug || company.slug;
+    if (!publicUrl && companySlug && slug) {
       const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-      publicUrl = `${baseUrl}/${company.slug}/${slug}`;
+      publicUrl = `${baseUrl}/${companySlug}/${slug}`;
+    } else if (!publicUrl) {
+      // Log warning if publicUrl couldn't be generated
+      console.warn(`⚠️ Could not generate publicUrl for branch "${createBranchDto.name}". Company slug: ${companySlug || 'missing'}, Branch slug: ${slug || 'missing'}`);
     }
 
     // Set default opening hours if not provided
@@ -299,7 +322,16 @@ export class BranchesService {
       throw new BadRequestException('Invalid branch ID');
     }
 
-    const branch = await this.findOne(id);
+    // Fetch branch with populated managerId
+    const branch = await this.branchModel
+      .findById(id)
+      .populate('managerId', 'firstName lastName email')
+      .lean();
+    
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+    
     const branchObjectId = new Types.ObjectId(id);
 
     // Calculate today's date range

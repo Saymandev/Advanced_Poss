@@ -1,12 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
+import { OpenAIService } from '../../common/services/openai.service';
+import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
+import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
+import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger(AiService.name);
+
   constructor(
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
+    @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
+    @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+    @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
+    private openAIService: OpenAIService,
   ) {}
 
   async generateSalesAnalytics(
@@ -821,5 +831,640 @@ export class AiService {
         'Consider seasonal adjustments based on trends',
       ],
     };
+  }
+
+  // Get menu optimization suggestions
+  async getMenuOptimization(branchId: string, category?: string): Promise<any[]> {
+    if (!Types.ObjectId.isValid(branchId)) {
+      throw new BadRequestException('Invalid branch ID');
+    }
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 90); // Last 90 days
+
+    // Build menu items query - match menu-items service logic
+    // Include both branch-specific items and company-wide items (branchId: null)
+    const branchIdObj = new Types.ObjectId(branchId);
+    
+    console.log(`[AI Menu Optimization] Querying menu items for branchId: ${branchId} (ObjectId: ${branchIdObj})`);
+    
+    let menuItems = await this.menuItemModel.find({
+      $or: [
+        { branchId: branchIdObj },
+        { branchId: branchId }, // Try string format too
+        { branchId: null }, // Include company-wide items
+      ],
+    })
+      .populate('categoryId', 'name type')
+      .lean();
+    
+    console.log(`[AI Menu Optimization] Found ${menuItems.length} menu items (before filtering)`);
+    
+    // Filter out unavailable items
+    menuItems = menuItems.filter((item: any) => item.isAvailable !== false);
+    
+    console.log(`[AI Menu Optimization] After filtering unavailable: ${menuItems.length} menu items`);
+
+    // Filter by category name if provided
+    if (category && category !== 'all') {
+      menuItems = menuItems.filter((item: any) => {
+        const populatedCategory = item.categoryId;
+        if (!populatedCategory) return false;
+        
+        // Handle both populated ObjectId with name property and direct name access
+        const categoryName = populatedCategory.name || populatedCategory;
+        return categoryName && categoryName.toString().toLowerCase() === category.toLowerCase();
+      });
+    }
+
+    // If there are no menu items, return empty array
+    // Note: We'll generate suggestions for ALL menu items, even without sales data
+    if (menuItems.length === 0) {
+      console.log(`[AI Menu Optimization] No menu items found for branchId: ${branchId}`);
+      console.log(`[AI Menu Optimization] Tried ObjectId format: ${new Types.ObjectId(branchId)}`);
+      return [];
+    }
+    
+    console.log(`[AI Menu Optimization] Found ${menuItems.length} menu items for branchId: ${branchId}`);
+
+    // Get order data for these menu items - Use POSOrder for actual sales data
+    // Note: This will be empty if there are no sales yet, but we'll still generate suggestions
+    const menuItemIds = menuItems.map(item => item._id);
+    const orderData = await this.posOrderModel.aggregate([
+      {
+        $match: {
+          branchId: new Types.ObjectId(branchId),
+          status: 'paid', // POSOrder uses 'paid' status
+          createdAt: { $gte: startDate, $lte: endDate }, // Use createdAt for POSOrder
+        },
+      },
+      { $unwind: '$items' },
+      {
+        $match: {
+          'items.menuItemId': { $in: menuItemIds },
+        },
+      },
+      {
+        $group: {
+          _id: '$items.menuItemId',
+          totalQuantity: { $sum: '$items.quantity' },
+          totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          avgPrice: { $avg: '$items.price' },
+          orderCount: { $sum: 1 },
+          lastOrderDate: { $max: '$createdAt' }, // Use createdAt for POSOrder
+        },
+      },
+    ]);
+
+    // Create a map of order data by menu item ID
+    const orderDataMap = new Map();
+    orderData.forEach(item => {
+      orderDataMap.set(item._id.toString(), item);
+    });
+
+    // Calculate total revenue for comparison (not used in current logic but useful for future enhancements)
+    const totalBranchRevenue = orderData.reduce((sum, item) => sum + item.totalRevenue, 0);
+
+    // Generate optimization suggestions for ALL menu items
+    const suggestions = [];
+
+    for (const menuItem of menuItems) {
+      const itemId = menuItem._id.toString();
+      const itemOrderData = orderDataMap.get(itemId);
+      
+      const currentPrice = menuItem.price || 0;
+      const totalQuantity = itemOrderData?.totalQuantity || 0;
+      const totalRevenue = itemOrderData?.totalRevenue || 0;
+      const orderCount = itemOrderData?.orderCount || 0;
+      const avgPrice = itemOrderData?.avgPrice || currentPrice;
+
+      // Calculate metrics
+      const daysSinceLastOrder = itemOrderData?.lastOrderDate 
+        ? Math.floor((endDate.getTime() - new Date(itemOrderData.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
+        : 999; // Never ordered
+
+      // Calculate demand score (0-10)
+      const demandScore = Math.min(10, Math.max(0, 
+        (totalQuantity / 10) + // Base on quantity
+        (orderCount / 5) + // Base on order frequency
+        (daysSinceLastOrder < 7 ? 3 : daysSinceLastOrder < 30 ? 1 : -2) // Recency bonus
+      ));
+
+      // Calculate popularity score (0-5)
+      const popularityScore = Math.min(5, Math.max(0,
+        (totalQuantity / 20) + // Base on total quantity
+        (orderCount / 10) // Base on order count
+      ));
+
+      // Calculate profit margin (simplified - assuming 30% cost)
+      const estimatedCost = currentPrice * 0.3;
+      const profitMargin = currentPrice > 0 ? ((currentPrice - estimatedCost) / currentPrice) * 100 : 0;
+
+      // Determine recommendation - Try OpenAI first, fallback to rule-based
+      let recommendation: 'increase_price' | 'decrease_price' | 'maintain_price' | 'remove_item' | 'add_item' = 'maintain_price';
+      let suggestedPrice = currentPrice;
+      let priceChange = 0;
+      let reasoning = '';
+      let confidence = 0.5;
+      let expectedImpactFromAI: { revenue: number; profit: number; orders: number } | null = null;
+
+      // Try to get AI-powered recommendation if OpenAI is available
+      if (this.openAIService.isAvailable()) {
+        try {
+          const categoryName = (menuItem.categoryId as any)?.name || menuItem.categoryId;
+          
+          // Get sales trend data
+          const sales30Days = orderData.filter((o: any) => {
+            const orderDate = new Date(o.lastOrderDate || 0);
+            const daysDiff = Math.floor((endDate.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
+            return daysDiff <= 30;
+          }).reduce((sum: number, o: any) => sum + (o.totalQuantity || 0), 0);
+
+          const sales90Days = totalQuantity;
+          const avgDailySales = totalQuantity > 0 ? totalQuantity / 90 : 0;
+          
+          let trend: 'increasing' | 'decreasing' | 'stable' = 'stable';
+          if (sales30Days > 0 && sales90Days > 0) {
+            const avg30Days = sales30Days / 30;
+            const avg90Days = sales90Days / 90;
+            if (avg30Days > avg90Days * 1.2) trend = 'increasing';
+            else if (avg30Days < avg90Days * 0.8) trend = 'decreasing';
+          }
+
+          const aiRecommendation = await this.openAIService.generateMenuOptimizationRecommendation({
+            itemName: menuItem.name || 'Unknown Item',
+            currentPrice,
+            demandScore,
+            popularityScore,
+            profitMargin,
+            totalQuantity,
+            orderCount,
+            daysSinceLastOrder,
+            avgPrice,
+            category: typeof categoryName === 'string' ? categoryName : undefined,
+            salesData: {
+              last30Days: sales30Days,
+              last90Days: sales90Days,
+              trend,
+            },
+          });
+
+          if (aiRecommendation) {
+            this.logger.log(`✅ Using AI recommendation for ${menuItem.name}`);
+            recommendation = aiRecommendation.recommendation;
+            suggestedPrice = Math.round(aiRecommendation.suggestedPrice * 100) / 100;
+            priceChange = suggestedPrice !== currentPrice 
+              ? Math.round(((suggestedPrice - currentPrice) / currentPrice) * 100 * 10) / 10
+              : 0;
+            reasoning = aiRecommendation.reasoning;
+            confidence = aiRecommendation.confidence;
+            expectedImpactFromAI = aiRecommendation.expectedImpact;
+          } else {
+            this.logger.warn(`⚠️ AI recommendation failed for ${menuItem.name}, using rule-based`);
+          }
+        } catch (error) {
+          this.logger.error(`Error getting AI recommendation for ${menuItem.name}: ${error.message}`);
+          // Continue with rule-based logic
+        }
+      }
+
+      // Fallback to rule-based recommendations if AI is not available or failed
+      if (!expectedImpactFromAI) {
+        // Handle items with no sales differently - provide useful initial recommendations
+        if (totalQuantity === 0) {
+          // New items or items with no sales - suggest promotional pricing to boost visibility
+          recommendation = 'decrease_price';
+          suggestedPrice = Math.round(currentPrice * 0.9 * 100) / 100; // 10% discount
+          priceChange = -10;
+          reasoning = 'New item with no sales data yet. Consider promotional pricing (10% discount) to increase visibility and attract initial customers. Monitor performance after first week.';
+          confidence = 0.55;
+        } else if (daysSinceLastOrder > 60) {
+          recommendation = 'remove_item';
+          reasoning = 'No sales in the last 60+ days. Consider removing this item from the menu or reintroducing it with promotional pricing.';
+          confidence = 0.8;
+        } else if (demandScore > 7 && currentPrice < avgPrice * 0.9) {
+          recommendation = 'increase_price';
+          suggestedPrice = Math.round(currentPrice * 1.1 * 100) / 100;
+          priceChange = 10;
+          reasoning = `High demand (${demandScore.toFixed(1)}/10) but price is below average. Increasing price by 10% could boost revenue without significantly impacting demand.`;
+          confidence = 0.75;
+        } else if (demandScore < 3 && currentPrice > avgPrice * 1.1) {
+          recommendation = 'decrease_price';
+          suggestedPrice = Math.round(currentPrice * 0.9 * 100) / 100;
+          priceChange = -10;
+          reasoning = `Low demand (${demandScore.toFixed(1)}/10) and price is above average. Reducing price by 10% could increase demand and overall revenue.`;
+          confidence = 0.7;
+        } else if (demandScore > 5 && profitMargin < 20) {
+          recommendation = 'increase_price';
+          suggestedPrice = Math.round(currentPrice * 1.05 * 100) / 100;
+          priceChange = 5;
+          reasoning = `Good demand but low profit margin (${profitMargin.toFixed(1)}%). Small price increase could improve profitability.`;
+          confidence = 0.65;
+        } else {
+          recommendation = 'maintain_price';
+          reasoning = `Current pricing appears optimal based on demand (${demandScore.toFixed(1)}/10) and performance metrics.`;
+          confidence = 0.6;
+        }
+      }
+
+      // Calculate expected impact - use AI prediction if available, otherwise calculate
+      let expectedRevenueChange = 0;
+      let expectedOrderChange = 0;
+      
+      if (expectedImpactFromAI) {
+        // Use AI-provided impact
+        expectedRevenueChange = expectedImpactFromAI.revenue;
+        expectedOrderChange = expectedImpactFromAI.orders;
+      } else {
+        // Fallback to rule-based calculation
+        if (totalQuantity > 0) {
+          // Items with sales: calculate based on actual volume
+          expectedRevenueChange = (suggestedPrice - currentPrice) * totalQuantity * 0.8; // Assume 80% of current volume
+          expectedOrderChange = priceChange > 0 ? -Math.round(totalQuantity * 0.1) : priceChange < 0 ? Math.round(totalQuantity * 0.2) : 0;
+        } else if (priceChange !== 0) {
+          // Items with no sales but price change: estimate potential
+          const estimatedMonthlyQuantity = 5; // Estimate 5 units/month for new items
+          expectedRevenueChange = (suggestedPrice - currentPrice) * estimatedMonthlyQuantity;
+          expectedOrderChange = priceChange < 0 ? 3 : 0; // Promotional pricing might attract 3 more orders
+        }
+      }
+      
+      const expectedProfitChange = expectedImpactFromAI?.profit || (expectedRevenueChange * (profitMargin / 100));
+
+      suggestions.push({
+        id: itemId,
+        itemId: itemId,
+        itemName: menuItem.name || 'Unknown Item',
+        currentPrice,
+        suggestedPrice,
+        priceChange,
+        demandScore: Math.round(demandScore * 10) / 10,
+        popularityScore: Math.round(popularityScore * 10) / 10,
+        profitMargin: Math.round(profitMargin * 10) / 10,
+        recommendation,
+        reasoning,
+        confidence: Math.round(confidence * 100) / 100,
+        expectedImpact: {
+          revenue: Math.round(expectedRevenueChange * 100) / 100,
+          profit: Math.round(expectedProfitChange * 100) / 100,
+          orders: expectedOrderChange,
+        },
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    // Sort by expected revenue impact (descending)
+    const sortedSuggestions = suggestions.sort((a, b) => b.expectedImpact.revenue - a.expectedImpact.revenue);
+    
+    console.log(`[AI Menu Optimization] Generated ${sortedSuggestions.length} suggestions for branchId: ${branchId}`);
+    
+    return sortedSuggestions;
+  }
+
+  // Get demand predictions
+  async getDemandPredictions(branchId: string): Promise<any[]> {
+    if (!Types.ObjectId.isValid(branchId)) {
+      throw new BadRequestException('Invalid branch ID');
+    }
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30); // Last 30 days
+
+    // Get menu items - match the same logic as menu-items service
+    const branchIdObj = new Types.ObjectId(branchId);
+    let menuItems = await this.menuItemModel.find({
+      $or: [
+        { branchId: branchIdObj },
+        { branchId: branchId }, // Try string format too
+        { branchId: null }, // Include company-wide items
+      ],
+    })
+      .populate('categoryId', 'name type')
+      .lean();
+    
+    // Filter out unavailable items
+    menuItems = menuItems.filter((item: any) => item.isAvailable !== false);
+
+    if (menuItems.length === 0) {
+      return [];
+    }
+
+    const menuItemIds = menuItems.map(item => item._id);
+
+    // Get historical order data - Use POSOrder for actual sales data
+    // Try both string and ObjectId formats for branchId
+    const orderData = await this.posOrderModel.aggregate([
+      {
+        $match: {
+          $or: [
+            { branchId: new Types.ObjectId(branchId) },
+            { branchId: branchId }
+          ],
+          status: 'paid', // POSOrder uses 'paid' status
+          createdAt: { $gte: startDate, $lte: endDate }, // Use createdAt for POSOrder
+        },
+      },
+      { $unwind: '$items' },
+      {
+        $match: {
+          'items.menuItemId': { $in: menuItemIds },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            menuItemId: '$items.menuItemId',
+            dayOfWeek: { $dayOfWeek: '$createdAt' }, // Use createdAt for POSOrder
+            hour: { $hour: '$createdAt' }, // Use createdAt for POSOrder
+          },
+          quantity: { $sum: '$items.quantity' },
+        },
+      },
+    ]);
+
+    // Calculate predictions for each menu item
+    const predictions = [];
+
+    for (const menuItem of menuItems) {
+      const itemId = menuItem._id.toString();
+      const itemOrders = orderData.filter(o => o._id.menuItemId.toString() === itemId);
+
+      // Generate predictions even for items with no sales data
+      if (itemOrders.length === 0) {
+        // For items with no sales, provide baseline predictions
+        predictions.push({
+          id: itemId,
+          itemId: itemId,
+          itemName: menuItem.name || 'Unknown Item',
+          predictedDemand: 0, // No sales data = 0 predicted demand
+          confidence: 0.3, // Low confidence due to lack of data
+          factors: {
+            timeOfDay: 0,
+            dayOfWeek: 0,
+            season: 0.5,
+            events: 0.5,
+            trends: 0.3,
+          },
+          recommendations: ['No sales data available. Monitor performance after launch.', 'Consider promotional pricing to increase visibility.'],
+          createdAt: new Date().toISOString(),
+        });
+        continue;
+      }
+
+      // Calculate average daily demand
+      const totalQuantity = itemOrders.reduce((sum, o) => sum + o.quantity, 0);
+      const avgDailyDemand = totalQuantity / 30;
+
+      // Predict next 7 days (simple average)
+      const predictedDemand = Math.round(avgDailyDemand * 7);
+
+      // Calculate factors
+      const timeOfDayFactor = itemOrders.filter(o => o._id.hour >= 11 && o._id.hour <= 14 || o._id.hour >= 18 && o._id.hour <= 21).length / itemOrders.length;
+      const dayOfWeekFactor = itemOrders.filter(o => o._id.dayOfWeek >= 5 && o._id.dayOfWeek <= 7).length / itemOrders.length; // Weekend
+      const seasonFactor = 0.7; // Placeholder - could be enhanced with actual seasonal data
+      const eventsFactor = 0.5; // Placeholder - could be enhanced with event data
+      const trendsFactor = avgDailyDemand > 5 ? 0.8 : 0.5; // Higher for popular items
+
+      // Calculate confidence based on data availability
+      const confidence = Math.min(0.95, Math.max(0.5, itemOrders.length / 20));
+
+      // Generate recommendations
+      const recommendations = [];
+      if (predictedDemand > 50) {
+        recommendations.push('High predicted demand - ensure adequate stock levels');
+        recommendations.push('Consider promoting this item to maximize sales');
+      } else if (predictedDemand < 10) {
+        recommendations.push('Low predicted demand - consider promotional pricing');
+        recommendations.push('Review if this item should remain on the menu');
+      }
+
+      if (timeOfDayFactor > 0.6) {
+        recommendations.push('Peak demand during meal times - optimize preparation');
+      }
+
+      predictions.push({
+        id: itemId,
+        itemId: itemId,
+        itemName: menuItem.name || 'Unknown Item',
+        predictedDemand,
+        confidence: Math.round(confidence * 100) / 100,
+        factors: {
+          timeOfDay: Math.round(timeOfDayFactor * 100) / 100,
+          dayOfWeek: Math.round(dayOfWeekFactor * 100) / 100,
+          season: Math.round(seasonFactor * 100) / 100,
+          events: Math.round(eventsFactor * 100) / 100,
+          trends: Math.round(trendsFactor * 100) / 100,
+        },
+        recommendations: recommendations.length > 0 ? recommendations : ['Monitor demand patterns for optimization opportunities'],
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    // Sort by predicted demand (descending)
+    return predictions.sort((a, b) => b.predictedDemand - a.predictedDemand);
+  }
+
+  // Generate personalized offers for a customer
+  async generatePersonalizedOffers(
+    customerId: string,
+    branchId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      type: 'discount' | 'free_item' | 'bonus_points' | 'early_access';
+      title: string;
+      description: string;
+      value: number;
+      expiryDate: string;
+      conditions?: string[];
+    }>
+  > {
+    if (!Types.ObjectId.isValid(customerId)) {
+      throw new BadRequestException('Invalid customer ID');
+    }
+    if (!Types.ObjectId.isValid(branchId)) {
+      throw new BadRequestException('Invalid branch ID');
+    }
+
+    // Fetch customer data
+    const customer = await this.customerModel
+      .findById(customerId)
+      .lean()
+      .exec();
+
+    if (!customer) {
+      throw new BadRequestException('Customer not found');
+    }
+
+    // Fetch customer order history
+    const customerOrders = await this.posOrderModel
+      .find({
+        customerId: new Types.ObjectId(customerId),
+        branchId: new Types.ObjectId(branchId),
+        status: 'paid',
+      })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean()
+      .exec();
+
+    const totalOrders = customerOrders.length;
+    const daysSinceLastOrder = customer.lastOrderDate
+      ? Math.floor(
+          (new Date().getTime() - new Date(customer.lastOrderDate).getTime()) /
+            (1000 * 60 * 60 * 24),
+        )
+      : 999;
+    const avgOrderValue =
+      totalOrders > 0
+        ? customer.totalSpent / customer.totalOrders
+        : customer.totalSpent;
+
+    // Generate offers based on customer behavior
+    const offers: Array<{
+      id: string;
+      type: 'discount' | 'free_item' | 'bonus_points' | 'early_access';
+      title: string;
+      description: string;
+      value: number;
+      expiryDate: string;
+      conditions?: string[];
+    }> = [];
+
+    // Offer 1: Welcome discount for new customers
+    if (totalOrders < 3) {
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 30);
+      offers.push({
+        id: `${customerId}-welcome-${Date.now()}`,
+        type: 'discount',
+        title: 'Welcome Discount',
+        description: `Welcome! Enjoy 15% off on your next order. Valid for 30 days.`,
+        value: 15,
+        expiryDate: expiryDate.toISOString(),
+        conditions: ['Minimum order value: $10', 'First-time customer offer'],
+      });
+    }
+
+    // Offer 2: Loyalty points bonus for frequent customers
+    if (totalOrders >= 5 && customer.loyaltyPoints < 500) {
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 60);
+      offers.push({
+        id: `${customerId}-bonus-points-${Date.now()}`,
+        type: 'bonus_points',
+        title: 'Bonus Loyalty Points',
+        description: `Earn 2x loyalty points on your next order!`,
+        value: 100, // Bonus points
+        expiryDate: expiryDate.toISOString(),
+        conditions: ['Valid for next order only', 'Minimum order value: $20'],
+      });
+    }
+
+    // Offer 3: Re-engagement offer for customers who haven't ordered in a while
+    if (daysSinceLastOrder > 30 && daysSinceLastOrder < 90) {
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 14);
+      const discountValue = daysSinceLastOrder > 60 ? 20 : 10;
+      offers.push({
+        id: `${customerId}-reengage-${Date.now()}`,
+        type: 'discount',
+        title: 'We Miss You!',
+        description: `Come back and enjoy ${discountValue}% off on your next order.`,
+        value: discountValue,
+        expiryDate: expiryDate.toISOString(),
+        conditions: [
+          'Valid for next order only',
+          `Minimum order value: $${Math.max(15, Math.round(avgOrderValue * 0.5))}`,
+        ],
+      });
+    }
+
+    // Offer 4: Tier upgrade incentive
+    const tierPoints = {
+      bronze: 0,
+      silver: 500,
+      gold: 1000,
+      platinum: 2000,
+    };
+    const nextTierPoints =
+      customer.loyaltyTier === 'bronze'
+        ? 500
+        : customer.loyaltyTier === 'silver'
+          ? 1000
+          : customer.loyaltyTier === 'gold'
+            ? 2000
+            : Infinity;
+    const pointsNeeded = nextTierPoints - customer.loyaltyPoints;
+    if (pointsNeeded > 0 && pointsNeeded <= 200) {
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 45);
+      offers.push({
+        id: `${customerId}-tier-upgrade-${Date.now()}`,
+        type: 'bonus_points',
+        title: 'Tier Upgrade Boost',
+        description: `You're ${pointsNeeded} points away from the next tier! Get bonus points to unlock exclusive benefits.`,
+        value: pointsNeeded,
+        expiryDate: expiryDate.toISOString(),
+        conditions: [
+          'Valid for next order only',
+          'Minimum order value: $25',
+          'Tier upgrade benefits apply immediately',
+        ],
+      });
+    }
+
+    // Offer 5: High-value customer VIP offer
+    if (customer.totalSpent > 500 || customer.isVIP) {
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 90);
+      offers.push({
+        id: `${customerId}-vip-${Date.now()}`,
+        type: 'early_access',
+        title: 'VIP Early Access',
+        description: `As a valued customer, get early access to new menu items and exclusive events.`,
+        value: 0,
+        expiryDate: expiryDate.toISOString(),
+        conditions: ['VIP customer exclusive', 'Includes priority booking'],
+      });
+    }
+
+    // Offer 6: Birthday/Anniversary special (if date available)
+    if (customer.dateOfBirth) {
+      const today = new Date();
+      const birthDate = new Date(customer.dateOfBirth);
+      const isBirthdayMonth =
+        today.getMonth() === birthDate.getMonth() &&
+        Math.abs(today.getDate() - birthDate.getDate()) <= 7;
+      if (isBirthdayMonth) {
+        const expiryDate = new Date();
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+        offers.push({
+          id: `${customerId}-birthday-${Date.now()}`,
+          type: 'free_item',
+          title: 'Birthday Special!',
+          description: `Happy Birthday! Enjoy a complimentary dessert with your next order.`,
+          value: avgOrderValue * 0.15, // Estimated dessert value
+          expiryDate: expiryDate.toISOString(),
+          conditions: [
+            'Valid during birthday month',
+            'Minimum order value: $30',
+            'Dessert selection based on availability',
+          ],
+        });
+      }
+    }
+
+    // Sort offers by relevance (new customers first, then by value)
+    offers.sort((a, b) => {
+      if (a.type === 'discount' && b.type !== 'discount') return -1;
+      if (b.type === 'discount' && a.type !== 'discount') return 1;
+      return b.value - a.value;
+    });
+
+    // Limit to top 5 offers
+    return offers.slice(0, 5);
   }
 }

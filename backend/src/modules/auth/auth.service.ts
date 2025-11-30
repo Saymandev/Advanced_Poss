@@ -330,6 +330,23 @@ export class AuthService {
       throw new BadRequestException('Company with this email already exists');
     }
 
+    // Handle branchAddress - frontend sends as object: { street, city, state, country, zipCode }
+    let streetAddress = '';
+    let cityAddress = 'Unknown';
+    let stateAddress = 'Unknown';
+    let zipCodeAddress = '00000';
+    
+    if (typeof branchAddress === 'object' && branchAddress !== null) {
+      // Frontend is sending object format: { street, city, state, country, zipCode }
+      streetAddress = (branchAddress as any).street || '';
+      cityAddress = (branchAddress as any).city || 'Unknown';
+      stateAddress = (branchAddress as any).state || 'Unknown';
+      zipCodeAddress = (branchAddress as any).zipCode || '00000';
+    } else if (typeof branchAddress === 'string') {
+      // Legacy format: just a string
+      streetAddress = branchAddress;
+    }
+
     // Create company first (without ownerId initially)
     const company = await this.companiesService.create({
       name: companyName,
@@ -337,11 +354,11 @@ export class AuthService {
       phone: phoneNumber,
       subscriptionPlan: subscriptionPackage,
       address: {
-        street: branchAddress,
-        city: 'Unknown', // Will be updated later
-        state: 'Unknown',
+        street: streetAddress,
+        city: cityAddress,
+        state: stateAddress,
         country,
-        zipCode: '00000',
+        zipCode: zipCodeAddress,
       },
     } as any);
 
@@ -350,11 +367,11 @@ export class AuthService {
       companyId: (company as any)._id.toString(),
       name: branchName,
       address: {
-        street: branchAddress,
-        city: 'Unknown',
-        state: 'Unknown',
+        street: streetAddress,
+        city: cityAddress,
+        state: stateAddress,
         country,
-        zipCode: '00000',
+        zipCode: zipCodeAddress,
       },
     });
 
@@ -380,7 +397,7 @@ export class AuthService {
     // Update company with owner ID
     await this.companiesService.update((company as any)._id.toString(), { 
       ownerId: (user as any)._id.toString() 
-    } as any);
+    });
 
     // Get subscription plan details
     const subscriptionPlan = await this.subscriptionPlansService.findByName(subscriptionPackage);
@@ -389,6 +406,30 @@ export class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user);
     await this.usersService.updateRefreshToken((user as any)._id.toString(), tokens.refreshToken);
+
+    // Format branch address for response
+    let formattedBranchAddress = '';
+    if (branch.address) {
+      if (typeof branch.address === 'string') {
+        formattedBranchAddress = branch.address;
+      } else if (typeof branch.address === 'object' && branch.address !== null) {
+        const addr = branch.address as any;
+        // Ensure we're accessing the address fields correctly
+        // Address schema: { street: string, city: string, state?: string, country: string, zipCode?: string }
+        const street = String(addr.street || '').trim();
+        const city = String(addr.city || '').trim();
+        const state = String(addr.state || '').trim();
+        const zipCode = String(addr.zipCode || '').trim();
+        
+        const parts = [
+          street,
+          city && city !== 'Unknown' ? city : null,
+          state && state !== 'Unknown' ? state : null,
+          zipCode && zipCode !== '00000' ? zipCode : null
+        ].filter(Boolean);
+        formattedBranchAddress = parts.length > 0 ? parts.join(', ') : (street || 'Address not available');
+      }
+    }
 
     return {
       user: {
@@ -404,13 +445,16 @@ export class AuthService {
         id: (company as any)._id.toString(),
         name: company.name,
         email: company.email,
+        slug: (company as any).slug, // Include slug for public URL routing
       },
       branch: {
         id: (branch as any)._id.toString(),
         name: branch.name,
-        address: branch.address,
+        address: formattedBranchAddress,
+        slug: (branch as any).slug, // Include slug for public URL routing
       },
-      tokens,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       requiresPayment,
       subscriptionPlan: {
         name: subscriptionPlan.name,
@@ -782,7 +826,12 @@ export class AuthService {
     // Get available roles for each branch
     const branchesWithRoles = await Promise.all(
       branches.map(async (branch: any) => {
-        const branchUsers = await this.usersService.findByBranch(branch._id.toString());
+        const branchIdStr = branch._id.toString();
+        const branchUsers = await this.usersService.findByBranch(branchIdStr);
+        this.logger.log(`📍 Branch: ${branch.name} (ID: ${branchIdStr}) - Found ${branchUsers.length} user(s)`);
+        branchUsers.forEach(user => {
+          this.logger.log(`  👤 User: ${user.firstName} ${user.lastName} - Role: ${user.role} - Active: ${(user as any).isActive} - BranchId: ${(user as any).branchId}`);
+        });
         const availableRoles = [...new Set(branchUsers.map(user => user.role))];
         this.logger.log(`📍 Branch: ${branch.name} - Users: ${branchUsers.length}, Roles: ${availableRoles.join(', ')}`);
 
@@ -800,10 +849,36 @@ export class AuthService {
           });
         });
 
+        // Format address properly
+        let formattedAddress = '';
+        if (branch.address) {
+          if (typeof branch.address === 'string') {
+            formattedAddress = branch.address;
+          } else if (typeof branch.address === 'object' && branch.address !== null) {
+            const addr = branch.address as any;
+            // Ensure we're accessing the address fields correctly
+            // Address schema: { street: string, city: string, state?: string, country: string, zipCode?: string }
+            const street = String(addr.street || '').trim();
+            const city = String(addr.city || '').trim();
+            const state = String(addr.state || '').trim();
+            const zipCode = String(addr.zipCode || '').trim();
+            
+            const parts = [
+              street,
+              city && city !== 'Unknown' ? city : null,
+              state && state !== 'Unknown' ? state : null,
+              zipCode && zipCode !== '00000' ? zipCode : null
+            ].filter(Boolean);
+            formattedAddress = parts.length > 0 ? parts.join(', ') : (street || 'Address not available');
+          }
+        }
+
         return {
           id: branch._id.toString(),
           name: branch.name,
-          address: branch.address,
+          slug: (branch as any).slug, // Include slug for public URL routing
+          address: formattedAddress || 'Address not available', // Always return formatted string
+          addressObject: branch.address, // Keep original object for detailed display
           isActive: branch.isActive,
           availableRoles: availableRoles,
           usersByRole: usersByRole
@@ -854,35 +929,57 @@ export class AuthService {
       this.logger.log(`🔍 Finding specific user by ID: ${userId}`);
       // If userId is provided, find specific user
       user = await this.usersService.findOne(userId);
-      if (!user || user.role !== role || user.branchId !== branchId) {
-        this.logger.error(`❌ Invalid user selection - User: ${userId}, Role match: ${user?.role === role}, Branch match: ${user?.branchId === branchId}`);
-        // Log failed login attempt
+      
+      // CRITICAL: Validate user is assigned to the branch they're trying to login to
+      const userBranchId = user?.branchId?.toString() || user?.branchId;
+      const loginBranchId = branchId.toString();
+      
+      if (!user) {
+        this.logger.error(`❌ User not found: ${userId}`);
+        throw new UnauthorizedException('User not found');
+      }
+      
+      if (user.role.toLowerCase() !== role.toLowerCase()) {
+        this.logger.error(`❌ Role mismatch - Expected: ${role}, Got: ${user.role}`);
+        throw new UnauthorizedException('Role mismatch');
+      }
+      
+      // Owners can login to any branch in their company, but other roles must be assigned to the branch
+      if (user.role.toLowerCase() !== 'owner' && userBranchId !== loginBranchId) {
+        this.logger.error(`❌ User ${userId} is not assigned to branch ${branchId}. User's branch: ${userBranchId}`);
         await this.logLoginActivity({
           userId: userId || 'unknown',
           companyId,
           branchId,
-          email: 'unknown',
+          email: user.email || 'unknown',
           role: role as any,
           status: LoginStatus.FAILED,
           method: LoginMethod.PIN_ROLE,
           ipAddress: ipAddress || 'unknown',
           userAgent: userAgent || 'unknown',
-          failureReason: 'Invalid user selection',
+          failureReason: `User not assigned to branch. User's branch: ${userBranchId}, Login branch: ${loginBranchId}`,
         });
-        throw new UnauthorizedException('Invalid user selection');
+        throw new UnauthorizedException('You are not assigned to this branch. Please contact your manager.');
       }
-      this.logger.log(`✅ Found user: ${user.email} (${user.firstName} ${user.lastName})`);
+      
+      // Validate company match
+      const userCompanyId = user?.companyId?.toString() || user?.companyId;
+      if (userCompanyId !== companyId.toString()) {
+        this.logger.error(`❌ Company mismatch - User's company: ${userCompanyId}, Login company: ${companyId}`);
+        throw new UnauthorizedException('Company mismatch');
+      }
+      
+      this.logger.log(`✅ Found user: ${user.email} (${user.firstName} ${user.lastName}) - Branch: ${userBranchId}`);
     } else {
       this.logger.log(`🔍 Finding user by role and branch`);
-      // Find user by role and branch
+      // Find user by role and branch - only users assigned to this branch
       const users = await this.usersService.findByBranch(branchId);
-      this.logger.log(`📍 Found ${users.length} user(s) in branch ${branchId}`);
+      this.logger.log(`📍 Found ${users.length} user(s) assigned to branch ${branchId}`);
       const roleUsers = users.filter(u => u.role.toLowerCase() === role.toLowerCase());
-      this.logger.log(`🎭 Found ${roleUsers.length} user(s) with role ${role}`);
+      this.logger.log(`🎭 Found ${roleUsers.length} user(s) with role ${role} in branch ${branchId}`);
       
       if (roleUsers.length === 0) {
-        this.logger.error(`❌ No users found with role '${role}' in branch ${branchId}`);
-        // Log failed login attempt
+        this.logger.error(`❌ No users found with role '${role}' assigned to branch ${branchId}`);
         await this.logLoginActivity({
           userId: 'unknown',
           companyId,
@@ -893,14 +990,13 @@ export class AuthService {
           method: LoginMethod.PIN_ROLE,
           ipAddress: ipAddress || 'unknown',
           userAgent: userAgent || 'unknown',
-          failureReason: 'No users found with this role in this branch',
+          failureReason: `No users found with role '${role}' assigned to branch ${branchId}`,
         });
-        throw new UnauthorizedException('No users found with this role in this branch');
+        throw new UnauthorizedException(`No users found with role '${role}' assigned to this branch. Please contact your manager.`);
       }
       
       if (roleUsers.length > 1) {
-        this.logger.warn(`⚠️  Multiple users (${roleUsers.length}) found with role '${role}' - user selection required`);
-        // Log failed login attempt
+        this.logger.warn(`⚠️  Multiple users (${roleUsers.length}) found with role '${role}' in branch ${branchId} - user selection required`);
         await this.logLoginActivity({
           userId: 'unknown',
           companyId,
@@ -911,18 +1007,20 @@ export class AuthService {
           method: LoginMethod.PIN_ROLE,
           ipAddress: ipAddress || 'unknown',
           userAgent: userAgent || 'unknown',
-          failureReason: 'Multiple users found with this role',
+          failureReason: 'Multiple users found with this role in this branch',
         });
-        throw new BadRequestException('Multiple users found with this role. Please select a specific user.');
+        throw new BadRequestException('Multiple users found with this role in this branch. Please select a specific user.');
       }
       
       user = roleUsers[0];
-      this.logger.log(`✅ Selected user: ${user.email} (${user.firstName} ${user.lastName})`);
+      this.logger.log(`✅ Selected user: ${user.email} (${user.firstName} ${user.lastName}) - Branch: ${user.branchId}`);
     }
 
-    // Verify PIN
+    // Verify PIN - get user with PIN field selected
     this.logger.log(`🔐 Verifying PIN for user: ${user.email}`);
+    this.logger.log(`🔍 User ID: ${(user as any)._id}, Email: ${user.email}`);
     const userWithPin = await this.usersService.findByEmail(user.email);
+    this.logger.log(`🔍 User with PIN found: ${!!userWithPin}, PIN exists: ${!!userWithPin?.pin}`);
     if (!userWithPin?.pin) {
       this.logger.error(`❌ PIN not set for user: ${user.email}`);
       // Log failed login attempt
@@ -941,10 +1039,17 @@ export class AuthService {
       throw new UnauthorizedException('PIN not set for this user');
     }
 
-    this.logger.log(`🔍 Comparing PIN...`);
-    const isPinValid = await PasswordUtil.compare(pin, userWithPin.pin);
+    // Ensure PIN is a string and trim whitespace
+    const cleanPin = String(pin).trim();
+    this.logger.log(`🔍 Comparing PIN... (User PIN hash exists: ${!!userWithPin.pin}, PIN length: ${cleanPin.length}, PIN value: "${cleanPin}")`);
+    const isPinValid = await PasswordUtil.compare(cleanPin, userWithPin.pin);
+    this.logger.log(`🔍 PIN comparison result: ${isPinValid}`);
     if (!isPinValid) {
-      this.logger.error(`❌ Invalid PIN for user: ${user.email}`);
+      // Debug: Try comparing with original pin (in case of encoding issues)
+      this.logger.log(`🔍 Retrying PIN comparison with original value...`);
+      const retryResult = await PasswordUtil.compare(pin, userWithPin.pin);
+      this.logger.log(`🔍 Retry PIN comparison result: ${retryResult}`);
+      this.logger.error(`❌ Invalid PIN for user: ${user.email} (Role: ${user.role})`);
       // Log failed login attempt
       await this.logLoginActivity({
         userId: user._id.toString(),

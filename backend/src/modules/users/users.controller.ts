@@ -81,5 +81,14 @@ export class UsersController {
   deactivate(@Param('id') id: string) {
     return this.usersService.deactivate(id);
   }
+
+  @Get('branch/:branchId/role/:role')
+  @ApiOperation({ summary: 'Get employees by branch and role' })
+  getEmployeesByBranchAndRole(
+    @Param('branchId') branchId: string,
+    @Param('role') role: string,
+  ) {
+    return this.usersService.findByBranchAndRole(branchId, role);
+  }
 }
 

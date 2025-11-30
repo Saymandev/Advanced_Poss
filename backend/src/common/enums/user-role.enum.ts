@@ -3,6 +3,7 @@ export enum UserRole {
   OWNER = 'owner',
   MANAGER = 'manager',
   CHEF = 'chef',
+  COOK = 'cook',
   WAITER = 'waiter',
   CASHIER = 'cashier',
 }

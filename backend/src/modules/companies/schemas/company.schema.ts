@@ -57,8 +57,8 @@ export class Company {
   };
 
   // Ownership
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  ownerId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  ownerId?: Types.ObjectId;
 
   // Subscription
   @Prop({

@@ -65,8 +65,21 @@ export class PublicController {
     @Param('branchSlug') branchSlug: string,
   ) {
     const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException(`Company with slug "${companySlug}" not found`);
+    }
+    
     const companyId = (company as any)._id?.toString() || (company as any).id;
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    
+    if (!branch) {
+      throw new NotFoundException(`Branch with slug "${branchSlug}" not found for company "${companySlug}"`);
+    }
+    
+    // Only return active branches
+    if (!branch.isActive) {
+      throw new NotFoundException(`Branch "${branchSlug}" is not active`);
+    }
     
     return {
       success: true,
