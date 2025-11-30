@@ -26,10 +26,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function CategoriesPage() {
   const [mounted, setMounted] = useState(false);
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have categories feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('categories');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);

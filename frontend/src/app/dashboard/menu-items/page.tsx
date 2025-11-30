@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
 import { useCreateMenuItemMutation, useDeleteMenuItemMutation, useGetMenuItemsQuery, useToggleAvailabilityMutation, useUpdateMenuItemMutation, useUploadMenuImagesMutation } from '@/lib/api/endpoints/menuItemsApi';
@@ -55,6 +56,10 @@ interface MenuItem {
 
 export default function MenuItemsPage() {
   const { companyContext, user } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have menu-management feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('menu-management');
+  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);

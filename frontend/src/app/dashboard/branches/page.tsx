@@ -26,9 +26,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function BranchesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have branches feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('branches');
   const companyId = companyContext?.companyId || user?.companyId || '';
   
   // Get current active branch ID

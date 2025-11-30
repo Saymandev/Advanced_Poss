@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { CreateStaffRequest, Staff, useCreateStaffMutation, useDeactivateStaffMutation, useDeleteStaffMutation, useGetStaffByIdQuery, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -34,6 +35,10 @@ const ROLE_OPTIONS = [
 
 export default function StaffPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have staff-management feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('staff-management');
+  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);

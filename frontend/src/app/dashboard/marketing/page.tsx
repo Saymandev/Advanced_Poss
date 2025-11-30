@@ -42,12 +42,12 @@ export default function MarketingPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
 
-  // Try to get campaigns from API, fallback to local storage
-  const { data: apiCampaigns = [], refetch } = useGetCampaignsQuery({
+  // Get campaigns from API
+  const { data: apiCampaigns = [], refetch, isLoading: isLoadingCampaigns, error: campaignsError } = useGetCampaignsQuery({
     branchId: user?.branchId || undefined,
     companyId: user?.companyId || undefined,
   }, {
-    skip: !user?.branchId,
+    skip: !user?.companyId,
   });
 
   const { data: customersData } = useGetCustomersQuery({ 
@@ -60,27 +60,37 @@ export default function MarketingPage() {
   const [pauseCampaign] = usePauseCampaignMutation();
   const [resumeCampaign] = useResumeCampaignMutation();
 
-  // Load campaigns from localStorage on mount
-  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    }
-    return [];
-  });
+  // Use API campaigns as primary source, with localStorage as fallback
+  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
 
-  // Sync API campaigns and local storage
+  // Load from localStorage on mount as fallback
+  useEffect(() => {
+    if (typeof window !== 'undefined' && apiCampaigns.length === 0 && !isLoadingCampaigns) {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setCampaigns(parsed);
+        } catch (e) {
+          console.error('Failed to parse localStorage campaigns:', e);
+        }
+      }
+    }
+  }, []);
+
+  // Update campaigns when API data is available
   useEffect(() => {
     if (apiCampaigns.length > 0) {
       setCampaigns(apiCampaigns);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(apiCampaigns));
+      // Backup to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(apiCampaigns));
+      }
+    } else if (!isLoadingCampaigns && apiCampaigns.length === 0) {
+      // Clear campaigns if API returns empty and not loading
+      setCampaigns([]);
     }
-  }, [apiCampaigns]);
-
-  // Save to localStorage whenever campaigns change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(campaigns));
-  }, [campaigns]);
+  }, [apiCampaigns, isLoadingCampaigns]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -114,31 +124,48 @@ export default function MarketingPage() {
 
   const handleCreate = async () => {
     try {
-      const newCampaign: MarketingCampaign = {
-        id: Date.now().toString(),
-        ...formData,
-        status: formData.scheduledDate ? 'scheduled' : 'draft',
-        recipients: calculateRecipients,
-        branchId: user?.branchId || '',
-        companyId: user?.companyId || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Try API first, then fallback to local
-      try {
-        await createCampaign(formData).unwrap();
-        await refetch();
-      } catch {
-        // API failed, use local storage
-        setCampaigns([newCampaign, ...campaigns]);
+      // Validate required fields
+      if (!formData.name || !formData.message) {
+        toast.error('Please fill in all required fields');
+        return;
       }
-      
-      toast.success('Campaign created successfully');
-      setIsCreateModalOpen(false);
-      resetForm();
+
+      if (formData.type === 'email' && !formData.subject) {
+        toast.error('Email subject is required for email campaigns');
+        return;
+      }
+
+      if (formData.target === 'segment' && !formData.segment) {
+        toast.error('Segment name is required when targeting a segment');
+        return;
+      }
+
+      // Try API first
+      try {
+        const result = await createCampaign(formData).unwrap();
+        await refetch();
+        toast.success('Campaign created successfully');
+        setIsCreateModalOpen(false);
+        resetForm();
+      } catch (apiError: any) {
+        // API failed, fallback to local storage
+        const newCampaign: MarketingCampaign = {
+          id: Date.now().toString(),
+          ...formData,
+          status: formData.scheduledDate ? 'scheduled' : 'draft',
+          recipients: calculateRecipients,
+          branchId: user?.branchId || '',
+          companyId: user?.companyId || '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setCampaigns([newCampaign, ...campaigns]);
+        toast.success('Campaign created (saved locally)');
+        setIsCreateModalOpen(false);
+        resetForm();
+      }
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to create campaign');
+      toast.error(error.data?.message || error.message || 'Failed to create campaign');
     }
   };
 
@@ -146,23 +173,38 @@ export default function MarketingPage() {
     if (!selectedCampaign) return;
 
     try {
+      // Validate required fields
+      if (!formData.name || !formData.message) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      if (formData.type === 'email' && !formData.subject) {
+        toast.error('Email subject is required for email campaigns');
+        return;
+      }
+
+      // Try API first
       try {
         await updateCampaign({ id: selectedCampaign.id, ...formData }).unwrap();
         await refetch();
-      } catch {
+        toast.success('Campaign updated successfully');
+        setIsEditModalOpen(false);
+        resetForm();
+      } catch (apiError: any) {
+        // API failed, fallback to local storage
         const updatedCampaigns = campaigns.map(campaign =>
           campaign.id === selectedCampaign.id
             ? { ...campaign, ...formData, updatedAt: new Date().toISOString() }
             : campaign
         );
         setCampaigns(updatedCampaigns);
+        toast.success('Campaign updated (saved locally)');
+        setIsEditModalOpen(false);
+        resetForm();
       }
-      
-      toast.success('Campaign updated successfully');
-      setIsEditModalOpen(false);
-      resetForm();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to update campaign');
+      toast.error(error.data?.message || error.message || 'Failed to update campaign');
     }
   };
 
@@ -170,38 +212,56 @@ export default function MarketingPage() {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
 
     try {
+      // Try API first
       try {
         await deleteCampaign(id).unwrap();
         await refetch();
-      } catch {
-        setCampaigns(campaigns.filter(campaign => campaign.id !== id));
+        toast.success('Campaign deleted successfully');
+      } catch (apiError: any) {
+        // API failed, fallback to local storage
+        setCampaigns(campaigns.filter(campaign => {
+          const campaignId = campaign.id || (campaign as any)._id?.toString();
+          return campaignId !== id;
+        }));
+        toast.success('Campaign deleted (local only)');
       }
-      toast.success('Campaign deleted successfully');
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to delete campaign');
+      toast.error(error.data?.message || error.message || 'Failed to delete campaign');
     }
   };
 
-  const handleStatusChange = async (id: string, status: MarketingCampaign['status']) => {
+  const handleStatusChange = async (campaign: MarketingCampaign, newStatus: MarketingCampaign['status']) => {
+    const campaignId = campaign.id || (campaign as any)._id?.toString();
+    if (!campaignId) {
+      toast.error('Campaign ID is missing');
+      return;
+    }
+
     try {
-      if (status === 'active') {
-        await resumeCampaign(id).unwrap();
-      } else if (status === 'paused') {
-        await pauseCampaign(id).unwrap();
-      } else {
-        await updateCampaign({ id, status }).unwrap();
+      // Try API first
+      try {
+        if (newStatus === 'active' && campaign.status !== 'active') {
+          await resumeCampaign(campaignId.toString()).unwrap();
+        } else if (newStatus === 'paused' && campaign.status !== 'paused') {
+          await pauseCampaign(campaignId.toString()).unwrap();
+        } else {
+          await updateCampaign({ id: campaignId.toString(), status: newStatus }).unwrap();
+        }
+        await refetch();
+        toast.success(`Campaign ${newStatus} successfully`);
+      } catch (apiError: any) {
+        // API failed, fallback to local update
+        const updatedCampaigns = campaigns.map(c => {
+          const cId = c.id || (c as any)._id?.toString();
+          return cId === campaignId.toString()
+            ? { ...c, status: newStatus, updatedAt: new Date().toISOString() }
+            : c;
+        });
+        setCampaigns(updatedCampaigns);
+        toast.success(`Campaign ${newStatus} (local only)`);
       }
-      await refetch();
-      toast.success(`Campaign ${status} successfully`);
-    } catch {
-      // Fallback to local update
-      const updatedCampaigns = campaigns.map(campaign =>
-        campaign.id === id
-          ? { ...campaign, status, updatedAt: new Date().toISOString() }
-          : campaign
-      );
-      setCampaigns(updatedCampaigns);
-      toast.success(`Campaign ${status} successfully`);
+    } catch (error: any) {
+      toast.error(error.data?.message || error.message || `Failed to change campaign status`);
     }
   };
 
@@ -368,10 +428,21 @@ export default function MarketingPage() {
           <CardTitle>Campaigns</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredCampaigns.map((campaign) => (
-              <div key={campaign.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-                <div className="flex items-start justify-between">
+          {isLoadingCampaigns ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400">Loading campaigns...</p>
+            </div>
+          ) : campaignsError ? (
+            <div className="text-center py-8">
+              <p className="text-red-500">Failed to load campaigns. Using local data.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredCampaigns.map((campaign) => {
+                const campaignId = campaign.id || (campaign as any)._id?.toString() || `campaign-${campaign.name}-${campaign.createdAt}`;
+                return (
+                  <div key={campaignId} className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                    <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -403,21 +474,25 @@ export default function MarketingPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleStatusChange(campaign.id, campaign.status === 'active' ? 'paused' : 'active')}
+                      onClick={() => {
+                        const newStatus = campaign.status === 'active' ? 'paused' : 'active';
+                        handleStatusChange(campaign, newStatus);
+                      }}
+                      disabled={campaign.status === 'completed'}
                     >
-                      {campaign.status === 'active' ? 'Pause' : 'Activate'}
+                      {campaign.status === 'active' ? 'Pause' : campaign.status === 'paused' ? 'Resume' : 'Activate'}
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => openEditModal(campaign)}
+                      onClick={() => openEditModal({ ...campaign, id: campaignId.toString() })}
                     >
                       <PencilIcon className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(campaign.id, campaign.name)}
+                      onClick={() => handleDelete(campaignId.toString(), campaign.name)}
                       className="text-red-600 hover:text-red-700"
                     >
                       <TrashIcon className="w-4 h-4" />
@@ -461,14 +536,16 @@ export default function MarketingPage() {
                   </div>
                 </div>
               </div>
-            ))}
+                );
+              })}
 
-            {filteredCampaigns.length === 0 && (
-              <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                No campaigns found matching your filters.
-              </p>
-            )}
-          </div>
+              {filteredCampaigns.length === 0 && (
+                <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                  No campaigns found matching your filters.
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

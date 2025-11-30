@@ -1986,13 +1986,13 @@ export default function POSPage() {
         <div className="flex-1 overflow-y-auto px-6 py-10">
           <div className="mx-auto max-w-5xl space-y-8">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-semibold text-slate-100">Select a table to start a dine-in order</h2>
-              <p className="text-slate-400">Tap an available table below to launch the ordering workspace.</p>
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Select a table to start a dine-in order</h2>
+              <p className="text-gray-600 dark:text-slate-400">Tap an available table below to launch the ordering workspace.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {tablesLoading ? (
                 [...Array(8)].map((_, index) => (
-                  <div key={index} className="h-40 rounded-2xl border border-slate-900/60 bg-slate-900/40 animate-pulse" />
+                  <div key={index} className="h-40 rounded-2xl border border-gray-200 dark:border-slate-900/60 bg-gray-100 dark:bg-slate-900/40 animate-pulse" />
                 ))
               ) : tables.length > 0 ? (
                 tables.map((table: any) => {
@@ -2008,13 +2008,13 @@ export default function POSPage() {
                           ? 'border-sky-500 bg-sky-500/10 shadow-lg shadow-sky-500/20'
                           : table.status === 'occupied'
                           ? 'border-orange-500/50 bg-orange-500/5 hover:border-orange-400/60'
-                          : 'border-slate-900 bg-slate-950/60 hover:border-sky-600/60 hover:shadow-lg hover:shadow-sky-900/20'
+                          : 'border-gray-300 dark:border-slate-900 bg-white dark:bg-slate-950/60 hover:border-sky-600/60 hover:shadow-lg hover:shadow-sky-900/20'
                       }`}
                     >
                       <div className="space-y-4">
                         <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Table No.</p>
-                          <p className="text-xl font-semibold text-slate-100 truncate">
+                          <p className="text-xs uppercase tracking-[0.3em] text-gray-500 dark:text-slate-500">Table No.</p>
+                          <p className="text-xl font-semibold text-gray-900 dark:text-slate-100 truncate">
                             {table.number || table.tableNumber || table.name || table.id}
                           </p>
                         </div>
@@ -2060,8 +2060,8 @@ export default function POSPage() {
                   );
                 })
               ) : (
-                <div className="col-span-full rounded-2xl border border-slate-900 bg-slate-950/60 p-10 text-center">
-                  <p className="text-slate-300 font-medium">No tables configured for this branch yet.</p>
+                <div className="col-span-full rounded-2xl border border-gray-200 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/60 p-10 text-center">
+                  <p className="text-gray-700 dark:text-slate-300 font-medium">No tables configured for this branch yet.</p>
                 </div>
               )}
             </div>
@@ -2082,14 +2082,14 @@ export default function POSPage() {
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <button
           onClick={() => setHasStartedOrder(true)}
-          className="w-full max-w-sm rounded-3xl border-2 border-sky-500/40 bg-slate-950/60 p-10 text-center transition hover:border-sky-400 hover:bg-slate-900/70 shadow-xl shadow-sky-950/20 space-y-6"
+          className="w-full max-w-sm rounded-3xl border-2 border-sky-500/40 bg-gray-50 dark:bg-slate-950/60 p-10 text-center transition hover:border-sky-400 hover:bg-gray-100 dark:hover:bg-slate-900/70 shadow-xl shadow-sky-950/20 space-y-6"
         >
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/15 text-sky-200">
             <IconComponent className="h-8 w-8" />
           </div>
           <div className="space-y-2">
-            <p className="text-lg font-semibold text-slate-100">{label}</p>
-            <p className="text-sm text-slate-400">{helper}</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-slate-100">{label}</p>
+            <p className="text-sm text-gray-600 dark:text-slate-400">{helper}</p>
           </div>
         </button>
       </div>
@@ -2098,7 +2098,7 @@ export default function POSPage() {
 
   const renderOrderingWorkspace = () => (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="bg-slate-940/80 backdrop-blur border-b border-slate-900 px-6 py-4">
+      <div className="bg-gray-50 dark:bg-slate-940/80 backdrop-blur border-b border-gray-200 dark:border-slate-900 px-6 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex-1">
             <label className="text-xs font-semibold uppercase text-slate-400 tracking-[0.2em] block mb-2">
@@ -2110,22 +2110,22 @@ export default function POSPage() {
                 placeholder='Try "salmon", "latte", or scan a barcode'
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-11 h-11 bg-slate-950/90 border border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-sky-600 focus:ring-sky-600/40"
+                className="pl-11 h-11 bg-white dark:bg-slate-950/90 border border-gray-300 dark:border-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:border-sky-600 focus:ring-sky-600/40"
               />
             </div>
           </div>
           <div className="flex flex-col gap-3 items-stretch lg:items-end">
             <div className="flex flex-wrap items-center gap-3 justify-between sm:justify-end">
-              <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2">
-                <UserGroupIcon className="h-4 w-4 text-slate-400" />
+              <div className="flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-4 py-2">
+                <UserGroupIcon className="h-4 w-4 text-gray-500 dark:text-slate-400" />
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="bg-transparent text-sm text-slate-100 focus:outline-none"
+                  className="bg-transparent text-sm text-gray-900 dark:text-slate-100 focus:outline-none"
                 >
-                  <option value="all" className="bg-slate-900">All Categories</option>
+                  <option value="all" className="bg-white dark:bg-slate-900">All Categories</option>
                   {categories.map((category: any) => (
-                    <option key={category.id} value={category.id} className="bg-slate-900">
+                    <option key={category.id} value={category.id} className="bg-white dark:bg-slate-900">
                       {category.name}
                     </option>
                   ))}
@@ -2133,7 +2133,7 @@ export default function POSPage() {
               </div>
               <Button
                 variant="secondary"
-                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                className="flex items-center gap-2 rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
                 onClick={resetFilters}
                 disabled={selectedCategory === 'all' && !searchQuery}
               >
@@ -2168,11 +2168,11 @@ export default function POSPage() {
         {menuItemsLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {[...Array(8)].map((_, i) => (
-              <Card key={i} className="animate-pulse bg-slate-900/40 border border-slate-800">
+              <Card key={i} className="animate-pulse bg-gray-100 dark:bg-slate-900/40 border border-gray-200 dark:border-slate-800">
                 <CardContent className="p-4">
-                  <div className="h-32 bg-slate-800 rounded-lg mb-3"></div>
-                  <div className="h-4 bg-slate-800 rounded mb-2"></div>
-                  <div className="h-4 bg-slate-800 rounded w-2/3"></div>
+                  <div className="h-32 bg-gray-200 dark:bg-slate-800 rounded-lg mb-3"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-slate-800 rounded mb-2"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-slate-800 rounded w-2/3"></div>
                 </CardContent>
               </Card>
             ))}
@@ -2182,10 +2182,10 @@ export default function POSPage() {
             {filteredMenuItems.map((item) => (
               <Card
                 key={item.id}
-                className="group relative overflow-hidden border border-slate-800/80 bg-slate-900/60 backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-700/20"
+                className="group relative overflow-hidden border border-gray-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-700/20"
               >
                 <CardContent className="p-4 space-y-3">
-                  <div className="aspect-square rounded-xl bg-slate-950/60 flex items-center justify-center border border-slate-800/80">
+                  <div className="aspect-square rounded-xl bg-gray-100 dark:bg-slate-950/60 flex items-center justify-center border border-gray-200 dark:border-slate-800/80">
                     {item.image ? (
                       <Image
                         src={item.image}
@@ -2200,7 +2200,7 @@ export default function POSPage() {
                   </div>
                   <div>
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-semibold text-slate-100 truncate">
+                      <h3 className="font-semibold text-gray-900 dark:text-slate-100 truncate">
                         {item.name}
                       </h3>
                       {item.category?.name && (
@@ -2209,7 +2209,7 @@ export default function POSPage() {
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-slate-400 line-clamp-2 min-h-[32px]">
+                    <p className="mt-1 text-xs text-gray-600 dark:text-slate-400 line-clamp-2 min-h-[32px]">
                       {item.description || "Perfect for today's menu."}
                     </p>
                   </div>
@@ -2231,12 +2231,12 @@ export default function POSPage() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center rounded-3xl border border-slate-800 bg-slate-950/50 backdrop-blur-sm">
+          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center rounded-3xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/50 backdrop-blur-sm">
             <div className="text-6xl mb-4">🍽️</div>
-            <h3 className="text-xl font-semibold text-slate-100 mb-2">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-2">
               No menu items found
             </h3>
-            <p className="text-slate-400 max-w-md">
+            <p className="text-gray-600 dark:text-slate-400 max-w-md">
               {searchQuery
                 ? 'No results match your search. Try adjusting the keywords or filters.'
                 : 'Menu items will show up here once they have been added for this branch.'}
@@ -2252,11 +2252,11 @@ export default function POSPage() {
   const renderQueuePanel = () => {
     if (isQueueCollapsed) {
       return (
-        <aside className="hidden md:flex md:w-16 md:flex-col md:items-center md:justify-center border-l border-slate-900/50 bg-slate-950/60">
+        <aside className="hidden md:flex md:w-16 md:flex-col md:items-center md:justify-center border-l border-gray-200 dark:border-slate-900/50 bg-white dark:bg-slate-950/60">
           <Button
             variant="ghost"
             onClick={() => setIsQueueCollapsed(false)}
-            className="flex flex-col items-center gap-2 text-slate-300 hover:text-white"
+            className="flex flex-col items-center gap-2 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white"
           >
             <ChevronLeftIcon className="h-5 w-5" />
             <span className="text-xs font-medium">Queue</span>
@@ -2268,14 +2268,14 @@ export default function POSPage() {
     return (
       <>
         <div
-          className="fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-30 bg-black/50 dark:bg-slate-950/70 backdrop-blur-sm md:hidden"
           onClick={() => setIsQueueCollapsed(true)}
         />
-        <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-md flex-col border-l border-slate-900 bg-slate-950/95 shadow-xl md:static md:z-auto md:max-w-xs md:bg-slate-950/80">
-          <div className="flex items-center justify-between border-b border-slate-900/70 px-4 py-3">
+        <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-md flex-col border-l border-gray-200 dark:border-slate-900 bg-white dark:bg-slate-950/95 shadow-xl md:static md:z-auto md:max-w-xs md:bg-white md:dark:bg-slate-950/80">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900/70 px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-slate-100">Orders</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Orders</p>
+              <p className="text-xs text-gray-600 dark:text-slate-400">
                 {queueTab === 'active' ? 'Active queue' : 'Completed orders'}
               </p>
             </div>
@@ -2285,7 +2285,7 @@ export default function POSPage() {
                 variant="ghost"
                 onClick={handleQueueRefresh}
                 disabled={queueLoading}
-                className="h-9 w-9 rounded-full border border-slate-800 bg-slate-900/80 text-slate-200 hover:bg-slate-800/80 disabled:opacity-40"
+                className="h-9 w-9 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
                 title="Refresh"
               >
                 <ArrowPathIcon className={`h-4 w-4 ${queueLoading ? 'animate-spin' : ''}`} />
@@ -2315,7 +2315,7 @@ export default function POSPage() {
                     className={`rounded-full px-4 py-1.5 text-xs uppercase tracking-wide ${
                       isActive
                         ? 'bg-sky-600 hover:bg-sky-500 text-white'
-                        : 'bg-slate-900/70 text-slate-300 hover:bg-slate-800/70'
+                        : 'bg-gray-100 dark:bg-slate-900/70 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800/70'
                     }`}
                   >
                     {tab === 'active' ? 'Active' : 'History'}
@@ -2330,7 +2330,7 @@ export default function POSPage() {
                 <select
                   value={queueOrderTypeFilter}
                   onChange={(event) => setQueueOrderTypeFilter(event.target.value as typeof queueOrderTypeFilter)}
-                  className="flex-1 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                  className="flex-1 rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/70 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
                 >
                   <option value="all">All Types</option>
                   {ORDER_TYPE_OPTIONS.map(({ value, label }) => (
@@ -2347,7 +2347,7 @@ export default function POSPage() {
                   <select
                     value={queueStatusFilter}
                     onChange={(event) => setQueueStatusFilter(event.target.value as typeof queueStatusFilter)}
-                    className="flex-1 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                    className="flex-1 rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/70 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
                   >
                     {ORDER_STATUS_FILTERS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -2570,18 +2570,18 @@ export default function POSPage() {
 
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950 text-slate-100">
+    <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100">
       {/* Header */}
-      <div className="bg-gradient-to-b from-slate-950 via-slate-930 to-slate-950 border-b border-slate-900/60 px-6 py-5 shadow-lg">
+      <div className="bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-gray-200 dark:border-slate-900/60 px-6 py-5 shadow-lg">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold text-white tracking-tight">POS System</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">POS System</h1>
               <Badge className="bg-sky-500/15 text-sky-100 border border-sky-500/30">
               {orderTypeLabel}
             </Badge>
             </div>
-            <div className="flex items-center gap-3 flex-wrap text-sm text-slate-300">
+            <div className="flex items-center gap-3 flex-wrap text-sm text-gray-600 dark:text-slate-300">
               <TableCellsIcon className="h-4 w-4 text-slate-400" />
               {requiresTable ? (
                 <div className="flex items-center gap-2">
@@ -2589,7 +2589,7 @@ export default function POSPage() {
                     value={selectedTable}
                     onChange={(event) => handleTableSelection(event.target.value)}
                     disabled={tablesLoading || tables.length === 0}
-                    className="rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-1.5 text-sm text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-1.5 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {tablesLoading ? 'Loading tables…' : 'Select a table'}
@@ -2612,20 +2612,20 @@ export default function POSPage() {
                   ) : null}
                 </div>
               ) : (
-                <span className="text-slate-200">Table not required for this order</span>
+                <span className="text-gray-600 dark:text-slate-200">Table not required for this order</span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
-              <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-940/70 px-3 py-1.5 shadow-sm">
-                <ActiveOrderIcon className="h-4 w-4 text-sky-300" />
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-slate-200">
+              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-940/70 px-3 py-1.5 shadow-sm">
+                <ActiveOrderIcon className="h-4 w-4 text-sky-600 dark:text-sky-300" />
                 <span className="font-medium tracking-wide">{orderTypeLabel} mode</span>
           </div>
-              <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-940/70 px-3 py-1.5">
-                <ClipboardDocumentListIcon className="h-4 w-4 text-emerald-300" />
+              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-940/70 px-3 py-1.5">
+                <ClipboardDocumentListIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
                 <span>{orderSummary.itemCount} item{orderSummary.itemCount === 1 ? '' : 's'} in cart</span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-940/70 px-3 py-1.5">
-                <CurrencyDollarIcon className="h-4 w-4 text-amber-300" />
+              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-940/70 px-3 py-1.5">
+                <CurrencyDollarIcon className="h-4 w-4 text-amber-600 dark:text-amber-300" />
                 <span>Total {formatCurrency(orderSummary.total)}</span>
               </div>
               {requiresDeliveryDetails && (
@@ -2652,7 +2652,7 @@ export default function POSPage() {
                       size="sm"
                       variant={isActive ? 'primary' : 'secondary'}
                       onClick={() => handleOrderTypeChange(value)}
-                    className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition ${isActive ? 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25' : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'}`}
+                    className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition ${isActive ? 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25' : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'}`}
                     >
                       <Icon className="h-4 w-4" />
                       {label}
@@ -2666,7 +2666,7 @@ export default function POSPage() {
                 onClick={() => setIsQueueCollapsed((prev) => !prev)}
                 className={`flex items-center gap-2 rounded-xl ${
                   isQueueCollapsed
-                    ? 'bg-slate-900/80 text-slate-100 hover:bg-slate-800/80'
+                    ? 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80'
                     : 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25'
                 }`}
               >
@@ -2677,7 +2677,7 @@ export default function POSPage() {
                 variant="secondary"
                 onClick={clearCart}
                 disabled={cart.length === 0}
-                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                className="flex items-center gap-2 rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
               >
                 <TrashIcon className="h-4 w-4" />
                 Clear Cart (F3)

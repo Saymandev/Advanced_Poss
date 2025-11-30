@@ -23,6 +23,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 const EXPENSE_CATEGORIES = [
   { value: 'ingredient', label: 'Ingredients' },
@@ -62,6 +63,9 @@ const RECURRING_FREQUENCIES = [
 
 export default function ExpensesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have expenses feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('expenses');
   
   const companyId =
     (user as any)?.companyId ||

@@ -44,12 +44,22 @@ export const marketingApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['Marketing' as const],
-      // For now, return empty array as backend doesn't have this endpoint yet
-      transformResponse: () => [],
+      transformResponse: (response: any) => {
+        if (Array.isArray(response)) {
+          return response;
+        }
+        if (response?.data && Array.isArray(response.data)) {
+          return response.data;
+        }
+        return [];
+      },
     }),
     getCampaignById: builder.query<MarketingCampaign, string>({
       query: (id) => `/marketing/campaigns/${id}`,
       providesTags: ['Marketing' as const],
+      transformResponse: (response: any) => {
+        return response?.data || response;
+      },
     }),
     createCampaign: builder.mutation<MarketingCampaign, CreateCampaignRequest>({
       query: (data) => ({
@@ -58,6 +68,9 @@ export const marketingApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ['Marketing' as const],
+      transformResponse: (response: any) => {
+        return response?.data || response;
+      },
     }),
     updateCampaign: builder.mutation<MarketingCampaign, UpdateCampaignRequest>({
       query: ({ id, ...data }) => ({
@@ -66,6 +79,9 @@ export const marketingApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ['Marketing' as const],
+      transformResponse: (response: any) => {
+        return response?.data || response;
+      },
     }),
     deleteCampaign: builder.mutation<void, string>({
       query: (id) => ({
@@ -87,6 +103,9 @@ export const marketingApi = apiSlice.injectEndpoints({
         method: 'POST',
       }),
       invalidatesTags: ['Marketing' as const],
+      transformResponse: (response: any) => {
+        return response?.data || response;
+      },
     }),
     resumeCampaign: builder.mutation<MarketingCampaign, string>({
       query: (id) => ({
@@ -94,6 +113,9 @@ export const marketingApi = apiSlice.injectEndpoints({
         method: 'POST',
       }),
       invalidatesTags: ['Marketing' as const],
+      transformResponse: (response: any) => {
+        return response?.data || response;
+      },
     }),
   }),
 });

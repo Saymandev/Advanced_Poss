@@ -6,7 +6,9 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useGetBranchesQuery } from '@/lib/api/endpoints/branchesApi';
-import { Staff, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
+import { useGetRolePermissionsQuery, useUpdateRolePermissionMutation } from '@/lib/api/endpoints/rolePermissionsApi';
+import { Staff, useDeleteStaffMutation, useDeactivateStaffMutation, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
+import { useAdminUpdatePasswordMutation, useAdminUpdatePinMutation, useActivateUserMutation } from '@/lib/api/endpoints/usersApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import {
@@ -20,18 +22,24 @@ import {
   CurrencyDollarIcon,
   ExclamationTriangleIcon,
   EyeIcon,
+  KeyIcon,
+  LockClosedIcon,
   MapPinIcon,
   PencilIcon,
   ReceiptPercentIcon,
   ShieldCheckIcon,
   ShoppingBagIcon,
   TableCellsIcon,
+  TrashIcon,
   TruckIcon,
   UserGroupIcon,
-  UsersIcon
+  UsersIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { Input } from '@/components/ui/Input';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 interface Feature {
   id: string;
@@ -158,16 +166,44 @@ const companyRoleAccess = allRoleAccess.filter(role => role.role !== UserRole.SU
 
 export default function RoleAccessPage() {
   const { user } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have role-management feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('role-management');
+  
   const companyId = user?.companyId || '';
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isEditFeaturesModalOpen, setIsEditFeaturesModalOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<string>('');
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [newRole, setNewRole] = useState<string>('');
   const [newBranchId, setNewBranchId] = useState<string>('');
+  const [newPin, setNewPin] = useState<string>('');
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  
+  const [deleteStaff] = useDeleteStaffMutation();
+  const [deactivateStaff] = useDeactivateStaffMutation();
+  const [activateUser] = useActivateUserMutation();
+  const [adminUpdatePin] = useAdminUpdatePinMutation();
+  const [adminUpdatePassword] = useAdminUpdatePasswordMutation();
+  const [updateRolePermission] = useUpdateRolePermissionMutation();
+  
+  const [updateStaff] = useUpdateStaffMutation();
+  
+  // Get role permissions from backend
+  const { data: rolePermissionsData, isLoading: isLoadingPermissions, refetch: refetchPermissions } = useGetRolePermissionsQuery(
+    undefined,
+    { skip: !companyId }
+  );
   
   // Get all staff members (exclude super admins - they're system-level, not company-level)
   const { data: staffData, isLoading, refetch } = useGetStaffQuery(
@@ -186,8 +222,6 @@ export default function RoleAccessPage() {
     { skip: !companyId },
   );
   
-  const [updateStaff] = useUpdateStaffMutation();
-  
   // Extract branches with proper error handling
   const branches = useMemo(() => {
     if (!branchesData) return [];
@@ -205,8 +239,28 @@ export default function RoleAccessPage() {
     return allStaff;
   }, [staffData?.staff]);
 
-  // Use company-level roles only (exclude SUPER_ADMIN)
-  const roleAccess = companyRoleAccess;
+  // Merge backend permissions with default role access
+  const roleAccess = useMemo(() => {
+    const baseRoles = [...companyRoleAccess];
+    
+    if (rolePermissionsData && rolePermissionsData.length > 0) {
+      // Update roles with backend permissions
+      return baseRoles.map((role) => {
+        const backendPermission = rolePermissionsData.find(
+          (perm) => perm.role === role.role
+        );
+        if (backendPermission) {
+          return {
+            ...role,
+            features: backendPermission.features,
+          };
+        }
+        return role;
+      });
+    }
+    
+    return baseRoles;
+  }, [rolePermissionsData]);
 
   // Filter staff by selected role
   const filteredStaff = useMemo(() => {
@@ -318,6 +372,148 @@ export default function RoleAccessPage() {
     }
   };
 
+  const handleUpdatePin = async () => {
+    if (!selectedStaff || !newPin) {
+      setFormErrors({ pin: 'PIN is required' });
+      return;
+    }
+
+    if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
+      setFormErrors({ pin: 'PIN must be 4-6 digits' });
+      return;
+    }
+
+    setFormErrors({});
+    setIsSubmitting(true);
+
+    try {
+      await adminUpdatePin({
+        userId: selectedStaff.id,
+        newPin,
+      }).unwrap();
+      toast.success('PIN updated successfully');
+      setIsPinModalOpen(false);
+      setSelectedStaff(null);
+      setNewPin('');
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update PIN');
+      setFormErrors({ pin: error.data?.message || 'Failed to update PIN' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!selectedStaff || !newPassword) {
+      setFormErrors({ password: 'Password is required' });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setFormErrors({ password: 'Password must be at least 8 characters' });
+      return;
+    }
+
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(newPassword)) {
+      setFormErrors({ password: 'Password must contain uppercase, lowercase, number and special character' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setFormErrors({ confirmPassword: 'Passwords do not match' });
+      return;
+    }
+
+    setFormErrors({});
+    setIsSubmitting(true);
+
+    try {
+      await adminUpdatePassword({
+        userId: selectedStaff.id,
+        newPassword,
+      }).unwrap();
+      toast.success('Password updated successfully');
+      setIsPasswordModalOpen(false);
+      setSelectedStaff(null);
+      setNewPassword('');
+      setConfirmPassword('');
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update password');
+      setFormErrors({ password: error.data?.message || 'Failed to update password' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedStaff) return;
+
+    setIsSubmitting(true);
+    try {
+      await deleteStaff(selectedStaff.id).unwrap();
+      toast.success('User deleted successfully');
+      setIsDeleteModalOpen(false);
+      setSelectedStaff(null);
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to delete user');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleRestrict = async (staffMember: Staff) => {
+    try {
+      if (staffMember.isActive) {
+        await deactivateStaff(staffMember.id).unwrap();
+        toast.success('User restricted successfully');
+      } else {
+        await activateUser(staffMember.id).unwrap();
+        toast.success('User activated successfully');
+      }
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update user status');
+    }
+  };
+
+  const handleEditFeatures = (role: RoleAccess) => {
+    setEditingRole(role.role);
+    setSelectedFeatures([...role.features]);
+    setIsEditFeaturesModalOpen(true);
+  };
+
+  const handleToggleFeature = (featureId: string) => {
+    setSelectedFeatures((prev) =>
+      prev.includes(featureId)
+        ? prev.filter((id) => id !== featureId)
+        : [...prev, featureId]
+    );
+  };
+
+  const handleSaveFeatures = async () => {
+    if (!editingRole) return;
+
+    setIsSubmitting(true);
+    try {
+      await updateRolePermission({
+        role: editingRole as any,
+        features: selectedFeatures,
+      }).unwrap();
+      toast.success('Role features updated successfully');
+      setIsEditFeaturesModalOpen(false);
+      setEditingRole('');
+      setSelectedFeatures([]);
+      refetchPermissions();
+    } catch (error: any) {
+      toast.error(error.data?.message || 'Failed to update role features');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const staffColumns = [
     {
       key: 'name',
@@ -395,11 +591,12 @@ export default function RoleAccessPage() {
             variant="ghost"
             size="sm"
             onClick={() => handleViewStaff(row)}
+            title="View details"
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
-          {/* Only owners and managers can change roles and branches */}
-          {(user?.role === 'owner' || user?.role === 'manager') && row.isActive && (
+          {/* Only owners can manage users */}
+          {user?.role === 'owner' && (
             <>
               <Button
                 variant="ghost"
@@ -416,6 +613,53 @@ export default function RoleAccessPage() {
                 title="Assign branch"
               >
                 <MapPinIcon className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedStaff(row);
+                  setIsPinModalOpen(true);
+                }}
+                title="Update PIN"
+              >
+                <LockClosedIcon className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedStaff(row);
+                  setIsPasswordModalOpen(true);
+                }}
+                title="Update password"
+              >
+                <KeyIcon className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleToggleRestrict(row)}
+                title={row.isActive ? 'Restrict user' : 'Activate user'}
+                className={row.isActive ? 'text-yellow-600' : 'text-green-600'}
+              >
+                {row.isActive ? (
+                  <XMarkIcon className="w-4 h-4" />
+                ) : (
+                  <UsersIcon className="w-4 h-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedStaff(row);
+                  setIsDeleteModalOpen(true);
+                }}
+                title="Delete user"
+                className="text-red-600 hover:text-red-700"
+              >
+                <TrashIcon className="w-4 h-4" />
               </Button>
             </>
           )}
@@ -478,7 +722,7 @@ export default function RoleAccessPage() {
                 {role.description}
               </p>
 
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 mb-4">
                 {categories.slice(0, 3).map((category) => {
                   const categoryFeatures = getFeaturesByCategory(category);
                   const hasAccess = categoryFeatures.some(f => role.features.includes(f.id));
@@ -490,6 +734,19 @@ export default function RoleAccessPage() {
                   ) : null;
                 })}
               </div>
+
+              {/* Edit Features Button - Owner Only */}
+              {user?.role === 'owner' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleEditFeatures(role)}
+                >
+                  <PencilIcon className="w-4 h-4 mr-2" />
+                  Edit Features
+                </Button>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -590,94 +847,6 @@ export default function RoleAccessPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Role Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {roleAccess.map((role) => (
-          <Card key={role.role}>
-            <CardContent className="p-6 text-center">
-              <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${role.color}`}>
-                <UsersIcon className="w-6 h-6" />
-              </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                {role.name}
-              </h3>
-              <p className="text-2xl font-bold text-primary-600 mb-2">
-                {roleCounts[role.role] || 0}
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Active Users
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                {role.features.length} features
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Access Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Access Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {roleAccess.map((role) => {
-              const categoryAccess = categories.map((category) => {
-                const categoryFeatures = getFeaturesByCategory(category);
-                const accessibleFeatures = categoryFeatures.filter(f => role.features.includes(f.id));
-                return {
-                  category,
-                  total: categoryFeatures.length,
-                  accessible: accessibleFeatures.length,
-                  percentage: (accessibleFeatures.length / categoryFeatures.length) * 100,
-                };
-              });
-
-              return (
-                <div key={role.role} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${role.color}`}>
-                      <UsersIcon className="w-4 h-4" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {role.name}
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {categoryAccess.map((cat) => (
-                      <div key={cat.category} className="text-center">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                          {cat.category}
-                        </p>
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {cat.accessible}/{cat.total}
-                          </span>
-                          <div className="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-300 ${
-                                cat.percentage === 100
-                                  ? 'bg-green-500'
-                                  : cat.percentage > 50
-                                  ? 'bg-yellow-500'
-                                  : 'bg-red-500'
-                              }`}
-                              style={{ width: `${cat.percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </CardContent>
       </Card>
@@ -942,6 +1111,307 @@ export default function RoleAccessPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Update PIN Modal */}
+      <Modal
+        isOpen={isPinModalOpen}
+        onClose={() => {
+          setIsPinModalOpen(false);
+          setSelectedStaff(null);
+          setNewPin('');
+          setFormErrors({});
+        }}
+        title="Update PIN"
+        className="max-w-md"
+      >
+        {selectedStaff && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Update PIN for <strong>{selectedStaff.firstName} {selectedStaff.lastName}</strong>
+              </p>
+            </div>
+
+            <Input
+              label="New PIN"
+              type="password"
+              value={newPin}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '');
+                setNewPin(value);
+                setFormErrors({ ...formErrors, pin: '' });
+              }}
+              error={formErrors.pin}
+              required
+              helperText="Must be 4-6 digits"
+              maxLength={6}
+            />
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsPinModalOpen(false);
+                  setSelectedStaff(null);
+                  setNewPin('');
+                  setFormErrors({});
+                }}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdatePin}
+                disabled={isSubmitting || !newPin || newPin.length < 4}
+              >
+                {isSubmitting ? 'Updating...' : 'Update PIN'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Update Password Modal */}
+      <Modal
+        isOpen={isPasswordModalOpen}
+        onClose={() => {
+          setIsPasswordModalOpen(false);
+          setSelectedStaff(null);
+          setNewPassword('');
+          setConfirmPassword('');
+          setFormErrors({});
+        }}
+        title="Update Password"
+        className="max-w-md"
+      >
+        {selectedStaff && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Update password for <strong>{selectedStaff.firstName} {selectedStaff.lastName}</strong>
+              </p>
+            </div>
+
+            <Input
+              label="New Password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                setFormErrors({ ...formErrors, password: '' });
+              }}
+              error={formErrors.password}
+              required
+              helperText="Must contain uppercase, lowercase, number and special character"
+            />
+
+            <Input
+              label="Confirm Password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                setFormErrors({ ...formErrors, confirmPassword: '' });
+              }}
+              error={formErrors.confirmPassword}
+              required
+            />
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsPasswordModalOpen(false);
+                  setSelectedStaff(null);
+                  setNewPassword('');
+                  setConfirmPassword('');
+                  setFormErrors({});
+                }}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdatePassword}
+                disabled={isSubmitting || !newPassword || newPassword !== confirmPassword}
+              >
+                {isSubmitting ? 'Updating...' : 'Update Password'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete User Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setSelectedStaff(null);
+        }}
+        title="Delete User"
+        className="max-w-md"
+      >
+        {selectedStaff && (
+          <div className="space-y-4">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-red-900 dark:text-red-300 mb-1">
+                    Warning: This action cannot be undone
+                  </p>
+                  <p className="text-sm text-red-800 dark:text-red-400">
+                    Are you sure you want to delete <strong>{selectedStaff.firstName} {selectedStaff.lastName}</strong>? 
+                    This will permanently remove the user and all associated data.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setSelectedStaff(null);
+                }}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteUser}
+                disabled={isSubmitting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isSubmitting ? 'Deleting...' : 'Delete User'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Features Modal */}
+      <Modal
+        isOpen={isEditFeaturesModalOpen}
+        onClose={() => {
+          setIsEditFeaturesModalOpen(false);
+          setEditingRole('');
+          setSelectedFeatures([]);
+        }}
+        title={`Edit Features - ${roleAccess.find(r => r.role === editingRole)?.name || editingRole}`}
+        className="max-w-4xl"
+      >
+        <div className="space-y-6">
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Select which features this role should have access to. Changes will apply to all users with this role.
+            </p>
+          </div>
+
+          <div className="max-h-96 overflow-y-auto space-y-6">
+            {categories.map((category) => {
+              const categoryFeatures = getFeaturesByCategory(category);
+              const selectedCount = categoryFeatures.filter(f => selectedFeatures.includes(f.id)).length;
+              const allSelected = categoryFeatures.length > 0 && selectedCount === categoryFeatures.length;
+              const someSelected = selectedCount > 0 && selectedCount < categoryFeatures.length;
+
+              return (
+                <div key={category} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900 dark:text-white">{category}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedCount}/{categoryFeatures.length} selected
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (allSelected) {
+                            // Deselect all in category
+                            setSelectedFeatures(prev => 
+                              prev.filter(id => !categoryFeatures.some(f => f.id === id))
+                            );
+                          } else {
+                            // Select all in category
+                            const categoryFeatureIds = categoryFeatures.map(f => f.id);
+                            setSelectedFeatures(prev => {
+                              const newFeatures = [...prev];
+                              categoryFeatureIds.forEach(id => {
+                                if (!newFeatures.includes(id)) {
+                                  newFeatures.push(id);
+                                }
+                              });
+                              return newFeatures;
+                            });
+                          }
+                        }}
+                      >
+                        {allSelected ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {categoryFeatures.map((feature) => {
+                      const isSelected = selectedFeatures.includes(feature.id);
+                      return (
+                        <label
+                          key={feature.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleFeature(feature.id)}
+                            className="mt-1 w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <feature.icon className="w-4 h-4 text-gray-400" />
+                              <span className="font-medium text-gray-900 dark:text-white text-sm">
+                                {feature.name}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                              {feature.description}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsEditFeaturesModalOpen(false);
+                setEditingRole('');
+                setSelectedFeatures([]);
+              }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveFeatures}
+              disabled={isSubmitting || selectedFeatures.length === 0}
+            >
+              {isSubmitting ? 'Saving...' : 'Save Features'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

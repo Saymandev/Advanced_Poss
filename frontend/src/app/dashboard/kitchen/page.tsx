@@ -40,9 +40,13 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import ElapsedTime from '@/components/kitchen/ElapsedTime';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function KitchenPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have kitchen-display feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('kitchen-display');
   const [selectedOrder, setSelectedOrder] = useState<KitchenOrder | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');

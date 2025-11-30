@@ -3,8 +3,11 @@
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function InventoryPage() {
+  // Redirect if user doesn't have inventory feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('inventory');
   const mockIngredients = [
     { id: '1', name: 'Tomatoes', quantity: 25, unit: 'kg', minStock: 10, status: 'in-stock', lastRestocked: '2024-01-15' },
     { id: '2', name: 'Chicken Breast', quantity: 8, unit: 'kg', minStock: 15, status: 'low-stock', lastRestocked: '2024-01-10' },

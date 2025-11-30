@@ -29,9 +29,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function AttendancePage() {
   const { user } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have attendance feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('attendance');
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState(false);
   const [_isEditModalOpen, _setIsEditModalOpen] = useState(false);

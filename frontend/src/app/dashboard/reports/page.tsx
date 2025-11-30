@@ -29,6 +29,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
     Bar,
     BarChart,
@@ -48,6 +49,9 @@ const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'
 
 export default function ReportsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have reports feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('reports');
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('week');
   const [activeReport, setActiveReport] = useState<'sales' | 'wastage' | 'food' | 'settlement'>('sales');
   const [mounted, setMounted] = useState(false);

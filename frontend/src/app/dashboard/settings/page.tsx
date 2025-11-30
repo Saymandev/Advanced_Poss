@@ -41,6 +41,7 @@ import {
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 interface TaxSetting {
   id: string;
@@ -63,6 +64,10 @@ interface ServiceChargeSetting {
 
 export default function SettingsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  // Redirect if user doesn't have settings feature (auto-redirects to role-specific dashboard)
+  useFeatureRedirect('settings');
+  
   const companyId = companyContext?.companyId || user?.companyId || '';
   const branchId = user?.branchId || '';
   const isSuperAdmin = user?.role === 'super_admin';
