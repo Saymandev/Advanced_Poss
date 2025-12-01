@@ -1,8 +1,17 @@
+import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import { getRoleDashboardPath } from '@/utils/getRoleDashboard';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useRolePermissions } from './useRolePermissions';
+
+/**
+ * Check if user is super admin
+ */
+function isSuperAdmin(role?: string | null): boolean {
+  if (!role) return false;
+  return role.toLowerCase() === UserRole.SUPER_ADMIN.toLowerCase() || role.toLowerCase() === 'super_admin';
+}
 
 /**
  * Hook to redirect users away from pages if they don't have required feature access
@@ -35,7 +44,13 @@ export function useFeatureRedirect(
       return;
     }
 
-    // Check feature access
+    // Super admin bypasses all feature checks
+    if (isSuperAdmin(user.role)) {
+      setHasAccess(true);
+      return;
+    }
+
+    // Check feature access for non-super-admin users
     let access = false;
     const features = Array.isArray(requiredFeature) ? requiredFeature : [requiredFeature];
 

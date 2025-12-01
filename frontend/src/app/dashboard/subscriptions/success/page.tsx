@@ -2,6 +2,9 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { apiSlice } from '@/lib/api/apiSlice';
+import { useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
+import { useAppSelector } from '@/lib/store';
 import { CheckCircleIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -9,10 +12,48 @@ import toast from 'react-hot-toast';
 
 export default function PaymentSuccessPage() {
   const router = useRouter();
+  const { user } = useAppSelector((state) => state.auth);
+  const companyId = user?.companyId || '';
+
+  // Refetch company and subscription data to get the latest status
+  const { refetch: refetchCompany } = useGetCompanyByIdQuery(companyId, {
+    skip: !companyId,
+  });
 
   useEffect(() => {
     toast.success('Payment successful! Your subscription is now active.');
-  }, []);
+    
+    // Invalidate all subscription and company related caches
+    // This ensures fresh data is fetched on the next page load
+    const invalidateCache = async () => {
+      try {
+        // Immediately invalidate all cache tags
+        apiSlice.util.invalidateTags(['Subscription', 'Company']);
+        
+        // Remove all cached queries for company and subscription
+        apiSlice.util.resetApiState();
+        
+        // Wait for webhook to process (can take a few seconds)
+        setTimeout(async () => {
+          // Force refetch company data
+          await refetchCompany();
+          
+          // Invalidate again after refetch
+          apiSlice.util.invalidateTags(['Subscription', 'Company']);
+          
+          // Force another refetch after a short delay to ensure webhook completed
+          setTimeout(async () => {
+            await refetchCompany();
+            apiSlice.util.invalidateTags(['Subscription', 'Company']);
+          }, 3000);
+        }, 3000);
+      } catch (error) {
+        console.error('Error invalidating cache:', error);
+      }
+    };
+
+    invalidateCache();
+  }, [refetchCompany]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
@@ -43,7 +84,20 @@ export default function PaymentSuccessPage() {
           </div>
 
           <Button
-            onClick={() => router.push('/dashboard')}
+            onClick={async () => {
+              // Force cache clear before navigating
+              apiSlice.util.resetApiState();
+              apiSlice.util.invalidateTags(['Subscription', 'Company']);
+              
+              // Navigate after a brief delay to ensure cache is cleared
+              setTimeout(() => {
+                router.push('/dashboard');
+                // Force a hard refresh after navigation to ensure fresh data
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1000);
+              }, 500);
+            }}
             className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 text-lg font-semibold"
           >
             Go to Dashboard

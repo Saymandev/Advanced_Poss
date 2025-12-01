@@ -135,6 +135,22 @@ export const usersApi = apiSlice.injectEndpoints({
         return response?.data || response;
       },
     }),
+    getAllUsersSystemWide: builder.query<{ users: User[]; total: number; page: number; limit: number }, any>({
+      query: (params) => ({
+        url: '/users/system/all',
+        params: {
+          ...params,
+          includeSuperAdmins: true,
+        },
+      }),
+      providesTags: ['User'],
+      transformResponse: (response: any) => {
+        if (response?.success && response?.data) {
+          return response.data;
+        }
+        return response;
+      },
+    }),
   }),
 });
 
@@ -147,5 +163,6 @@ export const {
   useAdminUpdatePasswordMutation,
   useActivateUserMutation,
   useUploadAvatarMutation,
+  useGetAllUsersSystemWideQuery,
 } = usersApi;
 

@@ -15,11 +15,21 @@ interface TimeRemaining {
 
 export function SubscriptionIndicator() {
   const { user } = useAppSelector((state) => state.auth);
+  
+  // Super Admins don't need subscription indicators - they manage system-wide subscriptions
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'super_admin';
+  if (isSuperAdmin) {
+    return null;
+  }
+  
   const companyId = user?.companyId;
   
-  const { data: companyData, isLoading } = useGetCompanyByIdQuery(companyId || '', {
+  const { data: companyData, isLoading, refetch } = useGetCompanyByIdQuery(companyId || '', {
     skip: !companyId,
     refetchOnMountOrArgChange: true,
+    // Refetch more aggressively to catch payment status changes
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   });
 
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null);
@@ -29,9 +39,43 @@ export function SubscriptionIndicator() {
     if (!companyData) return;
 
     const company = companyData as any;
+    const status = company.subscriptionStatus || company.subscription?.status;
+    const trialEndDateValue = company.trialEndDate;
+    
+    // DEBUG: Log the actual values to see what we're getting
+    console.log('🔍 SubscriptionIndicator Debug:', {
+      subscriptionStatus: status,
+      trialEndDate: trialEndDateValue,
+      trialEndDateType: typeof trialEndDateValue,
+      isNull: trialEndDateValue === null,
+      isUndefined: trialEndDateValue === undefined,
+      companyKeys: Object.keys(company),
+    });
+    
+    // CRITICAL: If subscription status is 'active', don't show trial banner at all
+    // This means payment was successful and subscription is active
+    // Check for both 'active' (lowercase) and 'ACTIVE' (uppercase)
+    if (status === 'active' || status === 'ACTIVE') {
+      console.log('✅ Subscription is ACTIVE - hiding trial banner');
+      setTimeRemaining(null);
+      setIsExpired(false);
+      return;
+    }
+    
+    // Also check if trialEndDate is null/undefined - if it is and status isn't trial, it's active
+    if ((trialEndDateValue === null || trialEndDateValue === undefined || trialEndDateValue === '') && status !== 'trial') {
+      console.log('✅ No trial end date and status is not trial - hiding trial banner');
+      setTimeRemaining(null);
+      setIsExpired(false);
+      return;
+    }
+    
+    // Only calculate trial time if status is actually 'trial'
+    // Also check if trialEndDate exists and is not null/empty
     const endDate = company.trialEndDate || company.subscription?.endDate || company.subscriptionEndDate;
     
-    if (!endDate) {
+    // If no end date, don't show trial banner
+    if (!endDate || endDate === null || endDate === 'null' || endDate === '') {
       setTimeRemaining(null);
       return;
     }
@@ -61,20 +105,38 @@ export function SubscriptionIndicator() {
     return () => clearInterval(interval);
   }, [companyData]);
 
-  if (isLoading || !companyData || !timeRemaining) {
+  // If loading or no company data, don't show anything
+  if (isLoading || !companyData) {
     return null;
   }
 
   const company = companyData as any;
-  const status = company.subscriptionStatus || company.subscription?.status || 'trial';
+  const status = company.subscriptionStatus || company.subscription?.status;
+  const trialEndDateValue = company.trialEndDate;
   const plan = company.subscriptionPlan || company.subscription?.planName || 'basic';
-  const isTrial = status === 'trial';
-  const isAboutToExpire = timeRemaining.totalMs > 0 && timeRemaining.totalMs < 24 * 60 * 60 * 1000; // Less than 24 hours
-
-  // Don't show indicator for active subscriptions that aren't expiring soon
-  if (status === 'active' && !isAboutToExpire && !isExpired) {
+  
+  // CRITICAL: If subscription status is 'active', never show the trial banner
+  // This is the most important check - if status is active, payment was successful
+  if (status === 'active' || status === 'ACTIVE') {
+    console.log('✅ Final check: Status is active - NOT showing trial banner');
     return null;
   }
+  
+  // Also check: if trialEndDate is null/undefined and status is not 'trial', hide banner
+  if ((trialEndDateValue === null || trialEndDateValue === undefined || trialEndDateValue === '') && status !== 'trial' && status !== 'TRIAL') {
+    console.log('✅ Final check: No trial end date and not in trial - NOT showing trial banner');
+    return null;
+  }
+  
+  // Only show trial banner if status is explicitly 'trial'
+  const isTrial = status === 'trial' || status === 'TRIAL' || (!status && trialEndDateValue);
+
+  // If no time remaining calculated (no trial period), don't show
+  if (!timeRemaining) {
+    return null;
+  }
+
+  const isAboutToExpire = timeRemaining.totalMs > 0 && timeRemaining.totalMs < 24 * 60 * 60 * 1000; // Less than 24 hours
 
   // Format time display
   const formatTime = () => {

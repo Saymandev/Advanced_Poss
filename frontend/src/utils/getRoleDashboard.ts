@@ -14,7 +14,7 @@ export function getRoleDashboardPath(role: string | undefined | null): string {
 
   // Map roles to their dashboard paths
   const roleDashboardMap: Record<string, string> = {
-    [UserRole.SUPER_ADMIN.toLowerCase()]: '/dashboard', // Super admin uses main dashboard
+    [UserRole.SUPER_ADMIN.toLowerCase()]: '/dashboard/super-admin', // Super admin uses dedicated dashboard
     [UserRole.OWNER.toLowerCase()]: '/dashboard', // Owner uses main dashboard
     [UserRole.MANAGER.toLowerCase()]: '/dashboard/manager',
     [UserRole.CHEF.toLowerCase()]: '/dashboard/kitchen',

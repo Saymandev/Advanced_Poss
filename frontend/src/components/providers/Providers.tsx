@@ -1,5 +1,6 @@
 'use client';
 
+import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { SocketProvider } from '@/components/providers/SocketProvider';
 import { restoreAuth } from '@/lib/slices/authSlice';
 import { store } from '@/lib/store';
@@ -60,10 +61,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <Provider store={store}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
         <AuthRestorer>
-          <SocketProvider>
-            {children}
-            <ClientOnlyToaster />
-          </SocketProvider>
+          <CurrencyProvider>
+            <SocketProvider>
+              {children}
+              <ClientOnlyToaster />
+            </SocketProvider>
+          </CurrencyProvider>
         </AuthRestorer>
       </ThemeProvider>
     </Provider>

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { useSuperAdminLoginMutation } from '@/lib/api/endpoints/authApi';
 import { setCredentials } from '@/lib/slices/authSlice';
 import { useAppDispatch } from '@/lib/store';
+import { getRoleDashboardPath } from '@/utils/getRoleDashboard';
 import { ArrowLeftIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -23,18 +24,43 @@ export default function SuperAdminLoginPage() {
     e.preventDefault();
 
     try {
-      const response = await superAdminLogin({ email, password }).unwrap();
+      const response: any = await superAdminLogin({ email, password }).unwrap();
 
+      // Handle response structure: { success, data: { user, tokens: { accessToken, refreshToken } } }
+      // or direct: { user, tokens: { accessToken, refreshToken } }
+      let loggedInUser, accessToken, refreshToken;
+      
+      if (response.data) {
+        // TransformInterceptor wrapped response
+        loggedInUser = response.data.user || response.data;
+        accessToken = response.data.tokens?.accessToken || response.data.accessToken;
+        refreshToken = response.data.tokens?.refreshToken || response.data.refreshToken;
+      } else {
+        // Direct response from service
+        loggedInUser = response.user;
+        accessToken = response.tokens?.accessToken || response.accessToken;
+        refreshToken = response.tokens?.refreshToken || response.refreshToken;
+      }
+
+      if (!accessToken || !refreshToken) {
+        console.error('Missing tokens in response:', response);
+        toast.error('Login failed: Invalid response from server');
+        return;
+      }
+      
       dispatch(
         setCredentials({
-          user: response.data.user,
-          accessToken: response.data.accessToken,
-          refreshToken: response.data.refreshToken,
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
         })
       );
 
       toast.success('Welcome back, Super Admin!');
-      router.push('/dashboard');
+      
+      // Redirect to role-specific dashboard (should be /dashboard/super-admin)
+      const dashboardPath = getRoleDashboardPath(loggedInUser?.role);
+      router.push(dashboardPath);
     } catch (error: any) {
       toast.error(error?.data?.message || 'Invalid credentials');
     }

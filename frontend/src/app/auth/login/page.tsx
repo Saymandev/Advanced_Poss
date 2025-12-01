@@ -31,25 +31,33 @@ export default function LoginPage() {
       return;
     }
 
-    console.log('🔍 Searching for company with email:', email);
-
     try {
       const response = await findCompany({ email }).unwrap();
 
-      console.log('📧 Find company response:', response);
+      let companyData: any = null;
+      if (response.success && response.data) {
+        companyData = response.data;
+      } else if ((response as any).found !== undefined) {
+        companyData = response;
+      } else if ((response as any).data?.found !== undefined) {
+        companyData = (response as any).data;
+      }
 
-      if (response.success && response.data && response.data.found) {
-        console.log('✅ Company found!', response.data);
-
-        dispatch(setCompanyContext(response.data));
-        toast.success(`Welcome to ${response.data.companyName}!`);
-        router.push('/auth/pin-login');
+      if (companyData && companyData.found) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('companyContext', JSON.stringify(companyData));
+        }
+        
+        dispatch(setCompanyContext(companyData));
+        toast.success(`Welcome to ${companyData.companyName || 'your restaurant'}!`);
+        
+        setTimeout(() => {
+          router.replace('/auth/pin-login');
+        }, 200);
       } else {
-        console.log('❌ Company not found');
         toast.error('No restaurant found with this email');
       }
     } catch (error: any) {
-      console.error('❌ Error finding company:', error);
       toast.error(error?.data?.message || 'No restaurant found with this email');
     }
   };

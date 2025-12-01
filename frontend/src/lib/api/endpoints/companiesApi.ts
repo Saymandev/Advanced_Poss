@@ -79,7 +79,8 @@ export interface UpdateCompanyRequest extends Partial<CreateCompanyRequest> {
 
 export interface CompanyStats {
   totalBranches: number;
-  totalUsers: number;
+  totalUsers: number; // Employees/Staff count
+  totalCustomers?: number; // Customers count
   totalOrders: number;
   totalRevenue: number;
   averageOrderValue: number;
@@ -95,14 +96,34 @@ export interface CompanyStats {
   }>;
 }
 
+export interface SystemStats {
+  totalCompanies: number;
+  activeCompanies: number;
+  trialCompanies: number;
+  expiredCompanies: number;
+  companiesByPlan: Record<string, number>;
+}
+
 export const companiesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getCompanies: builder.query<{ companies: Company[]; total: number }, any>({
+    getCompanies: builder.query<{ companies: Company[]; total: number } | Company[], any>({
       query: (params) => ({
         url: '/companies',
         params,
       }),
       providesTags: ['Company'],
+      transformResponse: (response: any) => {
+        if (response?.success && response?.data) {
+          return response.data;
+        }
+        if (Array.isArray(response)) {
+          return response;
+        }
+        if (response?.companies) {
+          return response;
+        }
+        return response?.data ?? response;
+      },
     }),
     getMyCompanies: builder.query<Company[], void>({
       query: () => '/companies/my-companies',
@@ -114,17 +135,30 @@ export const companiesApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         // Ensure logo field is included
         const data = response?.data ?? response;
-        console.log('getCompanyById response:', {
+        console.log('📦 getCompanyById response:', {
           hasLogo: !!data?.logo,
           logoValue: data?.logo?.substring(0, 50) + '...' || 'null',
           allKeys: Object.keys(data || {}),
+          subscriptionStatus: data?.subscriptionStatus,
+          subscriptionPlan: data?.subscriptionPlan,
+          trialEndDate: data?.trialEndDate,
+          hasTrialEndDate: data?.trialEndDate !== null && data?.trialEndDate !== undefined,
         });
         return data;
       },
     }),
-    getCompanyStats: builder.query<CompanyStats, string>({
+    getCompanyStats: builder.query<{ company: Company; stats: CompanyStats }, string>({
       query: (id) => `/companies/${id}/stats`,
       providesTags: ['Company'],
+      transformResponse: (response: any) => response?.data || response,
+    }),
+    getSystemStats: builder.query<SystemStats, void>({
+      query: () => '/companies/system/stats',
+      providesTags: ['Company'],
+      transformResponse: (response: any) => {
+        const data = response?.data ?? response;
+        return data;
+      },
     }),
     createCompany: builder.mutation<Company, CreateCompanyRequest>({
       query: (data) => ({
@@ -184,6 +218,7 @@ export const {
   useGetMyCompaniesQuery,
   useGetCompanyByIdQuery,
   useGetCompanyStatsQuery,
+  useGetSystemStatsQuery,
   useCreateCompanyMutation,
   useUpdateCompanyMutation,
   useUpdateCompanySettingsMutation,

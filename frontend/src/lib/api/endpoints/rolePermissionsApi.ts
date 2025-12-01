@@ -42,6 +42,27 @@ export const rolePermissionsApi = apiSlice.injectEndpoints({
         return response?.data || response;
       },
     }),
+    getCompanyRolePermissions: builder.query<RolePermission[], string>({
+      query: (companyId) => `/role-permissions/system/company/${companyId}`,
+      providesTags: ['RolePermission'],
+      transformResponse: (response: any) => {
+        return response?.data || response || [];
+      },
+    }),
+    updateCompanyRolePermission: builder.mutation<
+      RolePermission,
+      { companyId: string; data: UpdateRolePermissionRequest }
+    >({
+      query: ({ companyId, data }) => ({
+        url: `/role-permissions/system/company/${companyId}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['RolePermission', 'MyPermissions'],
+      transformResponse: (response: any) => {
+        return response?.data || response;
+      },
+    }),
   }),
 });
 
@@ -49,5 +70,7 @@ export const {
   useGetRolePermissionsQuery,
   useGetMyPermissionsQuery,
   useUpdateRolePermissionMutation,
+  useGetCompanyRolePermissionsQuery,
+  useUpdateCompanyRolePermissionMutation,
 } = rolePermissionsApi;
 

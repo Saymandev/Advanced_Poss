@@ -33,21 +33,43 @@ export interface PinLoginRequest {
 }
 
 export interface LoginResponse {
-  success: boolean;
-  data: {
-    user: {
+  success?: boolean;
+  data?: {
+    user?: {
       id: string;
       email: string;
       firstName: string;
       lastName: string;
       role: string;
-      companyId: string;
-      branchId: string;
+      companyId: string | null;
+      branchId: string | null;
+      isSuperAdmin?: boolean;
     };
+    tokens?: {
+      accessToken: string;
+      refreshToken: string;
+    };
+    accessToken?: string;
+    refreshToken?: string;
+    sessionId?: string;
+  };
+  // Direct response (if not wrapped)
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    companyId: string | null;
+    branchId: string | null;
+    isSuperAdmin?: boolean;
+  };
+  tokens?: {
     accessToken: string;
     refreshToken: string;
-    sessionId: string;
   };
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface SuperAdminLoginRequest {

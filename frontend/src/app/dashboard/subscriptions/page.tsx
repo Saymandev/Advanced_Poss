@@ -4,12 +4,17 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
+import { useCreateCheckoutSessionMutation } from '@/lib/api/endpoints/paymentsApi';
 import {
   BillingHistory,
   useCancelSubscriptionMutation,
   useCreateSubscriptionMutation,
+  useCreateSubscriptionPlanMutation,
+  useDeleteSubscriptionPlanMutation,
+  useGetAllSubscriptionsQuery,
   useGetBillingHistoryQuery,
   useGetCurrentSubscriptionQuery,
   useGetSubscriptionByCompanyQuery,
@@ -17,11 +22,13 @@ import {
   useGetUsageStatsQuery,
   useReactivateSubscriptionMutation,
   useUpdateSubscriptionMutation,
+  useUpdateSubscriptionPlanMutation,
 } from '@/lib/api/endpoints/subscriptionsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
   ArrowTrendingUpIcon,
+  BuildingOffice2Icon,
   CheckCircleIcon,
   ClockIcon,
   CreditCardIcon,
@@ -35,6 +42,7 @@ import toast from 'react-hot-toast';
 export default function SubscriptionsPage() {
   const { user } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || '';
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'super_admin';
   const { data: plansData, isLoading: isPlanLoading, error: plansError } = useGetSubscriptionPlansQuery({});
   
   // Normalize plans data - transformResponse handles the normalization
@@ -61,6 +69,7 @@ export default function SubscriptionsPage() {
   const { 
     data: currentSubscription, 
     isFetching: isSubscriptionLoading,
+    refetch: _refetchCurrentSubscription,
   } = useGetCurrentSubscriptionQuery(
     { companyId },
     { 
@@ -72,15 +81,25 @@ export default function SubscriptionsPage() {
 
   // Also try to fetch subscription by company (includes inactive ones)
   // This helps when getCurrentSubscription returns 404 but subscription exists
-  const { data: subscriptionByCompany, refetch: refetchSubscriptionByCompany } = useGetSubscriptionByCompanyQuery(
+  // Always fetch this, even if currentSubscription exists, because currentSubscription might be stale
+  const { 
+    data: subscriptionByCompany, 
+    refetch: _refetchSubscriptionByCompany,
+  } = useGetSubscriptionByCompanyQuery(
     { companyId },
     { 
-      skip: !companyId || !!currentSubscription, // Skip if we already have currentSubscription
+      skip: !companyId, // Only skip if no companyId - always try to fetch real subscription record
+      refetchOnMountOrArgChange: true, // Always refetch when component mounts or companyId changes
     },
   );
 
+
+  // Extract subscription data - handle both wrapped { data: {...} } and direct {...} formats
+  const unwrappedCurrentSubscription = (currentSubscription as any)?.data || currentSubscription;
+  const unwrappedSubscriptionByCompany = (subscriptionByCompany as any)?.data || subscriptionByCompany;
+  
   // Use subscriptionByCompany if currentSubscription is not available
-  const actualSubscription = currentSubscription || subscriptionByCompany;
+  const actualSubscription = unwrappedCurrentSubscription || unwrappedSubscriptionByCompany;
 
   // Create subscription object from company data if subscription record doesn't exist
   const subscriptionFromCompany = useMemo(() => {
@@ -94,10 +113,34 @@ export default function SubscriptionsPage() {
     const plan = plans.find((p: any) => p.name === companyData.subscriptionPlan);
     if (!plan) return null;
 
-    const isTrial = companyData.subscriptionStatus === 'trial';
-    const trialEndDate = companyData.trialEndDate 
-      ? new Date(companyData.trialEndDate).toISOString()
+    // Determine trial status: subscription is trial only if status is 'trial' AND has trialEndDate
+    const subscriptionStatus = companyData.subscriptionStatus || 'active';
+    const trialEndDateRaw = companyData.trialEndDate;
+    const trialEndDate = trialEndDateRaw && trialEndDateRaw !== null && trialEndDateRaw !== 'null'
+      ? new Date(trialEndDateRaw).toISOString()
       : null;
+    
+    // DEBUG: Log subscription status
+    console.log('🔍 Subscription Page Debug:', {
+      subscriptionStatus,
+      trialEndDateRaw,
+      trialEndDate,
+      hasTrialEndDate: !!trialEndDate,
+      companyDataKeys: Object.keys(companyData),
+    });
+    
+    // Subscription is in trial only if:
+    // 1. Status is explicitly 'trial' AND
+    // 2. Has a valid trialEndDate (not null, not undefined, not empty)
+    // If status is 'active', it's NOT a trial, regardless of trialEndDate
+    const isTrial = subscriptionStatus === 'trial' && trialEndDate !== null;
+    
+    console.log('📊 Trial Status Calculation:', {
+      subscriptionStatus,
+      isTrial,
+      trialEndDateExists: !!trialEndDate,
+      finalIsTrial: isTrial,
+    });
 
     return {
       id: 'company-subscription',
@@ -108,7 +151,7 @@ export default function SubscriptionsPage() {
         id: plan.id,
       },
       planKey: companyData.subscriptionPlan,
-      status: isTrial ? 'active' : (companyData.subscriptionStatus || 'active'),
+      status: subscriptionStatus === 'trial' ? 'active' : (subscriptionStatus || 'active'),
       currentPeriodStart: ((companyData as any).subscriptionStartDate) 
         ? new Date((companyData as any).subscriptionStartDate).toISOString()
         : new Date().toISOString(),
@@ -124,7 +167,56 @@ export default function SubscriptionsPage() {
   }, [actualSubscription, companyData, plans]);
 
   // Use subscription from company if subscription record doesn't exist
-  const effectiveSubscription = actualSubscription || subscriptionFromCompany;
+  // Also ensure isTrial is correctly computed from actual subscription data
+  let effectiveSubscription = actualSubscription || subscriptionFromCompany;
+  
+  // If we have actual subscription, ensure isTrial is correct based on status and trialEndDate
+  if (actualSubscription) {
+    const sub = actualSubscription as any;
+    const subscriptionStatus = sub.status || 'active';
+    const hasTrialEndDate = sub.trialEndDate || sub.trialEnd;
+    
+    // DEBUG: Log actual subscription data
+    console.log('🔍 Actual Subscription Debug:', {
+      status: subscriptionStatus,
+      hasTrialEndDate,
+      trialEndDate: sub.trialEndDate,
+      trialEnd: sub.trialEnd,
+      isTrialField: sub.isTrial,
+      allKeys: Object.keys(sub),
+    });
+    
+    // Subscription is trial ONLY if:
+    // 1. Status is explicitly 'trial' AND
+    // 2. Has a valid trialEndDate
+    // If status is 'active', it's NOT a trial, regardless of trialEndDate
+    const computedIsTrial = subscriptionStatus === 'trial' && hasTrialEndDate !== null && hasTrialEndDate !== undefined;
+    
+    console.log('📊 Computed Trial Status:', {
+      subscriptionStatus,
+      computedIsTrial,
+      hasTrialEndDate: !!hasTrialEndDate,
+    });
+    
+    effectiveSubscription = {
+      ...actualSubscription,
+      isTrial: computedIsTrial,
+      status: subscriptionStatus,
+    };
+  }
+  
+  // Final check: if companyData shows active status, override isTrial to false
+  if (companyData) {
+    const companyStatus = companyData.subscriptionStatus;
+    if (companyStatus === 'active') {
+      console.log('✅ Company status is active - forcing isTrial to false');
+      effectiveSubscription = {
+        ...effectiveSubscription,
+        isTrial: false,
+        status: 'active',
+      };
+    }
+  }
   const { data: usageStats } = useGetUsageStatsQuery(
     { companyId },
     { skip: !companyId },
@@ -137,10 +229,11 @@ export default function SubscriptionsPage() {
     { skip: !companyId },
   );
   
-  const [createSubscription] = useCreateSubscriptionMutation();
-  const [updateSubscription, { isLoading: isUpdating }] = useUpdateSubscriptionMutation();
+  const [_createSubscription] = useCreateSubscriptionMutation();
+  const [_updateSubscription] = useUpdateSubscriptionMutation();
   const [cancelSubscription, { isLoading: isCancelling }] = useCancelSubscriptionMutation();
   const [reactivateSubscription, { isLoading: isReactivating }] = useReactivateSubscriptionMutation();
+  const [createCheckoutSession, { isLoading: isUpdating }] = useCreateCheckoutSessionMutation();
 
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -150,7 +243,7 @@ export default function SubscriptionsPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   
   useEffect(() => {
-    if (!currentSubscription?.isTrial || !currentSubscription?.trialEnd) return;
+    if (!effectiveSubscription?.isTrial || !effectiveSubscription?.trialEnd) return;
     
     const interval = setInterval(() => {
       setCurrentTime(new Date());
@@ -183,101 +276,58 @@ export default function SubscriptionsPage() {
       return;
     }
 
-    if (effectiveSubscription?.plan && selectedPlan.id === effectiveSubscription.plan.id) {
+    // Check if user is in trial mode and wants to pay for the same plan
+    const isTrialMode = effectiveSubscription?.isTrial || 
+                        effectiveSubscription?.status === 'trial' ||
+                        companyData?.subscriptionStatus === 'trial';
+    
+    const currentPlanId = effectiveSubscription?.plan?.id;
+    const isSamePlan = currentPlanId && selectedPlan.id === currentPlanId;
+    
+    // If user is in trial mode and selecting the same plan, allow them to pay for it
+    if (isSamePlan && !isTrialMode) {
       toast.error('You are already on this plan');
       return;
     }
 
-    try {
-      let subscriptionId = effectiveSubscription.id;
-
-      // Check if we have a fake ID (from subscriptionFromCompany) or no real subscription
-      // The fake ID 'company-subscription' is not a valid MongoDB ObjectId
-      const isFakeId = subscriptionId === 'company-subscription' || !subscriptionId || !actualSubscription;
+      try {
+      // ALL plan changes MUST go through Stripe checkout for payment verification
+      // This prevents unauthorized plan upgrades without payment
       
-      if (isFakeId && companyData) {
-        // Find the current plan from company data
-        const currentPlan = plans.find((p: any) => p.name === companyData.subscriptionPlan);
-        
-        if (!currentPlan) {
-          toast.error('Unable to determine current plan. Please refresh the page.');
-          return;
-        }
-
-        // Validate required fields
-        const email = companyData.email || user?.email;
-        const companyName = companyData.name;
-        
-        if (!email || !companyName) {
-          toast.error('Missing required information (email or company name). Please contact support.');
-          return;
-        }
-
-        // Try to create subscription record with current plan
-        // Backend requires: companyId, plan (enum), billingCycle (enum), email, companyName
-        // NOTE: Backend expects 'plan' (enum value like 'basic', 'premium'), NOT 'planId'
-        try {
-          const newSubscription = await createSubscription({
-            companyId: companyId,
-            plan: currentPlan.name, // SubscriptionPlan enum value (e.g., 'basic', 'premium', 'enterprise')
-            billingCycle: currentPlan.billingCycle || 'monthly', // BillingCycle enum value
-            email: email,
-            companyName: companyName,
-            // paymentMethodId is optional, omit it for now
-          }).unwrap();
-
-          subscriptionId = newSubscription.id;
-        } catch (createError: any) {
-          // If backend says subscription already exists, try to fetch it
-          if (createError?.data?.message?.includes('already has an active subscription') || 
-              createError?.message?.includes('already has an active subscription')) {
-            // Try to fetch existing subscription by company using RTK Query
-            try {
-              const result = await refetchSubscriptionByCompany();
-              const existingSub = result.data;
-              
-              if (existingSub?.id) {
-                subscriptionId = existingSub.id;
-              } else {
-                throw new Error('Unable to fetch existing subscription');
-              }
-            } catch (fetchError) {
-              toast.error('Subscription exists but could not be retrieved. Please refresh the page.');
-              return;
-            }
-          } else {
-            // Re-throw other errors
-            throw createError;
-          }
-        }
-        
-        // If the new plan is the same as current plan, we're done
-        if (selectedPlan.id === currentPlan.id) {
-          toast.success(`Subscription created successfully with ${selectedPlan.displayName || selectedPlan.name}!`);
-          setIsUpgradeModalOpen(false);
-          setSelectedPlan(null);
-          return;
-        }
-      }
-
-      // Validate that we have a real subscription ID before updating
-      if (!subscriptionId || subscriptionId === 'company-subscription') {
-        toast.error('Unable to find subscription. Please refresh the page and try again.');
-        return;
-      }
-
-      // Update subscription to new plan
-      await updateSubscription({
-        id: subscriptionId,
-        planId: selectedPlan.id,
+      // For free plans, we can skip checkout, but for security, let's still use checkout
+      // This ensures all plan changes are properly tracked and verified
+      
+      // Prepare URLs for Stripe checkout
+      const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+      const successUrl = `${origin}/dashboard/subscriptions/success`;
+      const cancelUrl = `${origin}/dashboard/subscriptions?plan=${selectedPlan.name}`;
+      
+      toast.loading('Redirecting to payment...', { id: 'checkout-loading' });
+      
+      // Create Stripe checkout session
+      const response = await createCheckoutSession({
+        companyId: companyId,
+        planName: selectedPlan.name, // Use plan name (e.g., 'basic', 'premium') not display name
+        successUrl,
+        cancelUrl,
       }).unwrap();
 
-      toast.success(`Successfully ${effectiveSubscription?.plan?.price && selectedPlan.price > effectiveSubscription.plan.price ? 'upgraded' : effectiveSubscription?.plan?.price && selectedPlan.price < effectiveSubscription.plan.price ? 'downgraded' : 'switched'} to ${selectedPlan.displayName || selectedPlan.name}!`);
+      toast.dismiss('checkout-loading');
+      
+      // Redirect to Stripe Checkout
+      const checkoutUrl = (response as any).url || (response as any).data?.url;
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        toast.error('Payment session creation failed. Please try again.');
+      }
+      
       setIsUpgradeModalOpen(false);
       setSelectedPlan(null);
     } catch (error: any) {
-      console.error('Upgrade error:', error);
-      toast.error(error?.data?.message || error?.message || 'Failed to update subscription. Please try again.');
+      console.error('Checkout creation error:', error);
+      toast.dismiss('checkout-loading');
+      toast.error(error?.data?.message || error?.message || 'Failed to create payment session. Please try again.');
     }
   };
 
@@ -379,6 +429,474 @@ export default function SubscriptionsPage() {
     if (percentage >= 75) return 'text-yellow-600 dark:text-yellow-400';
     return 'text-green-600 dark:text-green-400';
   };
+
+  // SUPER ADMIN data/hooks (always declared, conditionally used in render)
+  const { data: subsData, isFetching: isSubsLoading } = useGetAllSubscriptionsQuery(
+    { limit: 100 },
+    { skip: !isSuperAdmin },
+  );
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<any | null>(null);
+
+  const [createPlan, { isLoading: isCreatingPlan }] = useCreateSubscriptionPlanMutation();
+  const [updatePlan, { isLoading: isUpdatingPlan }] = useUpdateSubscriptionPlanMutation();
+  const [deletePlan, { isLoading: isDeletingPlan }] = useDeleteSubscriptionPlanMutation();
+  
+  // Flatten subscription data for table/export (avoid nested objects as cell values)
+  const flattenedSubscriptions = useMemo(() => {
+    const source = subsData?.subscriptions || [];
+    if (!Array.isArray(source)) return [];
+    
+    return source.map((sub: any) => {
+      // Safely extract company name and email from populated companyId
+      // Backend populates companyId with { name, email, _id } when using .populate('companyId', 'name email')
+      let companyName = 'Unknown Company';
+      let companyEmail = '';
+      let companyId = '';
+      
+      // Check if companyId is populated (object with name/email) or just an ID
+      if (sub.companyId) {
+        if (typeof sub.companyId === 'object' && sub.companyId !== null) {
+          // Populated company object from backend: { _id, name, email }
+          // Handle both _id (ObjectId) and id (string) formats
+          companyId = sub.companyId._id?.toString() || sub.companyId.id?.toString() || String(sub.companyId._id || sub.companyId.id || '');
+          
+          // Extract name and email from populated object
+          companyName = sub.companyId.name || 'Unknown Company';
+          companyEmail = sub.companyId.email || '';
+          
+          // If name is missing but we have an ID, try to get from other fields
+          if (!companyName || companyName === 'Unknown Company') {
+            // Check if there's a company object nested differently
+            if (sub.company && typeof sub.company === 'object') {
+              companyName = sub.company.name || companyName;
+              companyEmail = sub.company.email || companyEmail;
+            }
+          }
+        } else {
+          // Just an ID string/ObjectId (not populated)
+          companyId = String(sub.companyId);
+        }
+      }
+      
+      // Fallback: check sub.company field if companyId wasn't populated
+      if ((!companyName || companyName === 'Unknown Company') && sub.company) {
+        if (typeof sub.company === 'string') {
+          companyName = sub.company;
+        } else if (typeof sub.company === 'object' && sub.company !== null) {
+          companyName = sub.company.name || 'Unknown Company';
+          companyEmail = sub.company.email || companyEmail;
+          if (!companyId && sub.company._id) {
+            companyId = sub.company._id.toString() || sub.company.id || '';
+          }
+        }
+      }
+      
+      // Use companyId as fallback for email if email is empty
+      if (!companyEmail && companyId) {
+        companyEmail = companyId;
+      }
+      
+      // Safely extract plan key
+      let planKey = 'N/A';
+      if (sub.planKey) {
+        planKey = String(sub.planKey);
+      } else if (sub.plan) {
+        if (typeof sub.plan === 'object' && sub.plan !== null) {
+          planKey = String(sub.plan.displayName || sub.plan.name || 'N/A');
+        } else {
+          planKey = String(sub.plan);
+        }
+      }
+      
+      // Create a clean object with ONLY primitive string values
+      const flattened: Record<string, string> = {
+        id: String(sub.id || ''),
+        companyId: companyId,
+        companyName: String(companyName),
+        companyEmail: String(companyEmail),
+        planKey: planKey,
+        status: String(sub.status || ''),
+        currentPeriodEnd: sub.currentPeriodEnd ? String(sub.currentPeriodEnd) : 'N/A',
+      };
+      
+      // Final safety check: remove any object values that might have slipped through
+      Object.keys(flattened).forEach(key => {
+        const value = flattened[key];
+        if (value !== null && value !== undefined && typeof value === 'object') {
+          flattened[key] = '[Object]';
+        }
+      });
+      
+      return flattened;
+    });
+  }, [subsData]);
+
+  // SUPER ADMIN VIEW: system-wide subscription + plan management
+  if (isSuperAdmin) {
+
+    const subscriptionColumns = [
+      {
+        key: 'companyName',
+        title: 'Company',
+        render: (_: any, row: any) => {
+          // Defensive: ensure all values are strings, never objects
+          const companyName = typeof row.companyName === 'string' 
+            ? row.companyName 
+            : (typeof row.companyName === 'object' && row.companyName?.name 
+                ? String(row.companyName.name)
+                : 'Unknown Company');
+          const companyEmail = typeof row.companyEmail === 'string'
+            ? row.companyEmail
+            : (typeof row.companyEmail === 'object'
+                ? (row.companyEmail?.email ? String(row.companyEmail.email) : '')
+                : '');
+          const companyId = typeof row.companyId === 'string'
+            ? row.companyId
+            : (typeof row.companyId === 'object'
+                ? String(row.companyId?._id || row.companyId?.id || '')
+                : String(row.companyId || ''));
+          
+          const displayEmail = companyEmail || companyId || 'N/A';
+          const displayName = companyName || 'Unknown Company';
+          const initial = displayName.charAt(0).toUpperCase();
+          
+          return (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-semibold">
+                {initial}
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {displayName}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {displayEmail}
+                </p>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: 'planKey',
+        title: 'Plan',
+        render: (value: string, row: any) => (
+          <span className="capitalize">
+            {row.planKey || value || 'N/A'}
+          </span>
+        ),
+      },
+      {
+        key: 'status',
+        title: 'Status',
+        render: (value: string) => (
+          <Badge variant={getStatusBadge(value)}>
+            {value.charAt(0).toUpperCase() + value.slice(1)}
+          </Badge>
+        ),
+      },
+      {
+        key: 'currentPeriodEnd',
+        title: 'Expires',
+        render: (value: string) =>
+          value ? formatDateTime(value).split(',')[0] : 'N/A',
+      },
+    ];
+
+    const planColumns = [
+      {
+        key: 'displayName',
+        title: 'Plan',
+        render: (value: string, row: any) => (
+          <div>
+            <p className="font-semibold text-gray-900 dark:text-white">
+              {value || row.name}
+            </p>
+            <p className="text-xs text-gray-500">
+              {row.description || 'No description'}
+            </p>
+          </div>
+        ),
+      },
+      {
+        key: 'price',
+        title: 'Price',
+        render: (value: number, row: any) => (
+          <span className="font-semibold">
+            {formatCurrency(value || 0, row.currency || 'BDT')} /{row.billingCycle || 'monthly'}
+          </span>
+        ),
+      },
+      {
+        key: 'isActive',
+        title: 'Status',
+        render: (value: boolean) => (
+          <Badge variant={value ? 'success' : 'danger'}>
+            {value ? 'Active' : 'Inactive'}
+          </Badge>
+        ),
+      },
+      {
+        key: 'actions',
+        title: 'Actions',
+        render: (_: any, row: any) => (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setEditingPlan(row);
+                setIsPlanModalOpen(true);
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-600 hover:text-red-700"
+              disabled={isDeletingPlan}
+              onClick={async () => {
+                if (!window.confirm(`Delete plan "${row.displayName || row.name}"?`)) return;
+                try {
+                  await deletePlan(row.id).unwrap();
+                  toast.success('Plan deleted');
+                } catch (err: any) {
+                  toast.error(err?.data?.message || 'Failed to delete plan');
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        ),
+      },
+    ];
+
+    const handleSavePlan = async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const formData = new FormData(event.currentTarget);
+      const payload: any = {
+        name: (formData.get('name') as string)?.trim(),
+        displayName: (formData.get('displayName') as string)?.trim(),
+        description: (formData.get('description') as string)?.trim(),
+        price: Number(formData.get('price') || 0),
+        currency: (formData.get('currency') as string) || 'BDT',
+        billingCycle: (formData.get('billingCycle') as string) || 'monthly',
+        trialPeriod: Number(formData.get('trialPeriod') || 0),
+        isActive: formData.get('isActive') === 'on',
+      };
+
+      try {
+        if (editingPlan?.id) {
+          await updatePlan({ id: editingPlan.id, data: payload }).unwrap();
+          toast.success('Plan updated');
+        } else {
+          await createPlan(payload).unwrap();
+          toast.success('Plan created');
+        }
+        setIsPlanModalOpen(false);
+        setEditingPlan(null);
+      } catch (err: any) {
+        toast.error(err?.data?.message || 'Failed to save plan');
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <BuildingOffice2Icon className="w-8 h-8 text-purple-600" />
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                System Subscriptions
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                View and manage subscriptions for all companies
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* System-wide subscriptions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Company Subscriptions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              data={flattenedSubscriptions}
+              columns={subscriptionColumns}
+              loading={isSubsLoading}
+              searchable
+              selectable={false}
+              emptyMessage="No subscriptions found"
+            />
+          </CardContent>
+        </Card>
+
+        {/* Plan Management */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Subscription Plans</CardTitle>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Manage available plans for all companies
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setEditingPlan(null);
+                setIsPlanModalOpen(true);
+              }}
+            >
+              Create Plan
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              data={plans}
+              columns={planColumns}
+              loading={isPlanLoading}
+              searchable
+              selectable={false}
+              emptyMessage="No plans found"
+            />
+          </CardContent>
+        </Card>
+
+        {/* Create / Edit Plan Modal */}
+        <Modal
+          isOpen={isPlanModalOpen}
+          onClose={() => {
+            setIsPlanModalOpen(false);
+            setEditingPlan(null);
+          }}
+          title={editingPlan ? 'Edit Subscription Plan' : 'Create Subscription Plan'}
+          className="max-w-lg"
+        >
+          <form onSubmit={handleSavePlan} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Internal Name
+                </label>
+                <Input
+                  name="name"
+                  defaultValue={editingPlan?.name || ''}
+                  placeholder="basic, premium, enterprise"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Display Name
+                </label>
+                <Input
+                  name="displayName"
+                  defaultValue={editingPlan?.displayName || ''}
+                  placeholder="Basic, Premium, Enterprise"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Description
+                </label>
+                <Input
+                  name="description"
+                  defaultValue={editingPlan?.description || ''}
+                  placeholder="Short description of the plan"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Price
+                  </label>
+                  <Input
+                    name="price"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    defaultValue={editingPlan?.price ?? 0}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Currency
+                  </label>
+                  <Input
+                    name="currency"
+                    defaultValue={editingPlan?.currency || 'BDT'}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Billing Cycle
+                  </label>
+                  <Input
+                    name="billingCycle"
+                    defaultValue={editingPlan?.billingCycle || 'monthly'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Trial Period (hours)
+                  </label>
+                  <Input
+                    name="trialPeriod"
+                    type="number"
+                    min={0}
+                    defaultValue={editingPlan?.trialPeriod ?? 0}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="isActive"
+                  name="isActive"
+                  type="checkbox"
+                  defaultChecked={editingPlan ? editingPlan.isActive : true}
+                  className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                />
+                <label
+                  htmlFor="isActive"
+                  className="text-sm text-gray-700 dark:text-gray-300"
+                >
+                  Active
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setIsPlanModalOpen(false);
+                  setEditingPlan(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isCreatingPlan || isUpdatingPlan}
+              >
+                {editingPlan ? 'Save Changes' : 'Create Plan'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      </div>
+    );
+  }
 
   if (!companyId) {
     return (

@@ -5,10 +5,34 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
+/**
+ * Format currency amount with automatic company currency detection
+ * @param amount - The amount to format
+ * @param currency - Optional currency override. If not provided, uses company's global currency setting
+ * @returns Formatted currency string
+ */
+export function formatCurrency(amount: number, currency?: string): string {
+  // If currency is explicitly provided, use it
+  if (currency) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }).format(amount);
+  }
+
+  // Try to get currency from window context (set by CurrencyProvider)
+  if (typeof window !== 'undefined' && (window as any).__CURRENCY__) {
+    const globalCurrency = (window as any).__CURRENCY__;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: globalCurrency,
+    }).format(amount);
+  }
+
+  // Fallback to USD if no global currency is set
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: 'USD',
   }).format(amount);
 }
 

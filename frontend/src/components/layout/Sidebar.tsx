@@ -19,6 +19,7 @@ import {
   HomeIcon,
   PrinterIcon,
   ReceiptPercentIcon,
+  ShieldCheckIcon,
   ShoppingBagIcon,
   TableCellsIcon,
   TagIcon,
@@ -30,7 +31,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 interface NavigationItem {
   name: string;
@@ -48,6 +49,9 @@ const navigation: NavigationItem[] = [
     href: '/dashboard',
     icon: HomeIcon,
     requiredFeature: 'dashboard',
+    // Hide the regular owner dashboard entry for super admins,
+    // they have a dedicated "Super Admin Dashboard" menu instead.
+    roles: ['owner', 'manager', 'chef', 'waiter', 'cashier'],
   },
   {
     name: 'POS System',
@@ -275,6 +279,46 @@ const navigation: NavigationItem[] = [
   },
 ];
 
+// Super Admin specific navigation items (shown only for super_admin role)
+const superAdminNavigation: NavigationItem[] = [
+  {
+    name: 'Super Admin Dashboard',
+    href: '/dashboard/super-admin',
+    icon: ShieldCheckIcon,
+    roles: ['super_admin'],
+  },
+  {
+    name: 'Company Management',
+    href: '/dashboard/companies',
+    icon: BuildingOfficeIcon,
+    roles: ['super_admin'],
+  },
+  {
+    name: 'System Users',
+    href: '/dashboard/users',
+    icon: UsersIcon,
+    roles: ['super_admin'],
+  },
+  {
+    name: 'Subscriptions',
+    href: '/dashboard/subscriptions',
+    icon: ReceiptPercentIcon,
+    roles: ['super_admin'],
+  },
+  {
+    name: 'Company Features',
+    href: '/dashboard/company-features',
+    icon: ShieldCheckIcon,
+    roles: ['super_admin'],
+  },
+  {
+    name: 'System Settings',
+    href: '/dashboard/system-settings',
+    icon: CogIcon,
+    roles: ['super_admin'],
+  },
+];
+
 interface SidebarProps {
   className?: string;
 }
@@ -286,6 +330,15 @@ export function Sidebar({ className }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>(['Inventory', 'Financial', 'Settings']);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Combine navigation items - super admin items first, then regular items
+  const allNavigationItems = useMemo(() => {
+    const isSuperAdmin = user?.role?.toLowerCase() === 'super_admin';
+    if (isSuperAdmin) {
+      return [...superAdminNavigation, ...navigation];
+    }
+    return navigation;
+  }, [user?.role]);
 
   const toggleExpanded = (itemName: string) => {
     setExpandedItems(prev =>
@@ -360,6 +413,31 @@ export function Sidebar({ className }: SidebarProps) {
     return true;
   };
 
+  // Flatten navigation items for collapsed sidebar (show all children as flat items)
+  const flattenNavigationItems = (items: NavigationItem[]): NavigationItem[] => {
+    const flattened: NavigationItem[] = [];
+    
+    items.forEach((item) => {
+      if (!hasAccess(item)) return;
+      
+      const hasChildren = item.children && item.children.length > 0;
+      const accessibleChildren = hasChildren 
+        ? item.children?.filter(child => hasAccess(child)) || []
+        : [];
+      
+      // If parent has children, add all children as flat items (skip parent)
+      if (hasChildren && accessibleChildren.length > 0) {
+        flattened.push(...accessibleChildren);
+      } else if (!hasChildren) {
+        // If no children, add the parent item
+        flattened.push(item);
+      }
+      // If parent has children but none accessible, skip it entirely
+    });
+    
+    return flattened;
+  };
+
   const renderNavigationItem = (item: NavigationItem, level = 0) => {
     // Check if item itself has access
     if (!hasAccess(item)) return null;
@@ -392,8 +470,9 @@ export function Sidebar({ className }: SidebarProps) {
             level > 0 && !isCollapsed && 'border-l border-gray-200 dark:border-gray-700 pl-4',
             isCollapsed && 'justify-center px-2'
           )}
-          onClick={() => {
-            if (hasChildren) {
+          onClick={(e) => {
+            if (hasChildren && !isCollapsed) {
+              e.preventDefault();
               toggleExpanded(item.name);
             }
             if (window.innerWidth < 768) {
@@ -513,21 +592,24 @@ export function Sidebar({ className }: SidebarProps) {
         <nav className={cn(
           "flex-1 px-3 py-4 space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent transition-all duration-300",
           isCollapsed ? "px-2" : ""
-        )} style={{ maxHeight: 'calc(100vh - 180px)' }}>
-          {navigation.map((item) => renderNavigationItem(item))}
+        )}>
+          {isCollapsed 
+            ? flattenNavigationItems(allNavigationItems).map((item: NavigationItem) => renderNavigationItem(item))
+            : allNavigationItems.map((item: NavigationItem) => renderNavigationItem(item))
+          }
         </nav>
 
         {/* Footer */}
         <div className={cn(
-          "px-4 pt-3 pb-2 border-t border-gray-200 dark:border-gray-800 transition-all duration-300",
-          isCollapsed ? "px-2 pt-3 pb-2" : ""
+          "px-4 py-2 border-t border-gray-200 dark:border-gray-800 transition-all duration-300 shrink-0",
+          isCollapsed ? "px-2" : ""
         )}>
           <div className={cn(
             "text-xs text-gray-600 dark:text-gray-400 text-center transition-all duration-300",
             isCollapsed ? "opacity-0 w-0 overflow-hidden h-0" : "opacity-100"
           )}>
             <p className="leading-tight">Advanced Restaurant POS</p>
-            <p className="mt-0.5 text-xs opacity-75">v1.0.0</p>
+            <p className="text-xs opacity-75">v1.0.0</p>
           </div>
         </div>
       </div>

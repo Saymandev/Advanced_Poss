@@ -85,7 +85,7 @@ export default function DashboardPage() {
   });
   const [isRouting, setIsRouting] = useState(true);
 
-  // Route managers to their dashboard
+  // Route users to their appropriate dashboards
   useEffect(() => {
     if (!user?.role) {
       setIsRouting(false);
@@ -93,6 +93,11 @@ export default function DashboardPage() {
     }
 
     const userRole = user.role.toLowerCase();
+    
+    if (userRole === 'super_admin') {
+      router.replace('/dashboard/super-admin');
+      return;
+    }
     
     if (userRole === 'manager') {
       router.replace('/dashboard/manager');

@@ -74,6 +74,20 @@ export interface UsageStats {
   storageLimit: number;
 }
 
+export interface SubscriptionListItem extends Subscription {
+  company?: {
+    id?: string;
+    _id?: string;
+    name?: string;
+    email?: string;
+  };
+}
+
+export interface SubscriptionListResponse {
+  subscriptions: SubscriptionListItem[];
+  total: number;
+}
+
 export const subscriptionsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSubscriptionPlans: builder.query<SubscriptionPlan[] | { plans: SubscriptionPlan[]; total: number }, any>({
@@ -132,6 +146,49 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         return [];
       },
     }),
+    // Super Admin: create a new subscription plan
+    createSubscriptionPlan: builder.mutation<SubscriptionPlan, Partial<SubscriptionPlan>>({
+      query: (data) => ({
+        url: '/subscription-plans',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    // Super Admin: update an existing subscription plan
+    updateSubscriptionPlan: builder.mutation<SubscriptionPlan, { id: string; data: Partial<SubscriptionPlan> }>({
+      query: ({ id, data }) => ({
+        url: `/subscription-plans/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    // Super Admin: delete a subscription plan
+    deleteSubscriptionPlan: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/subscription-plans/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    // Super Admin: list all subscriptions system-wide (with optional filters)
+    getAllSubscriptions: builder.query<SubscriptionListResponse, { companyId?: string; status?: string; plan?: string; limit?: number; offset?: number }>({
+      query: (params) => ({
+        url: '/subscriptions',
+        params,
+      }),
+      providesTags: ['Subscription'],
+      transformResponse: (response: any): SubscriptionListResponse => {
+        const data = response?.data ?? response;
+        if (!data) {
+          return { subscriptions: [], total: 0 };
+        }
+        const subscriptions = Array.isArray(data.subscriptions) ? data.subscriptions : [];
+        const total = typeof data.total === 'number' ? data.total : subscriptions.length;
+        return { subscriptions, total };
+      },
+    }),
     getCurrentSubscription: builder.query<Subscription, { companyId: string }>({
       query: (params) => ({
         url: '/subscriptions/current',
@@ -144,6 +201,8 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         url: `/subscriptions/company/${companyId}`,
       }),
       providesTags: ['Subscription'],
+      // Handle 404 gracefully - subscription might not exist or be inactive
+      keepUnusedDataFor: 60, // Cache for 60 seconds
     }),
     createSubscription: builder.mutation<Subscription, { 
       companyId: string;
@@ -237,7 +296,11 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
 });
 
 export const {
+  useGetAllSubscriptionsQuery,
   useGetSubscriptionPlansQuery,
+  useCreateSubscriptionPlanMutation,
+  useUpdateSubscriptionPlanMutation,
+  useDeleteSubscriptionPlanMutation,
   useGetCurrentSubscriptionQuery,
   useGetSubscriptionByCompanyQuery,
   useCreateSubscriptionMutation,

@@ -7,7 +7,7 @@ import {
   ChevronUpIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Checkbox } from './Checkbox';
 
 interface Column<T> {
@@ -115,10 +115,50 @@ export function DataTable<T extends Record<string, any>>({
     const value = getValue(row, column.key as string);
     
     if (column.render) {
-      return column.render(value, row);
+      const rendered = column.render(value, row);
+      // Validate that rendered value is safe for React
+      if (rendered === null || rendered === undefined) {
+        return '';
+      }
+      // Check if it's a valid React element
+      if (React.isValidElement(rendered)) {
+        return rendered;
+      }
+      // Check if it's a primitive or string
+      if (typeof rendered !== 'object' && typeof rendered !== 'function') {
+        return String(rendered);
+      }
+      // If it's an object, stringify it
+      if (typeof rendered === 'object') {
+        try {
+          return JSON.stringify(rendered);
+        } catch {
+          return '[Object]';
+        }
+      }
+      return String(rendered);
+    }
+
+    // Fallback: avoid rendering raw objects/arrays as React children
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    // Check if it's a valid React element
+    if (React.isValidElement(value)) {
+      return value;
+    }
+
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '[Object]';
+      }
     }
     
-    return value;
+    // Ensure we return a string for all primitives
+    return String(value);
   };
 
   if (loading) {

@@ -94,14 +94,32 @@ const authSlice = createSlice({
         const userStr = localStorage.getItem('user');
         const companyContextStr = localStorage.getItem('companyContext');
         
+        // Always restore companyContext if it exists (for login flow)
+        if (companyContextStr) {
+          try {
+            state.companyContext = JSON.parse(companyContextStr);
+          } catch (error) {
+            // Silent error - invalid JSON, just skip restoration
+          }
+        }
+        
+        // Restore user auth if tokens exist
         if (accessToken && refreshToken && userStr) {
           state.accessToken = accessToken;
           state.refreshToken = refreshToken;
           state.user = JSON.parse(userStr);
           state.isAuthenticated = true;
-          
-          if (companyContextStr) {
+        }
+      }
+    },
+    restoreCompanyContext: (state) => {
+      if (typeof window !== 'undefined') {
+        const companyContextStr = localStorage.getItem('companyContext');
+        if (companyContextStr) {
+          try {
             state.companyContext = JSON.parse(companyContextStr);
+          } catch (error) {
+            // Silent error - invalid JSON, just skip restoration
           }
         }
       }
@@ -119,6 +137,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, setCompanyContext, clearCompanyContext, logout, restoreAuth, setUser } = authSlice.actions;
+export const { setCredentials, setCompanyContext, clearCompanyContext, logout, restoreAuth, restoreCompanyContext, setUser } = authSlice.actions;
 export default authSlice.reducer;
 

@@ -26,8 +26,9 @@ import {
 } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useSocket } from '@/lib/hooks/useSocket';
+import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useAppSelector } from '@/lib/store';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -217,6 +218,7 @@ const generateClientId = () => {
 
 export default function POSPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  const formatCurrency = useFormatCurrency(); // Use hook to get reactive currency formatting
   
   // Load from localStorage on mount
   const [orderType, setOrderType] = useState<OrderType>(() => {
@@ -1992,7 +1994,7 @@ export default function POSPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {tablesLoading ? (
                 [...Array(8)].map((_, index) => (
-                  <div key={index} className="h-40 rounded-2xl border border-gray-200 dark:border-slate-900/60 bg-gray-100 dark:bg-slate-900/40 animate-pulse" />
+                  <div key={index} className="h-40 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/40 animate-pulse" />
                 ))
               ) : tables.length > 0 ? (
                 tables.map((table: any) => {
@@ -2098,7 +2100,7 @@ export default function POSPage() {
 
   const renderOrderingWorkspace = () => (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="bg-gray-50 dark:bg-slate-940/80 backdrop-blur border-b border-gray-200 dark:border-slate-900 px-6 py-4">
+      <div className="bg-gray-50 dark:bg-slate-900/80 backdrop-blur border-b border-gray-200 dark:border-slate-800 px-6 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex-1">
             <label className="text-xs font-semibold uppercase text-slate-400 tracking-[0.2em] block mb-2">
@@ -2572,12 +2574,12 @@ export default function POSPage() {
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100">
       {/* Header */}
-      <div className="bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-gray-200 dark:border-slate-900/60 px-6 py-5 shadow-lg">
+      <div className="bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-gray-200 dark:border-slate-800 px-6 py-5 shadow-lg">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">POS System</h1>
-              <Badge className="bg-sky-500/15 text-sky-100 border border-sky-500/30">
+              <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-200 border border-sky-500/30 dark:border-sky-500/50">
               {orderTypeLabel}
             </Badge>
             </div>
@@ -2616,17 +2618,17 @@ export default function POSPage() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-slate-200">
-              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-940/70 px-3 py-1.5 shadow-sm">
+              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/70 px-3 py-1.5 shadow-sm">
                 <ActiveOrderIcon className="h-4 w-4 text-sky-600 dark:text-sky-300" />
-                <span className="font-medium tracking-wide">{orderTypeLabel} mode</span>
+                <span className="font-medium tracking-wide text-gray-900 dark:text-slate-100">{orderTypeLabel} mode</span>
           </div>
-              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-940/70 px-3 py-1.5">
+              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/70 px-3 py-1.5">
                 <ClipboardDocumentListIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
-                <span>{orderSummary.itemCount} item{orderSummary.itemCount === 1 ? '' : 's'} in cart</span>
+                <span className="text-gray-900 dark:text-slate-100">{orderSummary.itemCount} item{orderSummary.itemCount === 1 ? '' : 's'} in cart</span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-940/70 px-3 py-1.5">
+              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/70 px-3 py-1.5">
                 <CurrencyDollarIcon className="h-4 w-4 text-amber-600 dark:text-amber-300" />
-                <span>Total {formatCurrency(orderSummary.total)}</span>
+                <span className="text-gray-900 dark:text-slate-100">Total {formatCurrency(orderSummary.total)}</span>
               </div>
               {requiresDeliveryDetails && (
                 <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 border ${deliveryIsValid ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/40 bg-amber-500/10 text-amber-100'}`}>

@@ -5,8 +5,9 @@
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { usePinLoginMutation } from '@/lib/api/endpoints/authApi';
-import { clearCompanyContext, setCredentials } from '@/lib/slices/authSlice';
+import { clearCompanyContext, restoreCompanyContext, setCompanyContext, setCredentials } from '@/lib/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
+import { getRoleDashboardPath } from '@/utils/getRoleDashboard';
 import { ArrowLeftIcon, BackspaceIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -27,12 +28,52 @@ export default function PinLoginPage() {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [showPin, setShowPin] = useState(false);
   const [pinLogin, { isLoading }] = usePinLoginMutation();
+  const [isCheckingContext, setIsCheckingContext] = useState(true);
 
   useEffect(() => {
-    if (!companyContext) {
-      router.push('/auth/login');
+    const storedContextStr = typeof window !== 'undefined' ? localStorage.getItem('companyContext') : null;
+    
+    if (storedContextStr) {
+      try {
+        const storedContext = JSON.parse(storedContextStr);
+        if (!companyContext) {
+          dispatch(setCompanyContext(storedContext));
+        }
+        setIsCheckingContext(false);
+        return;
+      } catch (error) {
+        // Invalid JSON, continue to fallback
+      }
     }
-  }, [companyContext, router]);
+    
+    if (!companyContext) {
+      dispatch(restoreCompanyContext());
+      
+      const timer = setTimeout(() => {
+        const finalCheck = typeof window !== 'undefined' ? localStorage.getItem('companyContext') : null;
+        if (!finalCheck) {
+          router.replace('/auth/login');
+        }
+        setIsCheckingContext(false);
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setIsCheckingContext(false);
+    }
+  }, [companyContext, dispatch, router]);
+
+  // Prevent redirect during context check
+  if (isCheckingContext || !companyContext) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+          <p className="mt-4 text-white/80">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handlePinInput = (digit: string) => {
     if (pin.length < 6) {
@@ -57,25 +98,45 @@ export default function PinLoginPage() {
       pin,
     };
 
-    console.log('🔐 Attempting PIN login with data:', loginData);
-
     try {
-      const response = await pinLogin(loginData).unwrap();
-      
-      console.log('✅ PIN login successful! Response:', response);
+      const response: any = await pinLogin(loginData).unwrap();
 
+      // Handle response structure: { success, data: { user, tokens: { accessToken, refreshToken } } }
+      // or direct: { user, tokens: { accessToken, refreshToken } }
+      let loggedInUser, accessToken, refreshToken;
+      
+      if (response.data) {
+        // TransformInterceptor wrapped response
+        loggedInUser = response.data.user || response.data;
+        accessToken = response.data.tokens?.accessToken || response.data.accessToken;
+        refreshToken = response.data.tokens?.refreshToken || response.data.refreshToken;
+      } else {
+        // Direct response from service
+        loggedInUser = response.user;
+        accessToken = response.tokens?.accessToken || response.accessToken;
+        refreshToken = response.tokens?.refreshToken || response.refreshToken;
+      }
+
+      if (!accessToken || !refreshToken) {
+        console.error('Missing tokens in response:', response);
+        toast.error('Login failed: Invalid response from server');
+        return;
+      }
+      
       dispatch(
         setCredentials({
-          user: response.data.user,
-          accessToken: response.data.accessToken,
-          refreshToken: response.data.refreshToken,
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
         })
       );
       
       toast.success('Login successful!');
-      router.push('/dashboard');
+      
+      // Redirect to role-specific dashboard
+      const dashboardPath = getRoleDashboardPath(loggedInUser?.role);
+      router.push(dashboardPath);
     } catch (error: any) {
-      console.error('❌ PIN login failed:', error);
       toast.error(error?.data?.message || 'Invalid PIN. Please try again.');
       setPin('');
     }

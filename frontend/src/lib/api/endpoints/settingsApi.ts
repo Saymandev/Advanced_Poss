@@ -64,7 +64,68 @@ export interface CompanySettings {
   updatedAt: string;
 }
 
+export interface SystemSettings {
+  id?: string;
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+  defaultCompanySettings: {
+    currency: string;
+    timezone: string;
+    dateFormat: string;
+    timeFormat: '12h' | '24h';
+    language: string;
+  };
+  security: {
+    minLength: number;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireNumbers: boolean;
+    requireSpecialChars: boolean;
+    maxAttempts: number;
+    lockoutDuration: number;
+  };
+  sessionTimeout: number;
+  rateLimiting: {
+    enabled: boolean;
+    windowMs: number;
+    max: number;
+  };
+  email: {
+    enabled: boolean;
+    provider: 'smtp' | 'sendgrid' | 'ses';
+    fromEmail: string;
+    fromName: string;
+    smtpHost: string;
+    smtpPort: number;
+    smtpUser: string;
+    smtpPassword: string;
+    apiKey: string;
+  };
+  sms: {
+    enabled: boolean;
+    provider: 'twilio' | 'aws-sns';
+    accountSid: string;
+    authToken: string;
+    fromNumber: string;
+    apiKey: string;
+  };
+  backup: {
+    enabled: boolean;
+    frequency: 'daily' | 'weekly' | 'monthly';
+    retentionDays: number;
+    autoCleanup: boolean;
+  };
+  features: {
+    enableNewRegistrations: boolean;
+    requireEmailVerification: boolean;
+    enableTwoFactor: boolean;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const settingsApi = apiSlice.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     // Tax Settings
     getTaxSettings: builder.query<TaxSettings[], string>({
@@ -156,6 +217,13 @@ export const settingsApi = apiSlice.injectEndpoints({
     getCompanySettings: builder.query<CompanySettings, string>({
       query: (companyId) => `/settings/company?companyId=${companyId}`,
       providesTags: ['Settings'],
+      transformResponse: (response: any) => {
+        // Handle backend TransformInterceptor response structure: { success: true, data: {...} }
+        if (response?.data) {
+          return response.data;
+        }
+        return response;
+      },
     }),
     updateCompanySettings: builder.mutation<CompanySettings, { companyId: string; data: Partial<CompanySettings> }>({
       query: ({ companyId, data }) => ({
@@ -164,6 +232,40 @@ export const settingsApi = apiSlice.injectEndpoints({
         body: { companyId, ...data },
       }),
       invalidatesTags: ['Settings'],
+      // Refetch company settings when currency or other settings change
+      onQueryStarted: async (_arg, { dispatch, queryFulfilled }) => {
+        await queryFulfilled;
+        // Force refetch of company settings query
+        dispatch(
+          settingsApi.util.invalidateTags(['Settings'])
+        );
+      },
+    }),
+
+    // System Settings (Super Admin only)
+    getSystemSettings: builder.query<SystemSettings, void>({
+      query: () => '/settings/system',
+      providesTags: ['Settings'],
+      transformResponse: (response: any) => {
+        if (response?.data) {
+          return response.data;
+        }
+        return response;
+      },
+    }),
+    updateSystemSettings: builder.mutation<SystemSettings, Partial<SystemSettings>>({
+      query: (data) => ({
+        url: '/settings/system',
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['Settings'],
+      transformResponse: (response: any) => {
+        if (response?.data) {
+          return response.data;
+        }
+        return response;
+      },
     }),
   }),
 });
@@ -181,4 +283,6 @@ export const {
   useUpdateInvoiceSettingsMutation,
   useGetCompanySettingsQuery,
   useUpdateCompanySettingsMutation,
+  useGetSystemSettingsQuery,
+  useUpdateSystemSettingsMutation,
 } = settingsApi;

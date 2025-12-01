@@ -277,6 +277,8 @@ export const apiSlice = createApi({
     'DeliveryIntegration',
     'PurchaseOrder',
     'Review',
+    'RolePermission',
+    'MyPermissions',
   ],
   endpoints: () => ({}),
 });
