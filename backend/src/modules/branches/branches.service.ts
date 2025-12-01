@@ -49,19 +49,22 @@ export class BranchesService {
       }
     }
 
-    // Check subscription limits for multi-branch feature
-    if (company.subscriptionPlan) {
+    // Check if this is the first branch for the company
+    const existingBranchesCount = await this.branchModel.countDocuments({ companyId: createBranchDto.companyId });
+    const isFirstBranch = existingBranchesCount === 0;
+
+    // Check subscription limits for multi-branch feature (only for additional branches, not the first one)
+    if (!isFirstBranch && company.subscriptionPlan) {
       const plan = await this.subscriptionPlansService.findByName(company.subscriptionPlan);
       if (plan) {
-        // Check if multi-branch is enabled
+        // Check if multi-branch is enabled (skip for first branch)
         if (!plan.features.multiBranch) {
           throw new BadRequestException('Multi-branch feature is not available in your current plan. Please upgrade to create additional branches.');
         }
 
-        // Check branch limit
+        // Check branch limit (already counted existing branches above)
         if (plan.features.maxBranches !== -1) {
-          const existingBranches = await this.branchModel.countDocuments({ companyId: createBranchDto.companyId });
-          if (existingBranches >= plan.features.maxBranches) {
+          if (existingBranchesCount >= plan.features.maxBranches) {
             throw new BadRequestException(
               `You have reached the maximum branch limit (${plan.features.maxBranches}) for your ${plan.displayName} plan. Please upgrade to create more branches.`
             );

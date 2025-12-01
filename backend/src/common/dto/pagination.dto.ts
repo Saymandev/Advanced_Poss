@@ -75,6 +75,11 @@ export class UserFilterDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string; // Search across name, email, phone, employeeId, role
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  includeSuperAdmins?: boolean; // Include super admin users in results
 }
 
 export class CustomerFilterDto extends PaginationDto {

@@ -61,13 +61,17 @@ export class CompanyOwnerRegisterDto {
   branchName: string;
 
   @ApiProperty({
-    description: 'Branch address',
+    description: 'Branch address (can be string or object with street, city, state, country, zipCode)',
     example: '123 Main Street, New York, NY 10001',
   })
   @IsNotEmpty()
-  @IsString()
-  @Length(10, 200)
-  branchAddress: string;
+  branchAddress: string | {
+    street: string;
+    city: string;
+    state?: string;
+    country: string;
+    zipCode?: string;
+  };
 
   @ApiProperty({
     description: 'Subscription package',

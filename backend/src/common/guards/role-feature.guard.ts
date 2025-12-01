@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { RolePermissionsService } from '../../modules/role-permissions/role-permissions.service';
 import { REQUIRES_ROLE_FEATURE } from '../decorators/requires-role-feature.decorator';
+import { isSuperAdmin } from '../utils/query.utils';
 
 @Injectable()
 export class RoleFeatureGuard implements CanActivate {
@@ -24,12 +25,22 @@ export class RoleFeatureGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const user = (request as any).user;
 
-    if (!user || !user.companyId) {
+    if (!user) {
       throw new ForbiddenException('User not authenticated');
     }
 
     if (!user.role) {
       throw new ForbiddenException('User role not found');
+    }
+
+    // Super admin bypasses all feature checks
+    if (isSuperAdmin(user.role)) {
+      return true;
+    }
+
+    // Non-super-admin users need companyId for role permissions
+    if (!user.companyId) {
+      throw new ForbiddenException('User not authenticated with company');
     }
 
     // Get role permissions for the user's role

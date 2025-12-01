@@ -8,6 +8,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model, Schema as MongooseSchema, Types } from 'mongoose';
 // import { WinstonLoggerService } from '../../common/logger/winston.logger';
 import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
+import { Company, CompanyDocument } from '../companies/schemas/company.schema';
 import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
 import { Table, TableDocument } from '../tables/schemas/table.schema';
@@ -57,6 +58,8 @@ export class SubscriptionsService {
     private customerModel: Model<CustomerDocument>,
     @InjectModel(Table.name)
     private tableModel: Model<TableDocument>,
+    @InjectModel(Company.name)
+    private companyModel: Model<CompanyDocument>,
     private stripeService: StripeService,
   ) {}
 
@@ -187,30 +190,82 @@ export class SubscriptionsService {
 
       const price = plan.price;
 
-      // Check if company already has a subscription
+      // Check if company already has a subscription (active or inactive)
       const existingSubscription = await this.subscriptionModel.findOne({
         companyId: createSubscriptionDto.companyId,
-        isActive: true,
       });
 
       if (existingSubscription) {
+        // If subscription exists but is inactive, we can reuse it by updating it
+        if (!existingSubscription.isActive) {
+          // Update existing inactive subscription instead of creating new one
+          existingSubscription.plan = createSubscriptionDto.plan as any;
+          existingSubscription.status = SubscriptionStatus.TRIAL;
+          existingSubscription.billingCycle = createSubscriptionDto.billingCycle as any;
+          existingSubscription.price = price;
+          existingSubscription.currency = plan.currency;
+          existingSubscription.isActive = true;
+          existingSubscription.autoRenew = true;
+          
+          // Use company's trial dates if company is in trial, otherwise calculate new ones
+          const company = await this.companyModel.findById(createSubscriptionDto.companyId).lean().exec();
+          if (company && company.subscriptionStatus === 'trial' && company.trialEndDate) {
+            existingSubscription.trialStartDate = company.subscriptionStartDate || new Date();
+            existingSubscription.trialEndDate = company.trialEndDate;
+            existingSubscription.currentPeriodStart = company.subscriptionStartDate || new Date();
+            existingSubscription.currentPeriodEnd = company.trialEndDate;
+            existingSubscription.nextBillingDate = company.trialEndDate;
+          } else {
+            // Calculate new trial dates
+            const trialStartDate = new Date();
+            const trialEndDate = new Date(trialStartDate.getTime() + (plan.trialPeriod * 60 * 60 * 1000));
+            existingSubscription.trialStartDate = trialStartDate;
+            existingSubscription.trialEndDate = trialEndDate;
+            existingSubscription.currentPeriodStart = trialStartDate;
+            existingSubscription.currentPeriodEnd = trialEndDate;
+            existingSubscription.nextBillingDate = trialEndDate;
+          }
+          
+          existingSubscription.limits = this.buildLimitsFromPlan(plan);
+          existingSubscription.usage = this.getInitialUsage();
+          
+          return await existingSubscription.save();
+        }
+        
         throw new BadRequestException(
           'Company already has an active subscription',
         );
       }
 
-      // Create Stripe customer
-      const stripeCustomer = await this.stripeService.createCustomer({
-        email: createSubscriptionDto.email,
-        name: createSubscriptionDto.companyName,
-        metadata: {
-          companyId: createSubscriptionDto.companyId.toString(),
-        },
-      });
+      // Get company to check if it's in trial period
+      const company = await this.companyModel.findById(createSubscriptionDto.companyId).lean().exec();
+      
+      // Create Stripe customer (check if company already has one)
+      let stripeCustomerId = company?.stripeCustomerId;
+      if (!stripeCustomerId) {
+        const stripeCustomer = await this.stripeService.createCustomer({
+          email: createSubscriptionDto.email,
+          name: createSubscriptionDto.companyName,
+          metadata: {
+            companyId: createSubscriptionDto.companyId.toString(),
+          },
+        });
+        stripeCustomerId = stripeCustomer.id;
+      }
 
-      // Calculate trial dates using millisecond-based calculation for precision
-      const trialStartDate = new Date();
-      const trialEndDate = new Date(trialStartDate.getTime() + (plan.trialPeriod * 60 * 60 * 1000));
+      // Use company's trial dates if company is in trial, otherwise calculate new ones
+      let trialStartDate: Date;
+      let trialEndDate: Date;
+      
+      if (company && company.subscriptionStatus === 'trial' && company.trialEndDate) {
+        // Use existing trial dates from company
+        trialStartDate = company.subscriptionStartDate || new Date();
+        trialEndDate = company.trialEndDate;
+      } else {
+        // Calculate new trial dates
+        trialStartDate = new Date();
+        trialEndDate = new Date(trialStartDate.getTime() + (plan.trialPeriod * 60 * 60 * 1000));
+      }
 
       const subscription = new this.subscriptionModel({
         companyId: createSubscriptionDto.companyId,
@@ -219,7 +274,7 @@ export class SubscriptionsService {
         billingCycle: createSubscriptionDto.billingCycle,
         price,
         currency: plan.currency,
-        stripeCustomerId: stripeCustomer.id,
+        stripeCustomerId: stripeCustomerId,
         trialStartDate,
         trialEndDate,
         currentPeriodStart: trialStartDate,
@@ -257,7 +312,11 @@ export class SubscriptionsService {
     const [subscriptions, total] = await Promise.all([
       this.subscriptionModel
         .find(query)
-        .populate('companyId', 'name email')
+        .populate({
+          path: 'companyId',
+          select: 'name email',
+          model: 'Company',
+        })
         .sort({ createdAt: -1 })
         .limit(limit)
         .skip(offset)
@@ -266,8 +325,21 @@ export class SubscriptionsService {
       this.subscriptionModel.countDocuments(query),
     ]);
 
+    // Transform subscriptions to ensure company data is always accessible
+    const transformedSubscriptions = subscriptions.map((sub: any) => {
+      // If companyId is populated, add it as 'company' field for easier access
+      if (sub.companyId && typeof sub.companyId === 'object' && sub.companyId.name) {
+        sub.company = {
+          id: sub.companyId._id || sub.companyId.id,
+          name: sub.companyId.name,
+          email: sub.companyId.email,
+        };
+      }
+      return sub;
+    });
+
     // @ts-ignore - Mongoose lean type
-    return { subscriptions, total };
+    return { subscriptions: transformedSubscriptions, total };
   }
 
   // Get subscription by ID
@@ -287,11 +359,29 @@ export class SubscriptionsService {
   // Get subscription by company
   async findByCompany(
     companyId: MongooseSchema.Types.ObjectId,
+    includeInactive: boolean = true,
   ): Promise<SubscriptionDocument> {
-    const subscription = await this.subscriptionModel
-      .findOne({ companyId, isActive: true })
+    const query: any = { companyId };
+    // If includeInactive is false, only get active subscriptions
+    if (!includeInactive) {
+      query.isActive = true;
+    }
+    
+    // Try to find active subscription first, then fall back to any subscription
+    let subscription = await this.subscriptionModel
+      .findOne({ ...query, isActive: true })
       .populate('companyId', 'name email')
+      .sort({ createdAt: -1 }) // Get the most recent one
       .exec();
+
+    // If no active subscription found and includeInactive is true, try to find any subscription
+    if (!subscription && includeInactive) {
+      subscription = await this.subscriptionModel
+        .findOne({ companyId })
+        .populate('companyId', 'name email')
+        .sort({ createdAt: -1 }) // Get the most recent one
+        .exec();
+    }
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found for this company');

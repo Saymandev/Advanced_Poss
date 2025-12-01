@@ -19,7 +19,7 @@ import {
 } from './dto/create-service-charge-setting.dto';
 import { CreateTaxSettingDto } from './dto/create-tax-setting.dto';
 import {
-  UpdateCompanySettingsDto,
+  UpdateCompanySettingsRequestDto
 } from './dto/update-company-settings.dto';
 import {
   UpdateInvoiceSettingsRequestDto
@@ -27,7 +27,9 @@ import {
 import {
   UpdateServiceChargeSettingDto,
 } from './dto/update-service-charge-setting.dto';
+import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { UpdateTaxSettingDto } from './dto/update-tax-setting.dto';
+import { LoginSecurityService } from './login-security.service';
 import { SettingsService } from './settings.service';
 
 @ApiTags('Settings')
@@ -35,7 +37,10 @@ import { SettingsService } from './settings.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('settings')
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    private readonly loginSecurityService: LoginSecurityService,
+  ) {}
 
   @Get('company')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
@@ -48,9 +53,9 @@ export class SettingsController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update company level settings' })
   updateCompanySettings(
-    @Body('companyId') companyId: string,
-    @Body() payload: UpdateCompanySettingsDto,
+    @Body() body: UpdateCompanySettingsRequestDto,
   ) {
+    const { companyId, ...payload } = body;
     return this.settingsService.updateCompanySettings(companyId, payload);
   }
 
@@ -131,6 +136,24 @@ export class SettingsController {
   @ApiOperation({ summary: 'Delete service charge setting' })
   deleteServiceCharge(@Param('id') id: string) {
     return this.settingsService.deleteServiceChargeSetting(id);
+  }
+
+  @Get('system')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get system-wide settings (Super Admin only)' })
+  async getSystemSettings() {
+    // This will automatically migrate to BD defaults if needed
+    return this.settingsService.getSystemSettings();
+  }
+
+  @Patch('system')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update system-wide settings (Super Admin only)' })
+  async updateSystemSettings(@Body() payload: UpdateSystemSettingsDto) {
+    const updated = await this.settingsService.updateSystemSettings(payload);
+    // Clear cache in LoginSecurityService to pick up new settings immediately
+    this.loginSecurityService.clearCache();
+    return updated;
   }
 }
 

@@ -1,12 +1,16 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
+import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
+import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
+import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { Company, CompanyDocument } from './schemas/company.schema';
@@ -15,6 +19,10 @@ import { Company, CompanyDocument } from './schemas/company.schema';
 export class CompaniesService {
   constructor(
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
+    @InjectModel(Branch.name) private branchModel: Model<BranchDocument>,
+    @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
   ) {}
 
@@ -66,7 +74,15 @@ export class CompaniesService {
   }
 
   async findAll(filter: any = {}): Promise<Company[]> {
-    return this.companyModel.find(filter).populate('ownerId', 'firstName lastName email').exec();
+    // NOTE:
+    // Super admin listing & system dashboards don't strictly need populated owner data,
+    // and older records may contain invalid / empty ownerId values which can cause
+    // Mongoose to throw "Cast to ObjectId failed" errors when populating the User model.
+    //
+    // To make this endpoint robust (and avoid 500s on `/companies` for super admin),
+    // we return plain companies here without populate. If/when owner details are needed
+    // in specific views, those endpoints can perform a safer populate with validation.
+    return this.companyModel.find(filter).lean().exec();
   }
 
   async findOne(id: string): Promise<Company> {
@@ -201,21 +217,139 @@ export class CompaniesService {
   }
 
   async getStats(id: string): Promise<any> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid company ID');
+    // In some dashboard contexts (especially super-admin views), the frontend
+    // may call this endpoint with an empty or placeholder ID when there is no
+    // specific company selected yet. Instead of throwing a 400 error that can
+    // break the UI, gracefully return default stats.
+    if (!id || !Types.ObjectId.isValid(id)) {
+      return {
+        company: null,
+        stats: {
+          totalBranches: 0,
+          totalUsers: 0,
+          totalCustomers: 0,
+          totalOrders: 0,
+          totalRevenue: 0,
+        },
+      };
     }
 
+    const companyId = new Types.ObjectId(id);
+
+    // Fetch company details
     const company = await this.findOne(id);
 
-    // TODO: Aggregate stats from branches, orders, etc.
+    // Get all branch IDs for this company first
+    // Try both ObjectId and string formats for compatibility
+    const [branchesWithObjectId, branchesWithString] = await Promise.all([
+      this.branchModel.find({ companyId }).select('_id').lean().exec(),
+      this.branchModel.find({ companyId: id }).select('_id').lean().exec(),
+    ]);
+    
+    // Combine and deduplicate branches
+    const allBranchIds = new Set<string>();
+    [...branchesWithObjectId, ...branchesWithString].forEach((b: any) => {
+      const branchId = b._id?.toString() || b._id;
+      if (branchId) allBranchIds.add(branchId.toString());
+    });
+    
+    const branchIds = Array.from(allBranchIds).map(branchIdStr => new Types.ObjectId(branchIdStr));
+    const totalBranchesCount = allBranchIds.size;
+
+    // Aggregate related stats in parallel for performance
+    const [totalBranches, totalUsers, totalCustomers, ordersAgg] = await Promise.all([
+      // Count branches
+      Promise.resolve(totalBranchesCount),
+      // Count users (employees/staff) - try both ObjectId and string formats for compatibility
+      Promise.all([
+        this.userModel.countDocuments({ companyId }).exec(),
+        this.userModel.countDocuments({ companyId: id }).exec(),
+      ]).then(([count1, count2]) => Math.max(count1, count2)),
+      // Count customers - try both ObjectId and string formats for compatibility
+      Promise.all([
+        this.customerModel.countDocuments({ companyId }).exec(),
+        this.customerModel.countDocuments({ companyId: id }).exec(),
+      ]).then(([count1, count2]) => Math.max(count1, count2)),
+      // Aggregate orders from all branches - POS orders only have branchId, not companyId
+      branchIds.length > 0
+        ? this.posOrderModel
+            .aggregate([
+              {
+                $match: {
+                  branchId: { $in: branchIds },
+                },
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalOrders: { $sum: 1 },
+                  totalRevenue: {
+                    $sum: {
+                      $cond: [
+                        { $in: ['$status', ['paid', 'completed']] },
+                        { $ifNull: ['$totalAmount', 0] },
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+            ])
+            .exec()
+        : Promise.resolve([]),
+    ]);
+
+    const ordersStats =
+      ordersAgg && Array.isArray(ordersAgg) && ordersAgg.length > 0
+        ? {
+            totalOrders: ordersAgg[0].totalOrders || 0,
+            totalRevenue: ordersAgg[0].totalRevenue || 0,
+          }
+        : { totalOrders: 0, totalRevenue: 0 };
+
     return {
       company,
       stats: {
-        totalBranches: 0,
-        totalUsers: 0,
-        totalOrders: 0,
-        totalRevenue: 0,
+        totalBranches,
+        totalUsers, // Employees/Staff count
+        totalCustomers, // Customers count
+        totalOrders: ordersStats.totalOrders,
+        totalRevenue: ordersStats.totalRevenue,
       },
+    };
+  }
+
+  async getSystemStats(): Promise<any> {
+    const [
+      totalCompanies,
+      activeCompanies,
+      trialCompanies,
+      expiredCompanies,
+      companiesByPlan,
+    ] = await Promise.all([
+      this.companyModel.countDocuments().exec(),
+      this.companyModel.countDocuments({ subscriptionStatus: 'active' }).exec(),
+      this.companyModel.countDocuments({ subscriptionStatus: 'trial' }).exec(),
+      this.companyModel.countDocuments({ subscriptionStatus: 'expired' }).exec(),
+      this.companyModel.aggregate([
+        {
+          $group: {
+            _id: '$subscriptionPlan',
+            count: { $sum: 1 },
+          },
+        },
+      ]).exec(),
+    ]);
+
+    return {
+      totalCompanies,
+      activeCompanies,
+      trialCompanies,
+      expiredCompanies,
+      companiesByPlan: companiesByPlan.reduce((acc: any, item: any) => {
+        acc[item._id || 'none'] = item.count;
+        return acc;
+      }, {}),
     };
   }
 }

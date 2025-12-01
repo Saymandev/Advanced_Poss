@@ -45,6 +45,22 @@ export class UsersController {
     return this.usersService.findAll(filterDto);
   }
 
+  @Get('system/all')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get all users across all companies (Super Admin only)' })
+  findAllSystemWide(@Query() filterDto: UserFilterDto) {
+    // For super admin: bypass company/branch filters and include super admins
+    const systemFilter = {
+      ...filterDto,
+      includeSuperAdmins: true,
+      // Remove branchId and companyId filters for system-wide access
+    };
+    // Explicitly remove branchId/companyId from filters
+    delete (systemFilter as any).branchId;
+    delete (systemFilter as any).companyId;
+    return this.usersService.findAll(systemFilter);
+  }
+
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
   getProfile(@CurrentUser('id') userId: string) {

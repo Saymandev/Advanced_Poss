@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
+import { Company, CompanySchema } from '../companies/schemas/company.schema';
 import {
   Customer,
   CustomerSchema,
@@ -31,6 +32,7 @@ import { SubscriptionsService } from './subscriptions.service';
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: BillingHistory.name, schema: BillingHistorySchema },
+      { name: Company.name, schema: CompanySchema },
       { name: Branch.name, schema: BranchSchema },
       { name: User.name, schema: UserSchema },
       { name: MenuItem.name, schema: MenuItemSchema },

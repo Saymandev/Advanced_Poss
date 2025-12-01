@@ -48,8 +48,19 @@ export class PaymentsController {
     @Req() req: Request,
   ) {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const successUrl = createCheckoutSessionDto.successUrl || `${baseUrl}/payment/success`;
-    const cancelUrl = createCheckoutSessionDto.cancelUrl || `${baseUrl}/payment/cancel`;
+    
+    // Validate and construct URLs - ensure they're valid URLs or use defaults
+    let successUrl = createCheckoutSessionDto.successUrl;
+    let cancelUrl = createCheckoutSessionDto.cancelUrl;
+    
+    // Validate URLs are properly formatted, fallback to defaults if invalid
+    if (!successUrl || (!successUrl.startsWith('http://') && !successUrl.startsWith('https://'))) {
+      successUrl = `${baseUrl}/payment/success`;
+    }
+    
+    if (!cancelUrl || (!cancelUrl.startsWith('http://') && !cancelUrl.startsWith('https://'))) {
+      cancelUrl = `${baseUrl}/payment/cancel`;
+    }
 
     return this.paymentsService.createCheckoutSession(
       createCheckoutSessionDto.companyId,

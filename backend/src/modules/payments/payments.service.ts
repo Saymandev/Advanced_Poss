@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
+import { Subscription, SubscriptionDocument, SubscriptionStatus, BillingCycle } from '../subscriptions/schemas/subscription.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class PaymentsService {
   constructor(
     private configService: ConfigService,
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
+    @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
   ) {
     this.stripe = new Stripe(this.configService.get('stripe.secretKey'), {
@@ -256,18 +258,138 @@ export class PaymentsService {
     // Add 30 days for monthly subscription (more accurate than setMonth)
     const subscriptionEndDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
 
-    // Update company subscription
-    await this.companyModel.findByIdAndUpdate(companyId, {
-      subscriptionPlan: planName,
-      subscriptionStatus: 'active',
-      subscriptionStartDate: now,
-      subscriptionEndDate: subscriptionEndDate,
-      trialEndDate: null,
-      settings: {
-        ...company.settings,
-        features: plan.features,
+    // Update company subscription - use $unset to completely remove trialEndDate field
+    // First, update the fields we want to set
+    await this.companyModel.findByIdAndUpdate(
+      companyId,
+      {
+        $set: {
+          subscriptionPlan: planName,
+          subscriptionStatus: 'active',
+          subscriptionStartDate: now,
+          subscriptionEndDate: subscriptionEndDate,
+          settings: {
+            ...company.settings,
+            features: plan.features,
+          },
+        },
+        $unset: {
+          trialEndDate: '', // Explicitly remove trialEndDate field completely
+        },
       },
+    );
+    
+    // Verify the update by fetching the company again
+    const updatedCompany = await this.companyModel.findById(companyId).lean().exec();
+    console.log(`✅ Company ${companyId} updated after payment:`, {
+      subscriptionStatus: updatedCompany?.subscriptionStatus,
+      subscriptionPlan: updatedCompany?.subscriptionPlan,
+      trialEndDate: updatedCompany?.trialEndDate,
+      hasTrialEndDate: updatedCompany?.trialEndDate !== null && updatedCompany?.trialEndDate !== undefined,
+      subscriptionEndDate: updatedCompany?.subscriptionEndDate,
+      allKeys: updatedCompany ? Object.keys(updatedCompany) : [],
     });
+
+    // Find or create subscription record
+    const companyObjectId = new Types.ObjectId(companyId);
+    let subscription = await this.subscriptionModel.findOne({
+      companyId: companyObjectId,
+    }).exec();
+
+    if (subscription) {
+      // Update existing subscription
+      subscription.status = SubscriptionStatus.ACTIVE;
+      subscription.plan = planName as any;
+      subscription.price = plan.price;
+      subscription.currency = plan.currency || 'BDT';
+      subscription.billingCycle = (plan.billingCycle || 'monthly') as BillingCycle;
+      subscription.trialEndDate = null;
+      subscription.currentPeriodStart = now;
+      subscription.currentPeriodEnd = subscriptionEndDate;
+      subscription.nextBillingDate = subscriptionEndDate;
+      subscription.lastPaymentDate = now;
+      subscription.failedPaymentAttempts = 0;
+      subscription.isActive = true;
+      subscription.stripeCustomerId = session.customer as string;
+      subscription.stripeSubscriptionId = session.subscription as string || undefined;
+      subscription.stripePriceId = plan.stripePriceId || undefined;
+      
+      // Build limits from plan (using same logic as SubscriptionsService)
+      const maxBranches = plan.limits?.maxBranches ?? plan.features?.maxBranches ?? -1;
+      const maxUsers = plan.limits?.maxUsers ?? plan.features?.maxUsers ?? -1;
+      const derive = (value: number, multiplier: number) => value > 0 ? value * multiplier : -1;
+      
+      subscription.limits = {
+        maxBranches,
+        maxUsers,
+        maxMenuItems: plan.limits?.maxMenuItems ?? derive(maxUsers, 10),
+        maxOrders: plan.limits?.maxOrders ?? derive(maxUsers, 50),
+        maxTables: plan.limits?.maxTables ?? derive(maxBranches, 10),
+        maxCustomers: plan.limits?.maxCustomers ?? derive(maxUsers, 100),
+        aiInsightsEnabled: plan.features?.aiInsights ?? false,
+        advancedReportsEnabled: plan.features?.accounting ?? false,
+        multiLocationEnabled: plan.features?.multiBranch ?? false,
+        apiAccessEnabled: plan.features?.crm ?? false,
+        whitelabelEnabled: plan.limits?.whitelabelEnabled ?? false,
+        customDomainEnabled: plan.limits?.customDomainEnabled ?? false,
+        prioritySupportEnabled: plan.limits?.prioritySupportEnabled ?? plan.features?.aiInsights ?? false,
+        storageGB: plan.limits?.storageGB ?? 0,
+      } as any;
+      
+      await subscription.save();
+    } else {
+      // Create new subscription record
+      const maxBranches = plan.limits?.maxBranches ?? plan.features?.maxBranches ?? -1;
+      const maxUsers = plan.limits?.maxUsers ?? plan.features?.maxUsers ?? -1;
+      const derive = (value: number, multiplier: number) => value > 0 ? value * multiplier : -1;
+      
+      subscription = new this.subscriptionModel({
+        companyId: companyObjectId,
+        plan: planName as any,
+        status: SubscriptionStatus.ACTIVE,
+        billingCycle: (plan.billingCycle || 'monthly') as BillingCycle,
+        price: plan.price,
+        currency: plan.currency || 'BDT',
+        stripeCustomerId: session.customer as string,
+        stripeSubscriptionId: session.subscription as string || undefined,
+        stripePriceId: plan.stripePriceId || undefined,
+        currentPeriodStart: now,
+        currentPeriodEnd: subscriptionEndDate,
+        nextBillingDate: subscriptionEndDate,
+        lastPaymentDate: now,
+        trialEndDate: null,
+        limits: {
+          maxBranches,
+          maxUsers,
+          maxMenuItems: plan.limits?.maxMenuItems ?? derive(maxUsers, 10),
+          maxOrders: plan.limits?.maxOrders ?? derive(maxUsers, 50),
+          maxTables: plan.limits?.maxTables ?? derive(maxBranches, 10),
+          maxCustomers: plan.limits?.maxCustomers ?? derive(maxUsers, 100),
+          aiInsightsEnabled: plan.features?.aiInsights ?? false,
+          advancedReportsEnabled: plan.features?.accounting ?? false,
+          multiLocationEnabled: plan.features?.multiBranch ?? false,
+          apiAccessEnabled: plan.features?.crm ?? false,
+          whitelabelEnabled: plan.limits?.whitelabelEnabled ?? false,
+          customDomainEnabled: plan.limits?.customDomainEnabled ?? false,
+          prioritySupportEnabled: plan.limits?.prioritySupportEnabled ?? plan.features?.aiInsights ?? false,
+          storageGB: plan.limits?.storageGB ?? 0,
+        } as any,
+        usage: {
+          currentBranches: 0,
+          currentUsers: 0,
+          currentMenuItems: 0,
+          currentOrders: 0,
+          currentTables: 0,
+          currentCustomers: 0,
+          storageUsed: 0,
+          lastUpdated: new Date(),
+        },
+        autoRenew: true,
+        isActive: true,
+      });
+      
+      await subscription.save();
+    }
 
     console.log(`Subscription activated for company ${companyId} with plan ${planName}`);
   }

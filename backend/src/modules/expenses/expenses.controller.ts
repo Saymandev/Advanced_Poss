@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
 import { ExpenseFilterDto } from '../../common/dto/pagination.dto';
@@ -38,8 +39,11 @@ export class ExpensesController {
   @Get()
   @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Get all expenses with pagination, filtering, and search' })
-  findAll(@Query() filterDto: ExpenseFilterDto) {
-    return this.expensesService.findAll(filterDto);
+  findAll(
+    @Query() filterDto: ExpenseFilterDto,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    return this.expensesService.findAll(filterDto, userRole);
   }
 
   @Get('branch/:branchId')

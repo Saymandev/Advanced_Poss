@@ -1,8 +1,8 @@
 import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
@@ -10,10 +10,12 @@ import { Model, Types } from 'mongoose';
 import { UserFilterDto } from '../../common/dto/pagination.dto';
 import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { GeneratorUtil } from '../../common/utils/generator.util';
+import { PasswordValidator } from '../../common/utils/password-validator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
 import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
 import { CompaniesService } from '../companies/companies.service';
+import { LoginSecurityService } from '../settings/login-security.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -29,9 +31,10 @@ export class UsersService {
     private subscriptionPlansService: SubscriptionPlansService,
     private cloudinaryService: CloudinaryService,
     private configService: ConfigService,
+    private loginSecurityService: LoginSecurityService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto, skipPasswordValidation: boolean = false): Promise<User> {
     // Check if user already exists
     const existingUser = await this.userModel.findOne({
       email: createUserDto.email,
@@ -55,6 +58,12 @@ export class UsersService {
           }
         }
       }
+    }
+
+    // Validate password against system security settings (skip for temporary passwords during registration)
+    if (createUserDto.password && !skipPasswordValidation) {
+      const securitySettings = await this.loginSecurityService.getPasswordSecuritySettings();
+      PasswordValidator.validateOrThrow(createUserDto.password, securitySettings);
     }
 
     // Hash password
@@ -475,9 +484,10 @@ export class UsersService {
     const attempts = (user.loginAttempts || 0) + 1;
     const updates: any = { loginAttempts: attempts };
 
-    // Lock account after 5 failed attempts for 15 minutes
-    if (attempts >= 5) {
-      updates.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+    // Use system settings for lockout
+    const { shouldLock, lockUntil } = await this.loginSecurityService.shouldLockAccount(attempts);
+    if (shouldLock && lockUntil) {
+      updates.lockUntil = lockUntil;
     }
 
     await this.userModel.findByIdAndUpdate(userId, updates);

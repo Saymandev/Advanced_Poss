@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bull';
 import { CacheModule } from '@nestjs/cache-manager';
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
@@ -38,6 +38,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { RolePermissionsModule } from './modules/role-permissions/role-permissions.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
+import { SystemSettings, SystemSettingsSchema } from './modules/settings/schemas/system-settings.schema';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -50,6 +51,7 @@ import { WorkPeriodsModule } from './modules/work-periods/work-periods.module';
 // Common
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
 
 @Module({
   imports: [
@@ -111,6 +113,11 @@ import { AppService } from './app.service';
     // Schedule (Cron jobs)
     NestScheduleModule.forRoot(),
 
+    // System Settings Schema (for maintenance middleware)
+    MongooseModule.forFeature([
+      { name: SystemSettings.name, schema: SystemSettingsSchema },
+    ]),
+
     // Feature Modules
     AuthModule,
     PublicModule,
@@ -151,5 +158,12 @@ import { AppService } from './app.service';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply maintenance mode middleware globally (runs before other middleware)
+    consumer
+      .apply(MaintenanceMiddleware)
+      .forRoutes('*');
+  }
+}
 

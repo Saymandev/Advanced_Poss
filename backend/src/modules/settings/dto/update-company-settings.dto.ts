@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsMongoId, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class UpdateCompanySettingsDto {
   @ApiPropertyOptional({ example: 'USD' })
@@ -56,5 +56,11 @@ export class UpdateCompanySettingsDto {
     reports?: boolean;
     analytics?: boolean;
   };
+}
+
+export class UpdateCompanySettingsRequestDto extends UpdateCompanySettingsDto {
+  @IsMongoId()
+  @IsNotEmpty()
+  companyId: string;
 }
 

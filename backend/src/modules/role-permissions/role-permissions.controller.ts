@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Patch,
   UseGuards,
 } from '@nestjs/common';
@@ -59,6 +60,28 @@ export class RolePermissionsController {
     if (!companyId) {
       throw new Error('Company ID is required');
     }
+    return this.rolePermissionsService.updateRolePermission(
+      companyId,
+      updateDto,
+      userId,
+    );
+  }
+
+  @Get('system/company/:companyId')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get role permissions for any company (Super Admin only)' })
+  getCompanyRolePermissions(@Param('companyId') companyId: string) {
+    return this.rolePermissionsService.getRolePermissions(companyId);
+  }
+
+  @Patch('system/company/:companyId')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update role permissions for any company (Super Admin only)' })
+  updateCompanyRolePermission(
+    @Param('companyId') companyId: string,
+    @CurrentUser('id') userId: string,
+    @Body() updateDto: UpdateRolePermissionDto,
+  ) {
     return this.rolePermissionsService.updateRolePermission(
       companyId,
       updateDto,

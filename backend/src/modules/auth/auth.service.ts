@@ -1,8 +1,8 @@
 import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
+    BadRequestException,
+    Injectable,
+    Logger,
+    UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -14,6 +14,7 @@ import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
 import { LoginActivityService } from '../login-activity/login-activity.service';
 import { LoginMethod, LoginStatus } from '../login-activity/schemas/login-activity.schema';
+import { LoginSecurityService } from '../settings/login-security.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { UsersService } from '../users/users.service';
 import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
@@ -33,6 +34,7 @@ export class AuthService {
     private branchesService: BranchesService,
     private subscriptionPlansService: SubscriptionPlansService,
     private loginActivityService: LoginActivityService,
+    private loginSecurityService: LoginSecurityService,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
@@ -185,13 +187,33 @@ export class AuthService {
     for (const user of users) {
       const userWithPin = await this.usersService.findByEmail(user.email);
       
-      if (userWithPin?.pin) {
+      if (!userWithPin) continue;
+
+      // Check if account is locked BEFORE attempting PIN validation
+      if (userWithPin.lockUntil && userWithPin.lockUntil > new Date()) {
+        const remainingTime = Math.ceil(
+          (userWithPin.lockUntil.getTime() - Date.now()) / 60000,
+        );
+        throw new UnauthorizedException(
+          `Account is locked. Try again in ${remainingTime} minutes`,
+        );
+      }
+
+      // Check if user is active
+      if (!userWithPin.isActive) {
+        continue; // Skip inactive users, try next user
+      }
+      
+      if (userWithPin.pin) {
         const isPinValid = await PasswordUtil.compare(pin, userWithPin.pin);
         
         if (isPinValid) {
+          // Reset login attempts on successful login
+          await this.usersService.updateLastLogin((user as any)._id?.toString() || (user as any).id, '0.0.0.0');
+
           const tokens = await this.generateTokens(user);
           // @ts-ignore - Mongoose virtual property
-          await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
+          await this.usersService.updateRefreshToken((user as any)._id?.toString() || (user as any).id, tokens.refreshToken);
 
           return {
             user: {
@@ -206,6 +228,9 @@ export class AuthService {
             },
             tokens,
           };
+        } else {
+          // Invalid PIN - increment login attempts for this user
+          await this.usersService.incrementLoginAttempts((user as any)._id?.toString() || (user as any).id);
         }
       }
     }
@@ -229,46 +254,51 @@ export class AuthService {
     for (const user of usersWithRole) {
       const userWithPin = await this.usersService.findByEmail(user.email);
       
-      if (userWithPin?.pin) {
-        const isPinValid = await PasswordUtil.compare(pin, userWithPin.pin);
-        
-        if (isPinValid) {
-          // Check if account is locked
-          if (userWithPin.lockUntil && userWithPin.lockUntil > new Date()) {
-            const remainingTime = Math.ceil(
-              (userWithPin.lockUntil.getTime() - Date.now()) / 60000,
-            );
-            throw new UnauthorizedException(
-              `Account is locked. Try again in ${remainingTime} minutes`,
-            );
-          }
+      if (!userWithPin?.pin) {
+        continue;
+      }
 
-          // Check if user is active
-          if (!userWithPin.isActive) {
-            throw new UnauthorizedException('Account is deactivated');
-          }
+      // Check if account is locked BEFORE attempting PIN validation
+      if (userWithPin.lockUntil && userWithPin.lockUntil > new Date()) {
+        const remainingTime = Math.ceil(
+          (userWithPin.lockUntil.getTime() - Date.now()) / 60000,
+        );
+        throw new UnauthorizedException(
+          `Account is locked. Try again in ${remainingTime} minutes`,
+        );
+      }
 
-          // Reset login attempts on successful login
-          await this.usersService.updateLastLogin(userWithPin.id, '0.0.0.0');
+      // Check if user is active
+      if (!userWithPin.isActive) {
+        throw new UnauthorizedException('Account is deactivated');
+      }
 
-          const tokens = await this.generateTokens(userWithPin);
-          // @ts-ignore - Mongoose virtual property
-          await this.usersService.updateRefreshToken(userWithPin.id, tokens.refreshToken);
+      const isPinValid = await PasswordUtil.compare(pin, userWithPin.pin);
+      
+      if (isPinValid) {
+        // Reset login attempts on successful login
+        await this.usersService.updateLastLogin((userWithPin as any)._id?.toString() || (userWithPin as any).id, '0.0.0.0');
 
-          return {
-            user: {
-              // @ts-ignore - Mongoose virtual property
-              id: userWithPin.id,
-              email: userWithPin.email,
-              firstName: userWithPin.firstName,
-              lastName: userWithPin.lastName,
-              role: userWithPin.role,
-              companyId: userWithPin.companyId,
-              branchId: userWithPin.branchId,
-            },
-            tokens,
-          };
-        }
+        const tokens = await this.generateTokens(userWithPin);
+        // @ts-ignore - Mongoose virtual property
+        await this.usersService.updateRefreshToken((userWithPin as any)._id?.toString() || (userWithPin as any).id, tokens.refreshToken);
+
+        return {
+          user: {
+            // @ts-ignore - Mongoose virtual property
+            id: userWithPin.id,
+            email: userWithPin.email,
+            firstName: userWithPin.firstName,
+            lastName: userWithPin.lastName,
+            role: userWithPin.role,
+            companyId: userWithPin.companyId,
+            branchId: userWithPin.branchId,
+          },
+          tokens,
+        };
+      } else {
+        // Invalid PIN - increment login attempts
+        await this.usersService.incrementLoginAttempts((userWithPin as any)._id?.toString() || (userWithPin as any).id);
       }
     }
 
@@ -332,19 +362,27 @@ export class AuthService {
 
     // Handle branchAddress - frontend sends as object: { street, city, state, country, zipCode }
     let streetAddress = '';
-    let cityAddress = 'Unknown';
-    let stateAddress = 'Unknown';
-    let zipCodeAddress = '00000';
+    let cityAddress = '';
+    let stateAddress = '';
+    let zipCodeAddress = '';
     
     if (typeof branchAddress === 'object' && branchAddress !== null) {
       // Frontend is sending object format: { street, city, state, country, zipCode }
-      streetAddress = (branchAddress as any).street || '';
-      cityAddress = (branchAddress as any).city || 'Unknown';
-      stateAddress = (branchAddress as any).state || 'Unknown';
-      zipCodeAddress = (branchAddress as any).zipCode || '00000';
+      streetAddress = (branchAddress as any).street?.trim() || '';
+      cityAddress = (branchAddress as any).city?.trim() || '';
+      stateAddress = (branchAddress as any).state?.trim() || '';
+      zipCodeAddress = (branchAddress as any).zipCode?.trim() || '';
+      
+      // Only use defaults if values are truly missing (not just empty strings from form)
+      if (!cityAddress) cityAddress = 'Unknown';
+      if (!stateAddress) stateAddress = 'Unknown';
+      if (!zipCodeAddress) zipCodeAddress = '00000';
     } else if (typeof branchAddress === 'string') {
       // Legacy format: just a string
-      streetAddress = branchAddress;
+      streetAddress = branchAddress.trim();
+      cityAddress = 'Unknown';
+      stateAddress = 'Unknown';
+      zipCodeAddress = '00000';
     }
 
     // Create company first (without ownerId initially)
@@ -375,24 +413,24 @@ export class AuthService {
       },
     });
 
-    // Hash the PIN
-    const hashedPin = await PasswordUtil.hash(pin);
-    
-    // Generate a temporary password (user will change it later)
-    const tempPassword = GeneratorUtil.generateToken();
+    // Generate a temporary password that meets security requirements (user will change it later)
+    // Using PasswordUtil.generate() ensures it meets all password complexity requirements
+    const tempPassword = PasswordUtil.generate(16);
 
     // Create the owner user
+    // Skip password validation for temporary password during registration (user logs in with PIN)
+    // Note: PIN will be hashed by users.service.ts - pass plain PIN here
     const user = await this.usersService.create({
       firstName,
       lastName,
       email: companyEmail,
       phone: phoneNumber,
       password: tempPassword,
-      pin: hashedPin,
+      pin: pin, // Pass plain PIN - users.service will hash it
       role: UserRole.OWNER,
       companyId: (company as any)._id.toString(),
       branchId: (branch as any)._id.toString(),
-    });
+    }, true); // skipPasswordValidation = true for registration
 
     // Update company with owner ID
     await this.companiesService.update((company as any)._id.toString(), { 
@@ -1072,12 +1110,26 @@ export class AuthService {
     this.logger.log(`🔍 Comparing PIN... (User PIN hash exists: ${!!userWithPin.pin}, PIN length: ${cleanPin.length}, PIN value: "${cleanPin}")`);
     const isPinValid = await PasswordUtil.compare(cleanPin, userWithPin.pin);
     this.logger.log(`🔍 PIN comparison result: ${isPinValid}`);
+    // Check if account is locked BEFORE attempting PIN validation
+    if (userWithPin.lockUntil && userWithPin.lockUntil > new Date()) {
+      const remainingTime = Math.ceil(
+        (userWithPin.lockUntil.getTime() - Date.now()) / 60000,
+      );
+      throw new UnauthorizedException(
+        `Account is locked. Try again in ${remainingTime} minutes`,
+      );
+    }
+
     if (!isPinValid) {
       // Debug: Try comparing with original pin (in case of encoding issues)
       this.logger.log(`🔍 Retrying PIN comparison with original value...`);
       const retryResult = await PasswordUtil.compare(pin, userWithPin.pin);
       this.logger.log(`🔍 Retry PIN comparison result: ${retryResult}`);
       this.logger.error(`❌ Invalid PIN for user: ${user.email} (Role: ${user.role})`);
+      
+      // Increment login attempts - this will lock the account if max attempts reached
+      await this.usersService.incrementLoginAttempts(user._id.toString());
+      
       // Log failed login attempt
       await this.logLoginActivity({
         userId: user._id.toString(),

@@ -6,6 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ExpenseFilterDto } from '../../common/dto/pagination.dto';
+import { isSuperAdmin } from '../../common/utils/query.utils';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { Expense, ExpenseDocument } from './schemas/expense.schema';
@@ -50,7 +51,7 @@ export class ExpensesService {
     return expense.save();
   }
 
-  async findAll(filterDto: ExpenseFilterDto): Promise<{ expenses: Expense[], total: number, page: number, limit: number }> {
+  async findAll(filterDto: ExpenseFilterDto, userRole?: string): Promise<{ expenses: Expense[], total: number, page: number, limit: number }> {
     const { 
       page = 1, 
       limit = 20, 
@@ -68,17 +69,33 @@ export class ExpensesService {
     const skip = (page - 1) * limit;
     const query: any = {};
 
-    // Convert string IDs to ObjectIds
-    if (companyId) {
+    // Apply company filter based on user role
+    // Super admin can query all companies if no companyId provided
+    if (isSuperAdmin(userRole)) {
+      // Only filter by companyId if explicitly provided
+      if (companyId) {
+        query.companyId = typeof companyId === 'string' 
+          ? new Types.ObjectId(companyId) 
+          : companyId;
+      }
+    } else {
+      // Non-super-admin users must filter by companyId
+      if (!companyId) {
+        throw new BadRequestException('Company ID is required');
+      }
       query.companyId = typeof companyId === 'string' 
         ? new Types.ObjectId(companyId) 
         : companyId;
     }
 
+    // Apply branch filter (super admin can query all branches if no branchId provided)
     if (branchId) {
       query.branchId = typeof branchId === 'string' 
         ? new Types.ObjectId(branchId) 
         : branchId;
+    } else if (!isSuperAdmin(userRole)) {
+      // Non-super-admin users typically need branchId, but we'll allow it to be optional for now
+      // You can add validation here if needed
     }
 
     if (category) {

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreatePaymentIntentDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
@@ -26,12 +26,12 @@ export class CreateCheckoutSessionDto {
 
   @ApiProperty({ example: 'https://yourapp.com/payment/success', required: false })
   @IsOptional()
-  @IsUrl()
+  @IsString()
   successUrl?: string;
 
   @ApiProperty({ example: 'https://yourapp.com/payment/cancel', required: false })
   @IsOptional()
-  @IsUrl()
+  @IsString()
   cancelUrl?: string;
 }
 
