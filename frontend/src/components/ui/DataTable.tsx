@@ -71,6 +71,9 @@ export function DataTable<T extends Record<string, any>>({
   rowClassName,
   onRowClick,
 }: DataTableProps<T>) {
+  // Ensure data is always an array
+  const safeData = Array.isArray(data) ? data : [];
+  
   const [sortKey, setSortKey] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,8 +107,8 @@ export function DataTable<T extends Record<string, any>>({
     }
   };
 
-  const isAllSelected = selectable && selectedItems.length === data.length && data.length > 0;
-  const isIndeterminate = selectable && selectedItems.length > 0 && selectedItems.length < data.length;
+  const isAllSelected = selectable && selectedItems.length === safeData.length && safeData.length > 0;
+  const isIndeterminate = selectable && selectedItems.length > 0 && selectedItems.length < safeData.length;
 
   const getValue = (row: T, key: string) => {
     return key.split('.').reduce((obj, k) => obj?.[k], row);
@@ -198,10 +201,10 @@ export function DataTable<T extends Record<string, any>>({
         {exportable && (
           <div className="w-full sm:w-auto flex justify-end">
             <ExportButton
-              data={selectedItems.length > 0 ? selectedItems : data}
+              data={selectedItems.length > 0 ? selectedItems : safeData}
               filename={exportFilename}
               formats={exportFormats}
-              onExport={(format) => onExport?.(format, selectedItems.length > 0 ? selectedItems : data)}
+              onExport={(format) => onExport?.(format, selectedItems.length > 0 ? selectedItems : safeData)}
             />
           </div>
         )}
@@ -249,7 +252,7 @@ export function DataTable<T extends Record<string, any>>({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {data.length === 0 ? (
+              {safeData.length === 0 ? (
                 <tr>
                   <td
                     colSpan={columns.length + (selectable ? 1 : 0)}
@@ -262,7 +265,7 @@ export function DataTable<T extends Record<string, any>>({
                   </td>
                 </tr>
               ) : (
-                data.map((row, index) => (
+                safeData.map((row, index) => (
                   <tr
                     key={index}
                     className={cn(

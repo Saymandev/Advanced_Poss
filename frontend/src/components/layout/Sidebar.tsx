@@ -17,6 +17,7 @@ import {
   CurrencyDollarIcon,
   GiftIcon,
   HomeIcon,
+  PhotoIcon,
   PrinterIcon,
   ReceiptPercentIcon,
   ShieldCheckIcon,
@@ -274,6 +275,12 @@ const navigation: NavigationItem[] = [
         href: '/dashboard/subscriptions',
         icon: ReceiptPercentIcon,
         requiredFeature: 'settings', // Usually only owner has this
+      },
+      {
+        name: 'Gallery',
+        href: '/dashboard/gallery',
+        icon: PhotoIcon,
+        requiredFeature: 'settings',
       },
     ],
   },

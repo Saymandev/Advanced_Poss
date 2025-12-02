@@ -4,12 +4,13 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
 import { useGetBranchMenuQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
-import { ExclamationTriangleIcon, MinusIcon, PlusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 interface CartItem {
@@ -45,6 +46,7 @@ export default function BranchShopPage() {
   );
   
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -81,15 +83,57 @@ export default function BranchShopPage() {
     }
   }, [cart, companySlug, branchSlug]);
 
-  const categories = menuData?.categories || [];
-  const menuItems = menuData?.menuItems || [];
+  const categories = useMemo(() => {
+    const cats = menuData?.categories;
+    return Array.isArray(cats) ? cats : [];
+  }, [menuData?.categories]);
+  
+  const menuItems = useMemo(() => {
+    const items = menuData?.menuItems;
+    // Ensure we always have an array
+    if (Array.isArray(items)) {
+      return items;
+    }
+    // If it's an object with menuItems property, extract it
+    if (items && typeof items === 'object' && Array.isArray((items as any).menuItems)) {
+      return (items as any).menuItems;
+    }
+    return [];
+  }, [menuData?.menuItems]);
 
-  const filteredItems = selectedCategory === 'all'
-    ? menuItems.filter((item: any) => item.isAvailable !== false)
-    : menuItems.filter((item: any) => 
-        (item.category?.id === selectedCategory || item.categoryId === selectedCategory) &&
-        item.isAvailable !== false
+  // Combined filtering: category + search + availability
+  const filteredItems = useMemo(() => {
+    if (!Array.isArray(menuItems)) {
+      console.error('menuItems is not an array:', menuItems);
+      return [];
+    }
+    
+    let filtered = menuItems.filter((item: any) => item.isAvailable !== false);
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter((item: any) => 
+        item.category?.id === selectedCategory || item.categoryId === selectedCategory
       );
+    }
+
+    // Filter by search query (searches in name, description, and category name)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((item: any) => {
+        const nameMatch = item.name?.toLowerCase().includes(query);
+        const descriptionMatch = item.description?.toLowerCase().includes(query);
+        const categoryName = typeof item.category === 'object' 
+          ? item.category?.name?.toLowerCase()
+          : categories.find((cat: any) => cat.id === item.categoryId)?.name?.toLowerCase();
+        const categoryMatch = categoryName?.includes(query);
+        
+        return nameMatch || descriptionMatch || categoryMatch;
+      });
+    }
+
+    return filtered;
+  }, [menuItems, selectedCategory, searchQuery, categories]);
 
   const addToCart = (item: any) => {
     if (!item.isAvailable) {
@@ -216,13 +260,45 @@ export default function BranchShopPage() {
         </div>
       </header>
 
-      {/* Category Filter */}
-      {categories.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-[73px] sm:top-[81px] z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
+      {/* Search and Category Filter */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-[73px] sm:top-[81px] z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-5">
+          {/* Search Bar */}
+          <div className="mb-4 md:mb-5">
+            <div className="relative max-w-md mx-auto">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+              <Input
+                type="text"
+                placeholder="Search menu items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10 w-full"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  aria-label="Clear search"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            {searchQuery && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-2">
+                {filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'} found
+              </p>
+            )}
+          </div>
+
+          {/* Category Filter */}
+          {categories.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               <button
-                onClick={() => setSelectedCategory('all')}
+                onClick={() => {
+                  setSelectedCategory('all');
+                  setSearchQuery('');
+                }}
                 className={`px-3 md:px-4 py-2 rounded-full whitespace-nowrap text-sm md:text-base transition-colors ${
                   selectedCategory === 'all'
                     ? 'bg-gray-900 dark:bg-gray-700 text-white'
@@ -245,20 +321,41 @@ export default function BranchShopPage() {
                 </button>
               ))}
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Menu Items */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         {filteredItems.length === 0 ? (
           <Card>
             <CardContent className="p-8 md:p-12 text-center">
-              <p className="text-gray-600 dark:text-gray-400">
-                {selectedCategory === 'all' 
-                  ? 'No items available at the moment.' 
-                  : 'No items available in this category.'}
-              </p>
+              {searchQuery ? (
+                <>
+                  <MagnifyingGlassIcon className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400 mb-2">
+                    No items found for &quot;{searchQuery}&quot;
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
+                    Try a different search term or clear your filters
+                  </p>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedCategory('all');
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </>
+              ) : (
+                <p className="text-gray-600 dark:text-gray-400">
+                  {selectedCategory === 'all' 
+                    ? 'No items available at the moment.' 
+                    : 'No items available in this category.'}
+                </p>
+              )}
             </CardContent>
           </Card>
         ) : (

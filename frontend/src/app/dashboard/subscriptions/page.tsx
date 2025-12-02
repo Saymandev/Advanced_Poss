@@ -961,7 +961,7 @@ export default function SubscriptionsPage() {
                 <div className="flex items-center gap-4 flex-wrap">
                   <div>
                     <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(effectiveSubscription.plan?.price || 0)}
+                      {formatCurrency(effectiveSubscription.plan?.price || 0, effectiveSubscription.plan?.currency)}
                       <span className="text-lg font-normal text-gray-600 dark:text-gray-400">
                         /{effectiveSubscription.plan?.billingCycle || 'month'}
                       </span>
@@ -1282,7 +1282,7 @@ export default function SubscriptionsPage() {
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{plan.displayName || plan.name}</h3>
                   <div className="mt-4">
                     <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(plan.price)}
+                      {formatCurrency(plan.price, plan.currency)}
                     </span>
                     <span className="text-gray-600 dark:text-gray-400">/{plan.billingCycle}</span>
                   </div>
@@ -1436,7 +1436,7 @@ export default function SubscriptionsPage() {
                     <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">Monthly Price</td>
                     {plans.map((plan: any) => (
                       <td key={plan.id} className="text-center py-3 px-4 text-sm font-bold text-gray-900 dark:text-white">
-                        {plan.price === 0 ? 'Free' : formatCurrency(plan.price)}
+                        {plan.price === 0 ? 'Free' : formatCurrency(plan.price, plan.currency)}
                       </td>
                     ))}
                   </tr>
@@ -1669,7 +1669,7 @@ export default function SubscriptionsPage() {
                   {effectiveSubscription?.plan?.displayName || effectiveSubscription?.plan?.name || 'N/A'}
                 </p>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  {formatCurrency(effectiveSubscription?.plan?.price || 0)}/{effectiveSubscription?.plan?.billingCycle || 'month'}
+                  {formatCurrency(effectiveSubscription?.plan?.price || 0, effectiveSubscription?.plan?.currency)}/{effectiveSubscription?.plan?.billingCycle || 'month'}
                 </p>
               </div>
               <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border-2 border-primary-500">
@@ -1690,12 +1690,12 @@ export default function SubscriptionsPage() {
                   {selectedPlan.price > (effectiveSubscription.plan?.price || 0) ? (
                     <>
                       <ArrowTrendingUpIcon className="w-4 h-4 inline mr-2" />
-                      You will be charged an additional {formatCurrency(selectedPlan.price - (effectiveSubscription.plan?.price || 0))}/{selectedPlan.billingCycle}
+                      You will be charged an additional {formatCurrency(selectedPlan.price - (effectiveSubscription.plan?.price || 0), selectedPlan.currency)}/{selectedPlan.billingCycle}
                     </>
                   ) : (
                     <>
                       <ArrowTrendingUpIcon className="w-4 h-4 inline mr-2 rotate-180" />
-                      You will save {formatCurrency((effectiveSubscription.plan?.price || 0) - selectedPlan.price)}/{selectedPlan.billingCycle}
+                      You will save {formatCurrency((effectiveSubscription.plan?.price || 0) - selectedPlan.price, effectiveSubscription.plan?.currency || selectedPlan.currency)}/{selectedPlan.billingCycle}
                     </>
                   )}
                 </p>

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Table, useCreateTableMutation, useDeleteTableMutation, useGetTablesQuery, useUpdateTableMutation, useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
+import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import {
   CheckCircleIcon,
@@ -20,7 +21,7 @@ import {
   UserGroupIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
@@ -44,6 +45,13 @@ export default function TablesPage() {
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
 
+  // WebSocket for real-time table updates
+  const { socket, isConnected } = useSocket();
+
+  // Track last refetch time to prevent excessive refetches
+  const lastRefetchTimeRef = useRef<number>(0);
+  const REFETCH_DEBOUNCE_MS = 1000; // Minimum 1 second between refetches
+
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   console.log('🔍 Tables Page - branchId:', branchId, 'user:', user);
@@ -55,8 +63,9 @@ export default function TablesPage() {
     limit: itemsPerPage,
   }, { 
     skip: !branchId,
-    // Auto-refresh every 5 seconds to sync table status
-    pollingInterval: 5000,
+    // Use WebSocket for real-time updates, polling as fallback
+    pollingInterval: isConnected ? 300000 : 60000, // 5min when WebSocket connected, 60s fallback
+    refetchOnMountOrArgChange: false, // Prevent refetch on every render
   });
 
   console.log('🔍 Tables Query State:', { isLoading, error, tablesResponse });
@@ -144,6 +153,45 @@ export default function TablesPage() {
       resetForm();
     }
   }, [isCreateModalOpen, isEditModalOpen, isViewModalOpen]);
+
+  // Debounced refetch function for WebSocket events
+  const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const handleTableUpdate = useCallback(() => {
+    // Throttle refetches
+    const now = Date.now();
+    if (now - lastRefetchTimeRef.current < REFETCH_DEBOUNCE_MS) {
+      return;
+    }
+    lastRefetchTimeRef.current = now;
+
+    // Clear existing timeout
+    if (refetchTimeoutRef.current) {
+      clearTimeout(refetchTimeoutRef.current);
+    }
+    
+    // Debounce to 800ms - batch multiple rapid WebSocket events
+    refetchTimeoutRef.current = setTimeout(() => {
+      refetch();
+    }, 800);
+  }, [refetch]);
+
+  // WebSocket listeners for real-time table status updates
+  useEffect(() => {
+    if (!socket || !isConnected || !branchId) return;
+
+    socket.on('table:status-changed', handleTableUpdate);
+    socket.on('table:available', handleTableUpdate);
+    socket.on('table:occupied', handleTableUpdate);
+
+    return () => {
+      socket.off('table:status-changed', handleTableUpdate);
+      socket.off('table:available', handleTableUpdate);
+      socket.off('table:occupied', handleTableUpdate);
+      if (refetchTimeoutRef.current) {
+        clearTimeout(refetchTimeoutRef.current);
+      }
+    };
+  }, [socket, isConnected, branchId, handleTableUpdate]);
 
   const handleCreate = async () => {
     if (!formData.number || !formData.capacity) {

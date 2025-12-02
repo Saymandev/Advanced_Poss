@@ -4,23 +4,22 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { useGetCompanyBySlugQuery, useTrackOrderQuery } from '@/lib/api/endpoints/publicApi';
+import { usePublicSocket } from '@/lib/hooks/usePublicSocket';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    CheckCircleIcon,
-    ClockIcon,
-    ExclamationTriangleIcon,
-    HomeIcon,
-    PhoneIcon,
-    XCircleIcon
+  CheckCircleIcon,
+  ClockIcon,
+  HomeIcon,
+  PhoneIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function OrderTrackingPage() {
   const params = useParams();
-  const router = useRouter();
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
   const orderId = params.orderId as string;
@@ -34,14 +33,110 @@ export default function OrderTrackingPage() {
   });
   
   const { 
-    data: order, 
+    data: orderData, 
     isLoading: orderLoading, 
     isError: orderError,
-    error: orderErrorData 
+    error: orderErrorData,
+    refetch: refetchOrder
   } = useTrackOrderQuery(orderId, {
     skip: !orderId,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    // WebSocket handles real-time updates, API call is for initial load and fallback
   });
+
+  // Local state for real-time order updates
+  const [order, setOrder] = useState<any>(null);
+
+  // WebSocket for real-time updates
+  const { socket, isConnected, joinOrder, leaveOrder } = usePublicSocket();
+
+  // Update local order state when data loads
+  useEffect(() => {
+    if (orderData) {
+      setOrder(orderData);
+    }
+  }, [orderData]);
+
+  // Join order room for real-time updates
+  // Support both orderId (MongoDB _id) and orderNumber
+  useEffect(() => {
+    if (!orderId || !isConnected || !order) return;
+
+    // Use order._id if available, otherwise use orderId from URL (could be orderNumber)
+    const orderRoomId = (order as any)?._id || (order as any)?.id || orderId;
+    
+    if (orderRoomId) {
+      joinOrder(orderRoomId);
+    }
+
+    return () => {
+      if (orderRoomId) {
+        leaveOrder(orderRoomId);
+      }
+    };
+  }, [orderId, order, isConnected, joinOrder, leaveOrder]);
+
+  // Listen for real-time order status updates
+  useEffect(() => {
+    if (!socket || !isConnected || !orderId) return;
+
+    const handleStatusChange = (data: any) => {
+      console.log('📦 Real-time order update received:', data);
+      
+      // Match order by orderId, order.id, order._id, or order.orderNumber
+      const receivedOrderId = data.orderId || data.order?.id || data.order?._id;
+      const currentOrderId = order?.id || order?._id || orderId;
+      
+      if (receivedOrderId === currentOrderId || 
+          receivedOrderId === orderId ||
+          data.order?.orderNumber === order?.orderNumber) {
+        
+        // Update local order state with new data
+        if (data.order) {
+          setOrder((prevOrder: any) => ({
+            ...prevOrder,
+            ...data.order,
+            status: data.status || data.order.status || prevOrder?.status,
+          }));
+        } else if (data.status) {
+          // If only status was sent, update status and refetch for full data
+          setOrder((prevOrder: any) => ({
+            ...prevOrder,
+            status: data.status,
+          }));
+          // Refetch after a short delay to get full updated order data
+          setTimeout(() => {
+            refetchOrder();
+          }, 500);
+        }
+
+        // Show toast notification for status changes
+        const statusMessages: Record<string, string> = {
+          confirmed: 'Your order has been confirmed! 🎉',
+          preparing: 'Your order is being prepared! 👨‍🍳',
+          ready: 'Your order is ready! ✅',
+          served: 'Your order is out for delivery! 🚚',
+          completed: 'Your order has been delivered! 🎊',
+          cancelled: 'Your order has been cancelled. ❌',
+        };
+
+        if (data.status && statusMessages[data.status] && order?.status !== data.status) {
+          const isError = data.status === 'cancelled';
+          toast[isError ? 'error' : 'success'](statusMessages[data.status], {
+            duration: 6000,
+            icon: isError ? '⚠️' : '✅',
+          });
+        }
+      }
+    };
+
+    socket.on('order:status-changed', handleStatusChange);
+    socket.on('order:updated', handleStatusChange);
+
+    return () => {
+      socket.off('order:status-changed', handleStatusChange);
+      socket.off('order:updated', handleStatusChange);
+    };
+  }, [socket, isConnected, orderId, order, refetchOrder]);
 
   useEffect(() => {
     if (companyError) {
@@ -143,17 +238,28 @@ export default function OrderTrackingPage() {
               Back to Shop
             </Button>
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 md:mb-3">
-            Order Tracking
-          </h1>
-          <div className="flex flex-wrap items-center gap-3 md:gap-4">
-            <Badge className={getStatusColor(order.status)}>
-              <StatusIcon className="w-4 h-4 mr-1" />
-              {order.status?.toUpperCase() || 'UNKNOWN'}
-            </Badge>
-            <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              Order #{order.orderNumber || orderId}
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 md:mb-3">
+                Order Tracking
+              </h1>
+              <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                <Badge className={getStatusColor(order.status)}>
+                  <StatusIcon className="w-4 h-4 mr-1" />
+                  {order.status?.toUpperCase() || 'UNKNOWN'}
+                </Badge>
+                <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                  Order #{order.orderNumber || orderId}
+                </span>
+              </div>
+            </div>
+            {/* Real-time Connection Indicator */}
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                {isConnected ? 'Live Updates' : 'Connecting...'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -171,20 +277,27 @@ export default function OrderTrackingPage() {
 
                 return (
                   <div key={step.key} className="flex items-start gap-3 md:gap-4 mb-6 md:mb-8 last:mb-0">
-                    <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors ${
-                      isCompleted ? 'bg-green-500 dark:bg-green-600' : 'bg-gray-300 dark:bg-gray-700'
+                    <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      isCompleted 
+                        ? 'bg-green-500 dark:bg-green-600 shadow-lg shadow-green-500/50' 
+                        : isCurrent
+                          ? 'bg-primary-500 dark:bg-primary-600 animate-pulse shadow-lg shadow-primary-500/50'
+                          : 'bg-gray-300 dark:bg-gray-700'
                     }`}>
-                      <StepIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${isCompleted ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                      <StepIcon className={`w-5 h-5 sm:w-6 sm:h-6 transition-all ${isCompleted ? 'text-white' : isCurrent ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className={`font-semibold text-sm sm:text-base ${
+                      <div className={`font-semibold text-sm sm:text-base transition-colors ${
                         isCurrent 
-                          ? 'text-green-600 dark:text-green-400' 
+                          ? 'text-primary-600 dark:text-primary-400' 
                           : isCompleted 
                             ? 'text-gray-900 dark:text-white' 
                             : 'text-gray-400 dark:text-gray-500'
                       }`}>
                         {step.label}
+                        {isCurrent && (
+                          <span className="ml-2 text-xs animate-pulse">●</span>
+                        )}
                       </div>
                       {step.time && (
                         <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -192,7 +305,7 @@ export default function OrderTrackingPage() {
                         </div>
                       )}
                       {!step.time && isCurrent && (
-                        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="text-xs sm:text-sm text-primary-600 dark:text-primary-400 mt-1 font-medium">
                           In progress...
                         </div>
                       )}

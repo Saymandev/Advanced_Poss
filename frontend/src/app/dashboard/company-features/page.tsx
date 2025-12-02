@@ -21,7 +21,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-// Import features list from role-access page
+// Import features list - must match role-access page
 const features = [
   { id: 'dashboard', name: 'Dashboard', category: 'Overview' },
   { id: 'reports', name: 'Reports', category: 'Overview' },
@@ -30,11 +30,19 @@ const features = [
   { id: 'attendance', name: 'Attendance', category: 'Staff' },
   { id: 'menu-management', name: 'Menu Management', category: 'Menu' },
   { id: 'categories', name: 'Categories', category: 'Menu' },
+  { id: 'qr-menus', name: 'QR Menus', category: 'Menu' },
   { id: 'order-management', name: 'Order Management', category: 'Orders' },
   { id: 'table-management', name: 'Table Management', category: 'Orders' },
   { id: 'kitchen-display', name: 'Kitchen Display', category: 'Orders' },
+  { id: 'customer-display', name: 'Customer Display', category: 'Orders' },
+  { id: 'pos-settings', name: 'POS Settings', category: 'Orders' },
+  { id: 'printer-management', name: 'Printer Management', category: 'Orders' },
+  { id: 'digital-receipts', name: 'Digital Receipts', category: 'Orders' },
   { id: 'customer-management', name: 'Customer Management', category: 'Customers' },
   { id: 'loyalty-program', name: 'Loyalty Program', category: 'Customers' },
+  { id: 'marketing', name: 'Marketing', category: 'Customers' },
+  { id: 'ai-menu-optimization', name: 'AI Menu Optimization', category: 'AI Features' },
+  { id: 'ai-customer-loyalty', name: 'Customer Loyalty AI', category: 'AI Features' },
   { id: 'inventory', name: 'Inventory Management', category: 'Inventory' },
   { id: 'suppliers', name: 'Supplier Management', category: 'Inventory' },
   { id: 'purchase-orders', name: 'Purchase Orders', category: 'Inventory' },

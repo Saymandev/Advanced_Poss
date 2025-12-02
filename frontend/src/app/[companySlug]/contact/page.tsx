@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
+import { useGetCompanyBySlugQuery, useSubmitContactFormMutation } from '@/lib/api/endpoints/publicApi';
 import { EnvelopeIcon, ExclamationTriangleIcon, MapPinIcon, PhoneIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -33,7 +33,7 @@ export default function ContactPage() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitContactForm, { isLoading: isSubmitting }] = useSubmitContactFormMutation();
 
   useEffect(() => {
     if (isError) {
@@ -81,26 +81,21 @@ export default function ContactPage() {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      // TODO: Implement backend API endpoint for contact form submission
-      // For now, simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In production, this would be:
-      // await contactApi.submitContactForm({
-      //   companySlug,
-      //   ...formData
-      // }).unwrap();
+      const result = await submitContactForm({
+        companySlug,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: formData.subject,
+        message: formData.message,
+      }).unwrap();
 
-      toast.success('Thank you for your message! We\'ll get back to you soon.');
+      toast.success(result.message || 'Thank you for your message! We\'ll get back to you soon.');
       setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
       setErrors({});
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to send message. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      toast.error(error?.data?.message || error?.message || 'Failed to send message. Please try again.');
     }
   };
 

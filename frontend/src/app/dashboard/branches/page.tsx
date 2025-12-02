@@ -348,6 +348,7 @@ export default function BranchesPage() {
       phone: branch.phoneNumber || (branch as any).phone || '',
       email: branch.email || '',
       managerId: branch.managerId || '',
+      slug: (branch as any).slug || '',
       openingHours: (branch as any).openingHours || [
         { day: 'monday', open: '09:00', close: '21:00', isClosed: false },
         { day: 'tuesday', open: '09:00', close: '21:00', isClosed: false },
@@ -1254,6 +1255,19 @@ export default function BranchesPage() {
               }}
               error={formErrors.country}
             />
+          </div>
+
+          <div>
+            <Input
+              label="Public URL Slug (Custom URL identifier)"
+              value={(formData as any).slug || ''}
+              onChange={(e) => setFormData({ ...formData, slug: e.target.value } as any)}
+              placeholder="branch-url-slug"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Custom slug for public URLs. Leave empty to auto-generate from branch name.
+              Only lowercase letters, numbers, and hyphens allowed. Must be unique within the company.
+            </p>
           </div>
 
           {managers.length > 0 && (

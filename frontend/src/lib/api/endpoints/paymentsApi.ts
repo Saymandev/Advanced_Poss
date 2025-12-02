@@ -86,6 +86,14 @@ export const paymentsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Payment', 'Order', 'Subscription'],
     }),
+    activateSubscription: builder.mutation<{ success: boolean; message: string }, { sessionId: string }>({
+      query: (data) => ({
+        url: '/payments/activate-subscription',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Payment', 'Subscription', 'Company'],
+    }),
   }),
 });
 
@@ -94,4 +102,5 @@ export const {
   useCreateCheckoutSessionMutation,
   useConfirmPaymentMutation,
   useHandleWebhookMutation,
+  useActivateSubscriptionMutation,
 } = paymentsApi;

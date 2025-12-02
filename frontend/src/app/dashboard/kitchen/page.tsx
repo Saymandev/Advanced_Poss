@@ -21,6 +21,7 @@ import {
     useUpdateKitchenItemPriorityMutation
 } from '@/lib/api/endpoints/kitchenApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
+import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -62,29 +63,31 @@ export default function KitchenPage() {
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
 
-  // Fetch chefs and cooks for assignment
+  // WebSocket for real-time updates
+  const { socket, isConnected, joinKitchen, leaveKitchen } = useSocket();
+  
+  // Join kitchen room for real-time updates
+  useEffect(() => {
+    if (branchId && socket && isConnected) {
+      joinKitchen(branchId);
+      return () => {
+        leaveKitchen(branchId);
+      };
+    }
+  }, [branchId, socket, isConnected, joinKitchen, leaveKitchen]);
+
+  // Track last refetch time to prevent excessive refetches
+  const lastRefetchTimeRef = useRef<number>(0);
+  const REFETCH_DEBOUNCE_MS = 1000; // Minimum 1 second between refetches
+
+  // Fetch only chefs for assignment (not cooks)
   const { data: chefsData } = useGetStaffQuery(
     { role: 'chef', branchId, isActive: true },
     { skip: !branchId }
   );
-  const { data: cooksData } = useGetStaffQuery(
-    { role: 'cook', branchId, isActive: true },
-    { skip: !branchId }
-  );
   const chefs = useMemo(() => {
-    const chefList = chefsData?.staff || [];
-    const cookList = cooksData?.staff || [];
-    // Combine and deduplicate by ID to prevent duplicate keys
-    const combined = [...chefList, ...cookList];
-    const uniqueMap = new Map();
-    combined.forEach((staff) => {
-      const id = staff.id || staff._id;
-      if (id && !uniqueMap.has(id)) {
-        uniqueMap.set(id, staff);
-      }
-    });
-    return Array.from(uniqueMap.values());
-  }, [chefsData, cooksData]);
+    return chefsData?.staff || [];
+  }, [chefsData]);
   
   // Check if current user can update orders (owner, chef, cook, manager)
   const canUpdateOrders = useMemo(() => {
@@ -100,49 +103,95 @@ export default function KitchenPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // API calls with polling for real-time updates
+  // API calls with optimized polling - use WebSocket when available, polling as fallback
+  // When WebSocket is connected, set very high polling interval (effectively disabled)
+  // When disconnected, use longer polling intervals to reduce API calls
 
   const { data: pendingResponse, isLoading: pendingLoading, refetch: refetchPending } = useGetKitchenPendingOrdersQuery(branchId || '', {
     skip: !branchId,
-    pollingInterval: 10000, // Refresh every 10 seconds
+    pollingInterval: isConnected ? 300000 : 60000, // 5min when WebSocket connected, 60s fallback
+    refetchOnMountOrArgChange: false, // Prevent refetch on every render
   });
 
   const { data: preparingResponse, isLoading: preparingLoading, refetch: refetchPreparing } = useGetKitchenPreparingOrdersQuery(branchId || '', {
     skip: !branchId,
-    pollingInterval: 10000,
+    pollingInterval: isConnected ? 300000 : 60000, // 5min when WebSocket connected, 60s fallback
+    refetchOnMountOrArgChange: false,
   });
 
   const { data: readyResponse, isLoading: readyLoading, refetch: refetchReady } = useGetKitchenReadyOrdersQuery(branchId || '', {
     skip: !branchId,
-    pollingInterval: 10000,
+    pollingInterval: isConnected ? 300000 : 60000, // 5min when WebSocket connected, 60s fallback
+    refetchOnMountOrArgChange: false,
   });
 
-  const { data: urgentResponse } = useGetKitchenUrgentOrdersQuery(branchId || '', {
+  const { data: urgentResponse, refetch: refetchUrgent } = useGetKitchenUrgentOrdersQuery(branchId || '', {
     skip: !branchId,
-    pollingInterval: 15000,
+    pollingInterval: isConnected ? 300000 : 90000, // 5min when WebSocket connected, 90s fallback
+    refetchOnMountOrArgChange: false,
   });
 
-  const { data: delayedResponse } = useGetKitchenDelayedOrdersQuery(branchId || '', {
+  const { data: delayedResponse, refetch: refetchDelayed } = useGetKitchenDelayedOrdersQuery(branchId || '', {
     skip: !branchId,
-    pollingInterval: 20000,
+    pollingInterval: isConnected ? 300000 : 120000, // 5min when WebSocket connected, 120s fallback
+    refetchOnMountOrArgChange: false,
   });
 
-  // Refetch function
+  // Refetch function with throttling
   const refetchAll = useCallback(() => {
     if (!branchId) return;
+    
+    // Throttle refetches - prevent if called too frequently
+    const now = Date.now();
+    if (now - lastRefetchTimeRef.current < REFETCH_DEBOUNCE_MS) {
+      return;
+    }
+    lastRefetchTimeRef.current = now;
+
     refetchPending();
     refetchPreparing();
     refetchReady();
-  }, [branchId, refetchPending, refetchPreparing, refetchReady]);
+    refetchUrgent();
+    refetchDelayed();
+  }, [branchId, refetchPending, refetchPreparing, refetchReady, refetchUrgent, refetchDelayed]);
 
-  // Auto-refresh orders every 30 seconds
-  useEffect(() => {
-    if (!branchId) return;
-    const interval = setInterval(() => {
+  // Debounce refetch to prevent excessive API calls from rapid WebSocket events
+  const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const handleWebSocketUpdate = useCallback(() => {
+    // Clear existing timeout
+    if (refetchTimeoutRef.current) {
+      clearTimeout(refetchTimeoutRef.current);
+    }
+    
+    // Debounce to 800ms - batch multiple rapid WebSocket events into one refetch
+    refetchTimeoutRef.current = setTimeout(() => {
       refetchAll();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [branchId, refetchAll]);
+    }, 800);
+  }, [refetchAll]);
+
+  // WebSocket listeners for real-time updates (replaces polling)
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    socket.on('kitchen:new-order', handleWebSocketUpdate);
+    socket.on('kitchen:order-received', handleWebSocketUpdate);
+    socket.on('kitchen:order-status-changed', handleWebSocketUpdate);
+    socket.on('kitchen:item-ready', handleWebSocketUpdate);
+    socket.on('kitchen:item-completed', handleWebSocketUpdate);
+
+    return () => {
+      socket.off('kitchen:new-order', handleWebSocketUpdate);
+      socket.off('kitchen:order-received', handleWebSocketUpdate);
+      socket.off('kitchen:order-status-changed', handleWebSocketUpdate);
+      socket.off('kitchen:item-ready', handleWebSocketUpdate);
+      socket.off('kitchen:item-completed', handleWebSocketUpdate);
+      if (refetchTimeoutRef.current) {
+        clearTimeout(refetchTimeoutRef.current);
+      }
+    };
+  }, [socket, isConnected, handleWebSocketUpdate]);
+
+  // Remove the redundant setInterval - WebSocket handles real-time updates
 
   const playSound = useCallback((type: 'new-order' | 'urgent') => {
     if (!soundEnabled) return;

@@ -176,6 +176,17 @@ export const posApi = apiSlice.injectEndpoints({
       },
     }),
 
+    // Get waiter active orders count (for busy indicator)
+    getWaiterActiveOrdersCount: builder.query<Record<string, number>, void>({
+      query: () => ({
+        url: '/pos/waiters/active-orders',
+      }),
+      providesTags: ['POSOrder'],
+      transformResponse: (response: any) => {
+        return response.data || response || {};
+      },
+    }),
+
     // Get available tables for POS
     getAvailableTables: builder.query<Array<{
       id: string;
@@ -654,4 +665,5 @@ export const {
   useCancelPrintJobMutation,
   useGetPOSSettingsQuery,
   useUpdatePOSSettingsMutation,
+  useGetWaiterActiveOrdersCountQuery,
 } = posApi;

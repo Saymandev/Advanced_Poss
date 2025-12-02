@@ -222,8 +222,25 @@ export default function CheckoutPage() {
         console.error('Failed to clear cart:', error);
       }
 
-      // Redirect to confirmation
+      // Get orderId (MongoDB _id) for tracking - this is what the tracking URL uses
       const orderId = result.data?.orderId || result.data?.orderNumber || result.orderId || result.orderNumber || 'pending';
+      const orderNumber = result.data?.orderNumber || orderId; // Display orderNumber to user
+      const trackingUrl = result.data?.trackingUrl; // Full tracking URL from backend
+      
+      // Store order info in sessionStorage for confirmation page
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('lastOrderId', orderId);
+          sessionStorage.setItem('lastOrderNumber', orderNumber);
+          if (trackingUrl) {
+            sessionStorage.setItem('lastTrackingUrl', trackingUrl);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to store order info:', error);
+      }
+      
+      // Redirect to confirmation page with orderId (MongoDB _id for tracking)
       router.push(`/${companySlug}/${branchSlug}/order-confirmation?orderId=${orderId}`);
     } catch (error: any) {
       const errorMessage = error?.data?.message || error?.message || 'Failed to place order. Please try again.';
@@ -251,13 +268,37 @@ export default function CheckoutPage() {
   
   const total = subtotal + tax + deliveryFee;
 
-  if (isLoadingCart || companyLoading) {
+  if (isLoadingCart || companyLoading || zonesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">Loading checkout...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (companyError || !company) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Company Not Found</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Unable to load company information. Please try again.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => router.push(`/${companySlug}`)} variant="secondary">
+                Go Back
+              </Button>
+              <Button onClick={() => router.push('/')}>
+                Go to Homepage
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

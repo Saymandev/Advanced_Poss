@@ -23,17 +23,23 @@ export const FEATURE_ROUTE_MAP: Record<string, string | string[] | null> = {
   '/dashboard/menu-items': 'menu-management',
   '/dashboard/menu': 'menu-management',
   '/dashboard/categories': 'categories',
+  '/dashboard/qr-code-menus': 'qr-menus',
   
   // Orders & Tables
   '/dashboard/orders': 'order-management',
   '/dashboard/order-history': 'order-management',
   '/dashboard/pos': 'order-management',
+  '/dashboard/pos-settings': 'pos-settings',
+  '/dashboard/printer-management': 'printer-management',
   '/dashboard/tables': 'table-management',
   '/dashboard/kitchen': 'kitchen-display',
+  '/dashboard/customer-display': 'customer-display',
+  '/dashboard/digital-receipts': 'digital-receipts',
   
   // Customers
   '/dashboard/customers': 'customer-management',
   '/dashboard/customer-loyalty-ai': ['customer-management', 'loyalty-program'],
+  '/dashboard/marketing': 'marketing',
   
   // Inventory
   '/dashboard/inventory': 'inventory',

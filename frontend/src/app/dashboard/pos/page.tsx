@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
@@ -19,6 +20,7 @@ import {
   useGetPOSSettingsQuery,
   useGetPrintersQuery,
   useGetReceiptHTMLQuery,
+  useGetWaiterActiveOrdersCountQuery,
   usePrintReceiptMutation,
   usePrintReceiptPDFMutation,
   useProcessPaymentMutation,
@@ -26,7 +28,6 @@ import {
 } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useSocket } from '@/lib/hooks/useSocket';
-import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -307,12 +308,6 @@ export default function POSPage() {
     return false;
   });
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
-  const [hasAutoOpenedCart, setHasAutoOpenedCart] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('pos_orderStarted') === 'true';
-    }
-    return false;
-  });
   const [orderNotes, setOrderNotes] = useState('');
   const [selectedWaiterId, setSelectedWaiterId] = useState<string>('');
   const [discountMode, setDiscountMode] = useState<'full' | 'item'>('full');
@@ -620,7 +615,13 @@ export default function POSPage() {
     return [] as any[];
   }, [customerSearchResults]);
 
-  const waiterOptions = useMemo<Array<{ id: string; name: string }>>(() => {
+  // Fetch waiter active orders count for busy indicator
+  const { data: waiterActiveOrdersCount = {} } = useGetWaiterActiveOrdersCountQuery(undefined, {
+    skip: !branchId,
+    pollingInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const waiterOptions = useMemo<Array<{ id: string; name: string; activeOrdersCount: number }>>(() => {
     const staffList = staffData?.staff || [];
     const currentBranchId = user?.branchId || branchId;
     
@@ -642,14 +643,20 @@ export default function POSPage() {
         
         return isAssignedToBranch;
       })
-      .map((staffMember: any) => ({
-        id: staffMember.id,
-        name:
-          `${staffMember.firstName || ''} ${staffMember.lastName || ''}`.trim() ||
-          staffMember.email ||
-          staffMember.id,
-      }));
-  }, [staffData, user?.branchId, branchId]);
+      .map((staffMember: any) => {
+        const waiterId = staffMember.id;
+        const activeOrdersCount = waiterActiveOrdersCount[waiterId] || 0;
+        
+        return {
+          id: waiterId,
+          name:
+            `${staffMember.firstName || ''} ${staffMember.lastName || ''}`.trim() ||
+            staffMember.email ||
+            staffMember.id,
+          activeOrdersCount,
+        };
+      });
+  }, [staffData, user?.branchId, branchId, waiterActiveOrdersCount]);
 
   const selectedWaiterName = useMemo(() => {
     return waiterOptions.find((option) => option.id === selectedWaiterId)?.name || '';
@@ -1160,6 +1167,7 @@ export default function POSPage() {
     if (!silent) {
       toast.success(`${newItem.name} added to cart`);
     }
+    setHasStartedOrder(true);
   }, [areModifiersEqual]);
 
   const addMultiPaymentRow = useCallback(() => {
@@ -1970,17 +1978,6 @@ export default function POSPage() {
     return '';
   }, [receiptErrorDetails]);
 
-  useEffect(() => {
-    if (!isOrderingActive) {
-      setHasAutoOpenedCart(false);
-      return;
-    }
-
-    if (isOrderingActive && !hasAutoOpenedCart) {
-      setIsCartModalOpen(true);
-      setHasAutoOpenedCart(true);
-    }
-  }, [isOrderingActive, hasAutoOpenedCart]);
  
   const renderPreOrderView = () => {
     if (orderType === 'dine-in') {
@@ -2774,13 +2771,17 @@ export default function POSPage() {
                         <input
                           type="number"
                           min="1"
-                          max={activeTable.orderDetails?.remainingSeats ? activeTable.orderDetails.remainingSeats + guestCount : (activeTable.capacity || 99)}
+                          max={activeTable.orderDetails?.remainingSeats !== undefined 
+                            ? activeTable.orderDetails.remainingSeats 
+                            : (activeTable.capacity || 99)}
                           value={guestCount}
                           onChange={(e) => {
-                            const maxSeats = activeTable.orderDetails?.remainingSeats 
-                              ? activeTable.orderDetails.remainingSeats + guestCount 
+                            // Calculate max seats correctly: use remaining seats if table has orders, otherwise use full capacity
+                            const maxSeats = activeTable.orderDetails?.remainingSeats !== undefined
+                              ? activeTable.orderDetails.remainingSeats // Don't add guestCount - remainingSeats already accounts for existing orders
                               : (activeTable.capacity || 99);
-                            const value = Math.max(1, Math.min(maxSeats, parseInt(e.target.value) || 1));
+                            const inputValue = parseInt(e.target.value) || 0;
+                            const value = Math.max(1, Math.min(maxSeats, inputValue));
                             setGuestCount(value);
                             if (typeof window !== 'undefined') {
                               localStorage.setItem('pos_guestCount', value.toString());
@@ -2837,10 +2838,24 @@ export default function POSPage() {
                     waiterOptions.map((waiter) => (
                       <option key={waiter.id} value={waiter.id} className="bg-slate-900">
                         {waiter.name}
+                        {waiter.activeOrdersCount > 0 ? ` (${waiter.activeOrdersCount} active order${waiter.activeOrdersCount > 1 ? 's' : ''})` : ''}
                       </option>
                     ))
                   )}
                 </select>
+                {(() => {
+                  const selectedWaiter = waiterOptions.find(w => w.id === selectedWaiterId);
+                  return selectedWaiter && selectedWaiter.activeOrdersCount > 0 ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <div className="flex items-center gap-1">
+                        <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
+                        <span className="text-amber-400">
+                          Waiter has {selectedWaiter.activeOrdersCount} active order{selectedWaiter.activeOrdersCount > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
                 {!branchId && (
                   <p className="text-xs text-slate-400 mt-1">Branch not selected</p>
                 )}
@@ -4170,15 +4185,31 @@ export default function POSPage() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-400">Order Status</p>
-                    <Badge className={
-                      occupiedTableModal.orderDetails.orderStatus === 'paid' 
+                    {(() => {
+                      // Get order status from multiple possible locations
+                      const orderDetails = occupiedTableModal.orderDetails;
+                      const orderStatus = orderDetails?.orderStatus 
+                        || orderDetails?.status 
+                        || orderDetails?.allOrders?.[0]?.status 
+                        || 'pending';
+                      const statusLabel = orderStatus === 'paid' ? 'Paid' 
+                        : orderStatus === 'pending' ? 'Pending' 
+                        : orderStatus === 'cancelled' ? 'Cancelled'
+                        : orderStatus || 'Unknown';
+                      const badgeClass = orderStatus === 'paid' 
                         ? 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30'
-                        : occupiedTableModal.orderDetails.orderStatus === 'pending'
+                        : orderStatus === 'pending'
                         ? 'bg-amber-500/10 text-amber-200 border border-amber-500/30'
-                        : 'bg-slate-500/10 text-slate-200 border border-slate-500/30'
-                    }>
-                      {occupiedTableModal.orderDetails.orderStatus === 'paid' ? 'Paid' : occupiedTableModal.orderDetails.orderStatus === 'pending' ? 'Pending' : occupiedTableModal.orderDetails.orderStatus || 'Unknown'}
-                    </Badge>
+                        : orderStatus === 'cancelled'
+                        ? 'bg-rose-500/10 text-rose-200 border border-rose-500/30'
+                        : 'bg-slate-500/10 text-slate-200 border border-slate-500/30';
+                      
+                      return (
+                        <Badge className={badgeClass}>
+                          {statusLabel}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                   {occupiedTableModal.orderDetails.waiterName && (
                     <div>
@@ -4209,59 +4240,70 @@ export default function POSPage() {
             )}
 
             <div className="flex flex-col gap-2">
-              {occupiedTableModal.orderDetails?.orderStatus !== 'paid' && (
-                <Button
-                  onClick={handleResumeOrder}
-                  className="w-full bg-sky-600 hover:bg-sky-500"
-                >
-                  Resume & Edit Order
-                </Button>
-              )}
-              {occupiedTableModal.orderDetails?.orderStatus === 'pending' && (
-                <Button
-                  onClick={async () => {
-                    if (!occupiedTableModal.orderDetails?.currentOrderId) return;
-                    try {
-                      await updateOrder({
-                        id: occupiedTableModal.orderDetails.currentOrderId,
-                        data: { status: 'paid' }
-                      }).unwrap();
-                      toast.success('Order marked as paid');
-                      setOccupiedTableModal(null);
-                      refetchTables();
-                      refetchQueue();
-                    } catch (error: any) {
-                      toast.error(error?.data?.message || 'Failed to update order status');
-                    }
-                  }}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500"
-                >
-                  Mark as Paid
-                </Button>
-              )}
-              {occupiedTableModal.orderDetails?.orderStatus === 'paid' && (
-                <Button
-                  onClick={async () => {
-                    if (!occupiedTableModal.orderDetails?.currentOrderId) return;
-                    try {
-                      await updateOrder({
-                        id: occupiedTableModal.orderDetails.currentOrderId,
-                        data: { status: 'pending' }
-                      }).unwrap();
-                      toast.success('Order marked as pending');
-                      setOccupiedTableModal(null);
-                      refetchTables();
-                      refetchQueue();
-                    } catch (error: any) {
-                      toast.error(error?.data?.message || 'Failed to update order status');
-                    }
-                  }}
-                  variant="secondary"
-                  className="w-full"
-                >
-                  Mark as Pending
-                </Button>
-              )}
+              {(() => {
+                const orderDetails = occupiedTableModal.orderDetails;
+                const currentStatus = orderDetails?.orderStatus 
+                  || orderDetails?.status 
+                  || orderDetails?.allOrders?.[0]?.status 
+                  || 'pending';
+                return (
+                  <>
+                    {currentStatus !== 'paid' && (
+                      <Button
+                        onClick={handleResumeOrder}
+                        className="w-full bg-sky-600 hover:bg-sky-500"
+                      >
+                        Resume & Edit Order
+                      </Button>
+                    )}
+                    {currentStatus === 'pending' && (
+                      <Button
+                        onClick={async () => {
+                          if (!occupiedTableModal.orderDetails?.currentOrderId) return;
+                          try {
+                            await updateOrder({
+                              id: occupiedTableModal.orderDetails.currentOrderId,
+                              data: { status: 'paid' }
+                            }).unwrap();
+                            toast.success('Order marked as paid');
+                            setOccupiedTableModal(null);
+                            refetchTables();
+                            refetchQueue();
+                          } catch (error: any) {
+                            toast.error(error?.data?.message || 'Failed to update order status');
+                          }
+                        }}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        Mark as Paid
+                      </Button>
+                    )}
+                    {currentStatus === 'paid' && (
+                      <Button
+                        onClick={async () => {
+                          if (!occupiedTableModal.orderDetails?.currentOrderId) return;
+                          try {
+                            await updateOrder({
+                              id: occupiedTableModal.orderDetails.currentOrderId,
+                              data: { status: 'pending' }
+                            }).unwrap();
+                            toast.success('Order marked as pending');
+                            setOccupiedTableModal(null);
+                            refetchTables();
+                            refetchQueue();
+                          } catch (error: any) {
+                            toast.error(error?.data?.message || 'Failed to update order status');
+                          }
+                        }}
+                        variant="secondary"
+                        className="w-full"
+                      >
+                        Mark as Pending
+                      </Button>
+                    )}
+                  </>
+                );
+              })()}
               {occupiedTableModal.orderDetails?.remainingSeats > 0 && (
                 <Button
                   onClick={handleStartNewOrderOnTable}
@@ -4271,15 +4313,22 @@ export default function POSPage() {
                   Start New Order ({occupiedTableModal.orderDetails.remainingSeats} seats)
                 </Button>
               )}
-              {occupiedTableModal.orderDetails?.orderStatus !== 'paid' && (
-                <Button
-                  onClick={handleCancelOccupiedOrder}
-                  variant="ghost"
-                  className="w-full text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-                >
-                  Cancel Order & Free Table
-                </Button>
-              )}
+              {(() => {
+                const orderDetails = occupiedTableModal.orderDetails;
+                const currentStatus = orderDetails?.orderStatus 
+                  || orderDetails?.status 
+                  || orderDetails?.allOrders?.[0]?.status 
+                  || 'pending';
+                return currentStatus !== 'paid' ? (
+                  <Button
+                    onClick={handleCancelOccupiedOrder}
+                    variant="ghost"
+                    className="w-full text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                  >
+                    Cancel Order & Free Table
+                  </Button>
+                ) : null;
+              })()}
               <Button
                 onClick={() => setOccupiedTableModal(null)}
                 variant="secondary"

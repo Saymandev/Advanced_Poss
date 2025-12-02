@@ -46,13 +46,17 @@ export default function CustomerDisplayPage() {
     itemRatings: {} as Record<string, { rating: number; comment: string }>,
   });
 
-  // Auto-refresh every 3 seconds
+  // Optimized polling - increased interval to reduce API calls
+  // WebSocket would be ideal but this is a public page, so using longer polling interval
   useEffect(() => {
+    if (!orderId) return; // Don't poll if no order
+    
     const interval = setInterval(() => {
       refetch();
-    }, 3000);
+    }, 30000); // Changed from 3s to 30s - much more efficient
+    
     return () => clearInterval(interval);
-  }, [refetch]);
+  }, [refetch, orderId]);
 
   // Show review button when order is ready or paid
   const canReview = currentOrder && (currentOrder.status === 'ready' || currentOrder.status === 'paid') && !existingReview;

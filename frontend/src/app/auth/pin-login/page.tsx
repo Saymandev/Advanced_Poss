@@ -10,7 +10,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { getRoleDashboardPath } from '@/utils/getRoleDashboard';
 import { ArrowLeftIcon, BackspaceIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 const getAvatarUrl = (email: string) => {
@@ -63,6 +63,39 @@ export default function PinLoginPage() {
     }
   }, [companyContext, dispatch, router]);
 
+  // Get available users for auto-selection (before early return, handle null safely)
+  // Use useMemo to prevent recalculation on every render
+  const selectedBranchData = useMemo(() => {
+    return companyContext?.branches?.find((b) => b.id === selectedBranch);
+  }, [companyContext?.branches, selectedBranch]);
+
+  const availableUsers = useMemo(() => {
+    return selectedBranchData?.usersByRole?.[selectedRole] || [];
+  }, [selectedBranchData, selectedRole]);
+
+  // Auto-select user if only one is available (hook must be before early return)
+  useEffect(() => {
+    if (!companyContext || !selectedRole) {
+      return;
+    }
+    
+    // Auto-select if exactly one user is available
+    if (availableUsers.length === 1) {
+      const singleUser = availableUsers[0];
+      setSelectedUser((currentUser: any) => {
+        // Only update if different user
+        if (!currentUser || currentUser.id !== singleUser.id) {
+          return singleUser;
+        }
+        return currentUser;
+      });
+    } else if (availableUsers.length === 0) {
+      // Reset if no users available
+      setSelectedUser(null);
+    }
+    // If multiple users, let user manually select (don't auto-reset)
+  }, [selectedRole, availableUsers, companyContext]);
+
   // Prevent redirect during context check
   if (isCheckingContext || !companyContext) {
     return (
@@ -91,12 +124,23 @@ export default function PinLoginPage() {
       return;
     }
 
-    const loginData = {
+    // If multiple users exist, require user selection
+    if (availableUsers.length > 1 && !selectedUser) {
+      toast.error('Please select a specific user');
+      return;
+    }
+
+    const loginData: any = {
       companyId: companyContext!.companyId,
       branchId: selectedBranch,
       role: selectedRole,
       pin,
     };
+
+    // Include userId if a specific user is selected
+    if (selectedUser?.id) {
+      loginData.userId = selectedUser.id;
+    }
 
     try {
       const response: any = await pinLogin(loginData).unwrap();
@@ -137,8 +181,26 @@ export default function PinLoginPage() {
       const dashboardPath = getRoleDashboardPath(loggedInUser?.role);
       router.push(dashboardPath);
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Invalid PIN. Please try again.');
-      setPin('');
+      // Handle multiple users error - show user selection if not already done
+      if (error?.data?.code === 'MULTIPLE_USERS' || error?.data?.message?.includes('Multiple users')) {
+        // If users list is provided, ensure UI shows selection
+        if (error?.data?.users && availableUsers.length === 0) {
+          // Update availableUsers from error response (shouldn't happen but handle it)
+          console.warn('Received user list from error response:', error.data.users);
+        }
+        toast.error(error?.data?.message || 'Multiple users found. Please select a specific user.');
+        // Don't clear PIN for multiple users error - let them select user and retry
+      } else {
+        // Invalid PIN or other authentication error
+        // Clear PIN but keep all other selections (branch, role, user) so user can retry easily
+        const errorMessage = error?.data?.message || 'Invalid PIN. Please try again.';
+        toast.error(errorMessage, {
+          duration: 4000, // Show error for 4 seconds
+          icon: '❌',
+        });
+        setPin(''); // Only clear PIN, keep branch/role/user selections
+      }
+      // DO NOT redirect - stay on PIN login page so user can retry
     }
   };
 
@@ -150,9 +212,6 @@ export default function PinLoginPage() {
   if (!companyContext) {
     return null;
   }
-
-  const selectedBranchData = companyContext.branches.find((b) => b.id === selectedBranch);
-  const availableUsers = selectedBranchData?.usersByRole?.[selectedRole] || [];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
@@ -357,8 +416,17 @@ export default function PinLoginPage() {
                   </div>
                 )}
 
+                {/* Show error message if multiple users but none selected */}
+                {availableUsers.length > 1 && !selectedUser && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg p-4 text-center">
+                    <p className="text-yellow-400 text-sm">
+                      Multiple users found with this role. Please select a specific user above.
+                    </p>
+                  </div>
+                )}
+
                 {/* PIN Input */}
-                {(selectedUser || availableUsers.length === 0) && (
+                {(selectedUser || availableUsers.length === 0 || availableUsers.length === 1) && (
                   <div className="max-w-md mx-auto space-y-6 mt-8">
                     <div>
                       <div className="flex items-center justify-between mb-4">

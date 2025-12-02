@@ -2,6 +2,7 @@
 
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
+import { OrderNotificationManager } from '@/components/orders/OrderNotificationManager';
 import { DashboardSkeleton } from '@/components/ui/DashboardSkeleton';
 import { SubscriptionIndicator } from '@/components/ui/SubscriptionIndicator';
 import { useAppSelector } from '@/lib/store';
@@ -85,6 +86,9 @@ export default function DashboardLayout({
         <div className={`mt-16 ${sidebarCollapsed ? 'ml-0' : 'ml-0'}`}>
           <SubscriptionIndicator />
         </div>
+        
+        {/* Order Notification Manager - Shows modal for new orders (owner/manager only) */}
+        <OrderNotificationManager />
         
         {/* Main content with top padding to account for fixed navbar */}
         <main className="pt-0 py-6" suppressHydrationWarning>

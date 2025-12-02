@@ -43,10 +43,19 @@ export default function CustomerOrderDisplayPage() {
     }
   }, [branchId, socket, isConnected, joinKitchen, leaveKitchen]);
 
+  // Track last refetch time to prevent excessive refetches
+  const lastRefetchTimeRef = useRef<number>(0);
+  const REFETCH_DEBOUNCE_MS = 1000; // Minimum 1 second between refetches
+
   // Fetch menu items for left side - include companyId like menu-items page does
+  // Menu items don't change frequently, so poll less often (60s) or rely on WebSocket
   const { data: menuItemsData } = useGetMenuItemsQuery(
     { branchId, companyId, limit: 100 },
-    { skip: !branchId, pollingInterval: 30000 }
+    { 
+      skip: !branchId, 
+      pollingInterval: 60000, // Poll every 60 seconds for menu (items change infrequently)
+      refetchOnMountOrArgChange: false, // Prevent refetch on every render
+    }
   );
   const menuItems = useMemo(() => {
     if (!menuItemsData) {
@@ -84,51 +93,77 @@ export default function CustomerOrderDisplayPage() {
   }, [menuItems]);
 
   // Fetch orders
+  // Use WebSocket for real-time updates, polling only as fallback when WebSocket is disconnected
+  // When WebSocket is connected, set very high polling interval (effectively disabled)
+  // When disconnected, use longer polling interval (60s) to reduce API calls
   const { data: pendingOrders = [], refetch: refetchPending } = useGetKitchenPendingOrdersQuery(branchId, {
     skip: !branchId,
-    pollingInterval: 5000,
+    pollingInterval: isConnected ? 300000 : 60000, // 5min when WebSocket connected (effectively disabled), 60s fallback
+    refetchOnMountOrArgChange: false, // Prevent refetch on every render
   });
 
   const { data: preparingOrders = [], refetch: refetchPreparing } = useGetKitchenPreparingOrdersQuery(branchId, {
     skip: !branchId,
-    pollingInterval: 5000,
+    pollingInterval: isConnected ? 300000 : 60000, // 5min when WebSocket connected (effectively disabled), 60s fallback
+    refetchOnMountOrArgChange: false, // Prevent refetch on every render
   });
 
   const { data: readyOrders = [], refetch: refetchReady } = useGetKitchenReadyOrdersQuery(branchId, {
     skip: !branchId,
-    pollingInterval: 5000,
+    pollingInterval: isConnected ? 300000 : 60000, // 5min when WebSocket connected (effectively disabled), 60s fallback
+    refetchOnMountOrArgChange: false, // Prevent refetch on every render
   });
 
   const refetchAll = useCallback(() => {
-    if (branchId) {
-      refetchPending();
-      refetchPreparing();
-      refetchReady();
+    if (!branchId) return;
+    
+    // Throttle refetches - prevent if called too frequently
+    const now = Date.now();
+    if (now - lastRefetchTimeRef.current < REFETCH_DEBOUNCE_MS) {
+      return;
     }
+    lastRefetchTimeRef.current = now;
+
+    refetchPending();
+    refetchPreparing();
+    refetchReady();
   }, [branchId, refetchPending, refetchPreparing, refetchReady]);
+
+  // Debounce refetch to prevent excessive API calls from rapid WebSocket events
+  const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const handleWebSocketUpdate = useCallback(() => {
+    // Clear existing timeout
+    if (refetchTimeoutRef.current) {
+      clearTimeout(refetchTimeoutRef.current);
+    }
+    
+    // Debounce to 800ms - batch multiple rapid WebSocket events into one refetch
+    refetchTimeoutRef.current = setTimeout(() => {
+      refetchAll();
+    }, 800);
+  }, [refetchAll]);
 
   // WebSocket listeners for real-time updates
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    const handleUpdate = () => {
-      refetchAll();
-    };
-
-    socket.on('kitchen:new-order', handleUpdate);
-    socket.on('kitchen:order-received', handleUpdate);
-    socket.on('kitchen:order-status-changed', handleUpdate);
-    socket.on('kitchen:item-ready', handleUpdate);
-    socket.on('kitchen:item-completed', handleUpdate);
+    socket.on('kitchen:new-order', handleWebSocketUpdate);
+    socket.on('kitchen:order-received', handleWebSocketUpdate);
+    socket.on('kitchen:order-status-changed', handleWebSocketUpdate);
+    socket.on('kitchen:item-ready', handleWebSocketUpdate);
+    socket.on('kitchen:item-completed', handleWebSocketUpdate);
 
     return () => {
-      socket.off('kitchen:new-order', handleUpdate);
-      socket.off('kitchen:order-received', handleUpdate);
-      socket.off('kitchen:order-status-changed', handleUpdate);
-      socket.off('kitchen:item-ready', handleUpdate);
-      socket.off('kitchen:item-completed', handleUpdate);
+      socket.off('kitchen:new-order', handleWebSocketUpdate);
+      socket.off('kitchen:order-received', handleWebSocketUpdate);
+      socket.off('kitchen:order-status-changed', handleWebSocketUpdate);
+      socket.off('kitchen:item-ready', handleWebSocketUpdate);
+      socket.off('kitchen:item-completed', handleWebSocketUpdate);
+      if (refetchTimeoutRef.current) {
+        clearTimeout(refetchTimeoutRef.current);
+      }
     };
-  }, [socket, isConnected, branchId, refetchAll]);
+  }, [socket, isConnected, handleWebSocketUpdate]);
 
   // Combine all orders and sort by status priority
   const allOrders = useMemo(() => {

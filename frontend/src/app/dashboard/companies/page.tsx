@@ -94,10 +94,10 @@ export default function CompaniesPage() {
 
   const [formData, setFormData] = useState<Partial<CreateCompanyRequest>>({
     name: '',
-    type: 'restaurant',
     email: '',
     phoneNumber: '',
     website: '',
+    slug: '',
     address: {
       street: '',
       city: '',
@@ -148,10 +148,10 @@ export default function CompaniesPage() {
   const resetForm = () => {
     setFormData({
       name: '',
-      type: 'restaurant',
       email: '',
       phoneNumber: '',
       website: '',
+      slug: '',
       address: {
         street: '',
         city: '',
@@ -197,10 +197,10 @@ export default function CompaniesPage() {
     try {
       await createCompany({
         name: formData.name!.trim(),
-        type: formData.type || 'restaurant',
         email: formData.email!.trim(),
         phoneNumber: formData.phoneNumber?.trim(),
         website: formData.website?.trim(),
+        slug: formData.slug?.trim(),
         address: formData.address!,
       } as CreateCompanyRequest).unwrap();
       toast.success('Company created successfully');
@@ -266,10 +266,10 @@ export default function CompaniesPage() {
     setSelectedCompany(company);
     setFormData({
       name: company.name,
-      type: company.type || 'restaurant',
       email: company.email,
       phoneNumber: company.phoneNumber,
       website: company.website,
+      slug: (company as any).slug || '',
       address: company.address || {
         street: '',
         city: '',
@@ -550,19 +550,6 @@ export default function CompaniesPage() {
                 error={formErrors.name}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Type</label>
-              <Select
-                value={formData.type || 'restaurant'}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                options={[
-                  { value: 'restaurant', label: 'Restaurant' },
-                  { value: 'cafe', label: 'Cafe' },
-                  { value: 'bar', label: 'Bar' },
-                  { value: 'bakery', label: 'Bakery' },
-                ]}
-              />
-            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -711,19 +698,6 @@ export default function CompaniesPage() {
                 error={formErrors.name}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Type</label>
-              <Select
-                value={formData.type || 'restaurant'}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                options={[
-                  { value: 'restaurant', label: 'Restaurant' },
-                  { value: 'cafe', label: 'Cafe' },
-                  { value: 'bar', label: 'Bar' },
-                  { value: 'bakery', label: 'Bakery' },
-                ]}
-              />
-            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -754,6 +728,21 @@ export default function CompaniesPage() {
               onChange={(e) => setFormData({ ...formData, website: e.target.value })}
               placeholder="https://example.com"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Public URL Slug (Custom URL identifier)
+            </label>
+            <Input
+              value={(formData as any).slug || ''}
+              onChange={(e) => setFormData({ ...formData, slug: e.target.value } as any)}
+              placeholder="company-url-slug"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Custom slug for public URLs. Leave empty to auto-generate from company name.
+              Only lowercase letters, numbers, and hyphens allowed.
+            </p>
           </div>
 
           <div className="border-t pt-4">

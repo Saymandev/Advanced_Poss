@@ -4,56 +4,91 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { apiSlice } from '@/lib/api/apiSlice';
 import { useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
+import { useActivateSubscriptionMutation } from '@/lib/api/endpoints/paymentsApi';
 import { useAppSelector } from '@/lib/store';
 import { CheckCircleIcon, SparklesIcon } from '@heroicons/react/24/outline';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function PaymentSuccessPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || '';
+  const [activationAttempted, setActivationAttempted] = useState(false);
+
+  // Get session_id from URL if available
+  const sessionId = searchParams?.get('session_id') || null;
 
   // Refetch company and subscription data to get the latest status
   const { refetch: refetchCompany } = useGetCompanyByIdQuery(companyId, {
     skip: !companyId,
   });
+  
+  const [activateSubscription] = useActivateSubscriptionMutation();
 
   useEffect(() => {
-    toast.success('Payment successful! Your subscription is now active.');
+    toast.success('Payment successful! Activating your subscription...');
     
-    // Invalidate all subscription and company related caches
-    // This ensures fresh data is fetched on the next page load
-    const invalidateCache = async () => {
+    const activateAndRefresh = async () => {
       try {
-        // Immediately invalidate all cache tags
+        // If we have session_id, try manual activation (for local dev where webhooks don't work)
+        if (sessionId && !activationAttempted) {
+          setActivationAttempted(true);
+          console.log('🔄 Attempting manual subscription activation for session:', sessionId);
+          
+          try {
+            const result = await activateSubscription({ sessionId }).unwrap();
+            if (result.success) {
+              console.log('✅ Manual activation successful:', result.message);
+              toast.success('Subscription activated successfully!');
+            } else {
+              console.warn('⚠️ Manual activation response:', result.message);
+            }
+          } catch (error: any) {
+            console.error('❌ Manual activation failed:', error);
+            // Don't show error toast - webhook might have already processed it
+          }
+        }
+
+        // Invalidate all subscription and company related caches
         apiSlice.util.invalidateTags(['Subscription', 'Company']);
-        
-        // Remove all cached queries for company and subscription
         apiSlice.util.resetApiState();
         
-        // Wait for webhook to process (can take a few seconds)
+        // Wait a bit then refetch
         setTimeout(async () => {
-          // Force refetch company data
           await refetchCompany();
-          
-          // Invalidate again after refetch
           apiSlice.util.invalidateTags(['Subscription', 'Company']);
           
-          // Force another refetch after a short delay to ensure webhook completed
-          setTimeout(async () => {
-            await refetchCompany();
-            apiSlice.util.invalidateTags(['Subscription', 'Company']);
-          }, 3000);
-        }, 3000);
+          // Check if subscription is now active
+          const updatedData = await refetchCompany();
+          const company = updatedData.data;
+          
+          if (company) {
+            console.log('📊 Company status after activation:', {
+              subscriptionStatus: company.subscriptionStatus,
+              trialEndDate: company.trialEndDate,
+              subscriptionPlan: company.subscriptionPlan,
+            });
+            
+            // If still trial, wait a bit more and try again
+            if (company.subscriptionStatus === 'trial' && company.trialEndDate) {
+              console.log('⏳ Still showing trial, waiting for webhook...');
+              setTimeout(async () => {
+                await refetchCompany();
+                apiSlice.util.invalidateTags(['Subscription', 'Company']);
+              }, 5000);
+            }
+          }
+        }, 2000);
       } catch (error) {
-        console.error('Error invalidating cache:', error);
+        console.error('Error in activation flow:', error);
       }
     };
 
-    invalidateCache();
-  }, [refetchCompany]);
+    activateAndRefresh();
+  }, [sessionId, activationAttempted, activateSubscription, refetchCompany]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">

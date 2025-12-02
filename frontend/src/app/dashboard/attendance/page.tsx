@@ -6,30 +6,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-    AttendanceRecord,
-    useApproveAttendanceMutation,
-    useCheckInMutation,
-    useCheckOutMutation,
-    useDeleteAttendanceMutation,
-    useGetAttendanceRecordsQuery,
-    useGetAttendanceStatsQuery,
-    useGetTodayAttendanceQuery,
-    useMarkAbsentMutation,
-    useUpdateAttendanceMutation
+  AttendanceRecord,
+  useApproveAttendanceMutation,
+  useCheckInMutation,
+  useCheckOutMutation,
+  useDeleteAttendanceMutation,
+  useGetAttendanceRecordsQuery,
+  useGetAttendanceStatsQuery,
+  useGetTodayAttendanceQuery,
+  useMarkAbsentMutation,
+  useUpdateAttendanceMutation
 } from '@/lib/api/endpoints/attendanceApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-    CheckCircleIcon,
-    ClockIcon,
-    TrashIcon,
-    UserGroupIcon,
-    XCircleIcon
+  CheckCircleIcon,
+  ClockIcon,
+  TrashIcon,
+  UserGroupIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function AttendancePage() {
   const { user } = useAppSelector((state) => state.auth);
@@ -43,9 +43,18 @@ export default function AttendancePage() {
   const [checkInNotes, setCheckInNotes] = useState('');
   const [checkOutNotes, setCheckOutNotes] = useState('');
 
+  // Check if user is owner/manager (can see all employees)
+  const isOwnerOrManager = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'super_admin';
+  
   // API calls
-  const { data: todayAttendance = [], isLoading: todayLoading } = useGetTodayAttendanceQuery(user?.branchId || '');
-  const { data: attendanceStats, isLoading: statsLoading } = useGetAttendanceStatsQuery(user?.branchId || '');
+  const { data: todayAttendance = [], isLoading: todayLoading, refetch: refetchTodayAttendance } = useGetTodayAttendanceQuery(
+    user?.branchId || '',
+    { skip: !user?.branchId }
+  );
+  const { data: attendanceStats, isLoading: statsLoading } = useGetAttendanceStatsQuery(
+    user?.branchId || '',
+    { skip: !user?.branchId }
+  );
   const { data: _attendanceRecords, isLoading: recordsLoading } = useGetAttendanceRecordsQuery({
     branchId: user?.branchId || '',
     page: 1,
@@ -64,11 +73,13 @@ export default function AttendancePage() {
     try {
       await checkIn({
         branchId: user?.branchId || '',
-        notes: checkInNotes,
+        ...(checkInNotes?.trim() && { notes: checkInNotes.trim() }),
       }).unwrap();
       toast.success('Checked in successfully');
       setIsCheckInModalOpen(false);
       setCheckInNotes('');
+      // RTK Query will automatically refetch due to invalidatesTags, but we can also manually refetch for immediate update
+      refetchTodayAttendance();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to check in');
     }
@@ -77,11 +88,13 @@ export default function AttendancePage() {
   const handleCheckOut = async () => {
     try {
       await checkOut({
-        notes: checkOutNotes,
+        ...(checkOutNotes?.trim() && { notes: checkOutNotes.trim() }),
       }).unwrap();
       toast.success('Checked out successfully');
       setIsCheckOutModalOpen(false);
       setCheckOutNotes('');
+      // RTK Query will automatically refetch due to invalidatesTags, but we can also manually refetch for immediate update
+      refetchTodayAttendance();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to check out');
     }
@@ -227,39 +240,50 @@ export default function AttendancePage() {
       key: 'actions',
       title: 'Actions',
       header: 'Actions',
-      render: (record: AttendanceRecord) => (
-        <div className="flex items-center gap-2">
-          {!record.checkOut && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                _setSelectedRecord(record);
-                setIsCheckOutModalOpen(true);
-              }}
-            >
-              <ClockIcon className="w-4 h-4" />
-            </Button>
-          )}
-          {(record as any).status === 'pending' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleApproveAttendance(record.id)}
-            >
-              <CheckCircleIcon className="w-4 h-4" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDeleteAttendance(record.id)}
-            className="text-red-600 hover:text-red-700"
-          >
-            <TrashIcon className="w-4 h-4" />
-          </Button>
-        </div>
-      ),
+      render: (record: AttendanceRecord) => {
+        // Only show actions for owners/managers, or if it's the user's own record
+        const canManage = isOwnerOrManager || record.userId === user?.id;
+        if (!canManage) return null;
+        
+        return (
+          <div className="flex items-center gap-2">
+            {!record.checkOut && record.userId === user?.id && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  _setSelectedRecord(record);
+                  setIsCheckOutModalOpen(true);
+                }}
+                title="Check Out"
+              >
+                <ClockIcon className="w-4 h-4" />
+              </Button>
+            )}
+            {isOwnerOrManager && (record as any).status === 'pending' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleApproveAttendance(record.id)}
+                title="Approve"
+              >
+                <CheckCircleIcon className="w-4 h-4" />
+              </Button>
+            )}
+            {isOwnerOrManager && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteAttendance(record.id)}
+                className="text-red-600 hover:text-red-700"
+                title="Delete"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -298,67 +322,103 @@ export default function AttendancePage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Employees</p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {isLoading ? '...' : attendanceStats?.totalEmployees || 0}
-                </p>
+        {isOwnerOrManager && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Employees</p>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {isLoading ? '...' : attendanceStats?.totalEmployees || 0}
+                  </p>
+                </div>
+                <UserGroupIcon className="w-8 h-8 text-blue-600" />
               </div>
-              <UserGroupIcon className="w-8 h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Present Today</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {isLoading ? '...' : attendanceStats?.presentToday || 0}
-                </p>
-              </div>
-              <CheckCircleIcon className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
+        {isOwnerOrManager ? (
+          <>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Present Today</p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {isLoading ? '...' : attendanceStats?.presentToday || 0}
+                    </p>
+                  </div>
+                  <CheckCircleIcon className="w-8 h-8 text-green-600" />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Absent Today</p>
-                <p className="text-3xl font-bold text-red-600">
-                  {isLoading ? '...' : attendanceStats?.absentToday || 0}
-                </p>
-              </div>
-              <XCircleIcon className="w-8 h-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Absent Today</p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {isLoading ? '...' : attendanceStats?.absentToday || 0}
+                    </p>
+                  </div>
+                  <XCircleIcon className="w-8 h-8 text-red-600" />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Attendance Rate</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {isLoading ? '...' : `${attendanceStats?.attendanceRate || 0}%`}
-                </p>
-              </div>
-              <ClockIcon className="w-8 h-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Attendance Rate</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {isLoading ? '...' : `${attendanceStats?.attendanceRate || 0}%`}
+                    </p>
+                  </div>
+                  <ClockIcon className="w-8 h-8 text-purple-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">My Status</p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {todayAttendance.length > 0 ? 'Present' : 'Not Checked In'}
+                    </p>
+                  </div>
+                  <CheckCircleIcon className="w-8 h-8 text-green-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Hours Worked</p>
+                    <p className="text-3xl font-bold text-blue-600">
+                      {isLoading ? '...' : todayAttendance[0]?.totalHours?.toFixed(1) || '0.0'}h
+                    </p>
+                  </div>
+                  <ClockIcon className="w-8 h-8 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Today's Attendance */}
       <Card>
         <CardHeader>
-          <CardTitle>Today's Attendance</CardTitle>
+          <CardTitle>{isOwnerOrManager ? "Today's Attendance" : "My Attendance"}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (

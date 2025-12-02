@@ -117,9 +117,28 @@ export const publicApi = apiSlice.injectEndpoints({
         `/public/companies/${companySlug}/branches/${branchSlug}/menu`,
       transformResponse: (response: any) => {
         const data = response.data || response;
+        
+        // Ensure categories is an array
+        let categories = [];
+        if (Array.isArray(data.categories)) {
+          categories = data.categories;
+        } else if (data.categories?.categories && Array.isArray(data.categories.categories)) {
+          categories = data.categories.categories;
+        }
+        
+        // Ensure menuItems is an array
+        let menuItems = [];
+        if (Array.isArray(data.menuItems)) {
+          menuItems = data.menuItems;
+        } else if (data.menuItems?.menuItems && Array.isArray(data.menuItems.menuItems)) {
+          menuItems = data.menuItems.menuItems;
+        } else if (Array.isArray(data.menu)) {
+          menuItems = data.menu;
+        }
+        
         return {
-          categories: data.categories || [],
-          menuItems: data.menuItems || data.menu || [],
+          categories,
+          menuItems,
         };
       },
     }),
@@ -198,6 +217,21 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || null;
       },
     }),
+    
+    submitContactForm: builder.mutation<{ success: boolean; message: string }, {
+      companySlug: string;
+      name: string;
+      email: string;
+      phone?: string;
+      subject: string;
+      message: string;
+    }>({
+      query: ({ companySlug, ...formData }) => ({
+        url: `/public/companies/${companySlug}/contact`,
+        method: 'POST',
+        body: formData,
+      }),
+    }),
   }),
 });
 
@@ -214,5 +248,6 @@ export const {
   useTrackOrderQuery,
   useGetBranchZonesQuery,
   useFindDeliveryZoneMutation,
+  useSubmitContactFormMutation,
 } = publicApi;
 

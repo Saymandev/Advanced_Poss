@@ -38,11 +38,28 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
   // Handle 401 unauthorized errors (token expired)
   if (result.error && result.error.status === 401) {
     const errorData = result.error.data as any;
+    const requestUrl = args?.url || '';
     
     console.warn('🔴 401 Unauthorized - Attempting token refresh');
-    console.warn('Request URL:', args?.url || args?.toString() || 'Unknown');
+    console.warn('Request URL:', requestUrl || args?.toString() || 'Unknown');
     console.warn('Request args:', { url: args?.url, method: args?.method, body: args?.body });
     console.warn('Error data:', errorData);
+    
+    // Skip token refresh and redirect for authentication endpoints (login, PIN login, etc.)
+    // These endpoints handle their own errors and shouldn't trigger global redirect
+    const authEndpoints = [
+      '/auth/login',
+      '/auth/login/pin',
+      '/auth/login/pin-with-role',
+      '/auth/login/super-admin',
+      '/auth/register',
+      '/auth/find-company',
+    ];
+    
+    if (authEndpoints.some(endpoint => requestUrl.includes(endpoint))) {
+      console.log('⚠️ Auth endpoint 401 error - skipping token refresh and redirect (let component handle error)');
+      return result; // Return error as-is, let the component handle it
+    }
     
     // Check if it's a subscription expiry error (don't try to refresh token)
     if (errorData?.code === 'SUBSCRIPTION_EXPIRED' || errorData?.code === 'TRIAL_EXPIRED') {
@@ -64,7 +81,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
     console.warn('Refresh token available:', refreshToken ? 'YES' : 'NO');
     
     // Don't try to refresh if this is a refresh token request itself
-    if (args.url === '/auth/refresh') {
+    if (requestUrl === '/auth/refresh' || requestUrl.includes('/auth/refresh')) {
       console.error('❌ Refresh token request failed - logging out');
       api.dispatch(logout());
       if (typeof window !== 'undefined') {
@@ -279,6 +296,7 @@ export const apiSlice = createApi({
     'Review',
     'RolePermission',
     'MyPermissions',
+    'Gallery',
   ],
   endpoints: () => ({}),
 });

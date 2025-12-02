@@ -92,20 +92,72 @@ export default function SettingsPage() {
   });
 
   // Get branches for the company
-  const { data: branchesData } = useGetBranchesQuery(
+  const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(
     { companyId, limit: 100 },
     { skip: !companyId }
   );
   const branches = branchesData?.branches || [];
   const currentBranch = branches.find(b => b.id === branchId);
+  
+  // Auto-refetch branches if slug is missing (backend will auto-generate it)
+  useEffect(() => {
+    if (currentBranch && !currentBranch.slug && company?.slug) {
+      // Small delay to let backend process the auto-generation
+      const timer = setTimeout(() => {
+        refetchBranches();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentBranch?.slug, company?.slug, refetchBranches]);
+
+  // Debug: Log branch and company data
+  useEffect(() => {
+    if (currentBranch) {
+      console.log('🔍 Current Branch Data:', {
+        id: currentBranch.id,
+        name: currentBranch.name,
+        slug: currentBranch.slug,
+        hasSlug: !!currentBranch.slug,
+        publicUrl: currentBranch.publicUrl,
+      });
+    }
+    if (company) {
+      console.log('🔍 Company Data:', {
+        id: company.id,
+        name: company.name,
+        slug: company.slug,
+        hasSlug: !!company.slug,
+      });
+    }
+  }, [currentBranch, company]);
 
   // Update branch public URL mutation
   const [updateBranchPublicUrl] = useUpdateBranchPublicUrlMutation();
 
+  // Helper function to generate public URL from slugs
+  const generatePublicUrl = (companySlug?: string, branchSlug?: string): string | null => {
+    if (!companySlug) return null;
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    if (branchSlug) {
+      return `${baseUrl}/${companySlug}/${branchSlug}`;
+    }
+    return `${baseUrl}/${companySlug}`;
+  };
+
   // Generate company-level public URL (fallback)
-  const companyPublicUrl = company?.slug 
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/${company.slug}`
-    : null;
+  const companyPublicUrl = generatePublicUrl(company?.slug);
+
+  // Generate branch public URL from slugs if not stored
+  const getBranchPublicUrl = (branch: typeof currentBranch): string | null => {
+    if (branch?.publicUrl) {
+      return branch.publicUrl;
+    }
+    // Generate from slugs
+    if (company?.slug && branch?.slug) {
+      return generatePublicUrl(company.slug, branch.slug);
+    }
+    return null;
+  };
 
   const copyPublicUrl = (url: string) => {
     if (!url) {
@@ -579,58 +631,104 @@ export default function SettingsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {currentBranch.publicUrl ? (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      Share this URL with your customers to access your branch's online menu, place orders, and view your restaurant information.
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 flex items-center gap-2">
-                        <LinkIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                        <input
-                          type="text"
-                          value={currentBranch.publicUrl}
-                          readOnly
-                          className="flex-1 bg-transparent border-none outline-none text-gray-900 dark:text-white text-sm font-mono"
-                        />
+                {(() => {
+                  const branchPublicUrl = getBranchPublicUrl(currentBranch!);
+                  return branchPublicUrl ? (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        Share this URL with your customers to access your branch's online menu, place orders, and view your restaurant information.
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 flex items-center gap-2">
+                          <LinkIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={branchPublicUrl}
+                            readOnly
+                            className="flex-1 bg-transparent border-none outline-none text-gray-900 dark:text-white text-sm font-mono"
+                          />
+                        </div>
+                        <Button
+                          onClick={() => copyPublicUrl(branchPublicUrl)}
+                          variant="primary"
+                          className="flex items-center gap-2"
+                        >
+                          <ClipboardDocumentIcon className="w-4 h-4" />
+                          Copy URL
+                        </Button>
                       </div>
-                      <Button
-                        onClick={() => copyPublicUrl(currentBranch.publicUrl!)}
-                        variant="primary"
-                        className="flex items-center gap-2"
-                      >
-                        <ClipboardDocumentIcon className="w-4 h-4" />
-                        Copy URL
-                      </Button>
+                      {(!currentBranch?.publicUrl && (company?.slug && currentBranch?.slug)) && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          This URL is generated from your company slug ({company.slug}) and branch slug ({currentBranch.slug})
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <a
+                          href={branchPublicUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                        >
+                          <GlobeAltIcon className="w-4 h-4" />
+                          Open in new tab
+                        </a>
+                        <span className="text-gray-400 dark:text-gray-600">•</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          This URL is automatically included in your digital receipts
+                        </span>
+                      </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <a
-                        href={currentBranch.publicUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                      >
-                        <GlobeAltIcon className="w-4 h-4" />
-                        Open in new tab
-                      </a>
-                      <span className="text-gray-400 dark:text-gray-600">•</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        This URL is automatically included in your digital receipts
-                      </span>
+                  ) : (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                        <strong>Public URL not configured for this branch</strong>
+                      </p>
+                      <div className="space-y-1 text-sm text-yellow-700 dark:text-yellow-300">
+                        {!company?.slug && (
+                          <p>⚠️ <strong>Company slug is missing.</strong> Go to <a href="/dashboard/companies" className="underline font-semibold">Companies</a> page to set it.</p>
+                        )}
+                        {!currentBranch?.slug && (
+                          <p>⚠️ <strong>Branch slug is missing.</strong> Go to <a href="/dashboard/branches" className="underline font-semibold">Branches</a> page to set it.</p>
+                        )}
+                        {company?.slug && currentBranch?.slug && (
+                          <p>⚠️ Both slugs are configured but URL generation failed. Please check the configuration.</p>
+                        )}
+                        {isSuperAdmin ? (
+                          <p className="mt-2">
+                            {company?.slug && currentBranch?.slug 
+                              ? 'You can set a custom URL below if needed.'
+                              : 'Configure the missing slugs above, or set a custom URL below.'}
+                          </p>
+                        ) : (
+                          <p className="mt-2">Please contact your administrator to configure the missing slugs.</p>
+                        )}
+                      </div>
+                      {isSuperAdmin && (
+                        <div className="mt-3 pt-3 border-t border-yellow-300 dark:border-yellow-700">
+                          <p className="text-xs text-yellow-800 dark:text-yellow-400 font-semibold mb-1">Quick Actions:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {!company?.slug && (
+                              <a 
+                                href="/dashboard/companies" 
+                                className="text-xs px-3 py-1 bg-yellow-100 dark:bg-yellow-900/50 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors"
+                              >
+                                Set Company Slug
+                              </a>
+                            )}
+                            {!currentBranch?.slug && (
+                              <a 
+                                href="/dashboard/branches" 
+                                className="text-xs px-3 py-1 bg-yellow-100 dark:bg-yellow-900/50 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors"
+                              >
+                                Set Branch Slug
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
-                      <strong>Public URL not configured for this branch</strong>
-                    </p>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                      {isSuperAdmin 
-                        ? 'You can configure the public URL for this branch below.'
-                        : 'Please contact your administrator to configure the public URL for this branch.'}
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
               </CardContent>
             </Card>
           )}
@@ -678,46 +776,58 @@ export default function SettingsPage() {
                             </div>
                           ) : (
                             <div className="mt-2">
-                              {branch.publicUrl ? (
-                                <div className="flex items-center gap-2">
-                                  <code className="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded flex-1 font-mono">
-                                    {branch.publicUrl}
-                                  </code>
-                                  <Button
-                                    onClick={() => copyPublicUrl(branch.publicUrl!)}
-                                    size="sm"
-                                    variant="ghost"
-                                  >
-                                    <ClipboardDocumentIcon className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    onClick={() => setEditingBranchUrl({ branchId: branch.id, url: branch.publicUrl || '' })}
-                                    size="sm"
-                                    variant="ghost"
-                                  >
-                                    <PencilIcon className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm text-gray-500 dark:text-gray-400 italic">
-                                    No URL configured
-                                  </span>
-                                  <Button
-                                    onClick={() => {
-                                      const defaultUrl = companyPublicUrl 
-                                        ? `${companyPublicUrl}/${branch.slug || branch.name.toLowerCase().replace(/\s+/g, '-')}`
-                                        : '';
-                                      setEditingBranchUrl({ branchId: branch.id, url: defaultUrl });
-                                    }}
-                                    size="sm"
-                                    variant="ghost"
-                                  >
-                                    <PlusIcon className="w-4 h-4 mr-1" />
-                                    Add URL
-                                  </Button>
-                                </div>
-                              )}
+                              {(() => {
+                                const branchUrl = branch.publicUrl || generatePublicUrl(company?.slug, branch.slug);
+                                return branchUrl ? (
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded flex-1 font-mono">
+                                      {branchUrl}
+                                      {!branch.publicUrl && (company?.slug && branch.slug) && (
+                                        <span className="text-xs text-gray-500 ml-2">(from slugs)</span>
+                                      )}
+                                    </code>
+                                    <Button
+                                      onClick={() => copyPublicUrl(branchUrl)}
+                                      size="sm"
+                                      variant="ghost"
+                                    >
+                                      <ClipboardDocumentIcon className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      onClick={() => setEditingBranchUrl({ branchId: branch.id, url: branchUrl })}
+                                      size="sm"
+                                      variant="ghost"
+                                    >
+                                      <PencilIcon className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                      No URL configured
+                                      {(!company?.slug || !branch.slug) && (
+                                        <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                                          (slugs missing)
+                                        </span>
+                                      )}
+                                    </span>
+                                    <Button
+                                      onClick={() => {
+                                        const defaultUrl = generatePublicUrl(
+                                          company?.slug, 
+                                          branch.slug || branch.name.toLowerCase().replace(/\s+/g, '-')
+                                        ) || '';
+                                        setEditingBranchUrl({ branchId: branch.id, url: defaultUrl });
+                                      }}
+                                      size="sm"
+                                      variant="ghost"
+                                    >
+                                      <PlusIcon className="w-4 h-4 mr-1" />
+                                      Add URL
+                                    </Button>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>

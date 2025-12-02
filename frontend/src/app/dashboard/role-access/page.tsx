@@ -3,12 +3,14 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetBranchesQuery } from '@/lib/api/endpoints/branchesApi';
 import { useGetRolePermissionsQuery, useUpdateRolePermissionMutation } from '@/lib/api/endpoints/rolePermissionsApi';
-import { Staff, useDeleteStaffMutation, useDeactivateStaffMutation, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
-import { useAdminUpdatePasswordMutation, useAdminUpdatePinMutation, useActivateUserMutation } from '@/lib/api/endpoints/usersApi';
+import { Staff, useDeactivateStaffMutation, useDeleteStaffMutation, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
+import { useActivateUserMutation, useAdminUpdatePasswordMutation, useAdminUpdatePinMutation } from '@/lib/api/endpoints/usersApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import {
@@ -19,13 +21,16 @@ import {
   ClipboardDocumentListIcon,
   ClockIcon,
   CogIcon,
+  ComputerDesktopIcon,
   CurrencyDollarIcon,
   ExclamationTriangleIcon,
   EyeIcon,
+  GiftIcon,
   KeyIcon,
   LockClosedIcon,
   MapPinIcon,
   PencilIcon,
+  PrinterIcon,
   ReceiptPercentIcon,
   ShieldCheckIcon,
   ShoppingBagIcon,
@@ -38,8 +43,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Input } from '@/components/ui/Input';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 interface Feature {
   id: string;
@@ -70,15 +73,25 @@ const features: Feature[] = [
   // Menu & Products
   { id: 'menu-management', name: 'Menu Management', description: 'Manage menu items and categories', icon: ShoppingBagIcon, category: 'Menu' },
   { id: 'categories', name: 'Categories', description: 'Manage menu categories', icon: ClipboardDocumentListIcon, category: 'Menu' },
+  { id: 'qr-menus', name: 'QR Menus', description: 'Create and manage QR code menus', icon: TableCellsIcon, category: 'Menu' },
 
   // Orders & Tables
   { id: 'order-management', name: 'Order Management', description: 'Manage orders and transactions', icon: ClipboardDocumentListIcon, category: 'Orders' },
   { id: 'table-management', name: 'Table Management', description: 'Manage restaurant tables', icon: TableCellsIcon, category: 'Orders' },
   { id: 'kitchen-display', name: 'Kitchen Display', description: 'Access kitchen display system', icon: BuildingStorefrontIcon, category: 'Orders' },
+  { id: 'customer-display', name: 'Customer Display', description: 'Access customer display system', icon: ComputerDesktopIcon, category: 'Orders' },
+  { id: 'pos-settings', name: 'POS Settings', description: 'Configure POS system settings', icon: CogIcon, category: 'Orders' },
+  { id: 'printer-management', name: 'Printer Management', description: 'Manage receipt and kitchen printers', icon: PrinterIcon, category: 'Orders' },
+  { id: 'digital-receipts', name: 'Digital Receipts', description: 'Generate and manage digital receipts', icon: ReceiptPercentIcon, category: 'Orders' },
 
   // Customer Management
   { id: 'customer-management', name: 'Customer Management', description: 'Manage customer data', icon: UserGroupIcon, category: 'Customers' },
   { id: 'loyalty-program', name: 'Loyalty Program', description: 'Manage loyalty programs', icon: ReceiptPercentIcon, category: 'Customers' },
+  { id: 'marketing', name: 'Marketing', description: 'Access marketing and promotions', icon: GiftIcon, category: 'Customers' },
+
+  // AI Features
+  { id: 'ai-menu-optimization', name: 'AI Menu Optimization', description: 'AI-powered menu recommendations', icon: ChartBarIcon, category: 'AI Features' },
+  { id: 'ai-customer-loyalty', name: 'Customer Loyalty AI', description: 'AI-powered customer loyalty insights', icon: UserGroupIcon, category: 'AI Features' },
 
   // Inventory & Suppliers
   { id: 'inventory', name: 'Inventory Management', description: 'Manage inventory and stock', icon: ClipboardDocumentListIcon, category: 'Inventory' },
@@ -1316,7 +1329,7 @@ export default function RoleAccessPage() {
               const categoryFeatures = getFeaturesByCategory(category);
               const selectedCount = categoryFeatures.filter(f => selectedFeatures.includes(f.id)).length;
               const allSelected = categoryFeatures.length > 0 && selectedCount === categoryFeatures.length;
-              const someSelected = selectedCount > 0 && selectedCount < categoryFeatures.length;
+              
 
               return (
                 <div key={category} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">

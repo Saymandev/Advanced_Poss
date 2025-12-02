@@ -6,7 +6,7 @@ import { useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
 import { CheckCircleIcon, ExclamationTriangleIcon, HomeIcon, PhoneIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function OrderConfirmationPage() {
@@ -15,7 +15,28 @@ export default function OrderConfirmationPage() {
   const searchParams = useSearchParams();
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
-  const orderId = searchParams.get('orderId');
+  const orderIdFromUrl = searchParams.get('orderId');
+  
+  // Get tracking URL from sessionStorage if available (from checkout page)
+  const [trackingUrl, setTrackingUrl] = useState<string | null>(null);
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const orderId = orderIdFromUrl || orderNumber || 'pending';
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedTrackingUrl = sessionStorage.getItem('lastTrackingUrl');
+      const storedOrderNumber = sessionStorage.getItem('lastOrderNumber');
+      if (storedTrackingUrl) {
+        setTrackingUrl(storedTrackingUrl);
+        sessionStorage.removeItem('lastTrackingUrl'); // Clear after use
+      }
+      if (storedOrderNumber) {
+        setOrderNumber(storedOrderNumber);
+        sessionStorage.removeItem('lastOrderNumber'); // Clear after use
+      }
+      sessionStorage.removeItem('lastOrderId'); // Clear after use
+    }
+  }, []);
 
   const { 
     data: company, 
@@ -52,11 +73,46 @@ export default function OrderConfirmationPage() {
             <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Company Not Found</h1>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Unable to load company information.
+              Unable to load company information. Please try again.
             </p>
-            <Button onClick={() => router.push('/')}>
-              Go to Homepage
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => router.push(`/${companySlug}`)} variant="secondary">
+                Go Back
+              </Button>
+              <Button onClick={() => router.push('/')}>
+                Go to Homepage
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Validate orderId
+  if (!orderId || orderId === 'pending') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <ExclamationTriangleIcon className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Order Processing</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Your order is being processed. Please check back in a moment or contact us if you have your order number.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Link href={`/${companySlug}/${branchSlug}/shop`}>
+                <Button variant="secondary">Continue Shopping</Button>
+              </Link>
+              {company?.phone && (
+                <a href={`tel:${company.phone}`}>
+                  <Button>
+                    <PhoneIcon className="w-4 h-4 mr-2" />
+                    Call Us
+                  </Button>
+                </a>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -82,9 +138,10 @@ export default function OrderConfirmationPage() {
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 md:p-6 mb-4 md:mb-6">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Order Number</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3 md:mb-4">
-                {orderId}
+                {orderNumber || orderId}
               </p>
-              <Link href={`/${companySlug}/${branchSlug}/track/${orderId}`}>
+              {/* Use tracking URL from sessionStorage if available, otherwise build from slugs */}
+              <Link href={trackingUrl || `/${companySlug}/${branchSlug}/track/${orderId}`}>
                 <Button variant="outline" className="w-full">
                   Track Your Order
                 </Button>
