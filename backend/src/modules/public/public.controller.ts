@@ -8,6 +8,7 @@ import {
   Query
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { GeneratorUtil } from '../../common/utils/generator.util';
 import { Public } from '../../common/decorators/public.decorator';
 import { BranchesService } from '../branches/branches.service';
 import { CategoriesService } from '../categories/categories.service';
@@ -48,12 +49,23 @@ export class PublicController {
   @ApiOperation({ summary: 'Get all branches for a company (public)' })
   async getCompanyBranches(@Param('companySlug') companySlug: string) {
     const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException(`Company with slug "${companySlug}" not found`);
+    }
     const companyId = (company as any)._id?.toString() || (company as any).id;
-    const branches = await this.branchesService.findByCompany(companyId);
+    
+    // Use findAll to get branches with proper slug handling
+    const branchesResult = await this.branchesService.findAll({ companyId } as any);
+    const branches = Array.isArray(branchesResult) 
+      ? branchesResult 
+      : (branchesResult as any)?.branches || [];
+    
+    // Filter active branches and ensure they have slugs
+    const activeBranches = branches.filter((b: any) => b.isActive);
     
     return {
       success: true,
-      data: branches.filter((b: any) => b.isActive),
+      data: activeBranches,
     };
   }
 
@@ -161,15 +173,21 @@ export class PublicController {
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
     const branchId = (branch as any)._id?.toString() || (branch as any).id;
     const categories = await this.categoriesService.findAll({ branchId } as any);
-    const menuItems = await this.menuItemsService.findAll({ 
+    const menuItemsResult = await this.menuItemsService.findAll({ 
       branchId,
       isAvailable: true 
     } as any);
 
+    // Extract menuItems array from the result object
+    // menuItemsService.findAll returns { menuItems: [], total, page, limit }
+    const menuItems = Array.isArray(menuItemsResult) 
+      ? menuItemsResult 
+      : (menuItemsResult as any)?.menuItems || [];
+
     return {
       success: true,
       data: {
-        categories,
+        categories: Array.isArray(categories) ? categories : [],
         menuItems,
       },
     };
@@ -214,11 +232,15 @@ export class PublicController {
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
     const branchId = (branch as any)._id?.toString() || (branch as any).id;
     
-    return this.publicService.createOrder({
+    const result = await this.publicService.createOrder({
       ...orderData,
       companyId,
       branchId,
+      companySlug,
+      branchSlug,
     });
+    
+    return result;
   }
 
   @Public()
@@ -289,6 +311,22 @@ export class PublicController {
       success: true,
       data: zone,
     };
+  }
+
+  @Public()
+  @Post('companies/:companySlug/contact')
+  @ApiOperation({ summary: 'Submit contact form (public)' })
+  async submitContactForm(
+    @Param('companySlug') companySlug: string,
+    @Body() contactFormDto: any,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+    
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    return this.publicService.submitContactForm(companyId, contactFormDto);
   }
 }
 

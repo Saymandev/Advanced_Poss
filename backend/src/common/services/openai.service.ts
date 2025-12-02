@@ -8,9 +8,52 @@ export class OpenAIService {
   private openai: OpenAI | null = null;
   private isEnabled = false;
 
+  private getValidModel(configuredModel: string): string {
+    // List of valid OpenAI models
+    const validModels = [
+      'gpt-4o',
+      'gpt-4o-mini',
+      'gpt-4-turbo',
+      'gpt-4-turbo-preview',
+      'gpt-4-0125-preview',
+      'gpt-4-1106-preview',
+      'gpt-3.5-turbo',
+      'gpt-3.5-turbo-16k',
+    ];
+
+    // Check if configured model is valid
+    if (validModels.includes(configuredModel)) {
+      return configuredModel;
+    }
+
+    // Handle common invalid model names
+    const modelMap: Record<string, string> = {
+      'gpt-4': 'gpt-4o-mini', // gpt-4 doesn't exist, use gpt-4o-mini
+      'gpt4': 'gpt-4o-mini',
+      'gpt4-turbo': 'gpt-4-turbo',
+    };
+
+    if (modelMap[configuredModel.toLowerCase()]) {
+      const fallbackModel = modelMap[configuredModel.toLowerCase()];
+      this.logger.warn(
+        `⚠️ Invalid OpenAI model "${configuredModel}" configured. Falling back to "${fallbackModel}". ` +
+        `Valid models: ${validModels.join(', ')}`
+      );
+      return fallbackModel;
+    }
+
+    // Default fallback
+    this.logger.warn(
+      `⚠️ Unknown OpenAI model "${configuredModel}". Using default "gpt-4o-mini". ` +
+      `Valid models: ${validModels.join(', ')}`
+    );
+    return 'gpt-4o-mini';
+  }
+
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('openai.apiKey');
-    const model = this.configService.get<string>('openai.model') || 'gpt-4o-mini';
+    const configuredModel = this.configService.get<string>('openai.model') || 'gpt-4o-mini';
+    const model = this.getValidModel(configuredModel);
 
     if (apiKey) {
       try {
@@ -19,6 +62,9 @@ export class OpenAIService {
         });
         this.isEnabled = true;
         this.logger.log(`✅ OpenAI service initialized with model: ${model}`);
+        if (configuredModel !== model) {
+          this.logger.warn(`⚠️ Model corrected from "${configuredModel}" to "${model}"`);
+        }
       } catch (error) {
         this.logger.warn(`⚠️ Failed to initialize OpenAI service: ${error.message}`);
         this.isEnabled = false;
@@ -70,7 +116,8 @@ export class OpenAIService {
     }
 
     try {
-      const model = this.configService.get<string>('openai.model') || 'gpt-4o-mini';
+      const configuredModel = this.configService.get<string>('openai.model') || 'gpt-4o-mini';
+      const model = this.getValidModel(configuredModel);
       
       const prompt = `You are an expert restaurant menu pricing consultant. Analyze the following menu item data and provide a pricing recommendation.
 
@@ -185,7 +232,8 @@ Return ONLY valid JSON, no additional text.`;
     }
 
     try {
-      const model = this.configService.get<string>('openai.model') || 'gpt-4o-mini';
+      const configuredModel = this.configService.get<string>('openai.model') || 'gpt-4o-mini';
+      const model = this.getValidModel(configuredModel);
 
       const prompt = `You are an expert restaurant demand forecasting consultant. Predict the demand for the next 7 days for this menu item.
 

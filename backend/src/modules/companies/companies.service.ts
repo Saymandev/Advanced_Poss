@@ -157,15 +157,64 @@ export class CompaniesService {
       throw new BadRequestException('Invalid company ID');
     }
 
-    const company = await this.companyModel
-      .findByIdAndUpdate(id, updateCompanyDto, { new: true })
-      .populate('ownerId', 'firstName lastName email');
-
+    const company = await this.companyModel.findById(id);
     if (!company) {
       throw new NotFoundException('Company not found');
     }
 
-    return company;
+    // Handle slug update with validation
+    if ((updateCompanyDto as any).slug !== undefined) {
+      let newSlug = (updateCompanyDto as any).slug;
+      
+      // If slug is provided, validate and ensure uniqueness
+      if (newSlug) {
+        // Sanitize slug
+        newSlug = GeneratorUtil.generateSlug(newSlug);
+        
+        if (!newSlug) {
+          throw new BadRequestException('Invalid slug format. Slug cannot be empty after sanitization.');
+        }
+
+        // Check uniqueness (exclude current company)
+        const existingCompany = await this.companyModel.findOne({ 
+          slug: newSlug,
+          _id: { $ne: id }
+        });
+        
+        if (existingCompany) {
+          throw new BadRequestException(`Slug "${newSlug}" is already taken by another company.`);
+        }
+        
+        (updateCompanyDto as any).slug = newSlug;
+      } else {
+        // If slug is being removed or set to empty, generate one from company name
+        const companyName = (updateCompanyDto as any).name || company.name;
+        const existingSlugs = await this.companyModel.find({ slug: { $exists: true } })
+          .select('slug')
+          .lean();
+        const slugsList = existingSlugs.map((c: any) => c.slug).filter(Boolean);
+        const autoSlug = GeneratorUtil.generateUniqueSlug(companyName, slugsList);
+        (updateCompanyDto as any).slug = autoSlug;
+      }
+    } else if (!company.slug) {
+      // Generate slug if company doesn't have one
+      const existingSlugs = await this.companyModel.find({ slug: { $exists: true } })
+        .select('slug')
+        .lean();
+      const slugsList = existingSlugs.map((c: any) => c.slug).filter(Boolean);
+      const autoSlug = GeneratorUtil.generateUniqueSlug(company.name, slugsList);
+      (updateCompanyDto as any).slug = autoSlug;
+    }
+
+    const updatedCompany = await this.companyModel
+      .findByIdAndUpdate(id, updateCompanyDto, { new: true })
+      .populate('ownerId', 'firstName lastName email');
+
+    if (!updatedCompany) {
+      throw new NotFoundException('Company not found');
+    }
+
+    return updatedCompany;
   }
 
   async updateSettings(id: string, settings: any): Promise<Company> {

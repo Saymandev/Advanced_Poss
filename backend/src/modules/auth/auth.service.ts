@@ -1062,24 +1062,66 @@ export class AuthService {
       }
       
       if (roleUsers.length > 1) {
-        this.logger.warn(`⚠️  Multiple users (${roleUsers.length}) found with role '${role}' in branch ${branchId} - user selection required`);
-        await this.logLoginActivity({
-          userId: 'unknown',
-          companyId,
-          branchId,
-          email: 'unknown',
-          role: role as any,
-          status: LoginStatus.FAILED,
-          method: LoginMethod.PIN_ROLE,
-          ipAddress: ipAddress || 'unknown',
-          userAgent: userAgent || 'unknown',
-          failureReason: 'Multiple users found with this role in this branch',
-        });
-        throw new BadRequestException('Multiple users found with this role in this branch. Please select a specific user.');
+        // If userId is provided, use it; otherwise throw error to request user selection
+        if (!userId) {
+          this.logger.warn(`⚠️  Multiple users (${roleUsers.length}) found with role '${role}' in branch ${branchId} - user selection required`);
+          await this.logLoginActivity({
+            userId: 'unknown',
+            companyId,
+            branchId,
+            email: 'unknown',
+            role: role as any,
+            status: LoginStatus.FAILED,
+            method: LoginMethod.PIN_ROLE,
+            ipAddress: ipAddress || 'unknown',
+            userAgent: userAgent || 'unknown',
+            failureReason: 'Multiple users found with this role in this branch',
+          });
+          
+          // Return the list of users so frontend can show selection
+          const usersList = roleUsers.map(u => ({
+            id: (u as any)._id?.toString() || (u as any).id,
+            email: u.email,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            role: u.role,
+          }));
+          
+          throw new BadRequestException({
+            message: 'Multiple users found with this role in this branch. Please select a specific user.',
+            users: usersList,
+            code: 'MULTIPLE_USERS',
+          });
+        }
+        
+        // userId provided - find the specific user
+        const selectedUser = roleUsers.find(u => 
+          ((u as any)._id?.toString() || (u as any).id) === userId
+        );
+        
+        if (!selectedUser) {
+          this.logger.error(`❌ User ${userId} not found in role ${role} users for branch ${branchId}`);
+          await this.logLoginActivity({
+            userId: 'unknown',
+            companyId,
+            branchId,
+            email: 'unknown',
+            role: role as any,
+            status: LoginStatus.FAILED,
+            method: LoginMethod.PIN_ROLE,
+            ipAddress: ipAddress || 'unknown',
+            userAgent: userAgent || 'unknown',
+            failureReason: `User ${userId} not found in role ${role} users`,
+          });
+          throw new BadRequestException('Selected user not found with this role in this branch.');
+        }
+        
+        user = selectedUser;
+        this.logger.log(`✅ Selected specific user: ${user.email} (${user.firstName} ${user.lastName}) - Branch: ${user.branchId}`);
+      } else {
+        user = roleUsers[0];
+        this.logger.log(`✅ Selected user: ${user.email} (${user.firstName} ${user.lastName}) - Branch: ${user.branchId}`);
       }
-      
-      user = roleUsers[0];
-      this.logger.log(`✅ Selected user: ${user.email} (${user.firstName} ${user.lastName}) - Branch: ${user.branchId}`);
     }
 
     // Verify PIN - get user with PIN field selected

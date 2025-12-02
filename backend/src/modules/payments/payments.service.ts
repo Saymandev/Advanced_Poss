@@ -6,6 +6,9 @@ import Stripe from 'stripe';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
 import { Subscription, SubscriptionDocument, SubscriptionStatus, BillingCycle } from '../subscriptions/schemas/subscription.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
+import { User, UserDocument } from '../users/schemas/user.schema';
+import { UserRole } from '../../common/enums/user-role.enum';
+import { WebsocketsGateway } from '../websockets/websockets.gateway';
 
 @Injectable()
 export class PaymentsService {
@@ -15,7 +18,9 @@ export class PaymentsService {
     private configService: ConfigService,
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
     @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
+    private websocketsGateway: WebsocketsGateway,
   ) {
     this.stripe = new Stripe(this.configService.get('stripe.secretKey'), {
       apiVersion: '2023-10-16',
@@ -165,6 +170,11 @@ export class PaymentsService {
     }
 
     // Create checkout session
+    // Append session_id to success_url for manual activation fallback
+    const successUrlWithSession = successUrl.includes('?') 
+      ? `${successUrl}&session_id={CHECKOUT_SESSION_ID}`
+      : `${successUrl}?session_id={CHECKOUT_SESSION_ID}`;
+    
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -185,7 +195,7 @@ export class PaymentsService {
         },
       ],
       mode: 'subscription',
-      success_url: successUrl,
+      success_url: successUrlWithSession,
       cancel_url: cancelUrl,
       metadata: {
         companyId: companyId,
@@ -259,7 +269,15 @@ export class PaymentsService {
     const subscriptionEndDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
 
     // Update company subscription - use $unset to completely remove trialEndDate field
-    // First, update the fields we want to set
+    // Properly merge settings to ensure features are saved correctly
+    const existingSettings = company.settings || {};
+    
+    // Create updated settings object with plan features
+    const updatedSettings = {
+      ...existingSettings,
+      features: plan.features, // Ensure plan features override any existing features
+    };
+    
     await this.companyModel.findByIdAndUpdate(
       companyId,
       {
@@ -268,10 +286,7 @@ export class PaymentsService {
           subscriptionStatus: 'active',
           subscriptionStartDate: now,
           subscriptionEndDate: subscriptionEndDate,
-          settings: {
-            ...company.settings,
-            features: plan.features,
-          },
+          settings: updatedSettings, // Update entire settings object with merged features
         },
         $unset: {
           trialEndDate: '', // Explicitly remove trialEndDate field completely
@@ -287,6 +302,8 @@ export class PaymentsService {
       trialEndDate: updatedCompany?.trialEndDate,
       hasTrialEndDate: updatedCompany?.trialEndDate !== null && updatedCompany?.trialEndDate !== undefined,
       subscriptionEndDate: updatedCompany?.subscriptionEndDate,
+      features: updatedCompany?.settings?.features,
+      hasFeatures: !!updatedCompany?.settings?.features,
       allKeys: updatedCompany ? Object.keys(updatedCompany) : [],
     });
 
@@ -391,7 +408,103 @@ export class PaymentsService {
       await subscription.save();
     }
 
-    console.log(`Subscription activated for company ${companyId} with plan ${planName}`);
+    console.log(`✅ Subscription activated for company ${companyId} with plan ${planName}`);
+    
+    // Notify all super admins about new subscription
+    try {
+      const superAdmins = await this.userModel.find({ 
+        role: UserRole.SUPER_ADMIN,
+        isActive: true 
+      }).select('_id email firstName lastName').exec();
+      
+      if (superAdmins && superAdmins.length > 0) {
+        const companyName = company.name || 'Unknown Company';
+        const planDisplayName = plan.displayName || planName;
+        
+        // Send notification to each super admin via WebSocket
+        for (const admin of superAdmins) {
+          // Use admin ID as branchId to send personal notification
+          this.websocketsGateway.notifySystemNotification(admin._id.toString(), {
+            type: 'subscription',
+            title: 'New Subscription Activated',
+            message: `${companyName} has successfully subscribed to ${planDisplayName} plan (${plan.price} ${plan.currency || 'BDT'}/${plan.billingCycle || 'monthly'})`,
+            data: {
+              companyId: companyId,
+              companyName: companyName,
+              planName: planName,
+              planDisplayName: planDisplayName,
+              subscriptionId: subscription._id.toString(),
+              amount: plan.price,
+              currency: plan.currency || 'BDT',
+              billingCycle: plan.billingCycle || 'monthly',
+            },
+            timestamp: new Date(),
+          });
+        }
+        
+        console.log(`📧 Notified ${superAdmins.length} super admin(s) about new subscription`);
+      }
+    } catch (error) {
+      console.error('❌ Error notifying super admins:', error);
+      // Don't fail subscription activation if notification fails
+    }
+  }
+  
+  // Manual activation method - called from frontend when webhook hasn't processed yet
+  async activateSubscriptionFromSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Retrieve the checkout session from Stripe
+      const session = await this.stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['line_items', 'customer', 'subscription'],
+      });
+      
+      // Check if payment was successful
+      if (session.payment_status !== 'paid') {
+        return {
+          success: false,
+          message: `Payment status is ${session.payment_status}. Subscription cannot be activated.`,
+        };
+      }
+      
+      // Check if already processed
+      const { companyId } = session.metadata || {};
+      if (!companyId) {
+        return {
+          success: false,
+          message: 'No company ID found in session metadata.',
+        };
+      }
+      
+      const company = await this.companyModel.findById(companyId);
+      if (!company) {
+        return {
+          success: false,
+          message: 'Company not found.',
+        };
+      }
+      
+      // Check if already activated
+      if (company.subscriptionStatus === 'active' && !company.trialEndDate) {
+        return {
+          success: true,
+          message: 'Subscription is already active.',
+        };
+      }
+      
+      // Call handleCheckoutCompleted to activate
+      await this.handleCheckoutCompleted(session);
+      
+      return {
+        success: true,
+        message: 'Subscription activated successfully.',
+      };
+    } catch (error: any) {
+      console.error('Error activating subscription from session:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to activate subscription.',
+      };
+    }
   }
 
   private async handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {

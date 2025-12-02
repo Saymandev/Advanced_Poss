@@ -9,6 +9,19 @@ export class PDFGeneratorService {
     this.initializePuppeteer();
   }
 
+  // Helper function to format currency
+  private formatCurrency(amount: number, currency: string = 'BDT'): string {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+      }).format(amount);
+    } catch (error) {
+      // Fallback to simple format if currency code is invalid
+      return `${currency} ${amount.toFixed(2)}`;
+    }
+  }
+
   private async initializePuppeteer() {
     try {
       // Dynamically import puppeteer to avoid build issues
@@ -257,37 +270,41 @@ export class PDFGeneratorService {
             </tr>
         </thead>
         <tbody>
-            ${orderData.items.map(item => `
+            ${orderData.items.map(item => {
+              const currency = orderData.currency || 'BDT';
+              const itemTotal = this.formatCurrency(item.quantity * item.price, currency);
+              return `
                 <tr>
                     <td class="item-name">${item.name || 'Menu Item'}</td>
                     <td class="item-qty">${item.quantity}</td>
-                    <td class="item-price">$${(item.quantity * item.price).toFixed(2)}</td>
+                    <td class="item-price">${itemTotal}</td>
                 </tr>
                 ${item.notes ? `<tr><td colspan="3" class="notes">Note: ${item.notes}</td></tr>` : ''}
-            `).join('')}
+            `;
+            }).join('')}
         </tbody>
     </table>
 
     <div class="totals">
         <div class="total-line">
             <span>Subtotal:</span>
-            <span>$${orderData.subtotal.toFixed(2)}</span>
+            <span>${this.formatCurrency(orderData.subtotal, orderData.currency || 'BDT')}</span>
         </div>
         ${orderData.taxRate > 0 ? `
             <div class="total-line">
                 <span>Tax (${orderData.taxRate}%):</span>
-                <span>$${orderData.taxAmount.toFixed(2)}</span>
+                <span>${this.formatCurrency(orderData.taxAmount, orderData.currency || 'BDT')}</span>
             </div>
         ` : ''}
         ${orderData.serviceCharge > 0 ? `
             <div class="total-line">
                 <span>Service Charge (${orderData.serviceCharge}%):</span>
-                <span>$${orderData.serviceChargeAmount.toFixed(2)}</span>
+                <span>${this.formatCurrency(orderData.serviceChargeAmount, orderData.currency || 'BDT')}</span>
             </div>
         ` : ''}
         <div class="total-line final">
             <span>TOTAL:</span>
-            <span>$${orderData.totalAmount.toFixed(2)}</span>
+            <span>${this.formatCurrency(orderData.totalAmount, orderData.currency || 'BDT')}</span>
         </div>
     </div>
 

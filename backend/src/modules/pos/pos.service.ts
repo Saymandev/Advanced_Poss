@@ -134,6 +134,41 @@ export class POSService {
 
     if (createOrderDto.tableId) {
       baseOrderData.tableId = new Types.ObjectId(createOrderDto.tableId);
+      
+      // Validate table capacity for dine-in orders
+      if (createOrderDto.orderType === 'dine-in' && createOrderDto.guestCount) {
+        const table = await this.tablesService.findOne(createOrderDto.tableId);
+        if (!table) {
+          throw new NotFoundException(`Table with ID ${createOrderDto.tableId} not found`);
+        }
+        
+        // Get active orders for this table today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const existingOrders = await this.posOrderModel.find({
+          tableId: new Types.ObjectId(createOrderDto.tableId),
+          createdAt: { $gte: today, $lt: tomorrow },
+          status: { $in: ['pending', 'paid'] },
+        }).exec();
+        
+        // Calculate used seats from existing orders
+        const usedSeats = existingOrders.reduce((sum, order) => {
+          return sum + (order.guestCount || 0);
+        }, 0);
+        
+        // Calculate remaining seats
+        const remainingSeats = Math.max(0, (table.capacity || 0) - usedSeats);
+        
+        // Check if new order exceeds capacity
+        if (createOrderDto.guestCount > remainingSeats) {
+          throw new BadRequestException(
+            `Cannot add ${createOrderDto.guestCount} guests. Table ${table.tableNumber} has only ${remainingSeats} seat(s) available (${usedSeats} already used out of ${table.capacity} total capacity).`
+          );
+        }
+      }
     } else {
       delete baseOrderData.tableId;
     }
@@ -263,8 +298,8 @@ export class POSService {
           throw inventoryError;
         }
 
-        // Update table status if dine-in order
-        if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in') {
+        // Update table status if dine-in order (only if order is pending - paid orders don't occupy tables)
+        if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in' && savedOrder.status === 'pending') {
           try {
             await this.tablesService.updateStatus(
               createOrderDto.tableId.toString(),
@@ -277,6 +312,19 @@ export class POSService {
           } catch (tableError) {
             // Log error but don't fail order creation
             console.error('Failed to update table status:', tableError);
+          }
+        } else if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in' && savedOrder.status === 'paid') {
+          // If order is paid, ensure table is available (not occupied)
+          try {
+            await this.tablesService.updateStatus(
+              createOrderDto.tableId.toString(),
+              {
+                status: 'available',
+              },
+            );
+            console.log(`✅ Table ${createOrderDto.tableId} set to available (order created as paid)`);
+          } catch (tableError) {
+            console.error('Failed to set table to available:', tableError);
           }
         }
 
@@ -323,12 +371,38 @@ export class POSService {
 
         // Notify via WebSocket: new order created
         try {
-          this.websocketsGateway.notifyNewOrder(
-            branchId,
-            savedOrder.toObject ? savedOrder.toObject() : savedOrder,
-          );
+          const orderData: any = savedOrder.toObject ? savedOrder.toObject() : savedOrder;
+          
+          // Ensure waiterId is included in order data for notifications (convert to string)
+          // waiterId might not be in savedOrder because it's not in the schema, so use from DTO
+          if (createOrderDto.waiterId) {
+            const waiterIdValue: any = createOrderDto.waiterId;
+            orderData.waiterId = typeof waiterIdValue === 'string' 
+              ? waiterIdValue 
+              : String(waiterIdValue);
+            console.log(`🔔 [POS Order ${orderData.orderNumber}] Waiter ID set: ${orderData.waiterId}`);
+          } else {
+            console.log(`⚠️ [POS Order ${orderData.orderNumber}] No waiterId in createOrderDto`);
+          }
+          
+          // Fetch table number if tableId exists
+          if (savedOrder.tableId) {
+            try {
+              const tableIdStr = savedOrder.tableId.toString();
+              const table = await this.tablesService.findOne(tableIdStr);
+              if (table) {
+                orderData.tableNumber = (table as any).tableNumber || (table as any).number;
+                console.log(`🍽️ [POS Order ${orderData.orderNumber}] Table number: ${orderData.tableNumber}`);
+              }
+            } catch (tableError) {
+              console.warn(`⚠️ [POS Order ${orderData.orderNumber}] Could not fetch table number:`, tableError);
+            }
+          }
+          
+          console.log(`📡 [POS Order ${orderData.orderNumber}] Sending notification, waiterId: ${orderData.waiterId || 'NONE'}, tableNumber: ${orderData.tableNumber || 'NONE'}`);
+          this.websocketsGateway.notifyNewOrder(branchId, orderData);
         } catch (wsError) {
-          console.error('Failed to emit WebSocket event:', wsError);
+          console.error('❌ Failed to emit WebSocket event:', wsError);
         }
 
         return savedOrder;
@@ -598,6 +672,20 @@ export class POSService {
       paymentId: savedPayment._id,
       completedAt: new Date(),
     }, { new: true }).exec();
+
+    // Free the table if this is a dine-in order (paid orders shouldn't keep tables occupied)
+    if (order.orderType === 'dine-in' && order.tableId) {
+      try {
+        const tableId = order.tableId.toString();
+        await this.tablesService.updateStatus(tableId, {
+          status: 'available',
+        });
+        console.log(`✅ Table ${tableId} freed after payment processed for order ${order.orderNumber}`);
+      } catch (tableError) {
+        // Log error but don't fail payment processing
+        console.error('❌ Failed to free table after payment:', tableError);
+      }
+    }
 
     // Update customer statistics if customer email is provided
     if (order.customerInfo?.email && companyId) {
@@ -1056,19 +1144,31 @@ export class POSService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const activeOrders = await this.posOrderModel.find({
+    // Only fetch PENDING orders to determine table occupation
+    // Paid orders should NOT keep tables occupied - they're completed transactions
+    const pendingOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
       createdAt: { $gte: today, $lt: tomorrow },
-      status: { $in: ['pending', 'paid'] },
+      status: 'pending', // Only pending orders keep tables occupied
       orderType: 'dine-in',
     })
     .populate('userId', 'firstName lastName name')
-    .select('tableId orderNumber totalAmount guestCount userId notes')
+    .select('tableId orderNumber totalAmount guestCount userId notes status')
     .exec();
 
-    // Group orders by table to calculate used seats
+    // Also fetch paid orders for history/reference, but they don't affect occupation
+    const paidOrders = await this.posOrderModel.find({
+      branchId: new Types.ObjectId(branchId),
+      createdAt: { $gte: today, $lt: tomorrow },
+      status: 'paid',
+      orderType: 'dine-in',
+    })
+    .select('tableId orderNumber totalAmount guestCount status')
+    .exec();
+
+    // Group PENDING orders by table (only pending orders affect occupation)
     const ordersByTable = new Map<string, any[]>();
-    activeOrders.forEach(order => {
+    pendingOrders.forEach(order => {
       if (order.tableId) {
         const tableId = order.tableId.toString();
         if (!ordersByTable.has(tableId)) {
@@ -1081,14 +1181,15 @@ export class POSService {
     // Transform tables to include occupation status and order details
     return allTables.map((table: any) => {
       const tableId = table._id?.toString() || table.id;
-      const tableOrders = ordersByTable.get(tableId) || [];
-      const isOccupied = tableOrders.length > 0;
+      const tablePendingOrders = ordersByTable.get(tableId) || [];
+      // Table is only occupied if there are PENDING orders
+      const isOccupied = tablePendingOrders.length > 0;
       
       // Get the primary order (most recent pending order)
-      const primaryOrder = tableOrders.find((o: any) => o.status === 'pending') || tableOrders[0];
+      const primaryOrder = tablePendingOrders.length > 0 ? tablePendingOrders[0] : null;
       
-      // Calculate used seats from all active orders
-      const usedSeats = tableOrders.reduce((sum: number, order: any) => {
+      // Calculate used seats from PENDING orders only (paid orders don't count)
+      const usedSeats = tablePendingOrders.reduce((sum: number, order: any) => {
         return sum + (order.guestCount || 0);
       }, 0);
       
@@ -1126,16 +1227,54 @@ export class POSService {
           holdCount: 0, // Placeholder - can be tracked later
           usedSeats: usedSeats,
           remainingSeats: remainingSeats,
-          allOrders: tableOrders.map((o: any) => ({
+          orderStatus: primaryOrder.status || 'pending', // Include order status for display
+          allOrders: tablePendingOrders.map((o: any) => ({
             id: o._id?.toString(),
             orderNumber: o.orderNumber,
             totalAmount: o.totalAmount || 0,
             guestCount: o.guestCount || 0,
-            status: o.status,
+            status: o.status || 'pending',
           })),
         } : null,
       };
     });
+  }
+
+  // Get waiter active orders count (for busy indicator)
+  async getWaiterActiveOrdersCount(branchId: string): Promise<Record<string, number>> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Get all active orders for today grouped by userId (waiter)
+    const activeOrders = await this.posOrderModel.aggregate([
+      {
+        $match: {
+          branchId: new Types.ObjectId(branchId),
+          createdAt: { $gte: today, $lt: tomorrow },
+          status: { $in: ['pending', 'paid'] },
+          userId: { $exists: true, $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: '$userId',
+          count: { $sum: 1 },
+        },
+      },
+    ]).exec();
+
+    // Convert to map of waiterId -> activeOrdersCount
+    const waiterCounts: Record<string, number> = {};
+    activeOrders.forEach((item) => {
+      const waiterId = item._id?.toString();
+      if (waiterId) {
+        waiterCounts[waiterId] = item.count || 0;
+      }
+    });
+
+    return waiterCounts;
   }
 
   // Get POS menu items (integrate with real menu service)

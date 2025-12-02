@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Headers,
@@ -91,5 +92,18 @@ export class PaymentsController {
     @Headers('stripe-signature') signature: string,
   ) {
     return this.paymentsService.handleWebhook(req.rawBody, signature);
+  }
+
+  @Post('activate-subscription')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Manually activate subscription from Stripe session ID (fallback for local dev)' })
+  @ApiResponse({ status: 200, description: 'Subscription activated successfully' })
+  @ApiResponse({ status: 400, description: 'Activation failed' })
+  async activateSubscription(@Body('sessionId') sessionId: string) {
+    if (!sessionId) {
+      throw new BadRequestException('Session ID is required');
+    }
+    return this.paymentsService.activateSubscriptionFromSession(sessionId);
   }
 }

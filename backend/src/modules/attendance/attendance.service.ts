@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -18,23 +18,31 @@ export class AttendanceService {
   ) {}
 
   async checkIn(checkInDto: CheckInDto): Promise<Attendance> {
-    const today = new Date();
+    if (!checkInDto.userId) {
+      throw new BadRequestException('User ID is required');
+    }
+
+    const checkInTime = new Date();
+    const today = new Date(checkInTime);
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Check if already checked in today
+    // Check if already checked in today - use checkIn timestamp to avoid timezone issues
+    // Also check by date field to catch records with timezone mismatches
     const existingAttendance = await this.attendanceModel.findOne({
       userId: new Types.ObjectId(checkInDto.userId),
-      date: { $gte: today, $lt: tomorrow },
+      $or: [
+        { checkIn: { $gte: today, $lt: tomorrow } },
+        { date: { $gte: today, $lt: tomorrow } }
+      ]
     });
 
     if (existingAttendance) {
       throw new BadRequestException('Already checked in today');
     }
 
-    const checkInTime = new Date();
-    const expectedStartTime = new Date();
+    const expectedStartTime = new Date(checkInTime);
     expectedStartTime.setHours(9, 0, 0, 0); // Assuming 9 AM start time
 
     const isLate = checkInTime > expectedStartTime;
@@ -45,42 +53,102 @@ export class AttendanceService {
     const attendance = new this.attendanceModel({
       userId: checkInDto.userId,
       branchId: checkInDto.branchId,
-      date: today,
+      date: today, // Store date based on checkIn time for consistency
       checkIn: checkInTime,
       status: isLate ? 'late' : 'present',
       isLate,
       lateBy,
+      notes: checkInDto.notes,
       checkInLocation: checkInDto.location,
     });
 
-    return attendance.save();
+    try {
+      const savedAttendance = await attendance.save();
+      
+      // Populate user and branch data before returning
+      return this.attendanceModel
+        .findById(savedAttendance._id)
+        .populate('userId', 'firstName lastName employeeId role email')
+        .populate('branchId', 'name code')
+        .exec()
+        .then((populated: any) => {
+          if (!populated) return savedAttendance;
+          const user = populated.userId;
+          const branch = populated.branchId;
+          return {
+            ...populated.toObject(),
+            userName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown' : 'Unknown',
+            branchName: branch ? branch.name || branch.code || 'Unknown' : 'Unknown',
+            totalHours: populated.workHours || 0,
+          };
+        });
+    } catch (error: any) {
+      // Handle MongoDB duplicate key error (E11000)
+      if (error?.code === 11000 && error?.keyPattern) {
+        // Check if it's a duplicate userId + date constraint
+        if (error.keyPattern.userId && error.keyPattern.date) {
+          throw new BadRequestException('You have already checked in today');
+        }
+      }
+      throw error;
+    }
   }
 
   async checkOut(checkOutDto: CheckOutDto): Promise<Attendance> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (!checkOutDto.userId) {
+      throw new BadRequestException('User ID is required');
+    }
+
+    // Find the most recent check-in record without check-out
+    // Use a flexible approach: find any check-in from the last 3 days without check-out
+    // This handles timezone issues and ensures we can always find the record
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    threeDaysAgo.setHours(0, 0, 0, 0);
 
     const attendance = await this.attendanceModel.findOne({
       userId: new Types.ObjectId(checkOutDto.userId),
-      date: { $gte: today, $lt: tomorrow },
-    });
+      checkIn: { $gte: threeDaysAgo },
+      checkOut: { $exists: false },
+    }).sort({ checkIn: -1 });
 
     if (!attendance) {
-      throw new NotFoundException('Check-in record not found for today');
+      throw new NotFoundException('Check-in record not found. Please check in first.');
     }
 
     if (attendance.checkOut) {
-      throw new BadRequestException('Already checked out today');
+      throw new BadRequestException('Already checked out');
     }
 
     attendance.checkOut = new Date();
     attendance.checkOutLocation = checkOutDto.location;
     attendance.breakTime = checkOutDto.breakTime || 0;
-    attendance.notes = checkOutDto.notes;
+    // Append notes if check-in had notes, otherwise set new notes
+    if (checkOutDto.notes) {
+      attendance.notes = attendance.notes 
+        ? `${attendance.notes}\nCheck-out: ${checkOutDto.notes}`
+        : `Check-out: ${checkOutDto.notes}`;
+    }
 
-    return attendance.save();
+    const savedAttendance = await attendance.save();
+    
+    // Populate user and branch data before returning
+    return this.attendanceModel
+      .findById(savedAttendance._id)
+      .populate('userId', 'firstName lastName employeeId role email')
+      .populate('branchId', 'name code')
+      .exec()
+      .then((populated: any) => {
+        if (!populated) return savedAttendance;
+        const user = populated.userId;
+        const branch = populated.branchId;
+        return {
+          ...populated.toObject(),
+          userName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown' : 'Unknown',
+          branchName: branch ? branch.name || branch.code || 'Unknown' : 'Unknown',
+          totalHours: populated.workHours || 0,
+        };
+      });
   }
 
   async findAll(filterDto: AttendanceFilterDto): Promise<{ attendance: Attendance[], total: number, page: number, limit: number }> {
@@ -197,19 +265,45 @@ export class AttendanceService {
       .exec();
   }
 
-  async getTodayAttendance(branchId: string): Promise<Attendance[]> {
+  async getTodayAttendance(branchId: string, userId?: string): Promise<Attendance[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    return this.attendanceModel
-      .find({
-        branchId: new Types.ObjectId(branchId),
-        date: { $gte: today, $lt: tomorrow },
-      })
-      .populate('userId', 'firstName lastName employeeId role')
+    // Query by checkIn time and date field to handle timezone issues
+    // This ensures we get attendance records where checkIn happened today, even if date field is off
+    const query: any = {
+      branchId: new Types.ObjectId(branchId),
+      $or: [
+        { checkIn: { $gte: today, $lt: tomorrow } },
+        { date: { $gte: today, $lt: tomorrow } }
+      ]
+    };
+
+    // If userId is provided, only return that user's attendance (for employees)
+    if (userId) {
+      query.userId = new Types.ObjectId(userId);
+    }
+
+    const attendances = await this.attendanceModel
+      .find(query)
+      .populate('userId', 'firstName lastName employeeId role email')
+      .populate('branchId', 'name code')
+      .sort({ checkIn: -1 })
       .exec();
+
+    // Transform to include userName and branchName
+    return attendances.map((attendance: any) => {
+      const user = attendance.userId;
+      const branch = attendance.branchId;
+      return {
+        ...attendance.toObject(),
+        userName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown' : 'Unknown',
+        branchName: branch ? branch.name || branch.code || 'Unknown' : 'Unknown',
+        totalHours: attendance.workHours || 0,
+      };
+    });
   }
 
   async markAbsent(
@@ -289,11 +383,19 @@ export class AttendanceService {
     branchId: string,
     startDate: Date,
     endDate: Date,
+    userId?: string,
   ): Promise<any> {
-    const attendances = await this.attendanceModel.find({
+    const query: any = {
       branchId: new Types.ObjectId(branchId),
       date: { $gte: startDate, $lte: endDate },
-    });
+    };
+
+    // If userId is provided, only calculate stats for that user (for employees)
+    if (userId) {
+      query.userId = new Types.ObjectId(userId);
+    }
+
+    const attendances = await this.attendanceModel.find(query);
 
     const totalDays = Math.ceil(
       (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),

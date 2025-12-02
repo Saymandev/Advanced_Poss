@@ -13,11 +13,21 @@ export class LoginActivityService {
   ) {}
 
   async createLoginActivity(createDto: CreateLoginActivityDto): Promise<LoginActivity> {
+    // Handle 'unknown' userId - don't try to create ObjectId from it
+    let userId: Types.ObjectId | undefined;
+    if (createDto.userId && createDto.userId !== 'unknown' && Types.ObjectId.isValid(createDto.userId)) {
+      userId = new Types.ObjectId(createDto.userId);
+    }
+    
     const loginActivity = new this.loginActivityModel({
       ...createDto,
-      userId: new Types.ObjectId(createDto.userId),
-      companyId: createDto.companyId ? new Types.ObjectId(createDto.companyId) : undefined,
-      branchId: createDto.branchId ? new Types.ObjectId(createDto.branchId) : undefined,
+      userId: userId,
+      companyId: createDto.companyId && Types.ObjectId.isValid(createDto.companyId) 
+        ? new Types.ObjectId(createDto.companyId) 
+        : undefined,
+      branchId: createDto.branchId && Types.ObjectId.isValid(createDto.branchId)
+        ? new Types.ObjectId(createDto.branchId)
+        : undefined,
       loginTime: createDto.loginTime || new Date(),
     });
 

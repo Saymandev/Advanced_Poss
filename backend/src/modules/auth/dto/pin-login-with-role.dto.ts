@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsMongoId, IsNotEmpty, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsMongoId, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 
 export class PinLoginWithRoleDto {
   @ApiProperty({
@@ -38,4 +38,13 @@ export class PinLoginWithRoleDto {
     message: 'PIN must be 4-6 digits',
   })
   pin: string;
+
+  @ApiPropertyOptional({
+    description: 'User ID - Required when multiple users exist with the same role',
+    example: '507f1f77bcf86cd799439010',
+  })
+  @IsOptional()
+  @IsString()
+  @IsMongoId()
+  userId?: string;
 }

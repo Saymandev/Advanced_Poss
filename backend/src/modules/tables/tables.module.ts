@@ -9,7 +9,7 @@ import { TablesService } from './tables.service';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Table.name, schema: TableSchema }]),
-    BranchesModule,
+    forwardRef(() => BranchesModule),
     forwardRef(() => WebsocketsModule),
   ],
   controllers: [TablesController],

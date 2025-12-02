@@ -6,6 +6,7 @@ import { CustomersModule } from '../customers/customers.module';
 import { IngredientsModule } from '../ingredients/ingredients.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
+import { SettingsModule } from '../settings/settings.module';
 import { TablesModule } from '../tables/tables.module';
 import { UsersModule } from '../users/users.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
@@ -36,6 +37,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
     CompaniesModule,
     BranchesModule,
     UsersModule,
+    SettingsModule,
     forwardRef(() => TablesModule),
     forwardRef(() => KitchenModule),
     forwardRef(() => CustomersModule),

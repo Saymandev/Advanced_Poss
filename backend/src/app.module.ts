@@ -23,6 +23,7 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { DeliveryZonesModule } from './modules/delivery-zones/delivery-zones.module';
 import { DigitalReceiptsModule } from './modules/digital-receipts/digital-receipts.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
+import { GalleryModule } from './modules/gallery/gallery.module';
 import { IngredientsModule } from './modules/ingredients/ingredients.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { LoginActivityModule } from './modules/login-activity/login-activity.module';
@@ -137,6 +138,7 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
     IngredientsModule,
     SuppliersModule,
     ExpensesModule,
+    GalleryModule,
     AttendanceModule,
     SubscriptionsModule,
     LoginActivityModule,

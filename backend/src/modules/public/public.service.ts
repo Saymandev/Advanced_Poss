@@ -4,21 +4,29 @@ import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { CustomersService } from '../customers/customers.service';
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
+import { GalleryService } from '../gallery/gallery.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/schemas/order.schema';
 import { UsersService } from '../users/users.service';
+import { WebsocketsGateway } from '../websockets/websockets.gateway';
+import { SubmitContactFormDto } from './dto/submit-contact-form.dto';
+import { ContactForm } from './schemas/contact-form.schema';
 
 @Injectable()
 export class PublicService {
   constructor(
     @InjectModel(Order.name)
     private orderModel: Model<any>,
+    @InjectModel(ContactForm.name)
+    private contactFormModel: Model<ContactForm>,
     private ordersService: OrdersService,
     private customersService: CustomersService,
     private menuItemsService: MenuItemsService,
     private zonesService: DeliveryZonesService,
+    private galleryService: GalleryService,
     private usersService: UsersService,
+    private websocketsGateway: WebsocketsGateway,
   ) {}
 
   async createOrder(orderData: any) {
@@ -142,12 +150,66 @@ export class PublicService {
 
       const savedOrder = await order.save();
 
+      // Get company and branch slugs for URL generation
+      const companySlug = orderData.companySlug;
+      const branchSlug = orderData.branchSlug;
+      const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+      const orderId = savedOrder._id.toString();
+      
+      // Generate tracking URL
+      const trackingUrl = companySlug && branchSlug
+        ? `${baseUrl}/${companySlug}/${branchSlug}/track/${orderId}`
+        : null;
+
+      // Notify via WebSocket: new CUSTOMER order created (for owner/manager dashboard)
+      try {
+        const orderDataForWS: any = {
+          id: savedOrder._id.toString(),
+          _id: savedOrder._id.toString(),
+          orderNumber: savedOrder.orderNumber,
+          branchId: orderData.branchId,
+          companyId: orderData.companyId,
+          customerId: customerId,
+          type: savedOrder.type,
+          status: savedOrder.status,
+          paymentStatus: savedOrder.paymentStatus,
+          total: savedOrder.total,
+          items: savedOrder.items,
+          deliveryAddress: savedOrder.deliveryAddress,
+          specialInstructions: savedOrder.specialInstructions,
+          createdAt: savedOrder.createdAt,
+          isCustomerOrder: true, // Flag to distinguish customer orders from POS orders
+          orderSource: 'customer', // Source of the order
+        };
+        
+        // Include waiterId if available
+        if (waiterId) {
+          orderDataForWS.waiterId = typeof waiterId === 'string' ? waiterId : waiterId.toString();
+        }
+        
+        // Include customer info if available
+        if (orderData.customer) {
+          orderDataForWS.customer = orderData.customer;
+          orderDataForWS.customerName = orderData.customer.firstName && orderData.customer.lastName
+            ? `${orderData.customer.firstName} ${orderData.customer.lastName}`
+            : orderData.customer.firstName || orderData.customer.email || 'Guest';
+        }
+        
+        this.websocketsGateway.notifyNewOrder(orderData.branchId, orderDataForWS);
+      } catch (wsError) {
+        console.error('❌ Failed to emit WebSocket event for public order:', wsError);
+        // Don't fail the order creation if WebSocket fails
+      }
+
       return {
         success: true,
         data: {
-          orderId: savedOrder._id.toString(),
+          orderId: orderId,
           orderNumber: savedOrder.orderNumber,
           total: savedOrder.total,
+          companySlug: companySlug || null,
+          branchSlug: branchSlug || null,
+          trackingUrl: trackingUrl,
         },
       };
     } catch (error: any) {
@@ -164,32 +226,106 @@ export class PublicService {
   }
 
   async getGallery(companyId: string) {
-    // TODO: Implement gallery system
-    return {
-      success: true,
-      data: [],
-    };
+    try {
+      const gallery = await this.galleryService.findAll(companyId, true); // Only active images
+      return {
+        success: true,
+        data: gallery.map((item) => ({
+          url: item.url,
+          caption: item.caption,
+          description: item.description,
+        })),
+      };
+    } catch (error: any) {
+      throw new BadRequestException(error.message || 'Failed to fetch gallery');
+    }
   }
 
-  async getOrderById(orderId: string) {
+  async getOrderById(orderIdOrNumber: string) {
     try {
-      const order = await this.orderModel
-        .findById(orderId)
-        .populate('companyId', 'name phone email')
-        .populate('branchId', 'name address phone')
-        .populate('customerId', 'firstName lastName phone email')
-        .lean();
+      // Try to find by MongoDB _id first
+      let order = null;
+      
+      // Check if it's a valid MongoDB ObjectId format
+      if (Types.ObjectId.isValid(orderIdOrNumber) && orderIdOrNumber.length === 24) {
+        order = await this.orderModel
+          .findById(orderIdOrNumber)
+          .populate('companyId', 'name phone email slug')
+          .populate('branchId', 'name address phone slug')
+          .populate('customerId', 'firstName lastName phone email')
+          .lean();
+      }
+      
+      // If not found by ID, try searching by orderNumber
+      if (!order) {
+        order = await this.orderModel
+          .findOne({ orderNumber: orderIdOrNumber })
+          .populate('companyId', 'name phone email slug')
+          .populate('branchId', 'name address phone slug')
+          .populate('customerId', 'firstName lastName phone email')
+          .lean();
+      }
 
       if (!order) {
         throw new BadRequestException('Order not found');
       }
 
+      // Generate tracking URL if we have company and branch slugs
+      const company = order.companyId as any;
+      const branch = order.branchId as any;
+      const companySlug = company?.slug;
+      const branchSlug = branch?.slug;
+      const orderId = (order as any)._id?.toString() || (order as any).id;
+      
+      let trackingUrl = null;
+      if (companySlug && branchSlug && orderId) {
+        const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+        trackingUrl = `${baseUrl}/${companySlug}/${branchSlug}/track/${orderId}`;
+      }
+
       return {
         success: true,
-        data: order,
+        data: {
+          ...order,
+          trackingUrl,
+          companySlug,
+          branchSlug,
+        },
       };
     } catch (error: any) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException(error.message || 'Failed to fetch order');
+    }
+  }
+
+  async submitContactForm(companyId: string, contactFormDto: SubmitContactFormDto) {
+    try {
+      const contactForm = new this.contactFormModel({
+        companyId: new Types.ObjectId(companyId),
+        name: contactFormDto.name.trim(),
+        email: contactFormDto.email.trim().toLowerCase(),
+        phone: contactFormDto.phone?.trim() || undefined,
+        subject: contactFormDto.subject.trim(),
+        message: contactFormDto.message.trim(),
+        status: 'new',
+        isActive: true,
+      });
+
+      const savedForm = await contactForm.save();
+
+      return {
+        success: true,
+        message: 'Thank you for contacting us! We will get back to you soon.',
+        data: {
+          id: savedForm._id.toString(),
+        },
+      };
+    } catch (error: any) {
+      throw new BadRequestException(
+        error.message || 'Failed to submit contact form. Please try again.',
+      );
     }
   }
 }

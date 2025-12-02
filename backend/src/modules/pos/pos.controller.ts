@@ -105,6 +105,13 @@ export class POSController {
     return this.posService.getAvailableTables(req.user.branchId);
   }
 
+  // Waiters
+  @Get('waiters/active-orders')
+  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  async getWaiterActiveOrdersCount(@Request() req) {
+    return this.posService.getWaiterActiveOrdersCount(req.user.branchId);
+  }
+
   // Menu Items
   @Get('menu-items')
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)

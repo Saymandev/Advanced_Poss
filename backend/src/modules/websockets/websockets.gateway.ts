@@ -1,13 +1,13 @@
 import { Logger } from '@nestjs/common';
 import {
-    ConnectedSocket,
-    MessageBody,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    OnGatewayInit,
-    SubscribeMessage,
-    WebSocketGateway,
-    WebSocketServer,
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnGatewayInit,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
@@ -26,6 +26,8 @@ export class WebsocketsGateway
 
   private logger: Logger = new Logger('WebSocketGateway');
   private rooms: Map<string, Set<string>> = new Map(); // branchId -> Set<socketId>
+  private userRooms: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
+  private socketToUser: Map<string, string> = new Map(); // socketId -> userId
 
   afterInit(server: Server) {
     this.logger.log('WebSocket Gateway initialized');
@@ -33,17 +35,43 @@ export class WebsocketsGateway
 
   handleConnection(client: Socket, ...args: any[]) {
     this.logger.log(`Client connected: ${client.id}`);
+    
+    // Extract user ID from handshake auth if available
+    const userId = (client.handshake.auth as any)?.userId || (client.handshake.query as any)?.userId;
+    if (userId) {
+      this.socketToUser.set(client.id, userId);
+      if (!this.userRooms.has(userId)) {
+        this.userRooms.set(userId, new Set());
+      }
+      this.userRooms.get(userId).add(client.id);
+      client.join(`user:${userId}`);
+      this.logger.log(`Client ${client.id} associated with user ${userId}`);
+    }
   }
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
 
-    // Remove from all rooms
+    // Remove from all branch rooms
     for (const [branchId, sockets] of this.rooms.entries()) {
       sockets.delete(client.id);
       if (sockets.size === 0) {
         this.rooms.delete(branchId);
       }
+    }
+
+    // Remove from user room
+    const userId = this.socketToUser.get(client.id);
+    if (userId) {
+      const userSockets = this.userRooms.get(userId);
+      if (userSockets) {
+        userSockets.delete(client.id);
+        if (userSockets.size === 0) {
+          this.userRooms.delete(userId);
+        }
+      }
+      this.socketToUser.delete(client.id);
+      client.leave(`user:${userId}`);
     }
   }
 
@@ -122,6 +150,97 @@ export class WebsocketsGateway
     };
   }
 
+  @SubscribeMessage('join-user')
+  handleJoinUser(
+    @MessageBody() data: { userId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { userId } = data;
+    client.join(`user:${userId}`);
+    
+    // Track user room
+    if (!this.userRooms.has(userId)) {
+      this.userRooms.set(userId, new Set());
+    }
+    this.userRooms.get(userId).add(client.id);
+    this.socketToUser.set(client.id, userId);
+
+    this.logger.log(`Client ${client.id} joined user room ${userId}`);
+
+    return {
+      success: true,
+      message: `Joined user room ${userId}`,
+    };
+  }
+
+  @SubscribeMessage('join-order')
+  handleJoinOrder(
+    @MessageBody() data: { orderId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { orderId } = data;
+    const orderRoom = `order:${orderId}`;
+    client.join(orderRoom);
+
+    this.logger.log(`Client ${client.id} joined order room ${orderId} (public tracking)`);
+
+    return {
+      success: true,
+      message: `Joined order room ${orderId}`,
+    };
+  }
+
+  @SubscribeMessage('leave-order')
+  handleLeaveOrder(
+    @MessageBody() data: { orderId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { orderId } = data;
+    const orderRoom = `order:${orderId}`;
+    client.leave(orderRoom);
+
+    this.logger.log(`Client ${client.id} left order room ${orderId}`);
+
+    return {
+      success: true,
+      message: `Left order room ${orderId}`,
+    };
+  }
+
+  // Emit to specific user
+  emitToUser(userId: string, event: string, data: any) {
+    const userRoom = `user:${userId}`;
+    
+    // Safely check socket count using our manual tracking or adapter if available
+    let socketCount = 0;
+    try {
+      // First try to use our manual tracking
+      const userSocketIds = this.userRooms.get(userId);
+      socketCount = userSocketIds ? userSocketIds.size : 0;
+      
+      // Fallback to adapter if manual tracking is empty but adapter is available
+      if (socketCount === 0 && this.server?.sockets?.adapter?.rooms) {
+        const socketsInRoom = this.server.sockets.adapter.rooms.get(userRoom);
+        socketCount = socketsInRoom ? socketsInRoom.size : 0;
+      }
+    } catch (error) {
+      // If adapter access fails, just use manual tracking
+      const userSocketIds = this.userRooms.get(userId);
+      socketCount = userSocketIds ? userSocketIds.size : 0;
+    }
+    
+    console.log(`📡 [WebSocket] Emitting ${event} to room: ${userRoom}`);
+    console.log(`📡 [WebSocket] Sockets in room: ${socketCount}`);
+    
+    // Always emit the event - Socket.IO will handle delivery
+    this.server.to(userRoom).emit(event, data);
+    this.logger.log(`📬 Emitted ${event} to user ${userId} (${socketCount} socket(s) in room)`);
+    
+    if (socketCount === 0) {
+      console.warn(`⚠️ [WebSocket] No sockets found in room ${userRoom} - waiter may not be connected!`);
+    }
+  }
+
   // Emit events to specific rooms
 
   emitToClient(clientId: string, event: string, data: any) {
@@ -151,12 +270,72 @@ export class WebsocketsGateway
   // Order events
 
   notifyNewOrder(branchId: string, order: any) {
+    console.log(`📦 [WebSocket] notifyNewOrder called for order ${order.orderNumber || 'N/A'}, waiterId: ${order.waiterId || 'NONE'}`);
+    
     this.emitToBranch(branchId, 'order:new', order);
     this.emitToKitchen(branchId, 'kitchen:new-order', order);
 
     if (order.tableId) {
       this.emitToTable(order.tableId, 'table:order-created', order);
     }
+
+    // Notify specific waiter if assigned
+    if (order.waiterId) {
+      const waiterIdStr = typeof order.waiterId === 'string' ? order.waiterId : String(order.waiterId);
+      console.log(`🔔 [WebSocket] Order has waiterId: ${waiterIdStr}, notifying waiter for order ${order.orderNumber || 'N/A'}...`);
+      this.notifyWaiterAssigned(waiterIdStr, order);
+    } else {
+      console.log(`⚠️ [WebSocket] Order ${order.orderNumber || 'N/A'} has no waiterId - skipping waiter notification`);
+      console.log(`⚠️ [WebSocket] Order keys: ${Object.keys(order).join(', ')}`);
+    }
+  }
+
+  notifyWaiterAssigned(waiterId: string | any, order: any) {
+    // Ensure waiterId is a string (convert ObjectId if needed)
+    let waiterIdStr: string;
+    if (typeof waiterId === 'string') {
+      waiterIdStr = waiterId;
+    } else if (waiterId && typeof waiterId.toString === 'function') {
+      waiterIdStr = waiterId.toString();
+    } else {
+      waiterIdStr = String(waiterId || '');
+    }
+    
+    // Extract tableNumber from tableId if populated
+    let tableNumber: string | undefined;
+    if (order.tableId) {
+      if (typeof order.tableId === 'object' && order.tableId !== null) {
+        // If tableId is populated (object), extract tableNumber
+        tableNumber = (order.tableId as any).tableNumber || (order.tableId as any).number || undefined;
+      } else if (typeof order.tableId === 'string') {
+        // If tableId is just an ID string, we can't get tableNumber here
+        tableNumber = undefined;
+      }
+    }
+    
+    const notificationData = {
+      orderId: order.id || (order._id ? String(order._id) : null),
+      orderNumber: order.orderNumber,
+      tableNumber: tableNumber || order.tableNumber || undefined,
+      tableId: typeof order.tableId === 'string' ? order.tableId : (order.tableId?._id || order.tableId?.id || undefined),
+      orderType: order.orderType || order.type,
+      totalAmount: order.totalAmount || order.total,
+      items: order.items || [],
+      notes: order.notes || order.customerNotes || '',
+      timestamp: new Date(),
+      order: order,
+    };
+
+    console.log(`📬 [WebSocket] Emitting order:assigned to user room: user:${waiterIdStr}`);
+    console.log(`📬 [WebSocket] Notification data:`, JSON.stringify(notificationData, null, 2));
+    
+    console.log(`📬 [WebSocket] About to emit order:assigned to waiter ${waiterIdStr}`);
+    console.log(`📬 [WebSocket] Order details: #${order.orderNumber || 'N/A'}, Table: ${order.tableNumber || 'N/A'}, Items: ${order.items?.length || 0}`);
+    
+    this.emitToUser(waiterIdStr, 'order:assigned', notificationData);
+    
+    this.logger.log(`📬 Notified waiter ${waiterIdStr} about assigned order ${order.orderNumber || 'N/A'}`);
+    console.log(`✅ [WebSocket] Notification sent to waiter ${waiterIdStr} for order ${order.orderNumber || 'N/A'}`);
   }
 
   notifyOrderUpdated(branchId: string, order: any) {
@@ -168,23 +347,39 @@ export class WebsocketsGateway
   }
 
   notifyOrderStatusChanged(branchId: string, order: any) {
+    const orderId = order.id || order._id?.toString() || order.orderNumber;
+    
+    // Emit to branch room (for authenticated users)
     this.emitToBranch(branchId, 'order:status-changed', {
-      orderId: order.id,
+      orderId,
       status: order.status,
       order,
     });
 
+    // Emit to kitchen room
     this.emitToKitchen(branchId, 'kitchen:order-status-changed', {
-      orderId: order.id,
+      orderId,
       status: order.status,
       order,
     });
 
+    // Emit to table room if applicable
     if (order.tableId) {
       this.emitToTable(order.tableId, 'table:order-status-changed', {
-        orderId: order.id,
+        orderId,
         status: order.status,
       });
+    }
+
+    // Emit to order-specific room for public tracking (no auth required)
+    if (orderId) {
+      const orderRoom = `order:${orderId}`;
+      this.server.to(orderRoom).emit('order:status-changed', {
+        orderId,
+        status: order.status,
+        order,
+      });
+      this.logger.debug(`📡 Emitted order status change to order room: ${orderRoom}`);
     }
   }
 
@@ -356,4 +551,5 @@ export class WebsocketsGateway
     return stats;
   }
 }
+
 

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -28,14 +30,28 @@ export class AttendanceController {
 
   @Post('check-in')
   @ApiOperation({ summary: 'Check in for work' })
-  checkIn(@Body() checkInDto: CheckInDto) {
-    return this.attendanceService.checkIn(checkInDto);
+  checkIn(@Body() checkInDto: CheckInDto, @Request() req: any) {
+    // Use authenticated user's ID (required)
+    if (!req.user?.id) {
+      throw new BadRequestException('User ID is required');
+    }
+    return this.attendanceService.checkIn({
+      ...checkInDto,
+      userId: req.user.id,
+    });
   }
 
   @Post('check-out')
   @ApiOperation({ summary: 'Check out from work' })
-  checkOut(@Body() checkOutDto: CheckOutDto) {
-    return this.attendanceService.checkOut(checkOutDto);
+  checkOut(@Body() checkOutDto: CheckOutDto, @Request() req: any) {
+    // Use authenticated user's ID (required)
+    if (!req.user?.id) {
+      throw new BadRequestException('User ID is required');
+    }
+    return this.attendanceService.checkOut({
+      ...checkOutDto,
+      userId: req.user.id,
+    });
   }
 
   @Get()
@@ -46,10 +62,17 @@ export class AttendanceController {
   }
 
   @Get('branch/:branchId/today')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get today\'s attendance for branch' })
-  getTodayAttendance(@Param('branchId') branchId: string) {
-    return this.attendanceService.getTodayAttendance(branchId);
+  getTodayAttendance(
+    @Param('branchId') branchId: string,
+    @Request() req: any,
+  ) {
+    // Only owners/managers can see all employees, others see only their own
+    const userRole = req.user?.role;
+    const userId = (userRole === UserRole.OWNER || userRole === UserRole.MANAGER || userRole === UserRole.SUPER_ADMIN)
+      ? undefined
+      : req.user?.id;
+    return this.attendanceService.getTodayAttendance(branchId, userId);
   }
 
   @Get('branch/:branchId')
@@ -90,17 +113,23 @@ export class AttendanceController {
   }
 
   @Get('stats/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get attendance statistics' })
   getStats(
     @Param('branchId') branchId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Request() req: any,
   ) {
+    // Only owners/managers can see all employees stats, others see only their own
+    const userRole = req.user?.role;
+    const userId = (userRole === UserRole.OWNER || userRole === UserRole.MANAGER || userRole === UserRole.SUPER_ADMIN)
+      ? undefined
+      : req.user?.id;
     return this.attendanceService.getStats(
       branchId,
       new Date(startDate),
       new Date(endDate),
+      userId,
     );
   }
 

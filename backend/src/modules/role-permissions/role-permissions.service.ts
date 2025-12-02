@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { DEFAULT_ROLE_FEATURES } from '../../common/constants/features.constants';
 import { UpdateRolePermissionDto } from './dto/update-role-permission.dto';
 import {
   RolePermission,
@@ -113,74 +114,8 @@ export class RolePermissionsService {
       throw new BadRequestException('Invalid company ID');
     }
 
-    // Default feature sets for each role
-    const defaultPermissions = {
-      owner: [
-        'dashboard',
-        'reports',
-        'staff-management',
-        'role-management',
-        'attendance',
-        'menu-management',
-        'categories',
-        'order-management',
-        'table-management',
-        'kitchen-display',
-        'customer-management',
-        'loyalty-program',
-        'inventory',
-        'suppliers',
-        'purchase-orders',
-        'expenses',
-        'accounting',
-        'work-periods',
-        'settings',
-        'branches',
-        'notifications',
-      ],
-      manager: [
-        'dashboard',
-        'reports',
-        'staff-management',
-        'attendance',
-        'menu-management',
-        'categories',
-        'order-management',
-        'table-management',
-        'kitchen-display',
-        'customer-management',
-        'loyalty-program',
-        'inventory',
-        'suppliers',
-        'expenses',
-        'work-periods',
-        'notifications',
-      ],
-      chef: [
-        'dashboard',
-        'menu-management',
-        'categories',
-        'kitchen-display',
-        'inventory',
-        'purchase-orders',
-        'notifications',
-      ],
-      waiter: [
-        'dashboard',
-        'order-management',
-        'table-management',
-        'customer-management',
-        'notifications',
-      ],
-      cashier: [
-        'dashboard',
-        'order-management',
-        'customer-management',
-        'expenses',
-        'work-periods',
-        'notifications',
-      ],
-    };
+    // Default feature sets for each role (using constants for consistency)
+    const defaultPermissions = DEFAULT_ROLE_FEATURES;
 
     const createdPermissions: RolePermission[] = [];
 

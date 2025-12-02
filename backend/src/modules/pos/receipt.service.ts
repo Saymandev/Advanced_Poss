@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
+import { SettingsService } from '../settings/settings.service';
 import { PDFGeneratorService } from './pdf-generator.service';
 import { PrinterService, PrintJob } from './printer.service';
 import { POSOrder, POSOrderDocument } from './schemas/pos-order.schema';
@@ -17,7 +18,21 @@ export class ReceiptService {
     private printerService: PrinterService,
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
+    private settingsService: SettingsService,
   ) {}
+
+  // Helper function to format currency
+  private formatCurrency(amount: number, currency: string = 'BDT'): string {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+      }).format(amount);
+    } catch (error) {
+      // Fallback to simple format if currency code is invalid
+      return `${currency} ${amount.toFixed(2)}`;
+    }
+  }
 
   // Generate receipt data
   async generateReceiptData(orderId: string): Promise<any> {
@@ -127,6 +142,27 @@ export class ReceiptService {
         }))
       : [];
 
+    // Get currency from company settings
+    let currency = 'BDT'; // Default
+    try {
+      const branch = await this.branchesService.findOne(order.branchId.toString());
+      if (branch?.companyId) {
+        let companyIdStr: string | undefined;
+        if (typeof branch.companyId === 'object' && branch.companyId !== null) {
+          companyIdStr = (branch.companyId as any)._id?.toString() || (branch.companyId as any).id?.toString() || branch.companyId.toString();
+        } else {
+          companyIdStr = branch.companyId.toString();
+        }
+        
+        if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
+          const companySettings = await this.settingsService.getCompanySettings(companyIdStr);
+          currency = companySettings?.currency || 'BDT';
+        }
+      }
+    } catch (error) {
+      console.warn('Could not retrieve currency from company settings, using default:', error);
+    }
+
     const receiptData = {
       orderNumber: order.orderNumber,
       orderId: order._id,
@@ -210,6 +246,7 @@ export class ReceiptService {
       },
       notes: order?.notes || undefined,
       publicUrl,
+      currency, // Add currency to receipt data
     };
 
     return receiptData;
@@ -354,36 +391,40 @@ export class ReceiptService {
             <span>Item</span>
             <span style="float: right;">Qty × Price</span>
         </div>
-        ${receiptData.items.map(item => `
+        ${receiptData.items.map(item => {
+          const itemPrice = this.formatCurrency(item.price, receiptData.currency);
+          const itemTotal = this.formatCurrency(item.quantity * item.price, receiptData.currency);
+          return `
             <div class="item">
                 <div class="item-name">${item.name || 'Menu Item'}</div>
-                <div class="item-quantity">${item.quantity} × $${item.price.toFixed(2)}</div>
-                <div class="item-price">$${(item.quantity * item.price).toFixed(2)}</div>
+                <div class="item-quantity">${item.quantity} × ${itemPrice}</div>
+                <div class="item-price">${itemTotal}</div>
             </div>
             ${item.notes ? `<div style="font-size: 10px; color: #666; margin-left: 10px; margin-bottom: 5px;">Note: ${item.notes}</div>` : ''}
-        `).join('')}
+        `;
+        }).join('')}
     </div>
 
     <div class="totals">
         <div class="total-line">
             <span>Subtotal:</span>
-            <span>$${receiptData.subtotal.toFixed(2)}</span>
+            <span>${this.formatCurrency(receiptData.subtotal, receiptData.currency)}</span>
         </div>
         ${receiptData.taxRate > 0 ? `
             <div class="total-line">
                 <span>Tax (${receiptData.taxRate}%):</span>
-                <span>$${receiptData.taxAmount.toFixed(2)}</span>
+                <span>${this.formatCurrency(receiptData.taxAmount, receiptData.currency)}</span>
             </div>
         ` : ''}
         ${receiptData.serviceCharge > 0 ? `
             <div class="total-line">
                 <span>Service Charge (${receiptData.serviceCharge}%):</span>
-                <span>$${receiptData.serviceChargeAmount.toFixed(2)}</span>
+                <span>${this.formatCurrency(receiptData.serviceChargeAmount, receiptData.currency)}</span>
             </div>
         ` : ''}
         <div class="total-line final">
             <span>TOTAL:</span>
-            <span>$${receiptData.totalAmount.toFixed(2)}</span>
+            <span>${this.formatCurrency(receiptData.totalAmount, receiptData.currency)}</span>
         </div>
     </div>
 

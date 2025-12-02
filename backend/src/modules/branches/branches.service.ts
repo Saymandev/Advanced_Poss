@@ -161,7 +161,7 @@ export class BranchesService {
     const [branches, total] = await Promise.all([
       this.branchModel
         .find(query)
-        .populate('companyId', 'name email')
+        .populate('companyId', 'name email slug')
         .populate('managerId', 'firstName lastName email')
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -169,6 +169,49 @@ export class BranchesService {
         .lean(),
       this.branchModel.countDocuments(query),
     ]);
+
+    // Auto-generate slugs for branches that don't have them
+    const branchesToUpdate: Array<{ id: string; slug: string; publicUrl?: string }> = [];
+    
+    for (const branch of branches as any[]) {
+      if (!branch.slug) {
+        const companyId = branch.companyId?._id?.toString() || branch.companyId?.id || branch.companyId;
+        if (companyId) {
+          const existingBranches = await this.branchModel.find({ 
+            companyId: new Types.ObjectId(companyId),
+            slug: { $exists: true }
+          }).select('slug').lean();
+          const slugsList = existingBranches.map((b: any) => b.slug).filter(Boolean);
+          const autoSlug = GeneratorUtil.generateUniqueSlug(branch.name, slugsList);
+          
+          const company = branch.companyId as any;
+          let publicUrl = branch.publicUrl;
+          if (company?.slug && !publicUrl) {
+            const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+            publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
+          }
+          
+          branchesToUpdate.push({
+            id: branch._id.toString(),
+            slug: autoSlug,
+            publicUrl: publicUrl,
+          });
+          
+          // Update the branch object in the response
+          branch.slug = autoSlug;
+          if (publicUrl) branch.publicUrl = publicUrl;
+        }
+      }
+    }
+    
+    // Save all branches with auto-generated slugs in parallel
+    if (branchesToUpdate.length > 0) {
+      await Promise.all(
+        branchesToUpdate.map(({ id, slug, publicUrl }) =>
+          this.branchModel.findByIdAndUpdate(id, { slug, ...(publicUrl && { publicUrl }) }, { new: false })
+        )
+      );
+    }
 
     return {
       branches: branches as any,
@@ -185,25 +228,61 @@ export class BranchesService {
 
     const branch = await this.branchModel
       .findById(id)
-      .populate('companyId', 'name email')
+      .populate('companyId', 'name email slug')
       .populate('managerId', 'firstName lastName email');
 
     if (!branch) {
       throw new NotFoundException('Branch not found');
     }
 
+    // Auto-generate slug if missing
+    if (!branch.slug) {
+      const companyId = (branch.companyId as any)?._id?.toString() || (branch.companyId as any)?.id;
+      const existingBranches = await this.branchModel.find({ 
+        companyId: new Types.ObjectId(companyId),
+        slug: { $exists: true }
+      }).select('slug').lean();
+      const slugsList = existingBranches.map((b: any) => b.slug).filter(Boolean);
+      const autoSlug = GeneratorUtil.generateUniqueSlug(branch.name, slugsList);
+      
+      // Update branch with auto-generated slug
+      branch.slug = autoSlug;
+      
+      // Also update publicUrl if company has slug
+      const company = branch.companyId as any;
+      if (company?.slug) {
+        const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+        branch.publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
+      }
+      
+      // Save the branch with auto-generated slug
+      await branch.save();
+    }
+
     return branch;
   }
 
   async findBySlug(companyId: string, branchSlug: string): Promise<Branch> {
-    const branch = await this.branchModel
-      .findOne({ 
+    // First, try to find branch by company + slug (preferred, multi-tenant safe)
+    let branch = await this.branchModel
+      .findOne({
         companyId: new Types.ObjectId(companyId),
-        slug: branchSlug
+        slug: branchSlug,
       })
-      .populate('companyId', 'name email')
+      .populate('companyId', 'name email slug')
       .populate('managerId', 'firstName lastName email')
       .lean();
+
+    // Fallback: in case companyId casting or historical data causes mismatch,
+    // try to find by slug only. This keeps old data working while still preferring
+    // the stricter company+slug match above.
+    if (!branch) {
+      branch = await this.branchModel
+        .findOne({ slug: branchSlug })
+        .populate('companyId', 'name email slug')
+        .populate('managerId', 'firstName lastName email')
+        .lean();
+    }
 
     if (!branch) {
       throw new NotFoundException('Branch not found');
@@ -224,16 +303,91 @@ export class BranchesService {
       throw new BadRequestException('Invalid branch ID');
     }
 
-    const branch = await this.branchModel
-      .findByIdAndUpdate(id, updateBranchDto, { new: true })
-      .populate('companyId', 'name email')
-      .populate('managerId', 'firstName lastName email');
-
+    const branch = await this.branchModel.findById(id).populate('companyId');
     if (!branch) {
       throw new NotFoundException('Branch not found');
     }
 
-    return branch;
+    const companyId = (branch.companyId as any)?._id?.toString() || (branch.companyId as any)?.id;
+
+    // Handle slug update with validation (per company uniqueness)
+    if ((updateBranchDto as any).slug !== undefined) {
+      let newSlug = (updateBranchDto as any).slug;
+      
+      // If slug is provided, validate and ensure uniqueness within company
+      if (newSlug) {
+        // Sanitize slug
+        newSlug = GeneratorUtil.generateSlug(newSlug);
+        
+        if (!newSlug) {
+          throw new BadRequestException('Invalid slug format. Slug cannot be empty after sanitization.');
+        }
+
+        // Check uniqueness within the same company (exclude current branch)
+        const existingBranch = await this.branchModel.findOne({ 
+          companyId: new Types.ObjectId(companyId),
+          slug: newSlug,
+          _id: { $ne: id }
+        });
+        
+        if (existingBranch) {
+          throw new BadRequestException(`Slug "${newSlug}" is already taken by another branch in this company.`);
+        }
+        
+        (updateBranchDto as any).slug = newSlug;
+        
+        // Update publicUrl if slug changed
+        const company = await this.companiesService.findOne(companyId);
+        if (company?.slug) {
+          const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+          (updateBranchDto as any).publicUrl = `${baseUrl}/${company.slug}/${newSlug}`;
+        }
+      } else {
+        // If slug is being removed or set to empty, generate one from branch name
+        const branchName = (updateBranchDto as any).name || branch.name;
+        const existingBranches = await this.branchModel.find({ 
+          companyId: new Types.ObjectId(companyId),
+          slug: { $exists: true }
+        }).select('slug').lean();
+        const slugsList = existingBranches.map((b: any) => b.slug).filter(Boolean);
+        const autoSlug = GeneratorUtil.generateUniqueSlug(branchName, slugsList);
+        (updateBranchDto as any).slug = autoSlug;
+        
+        // Update publicUrl
+        const company = await this.companiesService.findOne(companyId);
+        if (company?.slug) {
+          const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+          (updateBranchDto as any).publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
+        }
+      }
+    } else if (!branch.slug) {
+      // Generate slug if branch doesn't have one
+      const existingBranches = await this.branchModel.find({ 
+        companyId: new Types.ObjectId(companyId),
+        slug: { $exists: true }
+      }).select('slug').lean();
+      const slugsList = existingBranches.map((b: any) => b.slug).filter(Boolean);
+      const autoSlug = GeneratorUtil.generateUniqueSlug(branch.name, slugsList);
+      (updateBranchDto as any).slug = autoSlug;
+      
+      // Update publicUrl
+      const company = await this.companiesService.findOne(companyId);
+      if (company?.slug) {
+        const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+        (updateBranchDto as any).publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
+      }
+    }
+
+    const updatedBranch = await this.branchModel
+      .findByIdAndUpdate(id, updateBranchDto, { new: true })
+      .populate('companyId', 'name email')
+      .populate('managerId', 'firstName lastName email');
+
+    if (!updatedBranch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    return updatedBranch;
   }
 
   async updateSettings(id: string, settings: any): Promise<Branch> {
