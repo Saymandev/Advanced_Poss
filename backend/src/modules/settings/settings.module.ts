@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CompaniesModule } from '../companies/companies.module';
 import { LoginSecurityService } from './login-security.service';
@@ -37,7 +37,7 @@ import { SettingsService } from './settings.service';
       { name: InvoiceSettings.name, schema: InvoiceSettingsSchema },
       { name: SystemSettings.name, schema: SystemSettingsSchema },
     ]),
-    CompaniesModule,
+    forwardRef(() => CompaniesModule),
   ],
   controllers: [SettingsController],
   providers: [SettingsService, LoginSecurityService],

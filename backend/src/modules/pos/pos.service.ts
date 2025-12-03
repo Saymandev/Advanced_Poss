@@ -1300,7 +1300,7 @@ export class POSService {
 
       console.log('🔍 POS Menu Items Query Filters:', queryFilters);
 
-      // Fetch menu items from database
+      // Fetch menu items from database (includes populated ingredient stock info)
       const result = await this.menuItemsService.findAll(queryFilters);
       
       console.log(`✅ Found ${result.menuItems.length} menu items`);
@@ -1314,17 +1314,45 @@ export class POSService {
           ? item.images[0] 
           : undefined;
 
-        // Calculate stock: if tracking inventory, calculate from ingredients; otherwise unlimited
-        let stock = 999; // Default to unlimited stock
-        if (item.trackInventory === true) {
-          // If tracking inventory but no ingredients data, set to 0
-          // In a full implementation, calculate from ingredient stock
-          stock = Array.isArray(item.ingredients) && item.ingredients?.length > 0 ? 999 : 0;
+        // Calculate stock and low-stock flags from ingredient data
+        let stock = 999; // Default to "plenty" when not tracking inventory
+        let isLowStock = false;
+        let isOutOfStock = false;
+
+        if (item.trackInventory === true && Array.isArray(item.ingredients) && item.ingredients.length > 0) {
+          for (const ing of item.ingredients) {
+            const ingredient: any = ing?.ingredientId;
+            if (!ingredient) continue;
+
+            // Out of stock if any ingredient is out
+            if (ingredient.isOutOfStock || ingredient.currentStock <= 0) {
+              isOutOfStock = true;
+              isLowStock = true;
+              break;
+            }
+
+            // Low stock if any ingredient is flagged low
+            if (
+              ingredient.isLowStock ||
+              (typeof ingredient.currentStock === 'number' &&
+                typeof ingredient.minimumStock === 'number' &&
+                ingredient.currentStock > 0 &&
+                ingredient.currentStock <= ingredient.minimumStock)
+            ) {
+              isLowStock = true;
+            }
+          }
+
+          // If any ingredient is out of stock, treat item as out of stock
+          if (isOutOfStock) {
+            stock = 0;
+          }
         }
-        
-        // If item is not available, stock is 0
+
+        // If item is manually marked unavailable, treat as out of stock
         if (item.isAvailable === false) {
           stock = 0;
+          isOutOfStock = true;
         }
 
         return {
@@ -1336,9 +1364,12 @@ export class POSService {
             id: categoryId,
             name: categoryName,
           },
-          isAvailable: item.isAvailable !== false,
+          isAvailable: item.isAvailable !== false && !isOutOfStock,
           image: firstImage,
           stock: stock,
+          stockStatus: isOutOfStock ? 'out' : isLowStock ? 'low' : 'ok',
+          isLowStock,
+          isOutOfStock,
         };
       });
     } catch (error) {
@@ -1414,6 +1445,129 @@ export class POSService {
 
     // Use kitchen service to create the order
     await this.kitchenService.createFromOrder(kitchenOrderData);
+  }
+
+  // ========== DELIVERY MANAGEMENT METHODS ==========
+
+  /**
+   * Get delivery orders with optional status filter
+   */
+  async getDeliveryOrders(
+    branchId: string,
+    deliveryStatus?: 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled',
+    assignedDriverId?: string,
+  ): Promise<POSOrder[]> {
+    const query: any = {
+      branchId: new Types.ObjectId(branchId),
+      orderType: 'delivery',
+    };
+
+    if (deliveryStatus) {
+      query.deliveryStatus = deliveryStatus;
+    }
+
+    if (assignedDriverId) {
+      query.assignedDriverId = new Types.ObjectId(assignedDriverId);
+    }
+
+    return this.posOrderModel
+      .find(query)
+      .populate('userId', 'firstName lastName email')
+      .populate('assignedDriverId', 'firstName lastName phone')
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  /**
+   * Assign a driver to a delivery order
+   */
+  async assignDriver(orderId: string, driverId: string, userId: string): Promise<POSOrder> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID');
+    }
+
+    if (!Types.ObjectId.isValid(driverId)) {
+      throw new BadRequestException('Invalid driver ID');
+    }
+
+    // Verify driver exists
+    const driver = await this.userModel.findById(driverId);
+    if (!driver) {
+      throw new NotFoundException('Driver not found');
+    }
+
+    const order = await this.posOrderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.orderType !== 'delivery') {
+      throw new BadRequestException('This order is not a delivery order');
+    }
+
+    // Update order with driver assignment
+    order.assignedDriverId = new Types.ObjectId(driverId);
+    order.deliveryStatus = 'assigned';
+    order.assignedAt = new Date();
+
+    // Update deliveryDetails.assignedDriver for backward compatibility
+    if (order.deliveryDetails) {
+      order.deliveryDetails.assignedDriver = driverId;
+    } else {
+      order.deliveryDetails = { assignedDriver: driverId };
+    }
+
+    const updatedOrder = await order.save();
+
+    // TODO: Optionally emit websocket event for delivery updates in future
+    // (No emit here because WebsocketsGateway doesn't expose a generic emit method yet)
+
+    return updatedOrder;
+  }
+
+  /**
+   * Update delivery status
+   */
+  async updateDeliveryStatus(
+    orderId: string,
+    status: 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled',
+    userId: string,
+  ): Promise<POSOrder> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID');
+    }
+
+    const order = await this.posOrderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.orderType !== 'delivery') {
+      throw new BadRequestException('This order is not a delivery order');
+    }
+
+    // Update status and timestamps
+    order.deliveryStatus = status;
+
+    switch (status) {
+      case 'out_for_delivery':
+        order.outForDeliveryAt = new Date();
+        break;
+      case 'delivered':
+        order.deliveredAt = new Date();
+        order.completedAt = new Date();
+        break;
+      case 'cancelled':
+        order.cancelledAt = new Date();
+        order.cancelledBy = new Types.ObjectId(userId);
+        break;
+    }
+
+    const updatedOrder = await order.save();
+
+    // TODO: Optionally emit websocket event for delivery updates in future
+
+    return updatedOrder;
   }
 }
 

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { POSModule } from '../pos/pos.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
@@ -14,7 +14,7 @@ import { WorkPeriodsService } from './work-periods.service';
       { name: User.name, schema: UserSchema },
     ]),
     UsersModule,
-    POSModule,
+    forwardRef(() => POSModule),
   ],
   controllers: [WorkPeriodsController],
   providers: [WorkPeriodsService],

@@ -8,7 +8,6 @@ import {
   Query
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { GeneratorUtil } from '../../common/utils/generator.util';
 import { Public } from '../../common/decorators/public.decorator';
 import { BranchesService } from '../branches/branches.service';
 import { CategoriesService } from '../categories/categories.service';
@@ -173,16 +172,31 @@ export class PublicController {
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
     const branchId = (branch as any)._id?.toString() || (branch as any).id;
     const categories = await this.categoriesService.findAll({ branchId } as any);
-    const menuItemsResult = await this.menuItemsService.findAll({ 
+    const menuItemsResult = await this.menuItemsService.findAll({
       branchId,
-      isAvailable: true 
+      isAvailable: true,
     } as any);
 
     // Extract menuItems array from the result object
     // menuItemsService.findAll returns { menuItems: [], total, page, limit }
-    const menuItems = Array.isArray(menuItemsResult) 
-      ? menuItemsResult 
+    const rawMenuItems = Array.isArray(menuItemsResult)
+      ? menuItemsResult
       : (menuItemsResult as any)?.menuItems || [];
+
+    // For public menu, hide items whose tracked ingredients are low or out of stock
+    const menuItems = (rawMenuItems as any[]).filter((item) => {
+      // If inventory is not tracked or no ingredients, keep item visible
+      if (!item.trackInventory || !Array.isArray(item.ingredients) || item.ingredients.length === 0) {
+        return true;
+      }
+
+      // If any ingredient is low stock or out of stock, hide from public menu
+      return item.ingredients.every((ing: any) => {
+        const ingredient: any = ing?.ingredientId;
+        if (!ingredient) return true;
+        return !ingredient.isLowStock && !ingredient.isOutOfStock;
+      });
+    });
 
     return {
       success: true,

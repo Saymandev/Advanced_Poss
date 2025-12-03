@@ -42,7 +42,26 @@ export class POSOrder {
     postalCode?: string;
     instructions?: string;
     assignedDriver?: string;
+    zoneId?: string; // Delivery zone ID
   };
+
+  @Prop({ 
+    enum: ['pending', 'assigned', 'out_for_delivery', 'delivered', 'cancelled'],
+    default: 'pending'
+  })
+  deliveryStatus?: 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled';
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  assignedDriverId?: Types.ObjectId;
+
+  @Prop()
+  assignedAt?: Date;
+
+  @Prop()
+  outForDeliveryAt?: Date;
+
+  @Prop()
+  deliveredAt?: Date;
 
   @Prop({ type: Object })
   takeawayDetails?: {
@@ -105,3 +124,5 @@ POSOrderSchema.index({ status: 1 });
 POSOrderSchema.index({ createdAt: -1 });
 POSOrderSchema.index({ branchId: 1, status: 1 });
 POSOrderSchema.index({ branchId: 1, createdAt: -1 });
+POSOrderSchema.index({ orderType: 1, deliveryStatus: 1 });
+POSOrderSchema.index({ assignedDriverId: 1, deliveryStatus: 1 });

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -14,9 +15,13 @@ import {
   Res,
   UseGuards
 } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
+import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
+import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
 import { POSOrderFiltersDto, POSStatsFiltersDto } from './dto/pos-filters.dto';
 import { UpdatePOSSettingsDto } from './dto/pos-settings.dto';
@@ -26,7 +31,7 @@ import { POSService } from './pos.service';
 import { ReceiptService } from './receipt.service';
 
 @Controller('pos')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RoleFeatureGuard, WorkPeriodCheckGuard)
 export class POSController {
   constructor(
     private readonly posService: POSService,
@@ -220,6 +225,57 @@ export class POSController {
   async cancelPrintJob(@Param('jobId') jobId: string) {
     const success = await this.receiptService.cancelPrintJob(jobId);
     return { success, message: success ? 'Print job cancelled' : 'Failed to cancel print job' };
+  }
+
+  // ========== DELIVERY MANAGEMENT ENDPOINTS ==========
+
+  @Get('delivery-orders')
+  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER, UserRole.WAITER)
+  @RequiresRoleFeature('delivery-management')
+  @ApiOperation({ summary: 'Get delivery orders' })
+  async getDeliveryOrders(
+    @Query('deliveryStatus') deliveryStatus: string | undefined,
+    @Query('assignedDriverId') assignedDriverId: string | undefined,
+    @Request() req: any,
+  ) {
+    const branchId = req.user?.branchId;
+    if (!branchId) {
+      throw new BadRequestException('Branch ID not found');
+    }
+
+    return this.posService.getDeliveryOrders(
+      branchId,
+      deliveryStatus as any,
+      assignedDriverId,
+    );
+  }
+
+  @Post('orders/:orderId/assign-driver')
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresRoleFeature('delivery-management')
+  @ApiOperation({ summary: 'Assign driver to delivery order' })
+  async assignDriver(
+    @Param('orderId') orderId: string,
+    @Body('driverId') driverId: string,
+    @Request() req: any,
+  ) {
+    return this.posService.assignDriver(orderId, driverId, req.user.id);
+  }
+
+  @Patch('orders/:orderId/delivery-status')
+  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER, UserRole.WAITER)
+  @RequiresRoleFeature('delivery-management')
+  @ApiOperation({ summary: 'Update delivery status' })
+  async updateDeliveryStatus(
+    @Param('orderId') orderId: string,
+    @Body('status') status: string,
+    @Request() req: any,
+  ) {
+    return this.posService.updateDeliveryStatus(
+      orderId,
+      status as any,
+      req.user.id,
+    );
   }
 }
 

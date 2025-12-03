@@ -1,21 +1,23 @@
 import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Request,
-  UseGuards,
+    BadRequestException,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Request,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AttendanceFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AttendanceService } from './attendance.service';
 import { CheckInDto } from './dto/check-in.dto';
@@ -23,12 +25,13 @@ import { CheckOutDto } from './dto/check-out.dto';
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, RoleFeatureGuard)
 @Controller('attendance')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post('check-in')
+  @RequiresRoleFeature('attendance')
   @ApiOperation({ summary: 'Check in for work' })
   checkIn(@Body() checkInDto: CheckInDto, @Request() req: any) {
     // Use authenticated user's ID (required)
@@ -42,6 +45,7 @@ export class AttendanceController {
   }
 
   @Post('check-out')
+  @RequiresRoleFeature('attendance')
   @ApiOperation({ summary: 'Check out from work' })
   checkOut(@Body() checkOutDto: CheckOutDto, @Request() req: any) {
     // Use authenticated user's ID (required)
@@ -62,6 +66,7 @@ export class AttendanceController {
   }
 
   @Get('branch/:branchId/today')
+  @RequiresRoleFeature('attendance')
   @ApiOperation({ summary: 'Get today\'s attendance for branch' })
   getTodayAttendance(
     @Param('branchId') branchId: string,
@@ -113,6 +118,7 @@ export class AttendanceController {
   }
 
   @Get('stats/:branchId')
+  @RequiresRoleFeature('attendance')
   @ApiOperation({ summary: 'Get attendance statistics' })
   getStats(
     @Param('branchId') branchId: string,

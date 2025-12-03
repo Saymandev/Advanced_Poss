@@ -3,13 +3,17 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { CustomersModule } from '../customers/customers.module';
+import { DeliveryZonesModule } from '../delivery-zones/delivery-zones.module';
 import { IngredientsModule } from '../ingredients/ingredients.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
+import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { SettingsModule } from '../settings/settings.module';
 import { TablesModule } from '../tables/tables.module';
+import { User, UserSchema } from '../users/schemas/user.schema';
 import { UsersModule } from '../users/users.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { PDFGeneratorService } from './pdf-generator.service';
 import { POSController } from './pos.controller';
 import { POSService } from './pos.service';
@@ -20,7 +24,6 @@ import { POSOrder, POSOrderSchema } from './schemas/pos-order.schema';
 import { POSPayment, POSPaymentSchema } from './schemas/pos-payment.schema';
 import { POSSettings, POSSettingsSchema } from './schemas/pos-settings.schema';
 import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.schema';
-import { User, UserSchema } from '../users/schemas/user.schema';
 
 @Module({
   imports: [
@@ -38,9 +41,12 @@ import { User, UserSchema } from '../users/schemas/user.schema';
     BranchesModule,
     UsersModule,
     SettingsModule,
+    RolePermissionsModule,
     forwardRef(() => TablesModule),
     forwardRef(() => KitchenModule),
     forwardRef(() => CustomersModule),
+    forwardRef(() => WorkPeriodsModule),
+    DeliveryZonesModule,
   ],
   controllers: [POSController, PrinterManagementController],
   providers: [POSService, ReceiptService, PDFGeneratorService, PrinterService],

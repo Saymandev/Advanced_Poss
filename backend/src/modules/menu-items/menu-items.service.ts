@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -168,7 +168,11 @@ export class MenuItemsService {
     const menuItems = await this.menuItemModel
       .find(query)
       .populate('categoryId', 'name type')
-      .populate('ingredients.ingredientId', 'name unit')
+      // Populate ingredient details including stock flags so we can derive low-stock status
+      .populate(
+        'ingredients.ingredientId',
+        'name unit currentStock minimumStock isLowStock isOutOfStock',
+      )
       .sort(sortOptions)
       .skip(skip)
       .limit(limit)

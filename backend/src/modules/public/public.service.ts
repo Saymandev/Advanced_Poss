@@ -77,6 +77,7 @@ export class PublicService {
       // Calculate delivery fee based on zone
       let deliveryFee = 0;
       let deliveryZoneId = null;
+      let deliveryZoneName = null;
       
       if (orderData.deliveryType === 'delivery' && orderData.deliveryAddress) {
         const zone = await this.zonesService.findZoneByAddress(
@@ -87,6 +88,7 @@ export class PublicService {
         
         if (zone) {
           deliveryZoneId = (zone as any).id || (zone as any)._id?.toString();
+          deliveryZoneName = zone.name || null;
           deliveryFee = zone.deliveryCharge || 0;
           
           // Check if free delivery applies (order above minimum)
@@ -143,7 +145,6 @@ export class PublicService {
         status: 'pending',
         paymentStatus: 'pending',
         paymentMethod: orderData.paymentMethod || 'cash',
-        deliveryAddress: orderData.deliveryAddress,
         specialInstructions: orderData.specialInstructions,
         notes: orderData.specialInstructions,
       });
@@ -163,6 +164,22 @@ export class PublicService {
 
       // Notify via WebSocket: new CUSTOMER order created (for owner/manager dashboard)
       try {
+        // Build a human-readable delivery address string for websocket payload
+        let deliveryAddressString: string | undefined;
+        if (orderData.deliveryAddress) {
+          if (typeof orderData.deliveryAddress === 'string') {
+            deliveryAddressString = orderData.deliveryAddress;
+          } else {
+            deliveryAddressString = [
+              orderData.deliveryAddress.street,
+              orderData.deliveryAddress.city,
+              orderData.deliveryAddress.zipCode,
+            ]
+              .filter(Boolean)
+              .join(', ');
+          }
+        }
+
         const orderDataForWS: any = {
           id: savedOrder._id.toString(),
           _id: savedOrder._id.toString(),
@@ -175,7 +192,10 @@ export class PublicService {
           paymentStatus: savedOrder.paymentStatus,
           total: savedOrder.total,
           items: savedOrder.items,
-          deliveryAddress: savedOrder.deliveryAddress,
+          deliveryAddress: deliveryAddressString,
+          deliveryFee: savedOrder.deliveryFee || 0,
+          deliveryZoneId: deliveryZoneId,
+          deliveryZoneName: deliveryZoneName,
           specialInstructions: savedOrder.specialInstructions,
           createdAt: savedOrder.createdAt,
           isCustomerOrder: true, // Flag to distinguish customer orders from POS orders

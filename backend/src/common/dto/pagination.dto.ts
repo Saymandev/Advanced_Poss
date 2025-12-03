@@ -233,6 +233,10 @@ export class AttendanceFilterDto extends PaginationDto {
   userId?: string;
 
   @IsOptional()
+  @IsString()
+  status?: string; // Filter by status: present, absent, late, half-day, on-leave
+
+  @IsOptional()
   @IsDateString()
   startDate?: string;
 

@@ -82,6 +82,10 @@ export class DeliveryDetailsDto {
   @IsOptional()
   @IsString()
   assignedDriver?: string;
+
+  @IsOptional()
+  @IsString()
+  zoneId?: string; // Delivery zone ID
 }
 
 export class CreatePOSOrderDto {

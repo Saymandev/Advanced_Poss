@@ -30,6 +30,7 @@ export const FEATURES = {
 
   // Orders & Tables
   ORDER_MANAGEMENT: 'order-management',
+  DELIVERY_MANAGEMENT: 'delivery-management',
   TABLE_MANAGEMENT: 'table-management',
   KITCHEN_DISPLAY: 'kitchen-display',
   CUSTOMER_DISPLAY: 'customer-display',
@@ -76,6 +77,7 @@ export const FEATURE_CATEGORIES = {
   MENU: ['menu-management', 'categories', 'qr-menus'],
   ORDERS: [
     'order-management',
+    'delivery-management',
     'table-management',
     'kitchen-display',
     'customer-display',
@@ -104,6 +106,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.CATEGORIES,
     FEATURES.QR_MENUS,
     FEATURES.ORDER_MANAGEMENT,
+    FEATURES.DELIVERY_MANAGEMENT,
     FEATURES.TABLE_MANAGEMENT,
     FEATURES.KITCHEN_DISPLAY,
     FEATURES.CUSTOMER_DISPLAY,
@@ -134,6 +137,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.CATEGORIES,
     FEATURES.QR_MENUS,
     FEATURES.ORDER_MANAGEMENT,
+    FEATURES.DELIVERY_MANAGEMENT,
     FEATURES.TABLE_MANAGEMENT,
     FEATURES.KITCHEN_DISPLAY,
     FEATURES.CUSTOMER_DISPLAY,
@@ -159,6 +163,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
   waiter: [
     FEATURES.DASHBOARD,
     FEATURES.ORDER_MANAGEMENT,
+    FEATURES.DELIVERY_MANAGEMENT,
     FEATURES.TABLE_MANAGEMENT,
     FEATURES.CUSTOMER_DISPLAY,
     FEATURES.CUSTOMER_MANAGEMENT,
