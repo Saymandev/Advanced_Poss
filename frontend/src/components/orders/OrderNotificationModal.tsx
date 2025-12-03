@@ -3,16 +3,18 @@
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useUpdateOrderStatusMutation } from '@/lib/api/endpoints/ordersApi';
+import { useCreatePOSOrderMutation, type CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
+import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
-import { 
-  CheckCircleIcon, 
-  XCircleIcon,
+import {
+  CheckCircleIcon,
   ClockIcon,
-  UserIcon,
   MapPinIcon,
-  ShoppingBagIcon
+  ShoppingBagIcon,
+  UserIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
 interface OrderNotificationModalProps {
@@ -23,7 +25,8 @@ interface OrderNotificationModalProps {
 
 export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotificationModalProps) {
   const [updateOrderStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [createPOSOrder] = useCreatePOSOrderMutation();
+  const { user } = useAppSelector((state) => state.auth);
   const [hasPlayedSound, setHasPlayedSound] = useState(false);
 
   // Play notification sound when modal opens
@@ -77,15 +80,101 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
   const handleConfirm = async () => {
     try {
       const orderId = order.id || order._id || order.orderId;
+      
+      // First, update the public order status to confirmed
       await updateOrderStatus({
         id: orderId,
         status: 'confirmed',
       }).unwrap();
-      
-      toast.success(`Order #${order.orderNumber} confirmed`);
+
+      // If this is a delivery order from public site, also create a POS delivery order
+      const type = (order.type || order.orderType || 'delivery').toLowerCase();
+      if (type === 'delivery') {
+        const publicCustomer = order.customer || {};
+        const publicAddress = order.deliveryAddress || {};
+
+        const customerName =
+          publicCustomer.firstName && publicCustomer.lastName
+            ? `${publicCustomer.firstName} ${publicCustomer.lastName}`
+            : order.customerName || order.guestName || 'Guest';
+
+        // Extract menuItemId properly - handle both populated and non-populated cases
+        const items = (order.items || []).map((item: any) => {
+          // Try multiple ways to get menuItemId
+          let menuItemId = item.menuItemId;
+          if (!menuItemId || typeof menuItemId === 'object') {
+            menuItemId = item.menuItemId?._id || item.menuItemId?.id || item.menuItemIdId || item.menuItemId;
+          }
+          if (!menuItemId) {
+            console.error('⚠️ Could not extract menuItemId from item:', item);
+          }
+          return {
+            menuItemId: menuItemId?.toString() || '',
+            quantity: item.quantity || 1,
+            price: item.price || item.unitPrice || 0,
+            notes: item.notes || item.specialInstructions || '',
+          };
+        }).filter((item: any) => item.menuItemId); // Filter out items without menuItemId
+
+        if (items.length === 0) {
+          console.error('⚠️ No valid items found for POS order creation');
+          toast.error('Failed to create POS order: No valid items found');
+        } else {
+          const deliveryPayload: CreatePOSOrderRequest = {
+            orderType: 'delivery',
+            deliveryFee: order.deliveryFee || 0,
+            deliveryDetails: {
+              contactName: customerName,
+              contactPhone: publicCustomer.phone || '',
+              addressLine1:
+                typeof publicAddress === 'string'
+                  ? publicAddress
+                  : publicAddress.street || '',
+              addressLine2: typeof publicAddress === 'string' ? undefined : publicAddress.addressLine2,
+              city: typeof publicAddress === 'string' ? undefined : publicAddress.city,
+              postalCode: typeof publicAddress === 'string' ? undefined : publicAddress.zipCode,
+              instructions: order.specialInstructions || '',
+              ...(order.deliveryZoneId ? { zoneId: order.deliveryZoneId } : {}),
+            },
+            items,
+            customerInfo: {
+              name: customerName,
+              phone: publicCustomer.phone || '',
+              email: publicCustomer.email || '',
+            },
+            totalAmount: order.total || 0,
+            status: 'pending', // Keep as pending so it appears in POS queue
+            paymentMethod: (order.paymentMethod as any) || 'cash',
+            notes: [
+              `Source: Online / Public Order #${order.orderNumber || orderId}`,
+              order.specialInstructions || '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            waiterId: user?.id, // assign to current user (owner/manager/waiter)
+          };
+
+          try {
+            console.log('📦 Creating POS delivery order from public order:', deliveryPayload);
+            const posOrderResult = await createPOSOrder(deliveryPayload).unwrap();
+            console.log('✅ POS delivery order created successfully:', posOrderResult);
+            toast.success(`Order confirmed and added to delivery queue! Order #${posOrderResult.orderNumber || posOrderResult.id}`);
+          } catch (posError: any) {
+            console.error('❌ Failed to create POS delivery order from public order:', posError);
+            const errorMessage = posError?.data?.message || posError?.message || 'Unknown error';
+            toast.error(`Order confirmed, but failed to add to delivery queue: ${errorMessage}`);
+            // Don't block confirmation if POS order creation fails, but show error
+          }
+        }
+      } else {
+        // For non-delivery orders, just confirm
+        toast.success(`Order #${order.orderNumber} confirmed`);
+      }
+
       onClose();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to confirm order');
+      console.error('❌ Failed to confirm order:', error);
+      toast.error(error.data?.message || error.message || 'Failed to confirm order');
     }
   };
 
@@ -109,30 +198,29 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
   const customerName = order.customer?.firstName && order.customer?.lastName
     ? `${order.customer.firstName} ${order.customer.lastName}`
     : order.customerName || order.guestName || 'Guest';
+  const customerPhone = order.customer?.phone;
+  const customerEmail = order.customer?.email;
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
-            <ShoppingBagIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-              New Order Received
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Order #{order.orderNumber}
-            </p>
-          </div>
-        </div>
-      }
+      title={`New Order Received - #${order.orderNumber}`}
       size="lg"
       className="z-[9999]"
     >
       <div className="space-y-6">
+        {/* Header with icon */}
+        <div className="flex items-center gap-3 pb-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+            <ShoppingBagIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Order #{order.orderNumber}
+            </h3>
+          </div>
+        </div>
         {/* Order Summary */}
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -152,9 +240,18 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Customer:
             </span>
-            <span className="text-sm text-gray-900 dark:text-white font-semibold">
-              {customerName}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-sm text-gray-900 dark:text-white font-semibold">
+                {customerName}
+              </span>
+              {(customerPhone || customerEmail) && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {customerPhone ? `📞 ${customerPhone}` : ''}
+                  {customerPhone && customerEmail ? ' • ' : ''}
+                  {customerEmail ? `✉️ ${customerEmail}` : ''}
+                </span>
+              )}
+            </div>
           </div>
 
           {order.deliveryAddress && (
@@ -175,6 +272,14 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
                         .filter(Boolean)
                         .join(', ')}
                 </span>
+                {order.deliveryZoneName && (
+                  <span className="text-xs text-blue-600 dark:text-blue-400 mt-1 block">
+                    Zone: {order.deliveryZoneName}
+                    {order.deliveryFee && order.deliveryFee > 0 && (
+                      <span className="ml-2">• Delivery Fee: {formatCurrency(order.deliveryFee)}</span>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
           )}

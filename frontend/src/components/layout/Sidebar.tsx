@@ -87,6 +87,12 @@ const navigation: NavigationItem[] = [
     requiredFeature: 'order-management',
   },
   {
+    name: 'Deliveries',
+    href: '/dashboard/deliveries',
+    icon: TruckIcon,
+    requiredFeature: 'delivery-management',
+  },
+  {
     name: 'Menu',
     href: '/dashboard/menu-items',
     icon: ShoppingBagIcon,

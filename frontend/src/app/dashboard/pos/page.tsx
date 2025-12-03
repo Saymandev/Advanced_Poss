@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
+import { useGetDeliveryZonesByBranchQuery } from '@/lib/api/endpoints/deliveryZonesApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
   useCancelPOSOrderMutation,
@@ -27,9 +28,10 @@ import {
   useUpdatePOSOrderMutation
 } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
+import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
-import { formatDateTime } from '@/lib/utils';
+import { cn, formatDateTime } from '@/lib/utils';
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -42,6 +44,7 @@ import {
   DocumentArrowDownIcon,
   FunnelIcon,
   HomeModernIcon,
+  LockClosedIcon,
   MagnifyingGlassIcon,
   MinusIcon,
   PencilSquareIcon,
@@ -220,6 +223,14 @@ const generateClientId = () => {
 export default function POSPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const formatCurrency = useFormatCurrency(); // Use hook to get reactive currency formatting
+  const isOwnerOrManager =
+    user?.role === 'owner' || user?.role === 'super_admin';
+  const {
+    data: activeWorkPeriod,
+    isLoading: workPeriodLoading,
+  } = useGetCurrentWorkPeriodQuery(undefined, {
+    skip: isOwnerOrManager,
+  });
   
   // Load from localStorage on mount
   const [orderType, setOrderType] = useState<OrderType>(() => {
@@ -345,6 +356,13 @@ export default function POSPage() {
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const [queueDetailId, setQueueDetailId] = useState<string | null>(null);
   const [queueActionOrderId, setQueueActionOrderId] = useState<string | null>(null);
+
+  // Delivery zones for POS (branch-based)
+  const currentBranchId = user?.branchId || (companyContext as any)?.branchId || '';
+  const { data: deliveryZones = [], isLoading: zonesLoading } = useGetDeliveryZonesByBranchQuery(
+    { branchId: currentBranchId },
+    { skip: !currentBranchId }
+  );
 
   const resetDeliveryDetails = useCallback(() => {
     const defaults = createDefaultDeliveryDetails();
@@ -1589,6 +1607,7 @@ export default function POSPage() {
     refetchQueue,
     guestCount,
     refetchTables,
+    formatCurrency,
   ]);
 
   const handlePayment = async () => {
@@ -2184,7 +2203,7 @@ export default function POSPage() {
                 className="group relative overflow-hidden border border-gray-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-700/20"
               >
                 <CardContent className="p-4 space-y-3">
-                  <div className="aspect-square rounded-xl bg-gray-100 dark:bg-slate-950/60 flex items-center justify-center border border-gray-200 dark:border-slate-800/80">
+                  <div className="relative aspect-square rounded-xl bg-gray-100 dark:bg-slate-950/60 flex items-center justify-center border border-gray-200 dark:border-slate-800/80 overflow-hidden">
                     {item.image ? (
                       <Image
                         src={item.image}
@@ -2196,6 +2215,24 @@ export default function POSPage() {
                     ) : (
                       <div className="text-4xl">🍽️</div>
                     )}
+
+                    {/* Stock overlay in the middle of the image */}
+                    {(item.isOutOfStock || item.isLowStock) && (
+                      <div
+                        className={cn(
+                          'absolute inset-0 flex items-center justify-center backdrop-blur-[1px]',
+                          item.isOutOfStock
+                            ? 'bg-red-900/55'
+                            : 'bg-amber-900/45',
+                        )}
+                      >
+                        <div
+                          className="px-4 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border border-white/70 text-red-500 shadow-lg shadow-black/40 bg-white"
+                        >
+                          {item.isOutOfStock ? 'Out of stock' : 'Low stock'}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center justify-between gap-2">
@@ -2203,7 +2240,7 @@ export default function POSPage() {
                         {item.name}
                       </h3>
                       {item.category?.name && (
-                        <Badge className="bg-sky-500/10 text-sky-200 border border-sky-500/20">
+                        <Badge className="bg-sky-500/10 dark:text-sky-200 text-gray-900 border border-sky-500/20">
                           {item.category.name}
                         </Badge>
                       )}
@@ -2218,8 +2255,19 @@ export default function POSPage() {
                     </span>
                     <Button
                       size="sm"
-                      onClick={() => addToCart(item)}
-                      className="flex items-center gap-1 rounded-full bg-sky-600 hover:bg-sky-500"
+                      onClick={() => {
+                        if (item.isOutOfStock) {
+                          toast.error('This item is out of stock. Please restock before selling.');
+                          return;
+                        }
+                        if (item.isLowStock) {
+                          toast.error('This item is low on stock and cannot be sold for safety.');
+                          return;
+                        }
+                        addToCart(item);
+                      }}
+                      disabled={item.isOutOfStock || item.isLowStock}
+                      className="flex items-center gap-1 rounded-full bg-sky-600 hover:bg-sky-500 disabled:bg-gray-600 disabled:text-gray-200 disabled:cursor-not-allowed disabled:hover:bg-gray-600"
                     >
                       <PlusIcon className="h-4 w-4" />
                       Add
@@ -2569,6 +2617,28 @@ export default function POSPage() {
 
 
   return (
+    !isOwnerOrManager && !workPeriodLoading && !activeWorkPeriod ? (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
+        <Card className="max-w-md w-full mx-4">
+          <CardContent className="p-8 text-center space-y-4">
+            <LockClosedIcon className="w-16 h-16 text-red-500 mx-auto" />
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              POS Terminal Locked
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              No active work period found. Please ask an owner to start a work period
+              from the Work Periods page before using the POS terminal.
+            </p>
+            <Button
+              className="w-full"
+              onClick={() => (window.location.href = '/dashboard/work-periods')}
+            >
+              Go to Work Periods
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    ) : (
     <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100">
       {/* Header */}
       <div className="bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-gray-200 dark:border-slate-800 px-6 py-5 shadow-lg">
@@ -2628,7 +2698,7 @@ export default function POSPage() {
                 <span className="text-gray-900 dark:text-slate-100">Total {formatCurrency(orderSummary.total)}</span>
               </div>
               {requiresDeliveryDetails && (
-                <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 border ${deliveryIsValid ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/40 bg-amber-500/10 text-amber-100'}`}>
+                <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 border ${deliveryIsValid ? 'border-emerald-500/40 bg-emerald-500/10 dark:text-emerald-200 text-gray-900' : 'border-amber-500/40 bg-amber-500/10 dark:text-amber-100 text-gray-900'}`}>
                   <TruckIcon className="h-4 w-4" />
                   <span className="whitespace-nowrap">{deliveryIsValid ? 'Delivery details complete' : `Missing ${missingDeliveryFields.length} delivery field${missingDeliveryFields.length === 1 ? '' : 's'}`}</span>
                 </div>
@@ -2974,22 +3044,63 @@ export default function POSPage() {
                   placeholder="Postal Code"
                   className="bg-slate-950/60 border-slate-850 text-slate-100"
                 />
-                <div className="sm:col-span-2">
-                  <label className="block text-xs text-slate-400 mb-1">Delivery Fee</label>
-                  <Input
-                    value={deliveryFee}
-                    onChange={(e) => {
-                      setDeliveryFee(e.target.value);
-                      if (typeof window !== 'undefined') {
-                        localStorage.setItem('pos_deliveryFee', e.target.value);
-                      }
-                    }}
-                    placeholder="0.00"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="bg-slate-950/60 border-slate-850 text-slate-100"
-                  />
+                {/* Delivery Zone & Fee */}
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Delivery Zone</label>
+                    <select
+                      className="w-full rounded-md bg-slate-950/60 border border-slate-850 text-slate-100 text-sm px-3 py-2"
+                      value={(deliveryDetails as any).zoneId || ''}
+                      onChange={(e) => {
+                        const zoneId = e.target.value;
+                        const selectedZone = deliveryZones.find((z) => z.id === zoneId);
+                        setDeliveryDetails({
+                          ...deliveryDetails,
+                          ...(zoneId ? { zoneId } : {}),
+                        } as any);
+                        
+                        if (selectedZone) {
+                          const fee = selectedZone.deliveryCharge ?? 0;
+                          const feeStr = fee.toString();
+                          setDeliveryFee(feeStr);
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('pos_deliveryFee', feeStr);
+                          }
+                        }
+                      }}
+                      disabled={zonesLoading || deliveryZones.length === 0}
+                    >
+                      <option value="">
+                        {zonesLoading
+                          ? 'Loading zones...'
+                          : deliveryZones.length === 0
+                            ? 'No delivery zones configured'
+                            : 'Select delivery zone'}
+                      </option>
+                      {deliveryZones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name} ({formatCurrency(zone.deliveryCharge)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Delivery Fee</label>
+                    <Input
+                      value={deliveryFee}
+                      onChange={(e) => {
+                        setDeliveryFee(e.target.value);
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('pos_deliveryFee', e.target.value);
+                        }
+                      }}
+                      placeholder="0.00"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="bg-slate-950/60 border-slate-850 text-slate-100"
+                    />
+                  </div>
                 </div>
                 <Input
                   value={deliveryDetails.instructions}
@@ -4435,5 +4546,6 @@ export default function POSPage() {
         )}
       </Modal>
     </div>
+    )
   );
 }

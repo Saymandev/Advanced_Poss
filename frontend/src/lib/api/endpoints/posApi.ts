@@ -76,6 +76,16 @@ export interface POSStats {
   }>;
 }
 
+export type DeliveryStatus = 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled';
+
+export interface DeliveryOrder extends POSOrder {
+  deliveryStatus?: DeliveryStatus;
+  assignedDriverId?: string;
+  assignedAt?: string;
+  outForDeliveryAt?: string;
+  deliveredAt?: string;
+}
+
 export const posApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Create POS order
@@ -176,12 +186,47 @@ export const posApi = apiSlice.injectEndpoints({
       },
     }),
 
+    // Get delivery orders
+    getDeliveryOrders: builder.query<DeliveryOrder[], { deliveryStatus?: DeliveryStatus; assignedDriverId?: string }>({
+      query: (params) => ({
+        url: '/pos/delivery-orders',
+        params,
+      }),
+      providesTags: ['POS'],
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.orders)) return data.orders;
+        return [];
+      },
+    }),
+
+    // Assign driver to delivery order
+    assignDeliveryDriver: builder.mutation<DeliveryOrder, { orderId: string; driverId: string }>({
+      query: ({ orderId, driverId }) => ({
+        url: `/pos/orders/${orderId}/assign-driver`,
+        method: 'POST',
+        body: { driverId },
+      }),
+      invalidatesTags: ['POS'],
+    }),
+
+    // Update delivery status
+    updateDeliveryStatus: builder.mutation<DeliveryOrder, { orderId: string; status: DeliveryStatus }>({
+      query: ({ orderId, status }) => ({
+        url: `/pos/orders/${orderId}/delivery-status`,
+        method: 'PATCH',
+        body: { status },
+      }),
+      invalidatesTags: ['POS'],
+    }),
+
     // Get waiter active orders count (for busy indicator)
     getWaiterActiveOrdersCount: builder.query<Record<string, number>, void>({
       query: () => ({
         url: '/pos/waiters/active-orders',
       }),
-      providesTags: ['POSOrder'],
+      providesTags: ['POS'],
       transformResponse: (response: any) => {
         return response.data || response || {};
       },
@@ -275,6 +320,9 @@ export const posApi = apiSlice.injectEndpoints({
       };
       isAvailable: boolean;
       stock?: number;
+      stockStatus?: 'ok' | 'low' | 'out';
+      isLowStock?: boolean;
+      isOutOfStock?: boolean;
     }>, {
       branchId?: string;
       categoryId?: string;
@@ -290,22 +338,7 @@ export const posApi = apiSlice.injectEndpoints({
         const data = response.data || response;
         
         // Handle array response directly
-        if (Array.isArray(data)) {
-          return data.map((item: any) => ({
-            id: item._id || item.id,
-            name: item.name,
-            description: item.description,
-            price: item.price || 0,
-            image: item.imageUrl || item.image,
-            category: item.categoryId || item.category || { id: '', name: 'Uncategorized' },
-            isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
-            stock: item.stock || item.currentStock,
-          }));
-        }
-        
-        // Handle object with items array
-        const items = data.menuItems || data.items || [];
-        return items.map((item: any) => ({
+        const normalize = (item: any) => ({
           id: item._id || item.id,
           name: item.name,
           description: item.description,
@@ -314,7 +347,18 @@ export const posApi = apiSlice.injectEndpoints({
           category: item.categoryId || item.category || { id: '', name: 'Uncategorized' },
           isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
           stock: item.stock || item.currentStock,
-        }));
+          stockStatus: item.stockStatus || (item.isOutOfStock ? 'out' : item.isLowStock ? 'low' : 'ok'),
+          isLowStock: item.isLowStock || item.stockStatus === 'low',
+          isOutOfStock: item.isOutOfStock || item.stockStatus === 'out',
+        });
+
+        if (Array.isArray(data)) {
+          return data.map(normalize);
+        }
+        
+        // Handle object with items array
+        const items = data.menuItems || data.items || [];
+        return items.map(normalize);
       },
     }),
 
@@ -666,4 +710,7 @@ export const {
   useGetPOSSettingsQuery,
   useUpdatePOSSettingsMutation,
   useGetWaiterActiveOrdersCountQuery,
+  useGetDeliveryOrdersQuery,
+  useAssignDeliveryDriverMutation,
+  useUpdateDeliveryStatusMutation,
 } = posApi;

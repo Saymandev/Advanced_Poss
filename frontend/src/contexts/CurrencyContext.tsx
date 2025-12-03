@@ -33,11 +33,12 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     (user as any)?.companyId || 
     '';
 
-  // Only fetch company settings if user is authenticated (not during login flow)
-  // During login, companyContext has companyId but user is not authenticated yet
+  // Only fetch company settings if user is authenticated and has permission
+  // This endpoint requires OWNER/MANAGER/SUPER_ADMIN role - skip for waiters/employees
+  const isAuthorized = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'super_admin';
   const { data: companySettings, isLoading } = useGetCompanySettingsQuery(
     companyId,
-    { skip: !companyId || !isAuthenticated }
+    { skip: !companyId || !isAuthenticated || !isAuthorized }
   );
 
   const currency = companySettings?.currency || 'BDT'; // Default to BDT to match settings page

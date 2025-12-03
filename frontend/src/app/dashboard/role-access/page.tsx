@@ -77,6 +77,7 @@ const features: Feature[] = [
 
   // Orders & Tables
   { id: 'order-management', name: 'Order Management', description: 'Manage orders and transactions', icon: ClipboardDocumentListIcon, category: 'Orders' },
+  { id: 'delivery-management', name: 'Delivery Management', description: 'Manage delivery orders and drivers', icon: TruckIcon, category: 'Orders' },
   { id: 'table-management', name: 'Table Management', description: 'Manage restaurant tables', icon: TableCellsIcon, category: 'Orders' },
   { id: 'kitchen-display', name: 'Kitchen Display', description: 'Access kitchen display system', icon: BuildingStorefrontIcon, category: 'Orders' },
   { id: 'customer-display', name: 'Customer Display', description: 'Access customer display system', icon: ComputerDesktopIcon, category: 'Orders' },
@@ -158,8 +159,8 @@ const allRoleAccess: RoleAccess[] = [
     description: 'Order taking and customer service',
     color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
     features: [
-      'dashboard', 'order-management', 'table-management', 'customer-management',
-      'notifications'
+      'dashboard', 'order-management', 'delivery-management', 'table-management',
+      'customer-management', 'notifications'
     ],
   },
   {

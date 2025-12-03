@@ -4,18 +4,17 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
-import { 
-  useGetCompanyRolePermissionsQuery, 
-  useUpdateCompanyRolePermissionMutation,
-  RolePermission,
-} from '@/lib/api/endpoints/rolePermissionsApi';
 import { useGetCompaniesQuery } from '@/lib/api/endpoints/companiesApi';
+import {
+  RolePermission,
+  useGetCompanyRolePermissionsQuery,
+  useUpdateCompanyRolePermissionMutation,
+} from '@/lib/api/endpoints/rolePermissionsApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import {
-  ShieldCheckIcon,
-  BuildingOffice2Icon,
   CheckCircleIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -31,30 +30,39 @@ const features = [
   { id: 'menu-management', name: 'Menu Management', category: 'Menu' },
   { id: 'categories', name: 'Categories', category: 'Menu' },
   { id: 'qr-menus', name: 'QR Menus', category: 'Menu' },
+  // Orders & Tables
   { id: 'order-management', name: 'Order Management', category: 'Orders' },
+  { id: 'delivery-management', name: 'Delivery Management', category: 'Orders' },
   { id: 'table-management', name: 'Table Management', category: 'Orders' },
   { id: 'kitchen-display', name: 'Kitchen Display', category: 'Orders' },
   { id: 'customer-display', name: 'Customer Display', category: 'Orders' },
   { id: 'pos-settings', name: 'POS Settings', category: 'Orders' },
   { id: 'printer-management', name: 'Printer Management', category: 'Orders' },
   { id: 'digital-receipts', name: 'Digital Receipts', category: 'Orders' },
+  // Customers
   { id: 'customer-management', name: 'Customer Management', category: 'Customers' },
   { id: 'loyalty-program', name: 'Loyalty Program', category: 'Customers' },
   { id: 'marketing', name: 'Marketing', category: 'Customers' },
+  // AI Features
   { id: 'ai-menu-optimization', name: 'AI Menu Optimization', category: 'AI Features' },
   { id: 'ai-customer-loyalty', name: 'Customer Loyalty AI', category: 'AI Features' },
+  // Inventory
   { id: 'inventory', name: 'Inventory Management', category: 'Inventory' },
   { id: 'suppliers', name: 'Supplier Management', category: 'Inventory' },
   { id: 'purchase-orders', name: 'Purchase Orders', category: 'Inventory' },
+  // Financial
   { id: 'expenses', name: 'Expense Management', category: 'Financial' },
   { id: 'accounting', name: 'Accounting', category: 'Financial' },
   { id: 'work-periods', name: 'Work Periods', category: 'Financial' },
+  // System
   { id: 'settings', name: 'Settings', category: 'System' },
   { id: 'branches', name: 'Branch Management', category: 'System' },
   { id: 'notifications', name: 'Notifications', category: 'System' },
 ];
 
-const ROLE_OPTIONS = [
+type CompanyRole = 'owner' | 'manager' | 'chef' | 'waiter' | 'cashier';
+
+const ROLE_OPTIONS: { value: CompanyRole; label: string }[] = [
   { value: 'owner', label: 'Owner' },
   { value: 'manager', label: 'Manager' },
   { value: 'chef', label: 'Chef' },
@@ -73,7 +81,7 @@ export default function CompanyFeaturesPage() {
   }, [user, router]);
 
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
-  const [selectedRole, setSelectedRole] = useState<string>('owner');
+  const [selectedRole, setSelectedRole] = useState<CompanyRole>('owner');
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
 
   const { data: companiesData } = useGetCompaniesQuery({});
@@ -144,10 +152,10 @@ export default function CompanyFeaturesPage() {
     return grouped;
   }, []);
 
-  const currentRolePermission = useMemo(() => {
-    if (!rolePermissionsData || rolePermissionsData.length === 0) return null;
-    return rolePermissionsData.find((p: RolePermission) => p.role === selectedRole) || null;
-  }, [rolePermissionsData, selectedRole]);
+  // const currentRolePermission = useMemo(() => {
+  //   if (!rolePermissionsData || rolePermissionsData.length === 0) return null;
+  //   return rolePermissionsData.find((p: RolePermission) => p.role === selectedRole) || null;
+  // }, [rolePermissionsData, selectedRole]);
 
   if (!user || user.role !== UserRole.SUPER_ADMIN) {
     return (
@@ -213,7 +221,7 @@ export default function CompanyFeaturesPage() {
               <Select
                 value={selectedRole}
                 onChange={(value) => {
-                  setSelectedRole(value);
+                  setSelectedRole(value as CompanyRole);
                 }}
                 options={ROLE_OPTIONS}
                 className="w-full max-w-md"
