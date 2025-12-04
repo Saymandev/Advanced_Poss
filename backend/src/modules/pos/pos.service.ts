@@ -96,6 +96,14 @@ export class POSService {
         );
       }
     }
+
+    // Validate payment mode: If pay-first mode is enabled, orders cannot be created as 'pending'
+    const posSettings = await this.getPOSSettings(branchId);
+    if (posSettings.defaultPaymentMode === 'pay-first' && createOrderDto.status === 'pending') {
+      throw new BadRequestException(
+        'Pay-first mode is enabled. Orders must be created as "paid". Please process payment before creating the order.'
+      );
+    }
     // Cache menu items to fetch names efficiently
     const menuItemCache = new Map<string, any>();
     
@@ -148,13 +156,14 @@ export class POSService {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         
+        // Only count PENDING orders for seat calculation (paid orders don't occupy seats)
         const existingOrders = await this.posOrderModel.find({
           tableId: new Types.ObjectId(createOrderDto.tableId),
           createdAt: { $gte: today, $lt: tomorrow },
-          status: { $in: ['pending', 'paid'] },
+          status: 'pending', // Only pending orders count towards seat usage
         }).exec();
         
-        // Calculate used seats from existing orders
+        // Calculate used seats from PENDING orders only
         const usedSeats = existingOrders.reduce((sum, order) => {
           return sum + (order.guestCount || 0);
         }, 0);
@@ -314,17 +323,51 @@ export class POSService {
             console.error('Failed to update table status:', tableError);
           }
         } else if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in' && savedOrder.status === 'paid') {
-          // If order is paid, ensure table is available (not occupied)
+          // If order is paid first (pay-first mode), table should still be occupied
+          // because the customer is using the table even though they paid upfront
           try {
             await this.tablesService.updateStatus(
               createOrderDto.tableId.toString(),
               {
-                status: 'available',
+                status: 'occupied',
+                orderId: savedOrder._id.toString(),
+                occupiedBy: userId,
               },
             );
-            console.log(`✅ Table ${createOrderDto.tableId} set to available (order created as paid)`);
+            console.log(`✅ Table ${createOrderDto.tableId} occupied (order created as paid - customer using table)`);
           } catch (tableError) {
-            console.error('Failed to set table to available:', tableError);
+            console.error('Failed to update table status:', tableError);
+          }
+        }
+
+        // If order is created as 'paid' (pay-first mode), create payment record immediately
+        if (savedOrder.status === 'paid' && createOrderDto.paymentMethod) {
+          try {
+            const paymentData = {
+              orderId: savedOrder._id,
+              amount: savedOrder.totalAmount,
+              method: createOrderDto.paymentMethod,
+              status: 'completed',
+              transactionId: `PAY-FIRST-${savedOrder.orderNumber}-${Date.now()}`,
+              processedBy: new Types.ObjectId(userId),
+              processedAt: new Date(),
+              branchId: new Types.ObjectId(branchId),
+              paymentDetails: {},
+            };
+
+            const payment = new this.posPaymentModel(paymentData);
+            const savedPayment = await payment.save();
+
+            // Link payment to order
+            await this.posOrderModel.findByIdAndUpdate(savedOrder._id, {
+              paymentId: savedPayment._id,
+              completedAt: new Date(),
+            }).exec();
+
+            console.log(`✅ Payment record created for pay-first order ${savedOrder.orderNumber}`);
+          } catch (paymentError) {
+            // Log error but don't fail order creation
+            console.error('Failed to create payment record for paid order:', paymentError);
           }
         }
 
@@ -673,19 +716,9 @@ export class POSService {
       completedAt: new Date(),
     }, { new: true }).exec();
 
-    // Free the table if this is a dine-in order (paid orders shouldn't keep tables occupied)
-    if (order.orderType === 'dine-in' && order.tableId) {
-      try {
-        const tableId = order.tableId.toString();
-        await this.tablesService.updateStatus(tableId, {
-          status: 'available',
-        });
-        console.log(`✅ Table ${tableId} freed after payment processed for order ${order.orderNumber}`);
-      } catch (tableError) {
-        // Log error but don't fail payment processing
-        console.error('❌ Failed to free table after payment:', tableError);
-      }
-    }
+    // Note: We do NOT free the table after payment processing.
+    // Tables remain occupied even after payment because customers may still be using them.
+    // Tables are only freed when staff explicitly releases them or orders are cancelled.
 
     // Update customer statistics if customer email is provided
     if (order.customerInfo?.email && companyId) {
@@ -926,6 +959,7 @@ export class POSService {
         taxRate: 10,
         serviceCharge: 0,
         currency: 'USD',
+        defaultPaymentMode: 'pay-later',
         receiptSettings: {
           header: 'Welcome to Our Restaurant',
           footer: 'Thank you for your visit!',
@@ -1156,17 +1190,18 @@ export class POSService {
     .select('tableId orderNumber totalAmount guestCount userId notes status')
     .exec();
 
-    // Also fetch paid orders for history/reference, but they don't affect occupation
+    // Also fetch paid orders for display purposes (they don't affect occupation or seat calculation)
     const paidOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
       createdAt: { $gte: today, $lt: tomorrow },
       status: 'paid',
       orderType: 'dine-in',
     })
-    .select('tableId orderNumber totalAmount guestCount status')
+    .populate('userId', 'firstName lastName name')
+    .select('tableId orderNumber totalAmount guestCount userId notes status completedAt')
     .exec();
 
-    // Group PENDING orders by table (only pending orders affect occupation)
+    // Group PENDING orders by table (only pending orders affect occupation and seat calculation)
     const ordersByTable = new Map<string, any[]>();
     pendingOrders.forEach(order => {
       if (order.tableId) {
@@ -1178,66 +1213,86 @@ export class POSService {
       }
     });
 
-    // Transform tables to include occupation status and order details
-    return allTables.map((table: any) => {
-      const tableId = table._id?.toString() || table.id;
-      const tablePendingOrders = ordersByTable.get(tableId) || [];
-      // Table is only occupied if there are PENDING orders
-      const isOccupied = tablePendingOrders.length > 0;
-      
-      // Get the primary order (most recent pending order)
-      const primaryOrder = tablePendingOrders.length > 0 ? tablePendingOrders[0] : null;
-      
-      // Calculate used seats from PENDING orders only (paid orders don't count)
-      const usedSeats = tablePendingOrders.reduce((sum: number, order: any) => {
-        return sum + (order.guestCount || 0);
-      }, 0);
-      
-      const remainingSeats = Math.max(0, (table.capacity || 0) - usedSeats);
-      
-      // Extract waiter name from notes or userId
-      let waiterName = '';
-      if (primaryOrder) {
-        const notes = primaryOrder.notes || '';
-        const waiterMatch = notes.match(/Waiter:\s*(.+)/i);
-        if (waiterMatch) {
-          waiterName = waiterMatch[1].trim();
-        } else if (primaryOrder.userId) {
-          const user = primaryOrder.userId as any;
-          waiterName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || '';
+    // Group PAID orders by table (for display only - to show order info even after payment)
+    const paidOrdersByTable = new Map<string, any[]>();
+    paidOrders.forEach(order => {
+      if (order.tableId) {
+        const tableId = order.tableId.toString();
+        if (!paidOrdersByTable.has(tableId)) {
+          paidOrdersByTable.set(tableId, []);
         }
+        paidOrdersByTable.get(tableId)!.push(order);
       }
-
-      return {
-        id: tableId,
-        number: table.tableNumber || table.number || '',
-        tableNumber: table.tableNumber || table.number || '',
-        capacity: table.capacity || 0,
-        status: isOccupied ? 'occupied' : (table.status || 'available'),
-        currentOrderId: primaryOrder?._id?.toString(),
-        location: table.location,
-        // Order details for occupied tables
-        orderDetails: primaryOrder ? {
-          currentOrderId: primaryOrder._id?.toString(),
-          orderNumber: primaryOrder.orderNumber,
-          tokenNumber: primaryOrder.orderNumber,
-          totalAmount: primaryOrder.totalAmount || 0,
-          waiterName: waiterName,
-          guestCount: primaryOrder.guestCount || 0,
-          holdCount: 0, // Placeholder - can be tracked later
-          usedSeats: usedSeats,
-          remainingSeats: remainingSeats,
-          orderStatus: primaryOrder.status || 'pending', // Include order status for display
-          allOrders: tablePendingOrders.map((o: any) => ({
-            id: o._id?.toString(),
-            orderNumber: o.orderNumber,
-            totalAmount: o.totalAmount || 0,
-            guestCount: o.guestCount || 0,
-            status: o.status || 'pending',
-          })),
-        } : null,
-      };
     });
+
+      // Transform tables to include occupation status and order details
+      return allTables.map((table: any) => {
+        const tableId = table._id?.toString() || table.id;
+        const tablePendingOrders = ordersByTable.get(tableId) || [];
+        const tablePaidOrders = paidOrdersByTable.get(tableId) || [];
+        
+        // Table is only occupied if there are PENDING orders (paid orders don't keep table occupied)
+        const isOccupied = tablePendingOrders.length > 0;
+        
+        // Only show order details for PENDING orders (paid orders are completed, table is free)
+        const primaryOrder = tablePendingOrders.length > 0 ? tablePendingOrders[0] : null;
+        
+        // Calculate used seats from PENDING orders only (paid orders don't count towards seat usage)
+        const usedSeats = tablePendingOrders.reduce((sum: number, order: any) => {
+          return sum + (order.guestCount || 0);
+        }, 0);
+        
+        const remainingSeats = Math.max(0, (table.capacity || 0) - usedSeats);
+        
+        // Extract waiter name from notes or userId (only for pending orders)
+        let waiterName = '';
+        if (primaryOrder) {
+          const notes = primaryOrder.notes || '';
+          const waiterMatch = notes.match(/Waiter:\s*(.+)/i);
+          if (waiterMatch) {
+            waiterName = waiterMatch[1].trim();
+          } else if (primaryOrder.userId) {
+            const user = primaryOrder.userId as any;
+            waiterName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || '';
+          }
+        }
+
+        // Only show orderDetails if there are PENDING orders (not paid orders - they're completed)
+        const shouldShowOrderDetails = primaryOrder !== null;
+        // Table status: only occupied if pending orders exist, otherwise always available
+        // (Don't use table.status from DB as it might be stale - base it on actual pending orders)
+        const tableStatus = isOccupied ? 'occupied' : 'available';
+
+        return {
+          id: tableId,
+          number: table.tableNumber || table.number || '',
+          tableNumber: table.tableNumber || table.number || '',
+          capacity: table.capacity || 0,
+          status: tableStatus,
+          currentOrderId: primaryOrder?._id?.toString(),
+          location: table.location,
+          // Order details - only show for PENDING orders (paid orders mean table is free)
+          orderDetails: shouldShowOrderDetails ? {
+            currentOrderId: primaryOrder._id?.toString(),
+            orderNumber: primaryOrder.orderNumber,
+            tokenNumber: primaryOrder.orderNumber,
+            totalAmount: primaryOrder.totalAmount || 0,
+            waiterName: waiterName,
+            guestCount: primaryOrder.guestCount || 0,
+            holdCount: 0, // Placeholder - can be tracked later
+            usedSeats: usedSeats, // Count pending orders for seat calculation
+            remainingSeats: remainingSeats, // Based on pending orders only
+            orderStatus: primaryOrder.status || 'pending', // Should always be 'pending' here
+            allOrders: tablePendingOrders.map((o: any) => ({
+              id: o._id?.toString(),
+              orderNumber: o.orderNumber,
+              totalAmount: o.totalAmount || 0,
+              guestCount: o.guestCount || 0,
+              status: o.status || 'pending',
+            })),
+          } : null,
+        };
+      });
   }
 
   // Get waiter active orders count (for busy indicator)

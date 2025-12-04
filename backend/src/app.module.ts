@@ -30,6 +30,7 @@ import { LoginActivityModule } from './modules/login-activity/login-activity.mod
 import { MarketingModule } from './modules/marketing/marketing.module';
 import { MenuItemsModule } from './modules/menu-items/menu-items.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentMethodsModule } from './modules/payment-methods/payment-methods.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { POSModule } from './modules/pos/pos.module';
 import { PublicModule } from './modules/public/public.module';
@@ -134,6 +135,7 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
     POSModule,
     CustomersModule,
     DeliveryZonesModule,
+    PaymentMethodsModule,
     DigitalReceiptsModule,
     IngredientsModule,
     SuppliersModule,

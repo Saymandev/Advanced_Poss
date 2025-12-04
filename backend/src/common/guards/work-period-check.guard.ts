@@ -5,7 +5,7 @@ import { isSuperAdmin } from '../utils/query.utils';
 
 /**
  * Guard that ensures an active work period exists before accessing POS terminal.
- * Bypasses check for owner, manager, and super_admin roles.
+ * Bypasses check for owner, manager, and super_admin roles (they can access dashboard/stats without work period).
  */
 @Injectable()
 export class WorkPeriodCheckGuard implements CanActivate {
@@ -19,19 +19,32 @@ export class WorkPeriodCheckGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    // Bypass for OWNER and SUPER_ADMIN only (managers MUST start work period)
-    const bypassRoles = ['owner', 'super_admin'];
+    // Allow read-only POS stats endpoints for any authenticated role.
+    // These are used by the dashboard and should not require an active work period.
+    const originalUrl = (request as any).originalUrl || request.url || '';
+    if (
+      request.method === 'GET' &&
+      (originalUrl.includes('/pos/stats') || originalUrl.includes('/pos/quick-stats'))
+    ) {
+      return true;
+    }
+
+    // Bypass for OWNER, MANAGER, and SUPER_ADMIN for full POS access
+    const bypassRoles = ['owner', 'manager'];
     if (isSuperAdmin(user.role) || bypassRoles.includes(user.role?.toLowerCase())) {
       return true;
     }
 
-    // Check if there's an active work period for the company
+    // Check if there's an active work period for the company/branch
     if (!user.companyId) {
       throw new ForbiddenException('Company ID not found');
     }
 
     try {
-      const activeWorkPeriod = await this.workPeriodsService.findActive(user.companyId);
+      const activeWorkPeriod = await this.workPeriodsService.findActive(
+        user.companyId,
+        (user as any).branchId,
+      );
 
       if (!activeWorkPeriod) {
         throw new ForbiddenException(

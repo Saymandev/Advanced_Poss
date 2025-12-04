@@ -23,13 +23,37 @@ export class WorkPeriodsService {
     limit: number;
     status?: 'active' | 'completed';
     companyId?: string;
+    role?: string;
+    userId?: string;
+    userBranchId?: string;
   }) {
-    const { page, limit, status, companyId } = options;
+    const { page, limit, status, companyId, role, userId, userBranchId } = options;
     const skip = (page - 1) * limit;
 
     const filter: any = {};
     if (status) filter.status = status;
     if (companyId) filter.companyId = new Types.ObjectId(companyId);
+
+    // Permission and branch filtering:
+    // - Owners & super_admin: see all branches
+    // - Managers: only their branch
+    // - Other roles: only their branch AND periods they started/ended
+    const normalizedRole = role?.toLowerCase();
+    const isOwnerOrSuperAdmin =
+      normalizedRole === 'owner' || normalizedRole === 'super_admin';
+    const isManager = normalizedRole === 'manager';
+
+    if (isManager && userBranchId) {
+      filter.branchId = new Types.ObjectId(userBranchId);
+    }
+
+    if (!isOwnerOrSuperAdmin && !isManager && userId) {
+      if (userBranchId) {
+        filter.branchId = new Types.ObjectId(userBranchId);
+      }
+      const userObjectId = new Types.ObjectId(userId);
+      filter.$or = [{ startedBy: userObjectId }, { endedBy: userObjectId }];
+    }
 
     const [workPeriods, total] = await Promise.all([
       this.workPeriodModel
@@ -52,9 +76,14 @@ export class WorkPeriodsService {
     };
   }
 
-  async findActive(companyId: string) {
+  async findActive(companyId: string, branchId?: string) {
+    const query: any = { companyId: new Types.ObjectId(companyId), status: 'active' };
+    if (branchId) {
+      query.branchId = new Types.ObjectId(branchId);
+    }
+
     const activeWorkPeriod = await this.workPeriodModel
-      .findOne({ companyId: new Types.ObjectId(companyId), status: 'active' })
+      .findOne(query)
       .populate('startedBy', 'firstName lastName')
       .exec();
 
@@ -64,6 +93,7 @@ export class WorkPeriodsService {
   async startWorkPeriod(
     userId: string,
     companyId: string,
+    branchId: string,
     startWorkPeriodDto: StartWorkPeriodDto,
   ) {
     // Verify PIN against user's login PIN
@@ -83,9 +113,10 @@ export class WorkPeriodsService {
       throw new UnauthorizedException('Invalid PIN');
     }
 
-    // Check if there's already an active work period
+    // Check if there's already an active work period for this branch
     const existingActive = await this.workPeriodModel.findOne({
       companyId: new Types.ObjectId(companyId),
+      branchId: new Types.ObjectId(branchId),
       status: 'active',
     });
 
@@ -98,7 +129,10 @@ export class WorkPeriodsService {
 
     // Get the next serial number
     const lastWorkPeriod = await this.workPeriodModel
-      .findOne({ companyId: new Types.ObjectId(companyId) })
+      .findOne({
+        companyId: new Types.ObjectId(companyId),
+        branchId: new Types.ObjectId(branchId),
+      })
       .sort({ serial: -1 })
       .exec();
 
@@ -107,6 +141,7 @@ export class WorkPeriodsService {
     const workPeriod = new this.workPeriodModel({
       openingBalance: startWorkPeriodDto.openingBalance,
       companyId: new Types.ObjectId(companyId),
+      branchId: new Types.ObjectId(branchId),
       startedBy: new Types.ObjectId(userId),
       serial,
       status: 'active',

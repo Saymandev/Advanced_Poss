@@ -38,6 +38,10 @@ export class WorkPeriod {
 
   @Prop({ type: Types.ObjectId, ref: 'Company', required: true })
   companyId: Types.ObjectId;
+
+  // Branch that this work period belongs to (per-branch work periods)
+  @Prop({ type: Types.ObjectId, ref: 'Branch', required: true })
+  branchId: Types.ObjectId;
 }
 
 export const WorkPeriodSchema = SchemaFactory.createForClass(WorkPeriod);

@@ -40,6 +40,9 @@ export class POSSettings {
   @Prop({ required: true, type: Object })
   printerSettings: PrinterSettings;
 
+  @Prop({ required: true, enum: ['pay-first', 'pay-later'], default: 'pay-later' })
+  defaultPaymentMode: 'pay-first' | 'pay-later';
+
   @Prop({ default: true })
   isActive: boolean;
 

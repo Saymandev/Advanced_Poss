@@ -3,8 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Types, Connection } from 'mongoose';
 import * as QRCode from 'qrcode';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
@@ -13,12 +13,15 @@ import { ReserveTableDto } from './dto/reserve-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
 import { Table, TableDocument } from './schemas/table.schema';
+import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 
 @Injectable()
 export class TablesService {
   constructor(
     @InjectModel(Table.name)
     private tableModel: Model<TableDocument>,
+    @InjectModel(POSOrder.name)
+    private posOrderModel: Model<POSOrderDocument>,
     private websocketsGateway: WebsocketsGateway,
   ) {}
 
@@ -187,6 +190,43 @@ export class TablesService {
       updateData.occupiedAt = null;
       updateData.currentOrderId = null;
       updateData.occupiedBy = null;
+      
+      // Cancel all pending orders for this table to free up seats
+      // This ensures that when a table is released, seats are actually freed
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const pendingOrders = await this.posOrderModel.find({
+          tableId: new Types.ObjectId(id),
+          createdAt: { $gte: today, $lt: tomorrow },
+          status: 'pending',
+          orderType: 'dine-in',
+        }).exec();
+        
+        // Cancel all pending orders for this table
+        if (pendingOrders.length > 0) {
+          await this.posOrderModel.updateMany(
+            {
+              _id: { $in: pendingOrders.map(o => o._id) },
+            },
+            {
+              $set: {
+                status: 'cancelled',
+                cancelledAt: new Date(),
+                cancellationReason: 'Table released - orders cancelled automatically',
+              },
+            }
+          ).exec();
+          
+          console.log(`✅ Cancelled ${pendingOrders.length} pending order(s) for table ${id} when releasing`);
+        }
+      } catch (orderCancelError) {
+        // Log error but don't fail table release
+        console.error('Failed to cancel pending orders when releasing table:', orderCancelError);
+      }
     }
 
     const table = await this.tableModel

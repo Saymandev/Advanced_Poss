@@ -1,8 +1,9 @@
 import {
-    BadRequestException,
-    Injectable,
-    Logger,
-    UnauthorizedException,
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -952,12 +953,23 @@ export class AuthService {
       })
     );
 
+    // Prepare logo URL - handle both Cloudinary URLs and local uploads
+    let logoUrl: string | undefined;
+    if (company.logo) {
+      logoUrl = company.logo;
+      // If it's a local upload path, prepend base URL (Cloudinary URLs are already full URLs)
+      if (logoUrl.startsWith('/uploads/')) {
+        const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+        logoUrl = `${baseUrl}${logoUrl}`;
+      }
+    }
+
     const result = {
       found: true,
       companyId: targetCompanyId,
       companyName: company.name,
       companySlug: company.slug || company.name.toLowerCase().replace(/\s+/g, '-'),
-      logoUrl: company.logoUrl,
+      logoUrl: logoUrl,
       branches: branchesWithRoles,
       message: 'Please select a branch, role, and enter your PIN to continue',
     };
@@ -1126,18 +1138,33 @@ export class AuthService {
 
     // Verify PIN - get user with PIN field selected
     this.logger.log(`🔐 Verifying PIN for user: ${user.email}`);
-    this.logger.log(`🔍 User ID: ${(user as any)._id}, Email: ${user.email}`);
+    // Get the user ID safely - prefer _id from user object, fallback to id
+    const userIdForLookup = (user as any)._id?.toString() || (user as any).id?.toString() || user.email;
+    this.logger.log(`🔍 User ID: ${userIdForLookup}, Email: ${user.email}`);
     const userWithPin = await this.usersService.findByEmail(user.email);
     this.logger.log(`🔍 User with PIN found: ${!!userWithPin}, PIN exists: ${!!userWithPin?.pin}`);
+    
+    // Ensure we have a valid user object with _id
+    if (!userWithPin) {
+      throw new NotFoundException('User not found');
+    }
+    
+    // Use userWithPin for all subsequent operations as it has the proper _id
+    const validUserId: string =
+      (userWithPin as any)._id?.toString() || (userWithPin as any).id?.toString();
+    if (!validUserId || !Types.ObjectId.isValid(validUserId)) {
+      this.logger.error(`❌ Invalid user ID format: ${validUserId}`);
+      throw new BadRequestException('Invalid user ID format');
+    }
     if (!userWithPin?.pin) {
       this.logger.error(`❌ PIN not set for user: ${user.email}`);
-      // Log failed login attempt
+      // Log failed login attempt - use validUserId which was validated above
       await this.logLoginActivity({
-        userId: user._id.toString(),
-        companyId: user.companyId,
-        branchId: user.branchId,
-        email: user.email,
-        role: user.role,
+        userId: validUserId,
+        companyId: String(userWithPin.companyId),
+        branchId: String(userWithPin.branchId),
+        email: userWithPin.email,
+        role: userWithPin.role,
         status: LoginStatus.FAILED,
         method: LoginMethod.PIN_ROLE,
         ipAddress: ipAddress || 'unknown',
@@ -1170,15 +1197,15 @@ export class AuthService {
       this.logger.error(`❌ Invalid PIN for user: ${user.email} (Role: ${user.role})`);
       
       // Increment login attempts - this will lock the account if max attempts reached
-      await this.usersService.incrementLoginAttempts(user._id.toString());
+      await this.usersService.incrementLoginAttempts(validUserId);
       
       // Log failed login attempt
       await this.logLoginActivity({
-        userId: user._id.toString(),
-        companyId: user.companyId,
-        branchId: user.branchId,
-        email: user.email,
-        role: user.role,
+        userId: validUserId,
+        companyId: String(userWithPin.companyId),
+        branchId: String(userWithPin.branchId),
+        email: userWithPin.email,
+        role: userWithPin.role,
         status: LoginStatus.FAILED,
         method: LoginMethod.PIN_ROLE,
         ipAddress: ipAddress || 'unknown',
@@ -1190,7 +1217,7 @@ export class AuthService {
     this.logger.log(`✅ PIN verified successfully`);
 
     // Generate tokens using the proper method (uses correct secrets)
-    const tokens = await this.generateTokens(user);
+    const tokens = await this.generateTokens(userWithPin);
     const { accessToken, refreshToken } = tokens;
 
     // Generate session ID
@@ -1198,11 +1225,11 @@ export class AuthService {
 
     // Log successful login activity
     await this.logLoginActivity({
-      userId: user._id.toString(),
-      companyId: user.companyId,
-      branchId: user.branchId,
-      email: user.email,
-      role: user.role,
+      userId: validUserId,
+      companyId: String(userWithPin.companyId),
+      branchId: String(userWithPin.branchId),
+      email: userWithPin.email,
+      role: userWithPin.role,
       status: LoginStatus.SUCCESS,
       method: LoginMethod.PIN_ROLE,
       ipAddress: ipAddress || 'unknown',
@@ -1212,9 +1239,9 @@ export class AuthService {
 
     // Create login session
     await this.loginActivityService.createLoginSession({
-      userId: user._id.toString(),
-      companyId: user.companyId,
-      branchId: user.branchId,
+      userId: validUserId,
+      companyId: String(userWithPin.companyId),
+      branchId: String(userWithPin.branchId),
       sessionId,
       accessToken,
       refreshToken,
@@ -1224,20 +1251,21 @@ export class AuthService {
       expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
     });
 
-    // Update last login
-    await this.usersService.update(user._id.toString(), { lastLogin: new Date() } as any);
+    // NOTE: We intentionally skip updateLastLogin here for PIN login to avoid
+    // ObjectId casting issues from legacy data. Login activity already records
+    // the last successful login time, so this is safe to omit.
 
     const result = {
       success: true,
       data: {
         user: {
-          id: user._id.toString(),
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          companyId: user.companyId,
-          branchId: user.branchId
+          id: validUserId,
+          email: userWithPin.email,
+          firstName: userWithPin.firstName,
+          lastName: userWithPin.lastName,
+          role: userWithPin.role,
+          companyId: userWithPin.companyId,
+          branchId: userWithPin.branchId
         },
         accessToken,
         refreshToken,

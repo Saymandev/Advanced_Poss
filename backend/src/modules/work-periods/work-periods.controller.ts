@@ -30,20 +30,29 @@ export class WorkPeriodsController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('status') status?: 'active' | 'completed',
+    @CurrentUser('role') role?: string,
+    @CurrentUser('id') userId?: string,
     @CurrentUser('companyId') companyId?: string,
+    @CurrentUser('branchId') branchId?: string,
   ) {
     return this.workPeriodsService.findAll({
       page: page || 1,
       limit: limit || 10,
       status,
       companyId,
+      role,
+      userId,
+      userBranchId: branchId,
     });
   }
 
   @Get('active')
   @ApiOperation({ summary: 'Get current active work period' })
-  async findActive(@CurrentUser('companyId') companyId: string) {
-    const activePeriod = await this.workPeriodsService.findActive(companyId);
+  async findActive(
+    @CurrentUser('companyId') companyId: string,
+    @CurrentUser('branchId') branchId: string,
+  ) {
+    const activePeriod = await this.workPeriodsService.findActive(companyId, branchId);
     // Return null explicitly if no active period found (not undefined)
     if (!activePeriod) {
       return null;
@@ -57,11 +66,13 @@ export class WorkPeriodsController {
   startWorkPeriod(
     @CurrentUser('id') userId: string,
     @CurrentUser('companyId') companyId: string,
+    @CurrentUser('branchId') branchId: string,
     @Body() startWorkPeriodDto: StartWorkPeriodDto,
   ) {
     return this.workPeriodsService.startWorkPeriod(
       userId,
       companyId,
+      branchId,
       startWorkPeriodDto,
     );
   }
