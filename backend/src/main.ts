@@ -10,6 +10,7 @@ import { join } from 'path';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { EncryptionInterceptor } from './common/interceptors/encryption.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 // import { WinstonLogger } from './common/logger/winston.logger';
@@ -84,6 +85,7 @@ async function bootstrap() {
 
   // Global interceptors
   app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalInterceptors(new EncryptionInterceptor(app.get(ConfigService)));
   app.useGlobalInterceptors(new LoggingInterceptor());
 
   // Swagger documentation

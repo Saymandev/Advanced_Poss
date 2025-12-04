@@ -3,22 +3,22 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { Company, CompanySchema } from '../companies/schemas/company.schema';
 import {
-  Customer,
-  CustomerSchema,
+    Customer,
+    CustomerSchema,
 } from '../customers/schemas/customer.schema';
 import {
-  MenuItem,
-  MenuItemSchema,
+    MenuItem,
+    MenuItemSchema,
 } from '../menu-items/schemas/menu-item.schema';
 import { Table, TableSchema } from '../tables/schemas/table.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import {
-  BillingHistory,
-  BillingHistorySchema,
+    BillingHistory,
+    BillingHistorySchema,
 } from './schemas/billing-history.schema';
 import {
-  SubscriptionPlan,
-  SubscriptionPlanSchema,
+    SubscriptionPlan,
+    SubscriptionPlanSchema,
 } from './schemas/subscription-plan.schema';
 import { Subscription, SubscriptionSchema } from './schemas/subscription.schema';
 import { StripeService } from './stripe.service';
