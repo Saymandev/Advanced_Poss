@@ -2,6 +2,101 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { logout, setCredentials } from '../slices/authSlice';
 import { RootState } from '../store';
 
+// Helper to transparently decrypt AES-encrypted API responses
+const decryptIfNeeded = async (response: any) => {
+  try {
+    // Only run in browser (window/crypto not available during SSR)
+    if (typeof window === 'undefined' || !window.crypto?.subtle) {
+      return response;
+    }
+
+    if (!response || !response.data) return response;
+
+    let body = response.data as any;
+
+    // Handle wrapped format: { success: true, data: { encrypted: true, ... } }
+    if (
+      body &&
+      typeof body === 'object' &&
+      'success' in body &&
+      'data' in body &&
+      body.data &&
+      typeof body.data === 'object' &&
+      'encrypted' in body.data
+    ) {
+      body = body.data;
+    }
+
+    if (!body || typeof body !== 'object' || !body.encrypted) {
+      return response;
+    }
+
+    // Decrypt on the client using the Web Crypto API with a shared key.
+    // NOTE: For real security you should derive this key per-session or
+    //       use TLS only. A hard-coded key only adds light obfuscation.
+    const secret =
+      process.env.NEXT_PUBLIC_RESPONSE_ENCRYPTION_KEY || 'default-weak-key-change-me';
+
+    const enc = new TextEncoder();
+    const keyMaterial = await window.crypto.subtle.importKey(
+      'raw',
+      enc.encode(secret),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey'],
+    );
+
+    // Derive a 256-bit key from the secret (must mirror backend derivation)
+    const key = await window.crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: enc.encode('response-encryption-salt'),
+        iterations: 1000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      { name: 'AES-CBC', length: 256 },
+      false,
+      ['decrypt'],
+    );
+
+    const iv = Uint8Array.from(
+      atob(body.iv || ''),
+      (c) => c.charCodeAt(0),
+    );
+
+    const cipherBytes = Uint8Array.from(
+      atob(body.data || ''),
+      (c) => c.charCodeAt(0),
+    );
+
+    const decryptedBuffer = await window.crypto.subtle.decrypt(
+      { name: 'AES-CBC', iv },
+      key,
+      cipherBytes,
+    );
+
+    const decoded = new TextDecoder().decode(decryptedBuffer);
+
+    // Parse JSON if possible, otherwise keep as string
+    let parsed: any;
+    try {
+      parsed = JSON.parse(decoded);
+    } catch {
+      parsed = decoded;
+    }
+
+    // Replace entire body with decrypted payload so callers see the ORIGINAL
+    // response shape from the service (e.g. { success, data: {...} }).
+    response.data = parsed;
+
+    return response;
+  } catch (error) {
+    console.error('Failed to decrypt API response', error);
+    return response;
+  }
+};
+
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
   prepareHeaders: (headers, { getState }) => {
@@ -34,6 +129,11 @@ let refreshPromise: Promise<any> | null = null;
 // Wrapper to handle token refresh and subscription expiry errors
 const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
   let result = await baseQuery(args, api, extraOptions);
+
+  // Try to decrypt encrypted successful responses
+  if (result && !result.error) {
+    result = await decryptIfNeeded(result);
+  }
   
   // Handle 401 unauthorized errors (token expired)
   if (result.error && result.error.status === 401) {
@@ -136,7 +236,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
             baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
           });
 
-          const refreshResult = await refreshQuery(
+          let refreshResult = await refreshQuery(
             {
               url: '/auth/refresh',
               method: 'POST',
@@ -145,6 +245,11 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
             api,
             extraOptions
           );
+
+          // Decrypt refresh response if encrypted
+          if (refreshResult && !refreshResult.error) {
+            refreshResult = await decryptIfNeeded(refreshResult);
+          }
           
           return refreshResult;
         } finally {

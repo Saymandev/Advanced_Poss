@@ -59,7 +59,7 @@ export const FEATURE_ROUTE_MAP: Record<string, string | string[] | null> = {
   '/dashboard/branches': 'branches',
   
   // Marketing
-  '/dashboard/marketing': 'customer-management',
+  // '/dashboard/marketing': 'customer-management',
   
   // AI Features
   '/dashboard/ai-menu-optimization': 'menu-management',
