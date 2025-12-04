@@ -9,6 +9,7 @@ import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import { useGetDeliveryZonesByBranchQuery } from '@/lib/api/endpoints/deliveryZonesApi';
+import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
   useCancelPOSOrderMutation,
@@ -28,6 +29,7 @@ import {
   useUpdatePOSOrderMutation
 } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
+import { useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
@@ -199,7 +201,7 @@ type ModifierConfig = {
 
 type SplitPaymentRow = {
   id: string;
-  method: 'cash' | 'card' | 'wallet' | 'other';
+  method: string; // Payment method code from API
   amount: string;
 };
 
@@ -344,7 +346,7 @@ export default function POSPage() {
     addonSelections: Record<string, boolean>;
   } | null>(null);
   const [paymentTab, setPaymentTab] = useState<'full' | 'multi'>('full');
-  const [fullPaymentMethod, setFullPaymentMethod] = useState<'cash' | 'card'>('cash');
+  const [fullPaymentMethod, setFullPaymentMethod] = useState<string>('cash'); // Payment method code
   const [fullPaymentReceived, setFullPaymentReceived] = useState<string>('0');
   const [multiPayments, setMultiPayments] = useState<SplitPaymentRow[]>([]);
   const [paymentSuccessOrder, setPaymentSuccessOrder] = useState<PaymentSuccessState | null>(null);
@@ -356,12 +358,24 @@ export default function POSPage() {
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const [queueDetailId, setQueueDetailId] = useState<string | null>(null);
   const [queueActionOrderId, setQueueActionOrderId] = useState<string | null>(null);
+  
+  // Payment modal for pending orders
+  const [isPendingOrderPaymentModalOpen, setIsPendingOrderPaymentModalOpen] = useState(false);
+  const [pendingOrderPaymentMethod, setPendingOrderPaymentMethod] = useState<string>('cash');
+  const [pendingOrderPaymentReceived, setPendingOrderPaymentReceived] = useState<string>('0');
 
   // Delivery zones for POS (branch-based)
   const currentBranchId = user?.branchId || (companyContext as any)?.branchId || '';
+  const currentCompanyId = user?.companyId || (companyContext as any)?.companyId || '';
   const { data: deliveryZones = [], isLoading: zonesLoading } = useGetDeliveryZonesByBranchQuery(
     { branchId: currentBranchId },
     { skip: !currentBranchId }
+  );
+
+  // Payment methods for POS (branch-based, includes system + company + branch methods)
+  const { data: paymentMethods = [], isLoading: paymentMethodsLoading } = useGetPaymentMethodsByBranchQuery(
+    { companyId: currentCompanyId, branchId: currentBranchId },
+    { skip: !currentCompanyId || !currentBranchId }
   );
 
   const resetDeliveryDetails = useCallback(() => {
@@ -489,6 +503,36 @@ export default function POSPage() {
   
   // Use nullish coalescing (??) instead of || to allow 0 as a valid tax rate
   const taxRate = posSettings?.taxRate ?? 10; // Default 10% only if undefined/null
+  
+  // Payment mode: 'pay-first' = pay before creating order, 'pay-later' = create order then pay
+  const [paymentMode, setPaymentMode] = useState<'pay-first' | 'pay-later'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pos_paymentMode');
+      if (saved === 'pay-first' || saved === 'pay-later') {
+        return saved;
+      }
+    }
+    return (posSettings?.defaultPaymentMode as 'pay-first' | 'pay-later') || 'pay-later';
+  });
+  
+  // Sync payment mode with settings when they load (only if user hasn't set a preference)
+  useEffect(() => {
+    if (posSettings?.defaultPaymentMode && typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pos_paymentMode');
+      if (!saved) {
+        const defaultMode = posSettings.defaultPaymentMode as 'pay-first' | 'pay-later';
+        setPaymentMode(defaultMode);
+        localStorage.setItem('pos_paymentMode', defaultMode);
+      }
+    }
+  }, [posSettings?.defaultPaymentMode]);
+  
+  // Save payment mode preference when user changes it
+  useEffect(() => {
+    if (typeof window !== 'undefined' && paymentMode) {
+      localStorage.setItem('pos_paymentMode', paymentMode);
+    }
+  }, [paymentMode]);
   
   // Extract tables array from response (already transformed by API)
   const tables = useMemo(() => {
@@ -797,16 +841,25 @@ export default function POSPage() {
     getItemDiscountAmount,
   ]);
 
+  // Initialize payment method when payment methods load
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !fullPaymentMethod) {
+      const firstMethod = paymentMethods.find(m => m.code === 'cash')?.code || paymentMethods[0]?.code || 'cash';
+      setFullPaymentMethod(firstMethod);
+    }
+  }, [paymentMethods, fullPaymentMethod]);
+
   useEffect(() => {
     const formattedTotal = orderSummary.total.toFixed(2);
     setFullPaymentReceived(formattedTotal);
     setMultiPayments((prev) => {
       if (prev.length === 0) {
-        return [{ id: generateClientId(), method: 'cash', amount: formattedTotal }];
+        const firstMethod = paymentMethods.find(m => m.allowsPartialPayment !== false)?.code || paymentMethods[0]?.code || 'cash';
+        return [{ id: generateClientId(), method: firstMethod, amount: formattedTotal }];
       }
       return prev;
     });
-  }, [orderSummary.total]);
+  }, [orderSummary.total, paymentMethods]);
 
   // Save to localStorage whenever cart, selectedTable, or customerInfo changes
   useEffect(() => {
@@ -946,7 +999,7 @@ export default function POSPage() {
       });
     }, 250);
     return () => window.clearTimeout(handle);
-  }, [customerSearchTerm, isCustomerLookupOpen, triggerCustomerSearch, user?.branchId]);
+  }, [customerSearchTerm, isCustomerLookupOpen, triggerCustomerSearch, user, companyContext]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -1136,7 +1189,7 @@ export default function POSPage() {
       addonSelections: addonSelections.length > 0 ? addonSelections : undefined,
       selectionChoices: selectionChoices.length > 0 ? selectionChoices : undefined,
     };
-  }, [getDefaultModifierConfig]);
+  }, [getDefaultModifierConfig, formatCurrency]);
 
   const areModifiersEqual = useCallback((first: CartItem, second: CartItem) => {
     if (first.menuItemId !== second.menuItemId) {
@@ -1189,10 +1242,11 @@ export default function POSPage() {
   }, [areModifiersEqual]);
 
   const addMultiPaymentRow = useCallback(() => {
-    setMultiPayments((prev) => [...prev, { id: generateClientId(), method: 'cash', amount: '0' }]);
-  }, []);
+    const firstMethod = paymentMethods.find(m => m.allowsPartialPayment !== false)?.code || paymentMethods[0]?.code || 'cash';
+    setMultiPayments((prev) => [...prev, { id: generateClientId(), method: firstMethod, amount: '0' }]);
+  }, [paymentMethods]);
 
-  const updateMultiPaymentRow = useCallback((id: string, patch: Partial<{ method: 'cash' | 'card' | 'wallet' | 'other'; amount: string }>) => {
+  const updateMultiPaymentRow = useCallback((id: string, patch: Partial<{ method: string; amount: string }>) => {
     setMultiPayments((prev) => prev.map((payment) => (payment.id === id ? { ...payment, ...patch } : payment)));
   }, []);
 
@@ -1336,6 +1390,103 @@ export default function POSPage() {
   );
 
   const [occupiedTableModal, setOccupiedTableModal] = useState<{ tableId: string; orderDetails: any } | null>(null);
+  
+  // Context menu state for table quick actions
+  const [contextMenu, setContextMenu] = useState<{ tableId: string; x: number; y: number } | null>(null);
+  const [notifiedTables, setNotifiedTables] = useState<Set<string>>(new Set()); // Track tables we've already notified
+  
+  const [updateTableStatus] = useUpdateTableStatusMutation();
+
+  // Auto-suggestion: Check for tables paid > 15 minutes
+  useEffect(() => {
+    if (!tables || tables.length === 0) return;
+
+    const checkPaidTables = () => {
+      const now = new Date();
+      const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+
+      tables.forEach((table: any) => {
+        if (table.status !== 'occupied' || !table.orderDetails) return;
+        
+        const orderStatus = table.orderDetails.orderStatus 
+          || table.orderDetails.status 
+          || table.orderDetails.allOrders?.[0]?.status 
+          || 'pending';
+        
+        if (orderStatus === 'paid') {
+          // Try to get payment time from order details
+          // If we have completedAt or payment time, use it; otherwise skip
+          const paymentTime = table.orderDetails.completedAt 
+            || table.orderDetails.allOrders?.[0]?.completedAt
+            || table.orderDetails.paidAt;
+          
+          if (paymentTime) {
+            const paidAt = new Date(paymentTime);
+            if (paidAt < fifteenMinutesAgo && !notifiedTables.has(table.id)) {
+              // Show notification
+              toast(
+                (t) => (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">Table {table.number || table.tableNumber} - Ready to Release</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Payment received {Math.round((now.getTime() - paidAt.getTime()) / 60000)} minutes ago
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await updateTableStatus({
+                            id: table.id,
+                            status: 'available'
+                          }).unwrap();
+                          toast.dismiss(t.id);
+                          toast.success('Table released successfully');
+                          setNotifiedTables(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(table.id);
+                            return newSet;
+                          });
+                          refetchTables();
+                        } catch (error: any) {
+                          toast.error(error?.data?.message || 'Failed to release table');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-colors"
+                    >
+                      Release
+                    </button>
+                  </div>
+                ),
+                {
+                  duration: 10000, // Show for 10 seconds
+                  icon: '🔔',
+                }
+              );
+              setNotifiedTables(prev => new Set(prev).add(table.id));
+            }
+          }
+        }
+      });
+    };
+
+    // Check immediately
+    checkPaidTables();
+    
+    // Check every minute
+    const interval = setInterval(checkPaidTables, 60000);
+    
+    return () => clearInterval(interval);
+  }, [tables, notifiedTables, updateTableStatus, refetchTables]);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
 
   const handleTableSelection = useCallback(
     (tableId: string) => {
@@ -1347,8 +1498,8 @@ export default function POSPage() {
 
       const table = tables.find((entry: any) => entry.id === tableId);
       
-      // If table is occupied, show modal with options
-      if (table?.status === 'occupied' && table?.orderDetails) {
+      // If table has an order (pending or paid), show modal with options
+      if (table?.orderDetails) {
         setOccupiedTableModal({ tableId, orderDetails: table.orderDetails });
         return;
       }
@@ -1496,6 +1647,13 @@ export default function POSPage() {
 
   // Order functions
   const handleCreateOrder = useCallback(async () => {
+    // In pay-first mode, orders cannot be created without payment
+    if (paymentMode === 'pay-first') {
+      toast.error('Pay-first mode is enabled. Please use "Checkout" to process payment before creating the order.');
+      setIsPaymentModalOpen(true); // Open payment modal instead
+      return;
+    }
+
     const requiresTable = orderType === 'dine-in';
     const isDelivery = orderType === 'delivery';
     const isTakeaway = orderType === 'takeaway';
@@ -1608,6 +1766,7 @@ export default function POSPage() {
     guestCount,
     refetchTables,
     formatCurrency,
+    paymentMode,
   ]);
 
   const handlePayment = async () => {
@@ -1668,21 +1827,24 @@ export default function POSPage() {
           toast.error('Enter the amount received before completing payment');
           return;
         }
-        if (fullPaymentMethod === 'cash' && received + 0.009 < totalDue) {
-          toast.error('Received cash is less than the total due');
+        const selectedMethod = paymentMethods.find(m => m.code === fullPaymentMethod);
+        const allowsChange = selectedMethod?.allowsChangeDue ?? (fullPaymentMethod === 'cash');
+        if (allowsChange && received + 0.009 < totalDue) {
+          toast.error('Received amount is less than the total due');
           return;
         }
  
-        paymentMethodForBackend = fullPaymentMethod;
+        paymentMethodForBackend = 'cash'; // Backend expects 'cash', 'card', or 'split' - we'll use paymentBreakdown for actual method
         paymentBreakdown = [{ method: fullPaymentMethod, amount: totalDue }];
-        if (fullPaymentMethod === 'cash') {
+        const methodName = selectedMethod?.displayName || selectedMethod?.name || fullPaymentMethod;
+        if (allowsChange) {
           changeDue = Math.max(0, received - totalDue);
           paymentNotes.push(
-            `Cash payment received ${formatCurrency(received)} • Change ${formatCurrency(changeDue)}`
+            `${methodName} payment received ${formatCurrency(received)} • Change ${formatCurrency(changeDue)}`
           );
-          transactionReference = `cash:${received.toFixed(2)}|change:${changeDue.toFixed(2)}`;
+          transactionReference = `${fullPaymentMethod}:${received.toFixed(2)}|change:${changeDue.toFixed(2)}`;
         } else {
-          paymentNotes.push(`Card payment processed for ${formatCurrency(totalDue)}`);
+          paymentNotes.push(`${methodName} payment processed for ${formatCurrency(totalDue)}`);
         }
       } else {
         const activeRows = multiPayments.filter((row) => parseFloat(row.amount || '0') > 0);
@@ -1765,7 +1927,9 @@ export default function POSPage() {
         })),
         customerInfo: customerInfo,
         totalAmount: totalDue,
-        status: 'pending' as const,
+        // In "pay-first" mode, create order as 'paid' (payment happens before order creation)
+        // In "pay-later" mode, create order as 'pending' then process payment
+        status: paymentMode === 'pay-first' ? 'paid' as const : 'pending' as const,
         paymentMethod: paymentMethodForBackend,
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
         ...(selectedWaiterId ? { waiterId: selectedWaiterId } : {}),
@@ -1776,12 +1940,16 @@ export default function POSPage() {
       const orderId = order.id || order._id;
       const orderNumber = order.orderNumber || order.order_number || orderId;
       
-      await processPayment({
-        orderId,
-        amount: totalDue,
-        method: paymentMethodForBackend,
-        transactionId: transactionReference,
-      }).unwrap();
+      // Only process payment separately if order was created as 'pending' (pay-later mode)
+      // In pay-first mode, order is already created as 'paid', so we don't need to process payment again
+      if (paymentMode === 'pay-later') {
+        await processPayment({
+          orderId,
+          amount: totalDue,
+          method: paymentMethodForBackend,
+          transactionId: transactionReference,
+        }).unwrap();
+      }
 
       setCurrentOrderId(orderId);
       setPaymentSuccessOrder({
@@ -1794,7 +1962,8 @@ export default function POSPage() {
       });
       toast.success('Payment completed successfully');
       refetchQueue();
- 
+      refetchTables(); // Refetch tables to update status after payment
+      
       clearCart();
       if (requiresTable) {
         setSelectedTable('');
@@ -1922,15 +2091,53 @@ export default function POSPage() {
   );
 
   const getTableStatus = (table: any) => {
-    if (table.status === 'occupied') return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200';
-    if (table.status === 'reserved') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200';
-    return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200';
+    if (table.status === 'reserved') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 border-2 border-yellow-500/50';
+    if (table.status === 'available') return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border-2 border-green-500/50';
+    
+    // For occupied tables, check order status for visual indicators
+    if (table.status === 'occupied' && table.orderDetails) {
+      const orderStatus = table.orderDetails.orderStatus 
+        || table.orderDetails.status 
+        || table.orderDetails.allOrders?.[0]?.status 
+        || 'pending';
+      
+      if (orderStatus === 'paid') {
+        // Green badge: Paid - Ready to Release
+        return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border-2 border-green-500/50';
+      } else if (orderStatus === 'pending') {
+        // Yellow badge: Pending Payment
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 border-2 border-yellow-500/50';
+      } else {
+        // Red badge: Needs Attention (cancelled or other status)
+        return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 border-2 border-red-500/50';
+      }
+    }
+    
+    // Default for occupied without order details
+    return 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 border-2 border-orange-500/50';
   };
 
   const getTableStatusText = (table: any) => {
-    if (table.status === 'occupied') return 'Occupied';
     if (table.status === 'reserved') return 'Reserved';
-    return 'Available';
+    if (table.status === 'available') return 'Available';
+    
+    // For occupied tables, show payment status
+    if (table.status === 'occupied' && table.orderDetails) {
+      const orderStatus = table.orderDetails.orderStatus 
+        || table.orderDetails.status 
+        || table.orderDetails.allOrders?.[0]?.status 
+        || 'pending';
+      
+      if (orderStatus === 'paid') {
+        return 'Paid - Ready to Release';
+      } else if (orderStatus === 'pending') {
+        return 'Pending Payment';
+      } else {
+        return 'Needs Attention';
+      }
+    }
+    
+    return 'Occupied';
   };
 
   const isOrderingActive = useMemo(() => {
@@ -2016,65 +2223,215 @@ export default function POSPage() {
                 tables.map((table: any) => {
                   const statusClass = getTableStatus(table);
                   const isSelected = selectedTable === table.id;
-                  const hasOrderDetails = table.orderDetails && table.status === 'occupied';
+                  const hasOrderDetails = table.orderDetails !== null && table.orderDetails !== undefined;
+                  const orderStatus = table.orderDetails?.orderStatus 
+                    || table.orderDetails?.status 
+                    || table.orderDetails?.allOrders?.[0]?.status 
+                    || 'pending';
+                  const isPaid = orderStatus === 'paid' && table.status === 'occupied';
+                  
+                  const handleContextMenu = (e: React.MouseEvent) => {
+                    e.preventDefault();
+                    if (isPaid) {
+                      setContextMenu({ tableId: table.id, x: e.clientX, y: e.clientY });
+                    }
+                  };
+                  
+                  const handleTouchStart = (e: React.TouchEvent) => {
+                    if (!isPaid) return;
+                    const touch = e.touches[0];
+                    const timer = setTimeout(() => {
+                      setContextMenu({ tableId: table.id, x: touch.clientX, y: touch.clientY });
+                    }, 500);
+                    
+                    const handleTouchEnd = () => {
+                      clearTimeout(timer);
+                      document.removeEventListener('touchend', handleTouchEnd);
+                    };
+                    
+                    document.addEventListener('touchend', handleTouchEnd, { once: true });
+                  };
+                  
                   return (
-                    <button
-                      key={table.id}
-                      onClick={() => handleTableSelection(table.id)}
-                      className={`rounded-2xl border-2 p-6 text-left transition-all ${
-                        isSelected
-                          ? 'border-sky-500 bg-sky-500/10 shadow-lg shadow-sky-500/20'
-                          : table.status === 'occupied'
-                          ? 'border-orange-500/50 bg-orange-500/5 hover:border-orange-400/60'
-                          : 'border-gray-300 dark:border-slate-900 bg-white dark:bg-slate-950/60 hover:border-sky-600/60 hover:shadow-lg hover:shadow-sky-900/20'
-                      }`}
-                    >
+                    <div key={table.id} className="relative">
+                      <button
+                        onClick={() => {
+                          if (contextMenu?.tableId !== table.id) {
+                            handleTableSelection(table.id);
+                          }
+                        }}
+                        onContextMenu={handleContextMenu}
+                        onTouchStart={handleTouchStart}
+                        className={`rounded-2xl border-2 p-6 text-left transition-all w-full h-full flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-sky-500 bg-sky-500/10 shadow-lg shadow-sky-500/20'
+                            : hasOrderDetails || table.status === 'occupied'
+                            ? 'border-orange-500/50 bg-orange-500/5 hover:border-orange-400/60'
+                            : 'border-gray-300 dark:border-slate-900 bg-white dark:bg-slate-950/60 hover:border-sky-600/60 hover:shadow-lg hover:shadow-sky-900/20'
+                        }`}
+                      >
                       <div className="space-y-4">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-gray-500 dark:text-slate-500">Table No.</p>
-                          <p className="text-xl font-semibold text-gray-900 dark:text-slate-100 truncate">
-                            {table.number || table.tableNumber || table.name || table.id}
-                          </p>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.3em] text-gray-500 dark:text-slate-500">Table No.</p>
+                            <p className="text-xl font-semibold text-gray-900 dark:text-slate-100 truncate">
+                              {table.number || table.tableNumber || table.name || table.id}
+                            </p>
+                          </div>
+                          {table.location && (
+                            <Badge variant="secondary" className="text-xs bg-slate-800 text-slate-300">
+                              {table.location}
+                            </Badge>
+                          )}
                         </div>
                         <Badge className={`${statusClass} border border-white/10`}>
                           {getTableStatusText(table)}
                         </Badge>
+                        
+                        {/* Always show capacity */}
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <span className="text-slate-400">Capacity:</span>
+                          <span className="font-semibold text-slate-300">{table.capacity || 0} seats</span>
+                        </div>
+
                         {hasOrderDetails ? (
-                          <div className="space-y-2 text-xs">
+                          <div className="space-y-2 text-xs pt-2 border-t border-slate-800">
+                            {/* Order Status - Only show for pending orders (paid orders don't show orderDetails) */}
+                            {table.orderDetails.orderStatus && table.orderDetails.orderStatus === 'pending' && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-slate-400">Order Status:</span>
+                                <Badge className="bg-amber-500/10 text-amber-200 border border-amber-500/30 text-xs">
+                                  Pending Payment
+                                </Badge>
+                              </div>
+                            )}
+                            
+                            {/* Token/Order Number */}
                             <div className="flex items-center justify-between text-slate-300">
                               <span className="text-slate-400">Token:</span>
                               <span className="font-semibold">{table.orderDetails.tokenNumber || table.orderDetails.orderNumber}</span>
                             </div>
+                            
+                            {/* Amount */}
                             <div className="flex items-center justify-between text-slate-300">
                               <span className="text-slate-400">Amount:</span>
                               <span className="font-semibold text-emerald-400">{formatCurrency(table.orderDetails.totalAmount || 0)}</span>
                             </div>
+                            
+                            {/* Waiter - Always show if available */}
                             {table.orderDetails.waiterName && (
                               <div className="flex items-center justify-between text-slate-300">
                                 <span className="text-slate-400">Waiter:</span>
-                                <span className="font-semibold">{table.orderDetails.waiterName}</span>
+                                <span className="font-semibold text-sky-300">{table.orderDetails.waiterName}</span>
                               </div>
                             )}
+                            
+                            {/* Used Seats */}
+                            {table.orderDetails.usedSeats !== undefined && (
+                              <div className="flex items-center justify-between text-slate-300">
+                                <span className="text-slate-400">Used Seats:</span>
+                                <span className="font-semibold">{table.orderDetails.usedSeats} / {table.capacity || 0}</span>
+                              </div>
+                            )}
+                            
+                            {/* Remaining Seats - Show prominently */}
+                            {table.orderDetails.remainingSeats !== undefined && (
+                              <div className={`flex items-center justify-between mt-2 pt-2 border-t ${
+                                table.orderDetails.remainingSeats > 0 
+                                  ? 'border-sky-800' 
+                                  : 'border-slate-800'
+                              }`}>
+                                <span className={`font-medium ${
+                                  table.orderDetails.remainingSeats > 0 
+                                    ? 'text-sky-400' 
+                                    : 'text-slate-400'
+                                }`}>
+                                  {table.orderDetails.remainingSeats > 0 ? 'Available Seats:' : 'Fully Occupied'}
+                                </span>
+                                <span className={`font-bold ${
+                                  table.orderDetails.remainingSeats > 0 
+                                    ? 'text-sky-300' 
+                                    : 'text-orange-300'
+                                }`}>
+                                  {table.orderDetails.remainingSeats > 0 ? `${table.orderDetails.remainingSeats} seats` : '—'}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Hold Count */}
                             {table.orderDetails.holdCount > 0 && (
-                              <div className="flex items-center justify-between text-orange-300">
-                                <span>Held:</span>
-                                <span className="font-semibold">{table.orderDetails.holdCount}x</span>
-                              </div>
-                            )}
-                            {table.orderDetails.remainingSeats > 0 && (
-                              <div className="flex items-center justify-between text-sky-300 mt-2 pt-2 border-t border-slate-800">
-                                <span>Remaining:</span>
-                                <span className="font-semibold">{table.orderDetails.remainingSeats} seats</span>
+                              <div className="flex items-center justify-between text-orange-300 mt-1">
+                                <span className="text-xs">Held:</span>
+                                <span className="font-semibold text-xs">{table.orderDetails.holdCount}x</span>
                               </div>
                             )}
                           </div>
                         ) : (
-                          <div className="text-xs text-slate-400 mt-1">
-                            Capacity: {table.capacity || 0} seats
+                          /* Show status for tables without order details */
+                          <div className="pt-2 border-t border-slate-800">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-400">Status:</span>
+                              <span className={`font-semibold ${
+                                table.status === 'available' 
+                                  ? 'text-green-400' 
+                                  : table.status === 'reserved'
+                                  ? 'text-yellow-400'
+                                  : 'text-orange-400'
+                              }`}>
+                                {table.status === 'available' 
+                                  ? 'Available' 
+                                  : table.status === 'reserved'
+                                  ? 'Reserved'
+                                  : 'Occupied'}
+                              </span>
+                            </div>
                           </div>
                         )}
                       </div>
                     </button>
+                    {contextMenu && contextMenu.tableId === table.id && (
+                      <div
+                        className="fixed z-50 min-w-[200px] rounded-lg border border-slate-700 bg-slate-900 shadow-xl py-2"
+                        style={{
+                          left: `${contextMenu.x}px`,
+                          top: `${contextMenu.y}px`,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {isPaid && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await updateTableStatus({
+                                  id: table.id,
+                                  status: 'available'
+                                }).unwrap();
+                                toast.success('Table released successfully');
+                                setContextMenu(null);
+                                refetchTables();
+                              } catch (error: any) {
+                                toast.error(error?.data?.message || 'Failed to release table');
+                              }
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-green-400 hover:bg-slate-800 transition-colors flex items-center gap-2"
+                          >
+                            <span>✓</span>
+                            <span>Release Table</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            handleTableSelection(table.id);
+                            setContextMenu(null);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-800 transition-colors flex items-center gap-2"
+                        >
+                          <span>👁️</span>
+                          <span>View Details</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   );
                 })
               ) : (
@@ -2168,6 +2525,25 @@ export default function POSPage() {
                 <ShoppingCartIcon className="h-4 w-4" />
                 Open Order Cart
               </Button>
+              
+              {/* Payment Mode Toggle - In the middle */}
+              <div className="flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-slate-400 whitespace-nowrap">
+                  {paymentMode === 'pay-first' ? 'Pay First' : 'Pay Later'}
+                </span>
+                <button
+                  onClick={() => setPaymentMode(prev => prev === 'pay-first' ? 'pay-later' : 'pay-first')}
+                  className="relative inline-flex h-5 w-10 items-center rounded-full bg-gray-300 dark:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+                  title={`Switch to ${paymentMode === 'pay-first' ? 'Pay Later' : 'Pay First'} mode`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      paymentMode === 'pay-first' ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+              
               <Button
                 variant="primary"
                 onClick={() => setIsPaymentModalOpen(true)}
@@ -2605,7 +2981,12 @@ export default function POSPage() {
         case 'Enter':
           event.preventDefault();
           if (cart.length > 0 && !checkoutBlocked) {
-            handleCreateOrder();
+            // In pay-first mode, Enter should open payment modal instead of creating pending order
+            if (paymentMode === 'pay-first') {
+              setIsPaymentModalOpen(true);
+            } else {
+              handleCreateOrder();
+            }
           }
           break;
       }
@@ -2613,7 +2994,7 @@ export default function POSPage() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [cart.length, selectedTable, showKeyboardShortcuts, handleCreateOrder, requiresTable, checkoutBlocked]);
+  }, [cart.length, selectedTable, showKeyboardShortcuts, handleCreateOrder, requiresTable, checkoutBlocked, paymentMode, setIsPaymentModalOpen]);
 
 
   return (
@@ -3362,24 +3743,26 @@ export default function POSPage() {
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                <Button 
-                  variant="secondary" 
-                  onClick={handleCreateOrder} 
-                  disabled={checkoutBlocked || cart.length === 0}
-                  title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : ''}
-                >
-                  <ClockIcon className="mr-2 h-4 w-4" />
-                  Create Order
-                </Button>
+                {paymentMode === 'pay-later' && (
+                  <Button 
+                    variant="secondary" 
+                    onClick={handleCreateOrder} 
+                    disabled={checkoutBlocked || cart.length === 0}
+                    title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : ''}
+                  >
+                    <ClockIcon className="mr-2 h-4 w-4" />
+                    Create Order
+                  </Button>
+                )}
                 <Button
                   variant="primary"
                   onClick={handlePayment}
                   disabled={checkoutBlocked || cart.length === 0}
                   className="bg-emerald-600 hover:bg-emerald-500"
-                  title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : ''}
+                  title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : paymentMode === 'pay-first' ? 'Pay-first mode: Payment required before order creation' : ''}
                 >
                   <CreditCardIcon className="mr-2 h-4 w-4" />
-                  Process Payment
+                  {paymentMode === 'pay-first' ? 'Pay & Create Order' : 'Process Payment'}
                 </Button>
               </div>
             </div>
@@ -3571,22 +3954,49 @@ export default function POSPage() {
 
           {paymentTab === 'full' ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-              <Button
-                  variant={fullPaymentMethod === 'cash' ? 'primary' : 'secondary'}
-                  onClick={() => setFullPaymentMethod('cash')}
-                  className={`flex-1 ${fullPaymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'}`}
-                >
-                  💵 Cash
-                </Button>
-                <Button
-                  variant={fullPaymentMethod === 'card' ? 'primary' : 'secondary'}
-                  onClick={() => setFullPaymentMethod('card')}
-                  className={`flex-1 ${fullPaymentMethod === 'card' ? 'bg-sky-600 hover:bg-sky-500' : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'}`}
-              >
-                  <CreditCardIcon className="h-4 w-4" /> Card
-              </Button>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Select Payment Method</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {paymentMethodsLoading ? (
+                    <div className="col-span-full text-center text-slate-400 py-4">Loading payment methods...</div>
+                  ) : paymentMethods.length > 0 ? (
+                    paymentMethods.map((method) => {
+                      const isSelected = fullPaymentMethod === method.code;
+                      const getIcon = () => {
+                        if (method.icon) return method.icon;
+                        if (method.type === 'cash') return '💵';
+                        if (method.type === 'card') return <CreditCardIcon className="h-4 w-4" />;
+                        return <CurrencyDollarIcon className="h-4 w-4" />;
+                      };
+                      return (
+                        <Button
+                          key={method.id}
+                          variant={isSelected ? 'primary' : 'secondary'}
+                          onClick={() => setFullPaymentMethod(method.code)}
+                          className={`flex items-center justify-center gap-2 ${
+                            isSelected
+                              ? method.color
+                                ? `bg-[${method.color}] hover:opacity-90`
+                                : 'bg-emerald-600 hover:bg-emerald-500'
+                              : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                          }`}
+                        >
+                          {typeof getIcon() === 'string' ? (
+                            <span>{getIcon()}</span>
+                          ) : (
+                            getIcon()
+                          )}
+                          <span className="text-xs sm:text-sm">{method.displayName || method.name}</span>
+                        </Button>
+                      );
+                    })
+                  ) : (
+                    <div className="col-span-full text-center text-slate-400 py-4">
+                      No payment methods available. Please configure payment methods in settings.
+                    </div>
+                  )}
+                </div>
+              </div>
           <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Amount received</label>
             <Input
@@ -3614,23 +4024,21 @@ export default function POSPage() {
                   ))}
                 </div>
               )}
-              {fullPaymentMethod === 'cash' && (
-                <div className="text-sm text-slate-300">
-                  Change due:{' '}
-                  <span className="font-semibold text-emerald-300">{formatCurrency(fullPaymentChange)}</span>
-                </div>
-              )}
+              {(() => {
+                const selectedMethod = paymentMethods.find(m => m.code === fullPaymentMethod);
+                const allowsChange = selectedMethod?.allowsChangeDue ?? (fullPaymentMethod === 'cash');
+                return allowsChange && (
+                  <div className="text-sm text-slate-300">
+                    Change due:{' '}
+                    <span className="font-semibold text-emerald-300">{formatCurrency(fullPaymentChange)}</span>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="space-y-4">
               <div className="space-y-3">
                 {multiPayments.map((row) => {
-                  const methodLabel: Record<SplitPaymentRow['method'], string> = {
-                    cash: 'Cash',
-                    card: 'Card',
-                    wallet: 'Wallet',
-                    other: 'Other',
-                  };
                   return (
                     <div
                       key={row.id}
@@ -3639,15 +4047,24 @@ export default function POSPage() {
                       <select
                         value={row.method}
                         onChange={(event) =>
-                          updateMultiPaymentRow(row.id, { method: event.target.value as SplitPaymentRow['method'] })
+                          updateMultiPaymentRow(row.id, { method: event.target.value })
                         }
                         className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                        disabled={paymentMethodsLoading}
                       >
-                        {(Object.keys(methodLabel) as SplitPaymentRow['method'][]).map((method) => (
-                          <option key={method} value={method} className="bg-slate-900">
-                            {methodLabel[method]}
-                          </option>
-                        ))}
+                        {paymentMethodsLoading ? (
+                          <option>Loading...</option>
+                        ) : paymentMethods.length > 0 ? (
+                          paymentMethods
+                            .filter(method => method.allowsPartialPayment !== false)
+                            .map((method) => (
+                              <option key={method.id} value={method.code} className="bg-slate-900">
+                                {method.displayName || method.name}
+                              </option>
+                            ))
+                        ) : (
+                          <option value="">No methods available</option>
+                        )}
                       </select>
             <Input
                         type="number"
@@ -4369,24 +4786,20 @@ export default function POSPage() {
                     )}
                     {currentStatus === 'pending' && (
                       <Button
-                        onClick={async () => {
+                        onClick={() => {
                           if (!occupiedTableModal.orderDetails?.currentOrderId) return;
-                          try {
-                            await updateOrder({
-                              id: occupiedTableModal.orderDetails.currentOrderId,
-                              data: { status: 'paid' }
-                            }).unwrap();
-                            toast.success('Order marked as paid');
-                            setOccupiedTableModal(null);
-                            refetchTables();
-                            refetchQueue();
-                          } catch (error: any) {
-                            toast.error(error?.data?.message || 'Failed to update order status');
-                          }
+                          const orderAmount = occupiedTableModal.orderDetails.totalAmount || 0;
+                          setPendingOrderPaymentReceived(orderAmount.toFixed(2));
+                          // Set default payment method
+                          const defaultMethod = paymentMethods.find(m => m.code === 'cash')?.code || paymentMethods[0]?.code || 'cash';
+                          setPendingOrderPaymentMethod(defaultMethod);
+                          setIsPendingOrderPaymentModalOpen(true);
                         }}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500"
+                        disabled={paymentMode === 'pay-first'}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={paymentMode === 'pay-first' ? 'Pay-first mode is enabled. Pending orders cannot be created or processed.' : ''}
                       >
-                        Mark as Paid
+                        Process Payment
                       </Button>
                     )}
                     {currentStatus === 'paid' && (
@@ -4406,8 +4819,10 @@ export default function POSPage() {
                             toast.error(error?.data?.message || 'Failed to update order status');
                           }
                         }}
+                        disabled={paymentMode === 'pay-first'}
                         variant="secondary"
-                        className="w-full"
+                        className="w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={paymentMode === 'pay-first' ? 'Pay-first mode is enabled. Orders cannot be marked as pending.' : ''}
                       >
                         Mark as Pending
                       </Button>
@@ -4540,6 +4955,116 @@ export default function POSPage() {
                 className="bg-emerald-600 hover:bg-emerald-500"
               >
                 Done
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Payment Modal for Pending Orders */}
+      <Modal
+        isOpen={isPendingOrderPaymentModalOpen}
+        onClose={() => setIsPendingOrderPaymentModalOpen(false)}
+        title="Process Payment"
+        size="md"
+      >
+        {occupiedTableModal && occupiedTableModal.orderDetails && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-slate-400">Order Amount</span>
+                <span className="text-xl font-bold text-emerald-400">
+                  {formatCurrency(occupiedTableModal.orderDetails.totalAmount || 0)}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-slate-200">Payment Method</label>
+              <div className="grid grid-cols-2 gap-2">
+                {paymentMethods.map((method) => (
+                  <Button
+                    key={method.code}
+                    variant={pendingOrderPaymentMethod === method.code ? 'primary' : 'secondary'}
+                    onClick={() => setPendingOrderPaymentMethod(method.code)}
+                    className={`${
+                      pendingOrderPaymentMethod === method.code
+                        ? 'bg-emerald-600 hover:bg-emerald-500'
+                        : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                    }`}
+                  >
+                    {method.icon && <span className="mr-2">{method.icon}</span>} {method.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {pendingOrderPaymentMethod === 'cash' && (
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-200">Amount Received</label>
+                <Input
+                  type="number"
+                  value={pendingOrderPaymentReceived}
+                  onChange={(e) => setPendingOrderPaymentReceived(e.target.value)}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                />
+                {parseFloat(pendingOrderPaymentReceived || '0') > (occupiedTableModal.orderDetails.totalAmount || 0) && (
+                  <p className="text-sm text-amber-400">
+                    Change: {formatCurrency(parseFloat(pendingOrderPaymentReceived || '0') - (occupiedTableModal.orderDetails.totalAmount || 0))}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => setIsPendingOrderPaymentModalOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!occupiedTableModal.orderDetails?.currentOrderId) return;
+                  try {
+                    const orderAmount = occupiedTableModal.orderDetails.totalAmount || 0;
+                    const received = parseFloat(pendingOrderPaymentReceived || '0');
+                    
+                    if (pendingOrderPaymentMethod === 'cash' && received < orderAmount) {
+                      toast.error('Amount received must be at least the order amount');
+                      return;
+                    }
+
+                    // Map payment method code to backend expected format
+                    // Backend accepts 'cash', 'card', or 'split', but we use paymentBreakdown for actual method
+                    const backendMethod = pendingOrderPaymentMethod === 'cash' ? 'cash' : 
+                                         pendingOrderPaymentMethod === 'card' || pendingOrderPaymentMethod.includes('CARD') ? 'card' : 
+                                         'split';
+                    
+                    await processPayment({
+                      orderId: occupiedTableModal.orderDetails.currentOrderId,
+                      amount: orderAmount,
+                      method: backendMethod,
+                      transactionId: undefined,
+                    }).unwrap();
+
+                    toast.success('Payment processed successfully');
+                    setIsPendingOrderPaymentModalOpen(false);
+                    setOccupiedTableModal(null);
+                    refetchTables();
+                    refetchQueue();
+                  } catch (error: any) {
+                    toast.error(error?.data?.message || 'Failed to process payment');
+                  }
+                }}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                disabled={pendingOrderPaymentMethod === 'cash' && parseFloat(pendingOrderPaymentReceived || '0') < (occupiedTableModal.orderDetails.totalAmount || 0)}
+              >
+                Process Payment
               </Button>
             </div>
           </div>

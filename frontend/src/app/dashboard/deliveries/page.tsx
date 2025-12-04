@@ -113,6 +113,10 @@ export default function DeliveriesPage() {
   };
 
   const handleStatusChange = async (orderId: string, status: DeliveryStatus) => {
+    if (!orderId) {
+      toast.error('Invalid order ID');
+      return;
+    }
     try {
       await updateDeliveryStatus({ orderId, status }).unwrap();
       toast.success('Delivery status updated');
@@ -239,25 +243,41 @@ export default function DeliveriesPage() {
       title: 'Status',
       header: 'Status',
       render: (_: any, record: DeliveryOrder) => {
-        const status = (record.deliveryStatus || 'pending') as DeliveryStatus;
-        const option = DELIVERY_STATUS_OPTIONS.find((o) => o.value === status);
+        const deliveryStatus = (record.deliveryStatus || 'pending') as DeliveryStatus;
+        const paymentStatus = record.status || 'pending';
+        const option = DELIVERY_STATUS_OPTIONS.find((o) => o.value === deliveryStatus);
         const variant =
-          status === 'delivered'
+          deliveryStatus === 'delivered'
             ? 'success'
-            : status === 'out_for_delivery'
+            : deliveryStatus === 'out_for_delivery'
             ? 'info'
-            : status === 'cancelled'
+            : deliveryStatus === 'cancelled'
             ? 'danger'
-            : status === 'assigned'
+            : deliveryStatus === 'assigned'
             ? 'warning'
             : 'secondary';
         return (
           <div className="space-y-1">
-            <Badge variant={variant}>{option?.label || status}</Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant={variant}>{option?.label || deliveryStatus}</Badge>
+              {paymentStatus === 'paid' && (
+                <Badge variant="success" className="text-xs">Paid</Badge>
+              )}
+              {paymentStatus === 'pending' && (
+                <Badge variant="warning" className="text-xs">Payment Pending</Badge>
+              )}
+            </div>
             <select
               className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs px-2 py-1"
-              value={status}
-              onChange={(e) => handleStatusChange(record.id, e.target.value as DeliveryStatus)}
+              value={deliveryStatus}
+              onChange={(e) => {
+                const orderId = record.id || record._id;
+                if (orderId) {
+                  handleStatusChange(orderId, e.target.value as DeliveryStatus);
+                } else {
+                  toast.error('Order ID not found');
+                }
+              }}
               disabled={updatingStatus}
             >
               {DELIVERY_STATUS_OPTIONS.map((opt) => (
@@ -281,7 +301,14 @@ export default function DeliveriesPage() {
             <select
               className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs px-2 py-1"
               value={assignedId || ''}
-              onChange={(e) => handleAssignDriver(record.id, e.target.value)}
+              onChange={(e) => {
+                const orderId = record.id || record._id;
+                if (orderId) {
+                  handleAssignDriver(orderId, e.target.value);
+                } else {
+                  toast.error('Order ID not found');
+                }
+              }}
               disabled={assigning || drivers.length === 0}
             >
               <option value="">{drivers.length ? 'Select driver' : 'No drivers'}</option>

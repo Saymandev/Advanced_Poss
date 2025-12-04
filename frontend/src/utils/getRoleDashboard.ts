@@ -16,7 +16,8 @@ export function getRoleDashboardPath(role: string | undefined | null): string {
   const roleDashboardMap: Record<string, string> = {
     [UserRole.SUPER_ADMIN.toLowerCase()]: '/dashboard/super-admin', // Super admin uses dedicated dashboard
     [UserRole.OWNER.toLowerCase()]: '/dashboard', // Owner uses main dashboard
-    [UserRole.MANAGER.toLowerCase()]: '/dashboard/manager',
+    // Managers should also use the main dashboard instead of a separate manager page
+    [UserRole.MANAGER.toLowerCase()]: '/dashboard',
     [UserRole.CHEF.toLowerCase()]: '/dashboard/kitchen',
     [UserRole.KITCHEN.toLowerCase()]: '/dashboard/kitchen', // Alias for kitchen staff
     [UserRole.WAITER.toLowerCase()]: '/dashboard/pos', // Waiters use POS for order taking

@@ -93,18 +93,17 @@ export default function DashboardPage() {
     }
 
     const userRole = user.role.toLowerCase();
-    
+
+    // Super admin still uses dedicated dashboard
     if (userRole === 'super_admin') {
       router.replace('/dashboard/super-admin');
       return;
     }
-    
-    if (userRole === 'manager') {
-      router.replace('/dashboard/manager');
-      return;
-    }
-    
-    // Owner and other roles stay here - show owner dashboard
+
+    // Managers should use the same main dashboard as owner and other roles
+    // So we do NOT redirect managers away from this page anymore.
+
+    // Owner and other roles stay here - show owner/manager dashboard
     setIsRouting(false);
   }, [user?.role, router]);
 

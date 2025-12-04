@@ -101,6 +101,41 @@ export const attendanceApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['Attendance'],
+      transformResponse: (response: any) => {
+        const data = response?.data || response;
+        const rawRecords: any[] =
+          Array.isArray(data?.attendance) ? data.attendance :
+          Array.isArray(data?.records) ? data.records :
+          Array.isArray(data) ? data :
+          [];
+
+        const records: AttendanceRecord[] = rawRecords.map((item: any) => ({
+          id: item.id || item._id?.toString() || '',
+          userId: item.userId?.id || item.userId?._id?.toString() || (typeof item.userId === 'string' ? item.userId : ''),
+          userName:
+            item.userName ||
+            (item.userId?.firstName && item.userId?.lastName
+              ? `${item.userId.firstName} ${item.userId.lastName}`.trim()
+              : item.userId?.fullName || item.userId?.email || 'Unknown'),
+          branchId: item.branchId?.id || item.branchId?._id?.toString() || (typeof item.branchId === 'string' ? item.branchId : ''),
+          branchName: item.branchName || item.branchId?.name || item.branchId?.code || 'Unknown',
+          checkIn: item.checkIn,
+          checkOut: item.checkOut,
+          status: item.status || 'present',
+          totalHours: item.totalHours || item.workHours || 0,
+          overtime: item.overtime || item.overtimeHours || 0,
+          notes: item.notes,
+          approvedBy: item.approvedBy,
+          approvedAt: item.approvedAt,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        }));
+
+        return {
+          records,
+          total: data.total || records.length,
+        };
+      },
     }),
     getTodayAttendance: builder.query<AttendanceRecord[], string>({
       query: (branchId) => `/attendance/branch/${branchId}/today`,

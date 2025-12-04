@@ -1,11 +1,13 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useFindCompanyMutation } from '@/lib/api/endpoints/authApi';
 import { setCompanyContext } from '@/lib/slices/authSlice';
-import { useAppDispatch } from '@/lib/store';
+import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { EnvelopeIcon, HomeIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -15,9 +17,12 @@ import toast from 'react-hot-toast';
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { companyContext } = useAppSelector((state) => state.auth);
   const [email, setEmail] = useState('');
   const [findCompany, { isLoading }] = useFindCompanyMutation();
   const [mounted, setMounted] = useState(false);
+  const [foundCompanyLogo, setFoundCompanyLogo] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -46,6 +51,12 @@ export default function LoginPage() {
       if (companyData && companyData.found) {
         if (typeof window !== 'undefined') {
           localStorage.setItem('companyContext', JSON.stringify(companyData));
+        }
+        
+        // Store logo URL to display on login page
+        if (companyData.logoUrl) {
+          setFoundCompanyLogo(companyData.logoUrl);
+          setLogoError(false); // Reset error state when new logo is found
         }
         
         dispatch(setCompanyContext(companyData));
@@ -89,10 +100,25 @@ export default function LoginPage() {
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500"></div>
             
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl mb-4 animate-scale-in">
-                <SparklesIcon className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
+              {(foundCompanyLogo || companyContext?.logoUrl) && !logoError ? (
+                <div className="inline-flex items-center justify-center mb-4 animate-scale-in">
+                  <img
+                    src={foundCompanyLogo || companyContext?.logoUrl}
+                    alt={companyContext?.companyName || 'Company Logo'}
+                    className="h-16 w-16 rounded-2xl object-cover border-2 border-primary-500/50 shadow-lg"
+                    onError={() => {
+                      setLogoError(true);
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl mb-4 animate-scale-in">
+                  <SparklesIcon className="w-8 h-8 text-white" />
+                </div>
+              )}
+              <h1 className="text-3xl font-bold text-white mb-2">
+                {companyContext?.companyName ? `Welcome to ${companyContext.companyName}` : 'Welcome Back'}
+              </h1>
               <p className="text-gray-400">Enter your company email to continue</p>
             </div>
           </div>

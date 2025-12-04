@@ -195,9 +195,17 @@ export const posApi = apiSlice.injectEndpoints({
       providesTags: ['POS'],
       transformResponse: (response: any) => {
         const data = response.data || response;
-        if (Array.isArray(data)) return data;
-        if (Array.isArray(data?.orders)) return data.orders;
-        return [];
+        let orders = [];
+        if (Array.isArray(data)) {
+          orders = data;
+        } else if (Array.isArray(data?.orders)) {
+          orders = data.orders;
+        }
+        // Normalize _id to id for consistency
+        return orders.map((order: any) => ({
+          ...order,
+          id: order._id || order.id,
+        }));
       },
     }),
 
@@ -633,6 +641,7 @@ export const posApi = apiSlice.injectEndpoints({
       taxRate: number;
       serviceCharge: number;
       currency: string;
+      defaultPaymentMode?: 'pay-first' | 'pay-later';
       receiptSettings: {
         header: string;
         footer: string;
@@ -663,6 +672,7 @@ export const posApi = apiSlice.injectEndpoints({
       taxRate?: number;
       serviceCharge?: number;
       currency?: string;
+      defaultPaymentMode?: 'pay-first' | 'pay-later';
       receiptSettings?: any;
       printerSettings?: any;
     }>({

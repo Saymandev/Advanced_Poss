@@ -27,6 +27,7 @@ import { useAppSelector } from '@/lib/store';
 import {
   ClipboardDocumentIcon,
   CogIcon,
+  CreditCardIcon,
   CurrencyDollarIcon,
   DocumentIcon,
   GlobeAltIcon,
@@ -42,6 +43,13 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
+import {
+  useCreatePaymentMethodMutation,
+  useDeletePaymentMethodMutation,
+  useGetPaymentMethodsByCompanyQuery,
+  useUpdatePaymentMethodMutation,
+  type PaymentMethod,
+} from '@/lib/api/endpoints/paymentMethodsApi';
 
 interface TaxSetting {
   id: string;
@@ -71,7 +79,7 @@ export default function SettingsPage() {
   const companyId = companyContext?.companyId || user?.companyId || '';
   const branchId = user?.branchId || '';
   const isSuperAdmin = user?.role === 'super_admin';
-  const [activeTab, setActiveTab] = useState<'general' | 'taxes' | 'service-charges' | 'invoice'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'taxes' | 'service-charges' | 'invoice' | 'payment-methods'>('general');
   const [invoiceForm, setInvoiceForm] = useState<Partial<InvoiceSettings>>({});
   const [editingBranchUrl, setEditingBranchUrl] = useState<{ branchId: string; url: string } | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -210,6 +218,33 @@ export default function SettingsPage() {
   );
   const [updateInvoiceSettings] = useUpdateInvoiceSettingsMutation();
 
+  // Payment Methods
+  const { data: paymentMethods = [], isLoading: paymentMethodsLoading, refetch: refetchPaymentMethods } = useGetPaymentMethodsByCompanyQuery(
+    companyId,
+    { skip: !companyId }
+  );
+  const [createPaymentMethod, { isLoading: isCreatingPaymentMethod }] = useCreatePaymentMethodMutation();
+  const [updatePaymentMethod, { isLoading: isUpdatingPaymentMethod }] = useUpdatePaymentMethodMutation();
+  const [deletePaymentMethod, { isLoading: isDeletingPaymentMethod }] = useDeletePaymentMethodMutation();
+  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [paymentMethodForm, setPaymentMethodForm] = useState({
+    companyId: companyId,
+    name: '',
+    code: '',
+    displayName: '',
+    description: '',
+    type: 'other' as PaymentMethod['type'],
+    icon: '',
+    color: '#10b981',
+    isActive: true,
+    sortOrder: 0,
+    requiresReference: false,
+    requiresAuthorization: false,
+    allowsPartialPayment: false,
+    allowsChangeDue: true,
+  });
+
   // Modal states
   const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
   const [isServiceChargeModalOpen, setIsServiceChargeModalOpen] = useState(false);
@@ -252,6 +287,13 @@ export default function SettingsPage() {
     });
     setEditingServiceCharge(null);
   };
+
+  // Sync companyId in payment method form
+  useEffect(() => {
+    if (companyId) {
+      setPaymentMethodForm(prev => ({ ...prev, companyId }));
+    }
+  }, [companyId]);
 
   const handleCreateTax = async () => {
     if (!taxForm.name.trim()) {
@@ -396,6 +438,7 @@ export default function SettingsPage() {
     { id: 'taxes', label: 'Tax Settings', icon: ReceiptPercentIcon },
     { id: 'service-charges', label: 'Service Charges', icon: CurrencyDollarIcon },
     { id: 'invoice', label: 'Invoice Settings', icon: DocumentIcon },
+    { id: 'payment-methods', label: 'Payment Methods', icon: CreditCardIcon },
   ];
 
   const normalizedTaxSettings = Array.isArray(taxSettings)
@@ -1450,6 +1493,149 @@ export default function SettingsPage() {
         </Card>
       )}
 
+      {/* Payment Methods Tab */}
+      {activeTab === 'payment-methods' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <CreditCardIcon className="w-5 h-5" />
+                Payment Methods
+              </CardTitle>
+              <Button
+                onClick={() => {
+                  setEditingPaymentMethod(null);
+                  setPaymentMethodForm({
+                    companyId: companyId,
+                    name: '',
+                    code: '',
+                    displayName: '',
+                    description: '',
+                    type: 'other',
+                    icon: '',
+                    color: '#10b981',
+                    isActive: true,
+                    sortOrder: paymentMethods.length,
+                    requiresReference: false,
+                    requiresAuthorization: false,
+                    allowsPartialPayment: false,
+                    allowsChangeDue: true,
+                  });
+                  setIsPaymentMethodModalOpen(true);
+                }}
+                className="flex items-center gap-2"
+                disabled={!companyId}
+              >
+                <PlusIcon className="w-4 h-4" />
+                Add Payment Method
+              </Button>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              Manage company-specific payment methods. System-wide payment methods are available to all companies.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {paymentMethodsLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                <p className="mt-2 text-gray-500">Loading payment methods...</p>
+              </div>
+            ) : paymentMethods.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <CreditCardIcon className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                <p>No company-specific payment methods configured</p>
+                <p className="text-sm mt-1">Add a payment method or use system-wide methods</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {paymentMethods.map((method) => (
+                  <div
+                    key={method.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white"
+                        style={{ backgroundColor: method.color || '#10b981' }}
+                      >
+                        {method.icon || <CreditCardIcon className="w-5 h-5" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {method.displayName || method.name}
+                          </h3>
+                          <Badge className={method.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                            {method.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                          {!method.companyId && (
+                            <Badge className="bg-blue-100 text-blue-800">System</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500">{method.code}</p>
+                        {method.description && (
+                          <p className="text-sm text-gray-400 mt-1">{method.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {method.companyId && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setEditingPaymentMethod(method);
+                              setPaymentMethodForm({
+                                companyId: companyId,
+                                name: method.name,
+                                code: method.code,
+                                displayName: method.displayName || '',
+                                description: method.description || '',
+                                type: method.type,
+                                icon: method.icon || '',
+                                color: method.color || '#10b981',
+                                isActive: method.isActive,
+                                sortOrder: method.sortOrder,
+                                requiresReference: method.requiresReference,
+                                requiresAuthorization: method.requiresAuthorization,
+                                allowsPartialPayment: method.allowsPartialPayment,
+                                allowsChangeDue: method.allowsChangeDue,
+                              });
+                              setIsPaymentMethodModalOpen(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={async () => {
+                              if (window.confirm(`Are you sure you want to delete "${method.name}"?`)) {
+                                try {
+                                  await deletePaymentMethod(method.id).unwrap();
+                                  toast.success('Payment method deleted');
+                                  refetchPaymentMethods();
+                                } catch (error: any) {
+                                  toast.error(error?.data?.message || 'Failed to delete payment method');
+                                }
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tax Modal */}
       <Modal
         isOpen={isTaxModalOpen}
@@ -1609,6 +1795,172 @@ export default function SettingsPage() {
             </Button>
             <Button onClick={editingServiceCharge ? handleUpdateServiceCharge : handleCreateServiceCharge}>
               {editingServiceCharge ? 'Update' : 'Create'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Payment Method Modal */}
+      <Modal
+        isOpen={isPaymentMethodModalOpen}
+        onClose={() => {
+          setIsPaymentMethodModalOpen(false);
+          setEditingPaymentMethod(null);
+        }}
+        title={editingPaymentMethod ? 'Edit Payment Method' : 'Add Payment Method'}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Name"
+            value={paymentMethodForm.name}
+            onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, name: e.target.value })}
+            placeholder="e.g., Cash, VISA, bKash"
+            required
+          />
+          <Input
+            label="Code"
+            value={paymentMethodForm.code}
+            onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, code: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+            placeholder="e.g., cash, visa, bkash"
+            required
+            disabled={!!editingPaymentMethod}
+          />
+          <Input
+            label="Display Name (Optional)"
+            value={paymentMethodForm.displayName}
+            onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, displayName: e.target.value })}
+            placeholder="e.g., Cash Payment"
+          />
+          <Input
+            label="Description (Optional)"
+            value={paymentMethodForm.description}
+            onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, description: e.target.value })}
+            placeholder="Brief description"
+          />
+          <Select
+            label="Type"
+            value={paymentMethodForm.type}
+            onChange={(value) => setPaymentMethodForm({ ...paymentMethodForm, type: value as PaymentMethod['type'] })}
+            options={[
+              { value: 'cash', label: 'Cash' },
+              { value: 'card', label: 'Card' },
+              { value: 'mobile_wallet', label: 'Mobile Wallet' },
+              { value: 'bank_transfer', label: 'Bank Transfer' },
+              { value: 'due', label: 'Due/Credit' },
+              { value: 'complimentary', label: 'Complimentary' },
+              { value: 'other', label: 'Other' },
+            ]}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Icon (Optional)"
+              value={paymentMethodForm.icon}
+              onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, icon: e.target.value })}
+              placeholder="Icon name or emoji"
+            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Color
+              </label>
+              <input
+                type="color"
+                value={paymentMethodForm.color}
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, color: e.target.value })}
+                className="w-full h-10 rounded border border-gray-300 dark:border-gray-600"
+              />
+            </div>
+          </div>
+          <Input
+            label="Sort Order"
+            type="number"
+            value={paymentMethodForm.sortOrder}
+            onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, sortOrder: parseInt(e.target.value) || 0 })}
+          />
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={paymentMethodForm.isActive}
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, isActive: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={paymentMethodForm.requiresReference}
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, requiresReference: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Requires Transaction Reference</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={paymentMethodForm.requiresAuthorization}
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, requiresAuthorization: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Requires Authorization Code</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={paymentMethodForm.allowsPartialPayment}
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, allowsPartialPayment: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Allows Partial Payment (Split Tender)</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={paymentMethodForm.allowsChangeDue}
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, allowsChangeDue: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Allows Change Due</span>
+            </label>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsPaymentMethodModalOpen(false);
+                setEditingPaymentMethod(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!paymentMethodForm.name || !paymentMethodForm.code) {
+                  toast.error('Name and Code are required');
+                  return;
+                }
+                try {
+                  if (editingPaymentMethod) {
+                    await updatePaymentMethod({
+                      id: editingPaymentMethod.id,
+                      data: paymentMethodForm,
+                    }).unwrap();
+                    toast.success('Payment method updated');
+                  } else {
+                    await createPaymentMethod(paymentMethodForm).unwrap();
+                    toast.success('Payment method created');
+                  }
+                  setIsPaymentMethodModalOpen(false);
+                  setEditingPaymentMethod(null);
+                  refetchPaymentMethods();
+                } catch (error: any) {
+                  toast.error(error?.data?.message || 'Failed to save payment method');
+                }
+              }}
+              isLoading={isCreatingPaymentMethod || isUpdatingPaymentMethod}
+            >
+              {editingPaymentMethod ? 'Update' : 'Create'}
             </Button>
           </div>
         </div>

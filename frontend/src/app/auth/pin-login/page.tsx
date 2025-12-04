@@ -137,9 +137,20 @@ export default function PinLoginPage() {
       pin,
     };
 
-    // Include userId if a specific user is selected
-    if (selectedUser?.id) {
-      loginData.userId = selectedUser.id;
+    // Include userId if a specific user is selected and ID is valid
+    // Only include if it's a valid MongoDB ObjectId (24 hex characters)
+    if (selectedUser) {
+      const userId = selectedUser.id || selectedUser._id;
+      // Validate it's a valid MongoDB ObjectId format (24 hex characters)
+      // Must be exactly 24 hex characters, not empty, and not undefined/null
+      if (userId && typeof userId === 'string' && userId.trim().length === 24 && /^[0-9a-fA-F]{24}$/.test(userId.trim())) {
+        loginData.userId = userId.trim();
+      } else if (userId) {
+        // If userId exists but is invalid, log warning and don't include it
+        console.warn('Invalid userId format (not a valid MongoDB ObjectId):', userId);
+        // Don't include userId if it's not valid - backend will find user by role
+      }
+      // If userId is undefined/null/empty, don't include it (backend will find by role)
     }
 
     try {
@@ -237,7 +248,11 @@ export default function PinLoginPage() {
                 <img
                   src={companyContext.logoUrl}
                   alt={companyContext.companyName}
-                  className="h-20 w-20 rounded-full border-4 border-primary-500 shadow-lg"
+                  className="h-20 w-20 rounded-full border-4 border-primary-500 shadow-lg object-cover"
+                  onError={(e) => {
+                    // Hide image if it fails to load
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
                 />
               </div>
             )}
