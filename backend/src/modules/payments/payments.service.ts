@@ -3,11 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
-import { Subscription, SubscriptionDocument, SubscriptionStatus, BillingCycle } from '../subscriptions/schemas/subscription.schema';
+import { BillingCycle, Subscription, SubscriptionDocument, SubscriptionStatus } from '../subscriptions/schemas/subscription.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 
 @Injectable()
@@ -286,6 +286,7 @@ export class PaymentsService {
           subscriptionStatus: 'active',
           subscriptionStartDate: now,
           subscriptionEndDate: subscriptionEndDate,
+          nextBillingDate: subscriptionEndDate, // CRITICAL: Set nextBillingDate for plan changes
           settings: updatedSettings, // Update entire settings object with merged features
         },
         $unset: {
@@ -483,15 +484,20 @@ export class PaymentsService {
         };
       }
       
-      // Check if already activated
-      if (company.subscriptionStatus === 'active' && !company.trialEndDate) {
+      // Check if this is a plan change (different plan than current)
+      const { planName } = session.metadata || {};
+      const isPlanChange = planName && company.subscriptionPlan && company.subscriptionPlan !== planName;
+      
+      // If subscription is already active and NOT a plan change, return early
+      if (company.subscriptionStatus === 'active' && !company.trialEndDate && !isPlanChange) {
         return {
           success: true,
           message: 'Subscription is already active.',
         };
       }
       
-      // Call handleCheckoutCompleted to activate
+      // Call handleCheckoutCompleted to activate or update plan
+      // This will handle both initial activation and plan changes
       await this.handleCheckoutCompleted(session);
       
       return {

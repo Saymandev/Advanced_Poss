@@ -17,11 +17,17 @@ import {
     BillingHistorySchema,
 } from './schemas/billing-history.schema';
 import {
+    SubscriptionFeature,
+    SubscriptionFeatureSchema,
+} from './schemas/subscription-feature.schema';
+import {
     SubscriptionPlan,
     SubscriptionPlanSchema,
 } from './schemas/subscription-plan.schema';
 import { Subscription, SubscriptionSchema } from './schemas/subscription.schema';
 import { StripeService } from './stripe.service';
+import { SubscriptionFeaturesController } from './subscription-features.controller';
+import { SubscriptionFeaturesService } from './subscription-features.service';
 import { SubscriptionsWebhookController } from './subscriptions-webhook.controller';
 import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
@@ -31,6 +37,7 @@ import { SubscriptionsService } from './subscriptions.service';
     MongooseModule.forFeature([
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
+      { name: SubscriptionFeature.name, schema: SubscriptionFeatureSchema },
       { name: BillingHistory.name, schema: BillingHistorySchema },
       { name: Company.name, schema: CompanySchema },
       { name: Branch.name, schema: BranchSchema },
@@ -40,9 +47,22 @@ import { SubscriptionsService } from './subscriptions.service';
       { name: Table.name, schema: TableSchema },
     ]),
   ],
-  controllers: [SubscriptionsController, SubscriptionsWebhookController],
-  providers: [SubscriptionsService, StripeService],
-  exports: [SubscriptionsService, StripeService],
+  controllers: [
+    SubscriptionsController,
+    SubscriptionsWebhookController,
+    SubscriptionFeaturesController,
+  ],
+  providers: [
+    SubscriptionsService,
+    SubscriptionFeaturesService,
+    StripeService,
+  ],
+  exports: [
+    SubscriptionsService,
+    SubscriptionFeaturesService,
+    StripeService,
+    MongooseModule, // Export to make Subscription model available to other modules
+  ],
 })
 export class SubscriptionsModule {}
 

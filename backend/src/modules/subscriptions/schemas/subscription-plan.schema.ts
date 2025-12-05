@@ -15,10 +15,10 @@ export class SubscriptionPlan {
   description: string;
 
   @Prop({ required: true })
-  price: number; // Price in BDT
+  price: number; // Price amount
 
-  @Prop({ required: true })
-  currency: string; // Always 'BDT'
+  @Prop({ required: true, default: 'BDT' })
+  currency: string; // Currency is set from system settings (default: BDT)
 
   @Prop({ required: true })
   billingCycle: string; // 'monthly', 'yearly'
@@ -26,6 +26,7 @@ export class SubscriptionPlan {
   @Prop({ required: true })
   trialPeriod: number; // Trial period in hours
 
+  // Legacy features object (for backward compatibility)
   @Prop({
     type: Object,
     default: {
@@ -49,6 +50,11 @@ export class SubscriptionPlan {
     maxUsers: number;
     maxBranches: number;
   };
+
+  // New: Array of enabled feature keys from FEATURES constants
+  // Super Admin can enable/disable any feature dynamically
+  @Prop({ type: [String], default: [] })
+  enabledFeatureKeys: string[]; // e.g., ['dashboard', 'reports', 'menu-management', 'inventory', ...]
 
   @Prop({ required: true })
   stripePriceId: string; // Stripe price ID for payment

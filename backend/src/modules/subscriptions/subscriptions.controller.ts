@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -9,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Schema as MongooseSchema } from 'mongoose';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -114,16 +116,29 @@ export class SubscriptionsController {
   async update(
     @Param('id') id: string,
     @Body() updateSubscriptionDto: UpdateSubscriptionDto & { planId?: string },
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') userCompanyId: string,
+    @CurrentUser('role') userRole: string,
   ) {
+    // Security: Verify company ownership (unless Super Admin)
+    if (userRole !== UserRole.SUPER_ADMIN) {
+      const subscription = await this.subscriptionsService.findById(id);
+      const subscriptionCompanyId = subscription.companyId.toString();
+      if (subscriptionCompanyId !== userCompanyId) {
+        throw new ForbiddenException('You do not have permission to modify this subscription');
+      }
+    }
+
     if (updateSubscriptionDto?.planId) {
       return await this.subscriptionsService.updatePlanById(
         id,
         updateSubscriptionDto.planId,
         updateSubscriptionDto.billingCycle,
+        userId,
       );
     }
 
-    return await this.subscriptionsService.update(id, updateSubscriptionDto);
+    return await this.subscriptionsService.update(id, updateSubscriptionDto, userId);
   }
 
   // Upgrade/Downgrade subscription
@@ -132,8 +147,20 @@ export class SubscriptionsController {
   async upgrade(
     @Param('id') id: string,
     @Body() upgradeDto: UpgradeSubscriptionDto,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') userCompanyId: string,
+    @CurrentUser('role') userRole: string,
   ) {
-    return await this.subscriptionsService.upgrade(id, upgradeDto);
+    // Security: Verify company ownership (unless Super Admin)
+    if (userRole !== UserRole.SUPER_ADMIN) {
+      const subscription = await this.subscriptionsService.findById(id);
+      const subscriptionCompanyId = subscription.companyId.toString();
+      if (subscriptionCompanyId !== userCompanyId) {
+        throw new ForbiddenException('You do not have permission to modify this subscription');
+      }
+    }
+
+    return await this.subscriptionsService.upgrade(id, upgradeDto, userId);
   }
 
   // Cancel subscription

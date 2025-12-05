@@ -1,14 +1,15 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Param,
-    Patch,
-    Post,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -17,6 +18,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateSubscriptionPlanDto, UpdateSubscriptionPlanDto } from './dto/subscription-plan.dto';
 import { SubscriptionPlansService } from './subscription-plans.service';
+import { ALL_FEATURE_KEYS, getFeaturesByCategory } from './utils/plan-features.helper';
 
 @ApiTags('subscription-plans')
 @Controller('subscription-plans')
@@ -37,10 +39,49 @@ export class SubscriptionPlansController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all active subscription plans' })
+  @ApiOperation({ summary: 'Get all subscription plans (optionally filtered by isActive)' })
   @ApiResponse({ status: 200, description: 'Subscription plans retrieved successfully' })
-  findAll() {
-    return this.subscriptionPlansService.findAll();
+  findAll(@Query('isActive') isActive?: string) {
+    // If isActive query param is provided, parse it; otherwise return all plans
+    const filterActive = isActive !== undefined ? isActive === 'true' : undefined;
+    return this.subscriptionPlansService.findAll(filterActive);
+  }
+
+  @Get('available-features')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all available features for plan customization (Super Admin only)' })
+  @ApiResponse({ status: 200, description: 'Available features retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  getAvailableFeatures() {
+    const featuresByCategory = getFeaturesByCategory();
+    return {
+      success: true,
+      data: {
+        featuresByCategory,
+        allFeatureKeys: ALL_FEATURE_KEYS,
+      },
+    };
+  }
+
+  @Get(':id/features')
+  @ApiOperation({ summary: 'Get plan with normalized feature keys' })
+  @ApiResponse({ status: 200, description: 'Plan with normalized features retrieved successfully' })
+  async getPlanWithFeatures(@Param('id') id: string) {
+    return this.subscriptionPlansService.getPlanWithNormalizedFeatures(id);
+  }
+
+  @Post(':id/migrate-features')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Migrate legacy plan features to new enabledFeatureKeys format (Super Admin only)' })
+  @ApiResponse({ status: 200, description: 'Plan migrated successfully' })
+  @ApiResponse({ status: 404, description: 'Subscription plan not found' })
+  async migratePlanFeatures(@Param('id') id: string) {
+    return this.subscriptionPlansService.migrateToEnabledFeatureKeys(id);
   }
 
   @Get(':id')

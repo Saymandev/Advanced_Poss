@@ -36,6 +36,7 @@ import {
   UsageMetrics,
 } from './schemas/subscription.schema';
 import { StripeService } from './stripe.service';
+import { SubscriptionFeaturesService } from './subscription-features.service';
 
 @Injectable()
 export class SubscriptionsService {
@@ -61,6 +62,7 @@ export class SubscriptionsService {
     @InjectModel(Company.name)
     private companyModel: Model<CompanyDocument>,
     private stripeService: StripeService,
+    private featuresService: SubscriptionFeaturesService,
   ) {}
 
   private toObjectId(id: string | Types.ObjectId): Types.ObjectId {
@@ -171,6 +173,32 @@ export class SubscriptionsService {
     subscription.limits = this.buildLimitsFromPlan(plan) as SubscriptionLimits;
     subscription.billingCycle = resolvedBillingCycle;
 
+    // Update next billing date based on current period end
+    if (subscription.currentPeriodEnd) {
+      subscription.nextBillingDate = subscription.currentPeriodEnd;
+    } else {
+      // Calculate next billing date if not set
+      const periodStart = subscription.currentPeriodStart || new Date();
+      subscription.nextBillingDate = this.calculatePeriodEnd(periodStart, resolvedBillingCycle);
+    }
+
+    // CRITICAL: Update company record to reflect plan change
+    // Use plan.name (e.g., 'premium', 'basic') not planKey enum value
+    // This ensures company.subscriptionPlan matches the plan's name field for frontend matching
+    await this.companyModel.findByIdAndUpdate(
+      subscription.companyId,
+      {
+        subscriptionPlan: plan.name, // Use plan.name, not planKey enum
+        subscriptionStatus: subscription.status === SubscriptionStatus.ACTIVE ? 'active' : subscription.status,
+        nextBillingDate: subscription.nextBillingDate,
+        // Update subscription end date to match current period end
+        ...(subscription.currentPeriodEnd && {
+          subscriptionEndDate: subscription.currentPeriodEnd,
+        }),
+      },
+      { new: true },
+    ).exec();
+
     return subscription.save();
   }
 
@@ -179,16 +207,66 @@ export class SubscriptionsService {
     createSubscriptionDto: CreateSubscriptionDto,
   ): Promise<SubscriptionDocument> {
     try {
-      const plan = await this.planModel.findOne({
-        name: createSubscriptionDto.plan,
-        isActive: true,
-      });
+      // Check if feature-based or plan-based subscription
+      const isFeatureBased = createSubscriptionDto.enabledFeatures && createSubscriptionDto.enabledFeatures.length > 0;
+      
+      let plan: SubscriptionPlanDocument | null = null;
+      let price = 0;
+      let currency = 'BDT';
+      let limits: SubscriptionLimits;
+      let trialPeriodHours = 168; // Default 7 days
+      let enabledFeatures: string[] = [];
 
-      if (!plan) {
-        throw new BadRequestException('Invalid subscription plan');
+      // Fetch company once - will be reused later
+      let company = await this.companyModel.findById(createSubscriptionDto.companyId).lean().exec();
+
+      if (isFeatureBased) {
+        // Feature-based subscription
+        if (!createSubscriptionDto.enabledFeatures || createSubscriptionDto.enabledFeatures.length === 0) {
+          throw new BadRequestException('At least one feature must be selected');
+        }
+
+        // Calculate price from features
+        const branchCount = company ? await this.branchModel.countDocuments({ companyId: createSubscriptionDto.companyId }) : 1;
+        const userCount = company ? await this.userModel.countDocuments({ companyId: createSubscriptionDto.companyId }) : 1;
+
+        const pricing = await this.featuresService.calculatePrice(
+          createSubscriptionDto.enabledFeatures,
+          createSubscriptionDto.billingCycle as 'monthly' | 'yearly',
+          branchCount,
+          userCount,
+        );
+
+        price = pricing.totalPrice;
+        currency = 'BDT'; // Default currency
+        enabledFeatures = createSubscriptionDto.enabledFeatures;
+
+        // Build limits from features
+        limits = await this.featuresService.buildLimitsFromFeatures(createSubscriptionDto.enabledFeatures);
+
+        // Get trial period from first feature (or default)
+        const firstFeature = pricing.features[0];
+        trialPeriodHours = 168; // Default 7 days trial
+      } else {
+        // Plan-based subscription (legacy)
+        if (!createSubscriptionDto.plan) {
+          throw new BadRequestException('Either plan or enabledFeatures must be provided');
+        }
+
+        plan = await this.planModel.findOne({
+          name: createSubscriptionDto.plan,
+          isActive: true,
+        });
+
+        if (!plan) {
+          throw new BadRequestException('Invalid subscription plan');
+        }
+
+        price = plan.price;
+        currency = plan.currency;
+        trialPeriodHours = plan.trialPeriod;
+        limits = this.buildLimitsFromPlan(plan);
       }
-
-      const price = plan.price;
 
       // Check if company already has a subscription (active or inactive)
       const existingSubscription = await this.subscriptionModel.findOne({
@@ -199,16 +277,21 @@ export class SubscriptionsService {
         // If subscription exists but is inactive, we can reuse it by updating it
         if (!existingSubscription.isActive) {
           // Update existing inactive subscription instead of creating new one
-          existingSubscription.plan = createSubscriptionDto.plan as any;
+          if (isFeatureBased) {
+            existingSubscription.enabledFeatures = enabledFeatures;
+          } else {
+            existingSubscription.plan = createSubscriptionDto.plan as any;
+          }
+          
           existingSubscription.status = SubscriptionStatus.TRIAL;
           existingSubscription.billingCycle = createSubscriptionDto.billingCycle as any;
           existingSubscription.price = price;
-          existingSubscription.currency = plan.currency;
+          existingSubscription.currency = currency;
           existingSubscription.isActive = true;
           existingSubscription.autoRenew = true;
           
           // Use company's trial dates if company is in trial, otherwise calculate new ones
-          const company = await this.companyModel.findById(createSubscriptionDto.companyId).lean().exec();
+          // Company is already fetched above
           if (company && company.subscriptionStatus === 'trial' && company.trialEndDate) {
             existingSubscription.trialStartDate = company.subscriptionStartDate || new Date();
             existingSubscription.trialEndDate = company.trialEndDate;
@@ -218,7 +301,7 @@ export class SubscriptionsService {
           } else {
             // Calculate new trial dates
             const trialStartDate = new Date();
-            const trialEndDate = new Date(trialStartDate.getTime() + (plan.trialPeriod * 60 * 60 * 1000));
+            const trialEndDate = new Date(trialStartDate.getTime() + (trialPeriodHours * 60 * 60 * 1000));
             existingSubscription.trialStartDate = trialStartDate;
             existingSubscription.trialEndDate = trialEndDate;
             existingSubscription.currentPeriodStart = trialStartDate;
@@ -226,7 +309,7 @@ export class SubscriptionsService {
             existingSubscription.nextBillingDate = trialEndDate;
           }
           
-          existingSubscription.limits = this.buildLimitsFromPlan(plan);
+          existingSubscription.limits = limits;
           existingSubscription.usage = this.getInitialUsage();
           
           return await existingSubscription.save();
@@ -237,9 +320,7 @@ export class SubscriptionsService {
         );
       }
 
-      // Get company to check if it's in trial period
-      const company = await this.companyModel.findById(createSubscriptionDto.companyId).lean().exec();
-      
+      // Company is already fetched above - use it here
       // Create Stripe customer (check if company already has one)
       let stripeCustomerId = company?.stripeCustomerId;
       if (!stripeCustomerId) {
@@ -252,7 +333,7 @@ export class SubscriptionsService {
         });
         stripeCustomerId = stripeCustomer.id;
       }
-
+      
       // Use company's trial dates if company is in trial, otherwise calculate new ones
       let trialStartDate: Date;
       let trialEndDate: Date;
@@ -264,26 +345,34 @@ export class SubscriptionsService {
       } else {
         // Calculate new trial dates
         trialStartDate = new Date();
-        trialEndDate = new Date(trialStartDate.getTime() + (plan.trialPeriod * 60 * 60 * 1000));
+        trialEndDate = new Date(trialStartDate.getTime() + (trialPeriodHours * 60 * 60 * 1000));
       }
 
-      const subscription = new this.subscriptionModel({
+      const subscriptionData: any = {
         companyId: createSubscriptionDto.companyId,
-        plan: createSubscriptionDto.plan,
         status: SubscriptionStatus.TRIAL,
         billingCycle: createSubscriptionDto.billingCycle,
         price,
-        currency: plan.currency,
+        currency,
         stripeCustomerId: stripeCustomerId,
         trialStartDate,
         trialEndDate,
         currentPeriodStart: trialStartDate,
         currentPeriodEnd: trialEndDate,
         nextBillingDate: trialEndDate,
-        limits: this.buildLimitsFromPlan(plan),
+        limits,
         usage: this.getInitialUsage(),
         autoRenew: true,
-      });
+      };
+
+      // Set plan or enabledFeatures based on subscription type
+      if (isFeatureBased) {
+        subscriptionData.enabledFeatures = enabledFeatures;
+      } else {
+        subscriptionData.plan = createSubscriptionDto.plan;
+      }
+
+      const subscription = new this.subscriptionModel(subscriptionData);
 
       return await subscription.save();
     } catch (error) {
@@ -314,7 +403,7 @@ export class SubscriptionsService {
         .find(query)
         .populate({
           path: 'companyId',
-          select: 'name email',
+          select: 'name email subscriptionPlan subscriptionStatus nextBillingDate subscriptionEndDate trialEndDate',
           model: 'Company',
         })
         .sort({ createdAt: -1 })
@@ -333,6 +422,11 @@ export class SubscriptionsService {
           id: sub.companyId._id || sub.companyId.id,
           name: sub.companyId.name,
           email: sub.companyId.email,
+          subscriptionPlan: sub.companyId.subscriptionPlan,
+          subscriptionStatus: sub.companyId.subscriptionStatus,
+          nextBillingDate: sub.companyId.nextBillingDate,
+          subscriptionEndDate: sub.companyId.subscriptionEndDate,
+          trialEndDate: sub.companyId.trialEndDate,
         };
       }
       return sub;
@@ -394,8 +488,16 @@ export class SubscriptionsService {
   async update(
     id: string,
     updateSubscriptionDto: UpdateSubscriptionDto,
+    userId?: string,
   ): Promise<any> {
     const subscription = await this.findById(id);
+
+    // Audit log: Track who made the change
+    if (userId) {
+      subscription.metadata = subscription.metadata || {};
+      subscription.metadata.lastUpdatedBy = userId;
+      subscription.metadata.lastUpdatedAt = new Date();
+    }
 
     Object.assign(subscription, updateSubscriptionDto);
     await subscription.save();
@@ -479,10 +581,108 @@ export class SubscriptionsService {
     };
   }
 
+  // Update subscription from Stripe webhook (when plan changes via Stripe)
+  async updateFromStripeWebhook(
+    stripeSubscriptionId: string,
+    stripeSubscriptionData: any,
+  ): Promise<SubscriptionDocument | null> {
+    const subscription = await this.subscriptionModel
+      .findOne({
+        stripeSubscriptionId,
+      })
+      .exec();
+
+    if (!subscription) {
+      return null;
+    }
+
+    // Update plan if price ID changed
+    if (stripeSubscriptionData.items?.data?.[0]?.price?.id) {
+      const newStripePriceId = stripeSubscriptionData.items.data[0].price.id;
+      if (newStripePriceId !== subscription.stripePriceId) {
+        const plan = await this.planModel
+          .findOne({ stripePriceId: newStripePriceId })
+          .exec();
+
+        if (plan) {
+          await this.applyPlanChange(subscription, plan);
+        }
+      }
+    }
+
+    // Update status
+    if (stripeSubscriptionData.status === 'active') {
+      subscription.status = SubscriptionStatus.ACTIVE;
+    } else if (stripeSubscriptionData.status === 'past_due') {
+      subscription.status = SubscriptionStatus.PAST_DUE;
+    } else if (stripeSubscriptionData.status === 'canceled') {
+      subscription.status = SubscriptionStatus.CANCELLED;
+      subscription.cancelledAt = new Date();
+    } else if (stripeSubscriptionData.status === 'unpaid') {
+      subscription.status = SubscriptionStatus.PAST_DUE;
+    }
+
+    // Update period dates
+    if (stripeSubscriptionData.current_period_start) {
+      subscription.currentPeriodStart = new Date(
+        stripeSubscriptionData.current_period_start * 1000,
+      );
+    }
+    if (stripeSubscriptionData.current_period_end) {
+      subscription.currentPeriodEnd = new Date(
+        stripeSubscriptionData.current_period_end * 1000,
+      );
+      subscription.nextBillingDate = new Date(
+        stripeSubscriptionData.current_period_end * 1000,
+      );
+    }
+
+    // Update cancel_at if set
+    if (stripeSubscriptionData.cancel_at) {
+      subscription.cancelAt = new Date(stripeSubscriptionData.cancel_at * 1000);
+    }
+
+    // Save subscription first
+    await subscription.save();
+
+    // CRITICAL: Always update company record with subscription status and dates
+    // This ensures company data stays in sync even if period_end is not provided
+    const companyUpdate: any = {
+      subscriptionStatus: subscription.status === SubscriptionStatus.ACTIVE ? 'active' : subscription.status,
+    };
+    
+    if (subscription.nextBillingDate) {
+      companyUpdate.nextBillingDate = subscription.nextBillingDate;
+    }
+    if (subscription.currentPeriodEnd) {
+      companyUpdate.subscriptionEndDate = subscription.currentPeriodEnd;
+    }
+    
+    // Update plan if it was changed
+    if (subscription.plan) {
+      // Find plan by enum value to get the plan name
+      const plan = await this.planModel.findOne({ 
+        name: subscription.plan 
+      }).exec();
+      if (plan) {
+        companyUpdate.subscriptionPlan = plan.name;
+      }
+    }
+    
+    await this.companyModel.findByIdAndUpdate(
+      subscription.companyId,
+      companyUpdate,
+      { new: true },
+    ).exec();
+
+    return subscription;
+  }
+
   // Upgrade/Downgrade subscription
   async upgrade(
     id: string,
     upgradeDto: UpgradeSubscriptionDto,
+    userId?: string,
   ): Promise<SubscriptionDocument> {
     const subscription = await this.findById(id);
 
@@ -493,6 +693,15 @@ export class SubscriptionsService {
 
     if (!newPlan) {
       throw new BadRequestException('Invalid subscription plan');
+    }
+
+    // Audit log: Track plan change
+    if (userId) {
+      subscription.metadata = subscription.metadata || {};
+      subscription.metadata.planChangedBy = userId;
+      subscription.metadata.planChangedAt = new Date();
+      subscription.metadata.previousPlan = subscription.plan;
+      subscription.metadata.newPlan = upgradeDto.newPlan;
     }
 
     const updated = await this.applyPlanChange(
@@ -508,12 +717,22 @@ export class SubscriptionsService {
     id: string,
     planId: string,
     billingCycle?: BillingCycle,
+    userId?: string,
   ) {
     const subscription = await this.findById(id);
     const plan = await this.planModel.findById(planId);
 
     if (!plan || !plan.isActive) {
       throw new BadRequestException('Invalid subscription plan');
+    }
+
+    // Audit log: Track plan change
+    if (userId) {
+      subscription.metadata = subscription.metadata || {};
+      subscription.metadata.planChangedBy = userId;
+      subscription.metadata.planChangedAt = new Date();
+      subscription.metadata.previousPlan = subscription.plan;
+      subscription.metadata.newPlan = plan.name;
     }
 
     const updated = await this.applyPlanChange(subscription, plan, billingCycle);
@@ -525,8 +744,17 @@ export class SubscriptionsService {
     id: string,
     reason?: string,
     cancelImmediately = false,
+    userId?: string,
   ): Promise<SubscriptionDocument> {
     const subscription = await this.findById(id);
+
+    // Audit log: Track cancellation
+    if (userId) {
+      subscription.metadata = subscription.metadata || {};
+      subscription.metadata.cancelledBy = userId;
+      subscription.metadata.cancelledAt = new Date();
+      subscription.metadata.cancellationReason = reason;
+    }
 
     if (cancelImmediately) {
       subscription.status = SubscriptionStatus.CANCELLED;

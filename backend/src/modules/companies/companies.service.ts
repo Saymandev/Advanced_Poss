@@ -369,17 +369,17 @@ export class CompaniesService {
   }
 
   async getSystemStats(): Promise<any> {
+    const now = new Date();
+    
     const [
       totalCompanies,
-      activeCompanies,
-      trialCompanies,
-      expiredCompanies,
+      allCompanies,
+      totalUsers,
       companiesByPlan,
     ] = await Promise.all([
       this.companyModel.countDocuments().exec(),
-      this.companyModel.countDocuments({ subscriptionStatus: 'active' }).exec(),
-      this.companyModel.countDocuments({ subscriptionStatus: 'trial' }).exec(),
-      this.companyModel.countDocuments({ subscriptionStatus: 'expired' }).exec(),
+      this.companyModel.find({}).select('subscriptionStatus trialEndDate').lean().exec(),
+      this.userModel.countDocuments({ isActive: true }).exec(),
       this.companyModel.aggregate([
         {
           $group: {
@@ -390,11 +390,45 @@ export class CompaniesService {
       ]).exec(),
     ]);
 
+    // Calculate active and trial companies based on subscriptionStatus and trialEndDate
+    // A company is "trial" if subscriptionStatus is 'trial' AND has a valid trialEndDate in the future
+    // A company is "active" if subscriptionStatus is 'active' (regardless of trialEndDate)
+    // A company is "expired" if subscriptionStatus is 'expired' OR trial has ended
+    let activeCompanies = 0;
+    let trialCompanies = 0;
+    let expiredCompanies = 0;
+
+    for (const company of allCompanies) {
+      const status = company.subscriptionStatus?.toLowerCase() || null;
+      const trialEndDate = company.trialEndDate ? new Date(company.trialEndDate) : null;
+      const isTrialActive = trialEndDate && trialEndDate > now;
+
+      if (status === 'active') {
+        // Company has active subscription (paid)
+        activeCompanies++;
+      } else if (status === 'trial') {
+        if (isTrialActive) {
+          // Trial is still active
+          trialCompanies++;
+        } else {
+          // Trial has expired
+          expiredCompanies++;
+        }
+      } else if (status === 'expired' || status === 'cancelled' || status === 'inactive') {
+        // Explicitly expired, cancelled, or inactive
+        expiredCompanies++;
+      } else {
+        // No status or unknown status - treat as expired/inactive
+        expiredCompanies++;
+      }
+    }
+
     return {
       totalCompanies,
       activeCompanies,
       trialCompanies,
       expiredCompanies,
+      totalUsers,
       companiesByPlan: companiesByPlan.reduce((acc: any, item: any) => {
         acc[item._id || 'none'] = item.count;
         return acc;

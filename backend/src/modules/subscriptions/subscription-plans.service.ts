@@ -3,6 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateSubscriptionPlanDto, UpdateSubscriptionPlanDto } from './dto/subscription-plan.dto';
 import { SubscriptionPlan, SubscriptionPlanDocument } from './schemas/subscription-plan.schema';
+import {
+  convertLegacyFeaturesToKeys,
+  ensureCoreFeatures,
+  normalizeFeatureKeys
+} from './utils/plan-features.helper';
 
 @Injectable()
 export class SubscriptionPlansService {
@@ -20,17 +25,41 @@ export class SubscriptionPlansService {
       throw new BadRequestException('Subscription plan with this name already exists');
     }
 
+    // Validate and normalize enabledFeatureKeys if provided
+    let enabledFeatureKeys: string[] = [];
+    if (createDto.enabledFeatureKeys && createDto.enabledFeatureKeys.length > 0) {
+      const normalized = normalizeFeatureKeys(createDto.enabledFeatureKeys);
+      if (normalized.invalidKeys.length > 0) {
+        throw new BadRequestException(
+          `Invalid feature keys: ${normalized.invalidKeys.join(', ')}`,
+        );
+      }
+      enabledFeatureKeys = normalized.normalized;
+    } else if (createDto.features) {
+      // If no enabledFeatureKeys but has legacy features, convert them
+      enabledFeatureKeys = convertLegacyFeaturesToKeys(createDto.features);
+    } else {
+      // No features provided, add at least core features
+      enabledFeatureKeys = ensureCoreFeatures([]);
+    }
+
     const plan = new this.subscriptionPlanModel({
       ...createDto,
-      currency: 'BDT', // Always BDT for Bangladesh
+      currency: 'BDT', // Currency is handled globally in Settings, default to system default (BDT)
+      enabledFeatureKeys,
     });
 
     return plan.save();
   }
 
-  async findAll(): Promise<SubscriptionPlan[]> {
+  async findAll(filterActive?: boolean): Promise<SubscriptionPlan[]> {
+    const query: any = {};
+    // Only filter by isActive if explicitly provided
+    if (filterActive !== undefined) {
+      query.isActive = filterActive;
+    }
     return this.subscriptionPlanModel
-      .find({ isActive: true })
+      .find(query)
       .sort({ sortOrder: 1 })
       .exec();
   }
@@ -52,9 +81,37 @@ export class SubscriptionPlansService {
   }
 
   async update(id: string, updateDto: UpdateSubscriptionPlanDto): Promise<SubscriptionPlan> {
+    const existingPlan = await this.subscriptionPlanModel.findById(id);
+    if (!existingPlan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+
+    // Prepare update data
+    const updateData: any = { ...updateDto };
+
+    // Handle enabledFeatureKeys if provided
+    if (updateDto.enabledFeatureKeys !== undefined) {
+      if (updateDto.enabledFeatureKeys.length > 0) {
+        const normalized = normalizeFeatureKeys(updateDto.enabledFeatureKeys);
+        if (normalized.invalidKeys.length > 0) {
+          throw new BadRequestException(
+            `Invalid feature keys: ${normalized.invalidKeys.join(', ')}`,
+          );
+        }
+        updateData.enabledFeatureKeys = normalized.normalized;
+      } else {
+        // Empty array means no custom features, use core features only
+        updateData.enabledFeatureKeys = ensureCoreFeatures([]);
+      }
+    } else if (updateDto.features) {
+      // If updating legacy features, convert to enabledFeatureKeys
+      const convertedKeys = convertLegacyFeaturesToKeys(updateDto.features);
+      updateData.enabledFeatureKeys = convertedKeys;
+    }
+
     const plan = await this.subscriptionPlanModel.findByIdAndUpdate(
       id,
-      updateDto,
+      updateData,
       { new: true },
     );
 
@@ -70,6 +127,65 @@ export class SubscriptionPlansService {
     if (!result) {
       throw new NotFoundException('Subscription plan not found');
     }
+  }
+
+  /**
+   * Migrate legacy plan features to new enabledFeatureKeys format
+   */
+  async migrateToEnabledFeatureKeys(id: string): Promise<SubscriptionPlan> {
+    const plan = await this.subscriptionPlanModel.findById(id);
+    
+    if (!plan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+
+    // If already has enabledFeatureKeys, return as is
+    if (plan.enabledFeatureKeys && plan.enabledFeatureKeys.length > 0) {
+      return plan.toObject();
+    }
+
+    // Convert legacy features to enabledFeatureKeys
+    let enabledFeatureKeys: string[] = [];
+    if (plan.features) {
+      enabledFeatureKeys = convertLegacyFeaturesToKeys(plan.features);
+    } else {
+      // If no features at all, add core features
+      enabledFeatureKeys = ensureCoreFeatures([]);
+    }
+
+    // Update the plan with new enabledFeatureKeys
+    const updatedPlan = await this.subscriptionPlanModel.findByIdAndUpdate(
+      id,
+      { enabledFeatureKeys },
+      { new: true },
+    );
+
+    if (!updatedPlan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+
+    return updatedPlan.toObject();
+  }
+
+  /**
+   * Get plan with normalized feature keys (useful for API responses)
+   */
+  async getPlanWithNormalizedFeatures(id: string): Promise<SubscriptionPlan> {
+    const plan = await this.findOne(id);
+
+    // Ensure plan has enabledFeatureKeys (migrate if needed)
+    if (!plan.enabledFeatureKeys || plan.enabledFeatureKeys.length === 0) {
+      if (plan.features) {
+        plan.enabledFeatureKeys = convertLegacyFeaturesToKeys(plan.features);
+      } else {
+        plan.enabledFeatureKeys = ensureCoreFeatures([]);
+      }
+    }
+
+    // Normalize (ensure core features, remove duplicates)
+    plan.enabledFeatureKeys = ensureCoreFeatures(plan.enabledFeatureKeys);
+
+    return plan;
   }
 
   // Initialize default subscription plans

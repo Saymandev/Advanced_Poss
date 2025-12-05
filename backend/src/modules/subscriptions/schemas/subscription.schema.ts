@@ -146,6 +146,10 @@ export class Subscription {
   @Prop({ default: 0 })
   addonsPrice: number;
 
+  // Feature-based subscription: array of enabled feature keys
+  @Prop({ type: [String], default: [] })
+  enabledFeatures: string[]; // Feature keys from SubscriptionFeature catalog
+
   @Prop({ type: Object })
   metadata: Record<string, any>;
 

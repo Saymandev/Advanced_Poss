@@ -49,6 +49,13 @@ export class CompaniesController {
     return this.companiesService.findByOwner(userId);
   }
 
+  @Get('system/stats')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get system-wide statistics (Super Admin only)' })
+  getSystemStats() {
+    return this.companiesService.getSystemStats();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get company by ID' })
   findOne(@Param('id') id: string) {
@@ -88,13 +95,6 @@ export class CompaniesController {
   @ApiOperation({ summary: 'Deactivate company' })
   deactivate(@Param('id') id: string) {
     return this.companiesService.deactivate(id);
-  }
-
-  @Get('system/stats')
-  @Roles(UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Get system-wide statistics (Super Admin only)' })
-  getSystemStats() {
-    return this.companiesService.getSystemStats();
   }
 }
 

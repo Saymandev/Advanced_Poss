@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class CreateSubscriptionPlanDto {
   @ApiProperty({ example: 'basic' })
@@ -103,6 +103,15 @@ export class CreateSubscriptionPlanDto {
   })
   @IsOptional()
   featureList?: string[];
+
+  @ApiPropertyOptional({
+    example: ['dashboard', 'reports', 'menu-management', 'inventory', 'pos'],
+    description: 'Array of enabled feature keys from FEATURES constants. Super Admin can customize which features are enabled.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  enabledFeatureKeys?: string[];
 }
 
 export class UpdateSubscriptionPlanDto {
@@ -207,4 +216,13 @@ export class UpdateSubscriptionPlanDto {
   })
   @IsOptional()
   featureList?: string[];
+
+  @ApiPropertyOptional({
+    example: ['dashboard', 'reports', 'menu-management', 'inventory'],
+    description: 'Array of enabled feature keys from FEATURES constants. Super Admin can customize which features are enabled.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  enabledFeatureKeys?: string[];
 }

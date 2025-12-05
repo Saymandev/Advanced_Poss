@@ -119,44 +119,11 @@ export class SubscriptionsWebhookController {
   private async handleSubscriptionUpdated(subscription: any) {
     // this.logger.log(`Subscription updated: ${subscription.id}`);
 
-    // Find subscription by Stripe subscription ID
-    const sub = await this.subscriptionsService['subscriptionModel']
-      .findOne({
-        stripeSubscriptionId: subscription.id,
-      })
-      .exec();
-
-    if (sub) {
-      // Update subscription status based on Stripe status
-      if (subscription.status === 'active') {
-        sub.status = SubscriptionStatus.ACTIVE;
-      } else if (subscription.status === 'past_due') {
-        sub.status = SubscriptionStatus.PAST_DUE;
-      } else if (subscription.status === 'canceled') {
-        sub.status = SubscriptionStatus.CANCELLED;
-        sub.cancelledAt = new Date();
-      } else if (subscription.status === 'unpaid') {
-        sub.status = SubscriptionStatus.PAST_DUE;
-      }
-
-      // Update period dates
-      if (subscription.current_period_start) {
-        sub.currentPeriodStart = new Date(
-          subscription.current_period_start * 1000,
-        );
-      }
-      if (subscription.current_period_end) {
-        sub.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
-        sub.nextBillingDate = new Date(subscription.current_period_end * 1000);
-      }
-
-      // Update cancel_at if set
-      if (subscription.cancel_at) {
-        sub.cancelAt = new Date(subscription.cancel_at * 1000);
-      }
-
-      await sub.save();
-    }
+    // Use service method to handle webhook update (includes plan change and company sync)
+    await this.subscriptionsService.updateFromStripeWebhook(
+      subscription.id,
+      subscription,
+    );
   }
 
   private async handleSubscriptionDeleted(subscription: any) {
@@ -225,10 +192,35 @@ export class SubscriptionsWebhookController {
 
         await newBilling.save();
 
-        // Update subscription
+        // CRITICAL: Update subscription period dates from invoice
+        // Invoice contains the actual billing period from Stripe
+        if (invoice.period_start) {
+          subscription.currentPeriodStart = new Date(invoice.period_start * 1000);
+        }
+        if (invoice.period_end) {
+          subscription.currentPeriodEnd = new Date(invoice.period_end * 1000);
+          subscription.nextBillingDate = new Date(invoice.period_end * 1000);
+        }
+        
+        // Update subscription status to ACTIVE if payment succeeded
+        subscription.status = SubscriptionStatus.ACTIVE;
         subscription.lastPaymentDate = new Date();
         subscription.failedPaymentAttempts = 0;
+        
         await subscription.save();
+        
+        // CRITICAL: Update company record with correct dates
+        await this.subscriptionsService['companyModel']
+          .findByIdAndUpdate(
+            subscription.companyId,
+            {
+              subscriptionStatus: 'active',
+              nextBillingDate: subscription.nextBillingDate,
+              subscriptionEndDate: subscription.currentPeriodEnd,
+            },
+            { new: true },
+          )
+          .exec();
       }
     }
   }
