@@ -87,6 +87,7 @@ export interface DeliveryOrder extends POSOrder {
 }
 
 export const posApi = apiSlice.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     // Create POS order
     createPOSOrder: builder.mutation<POSOrder, CreatePOSOrderRequest>({

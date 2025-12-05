@@ -120,7 +120,7 @@ export default function SuperAdminDashboardPage() {
                   {isLoadingStats ? (
                     <span className="animate-pulse">...</span>
                   ) : (
-                    '0'
+                    systemStats?.totalUsers ?? 0
                   )}
                 </p>
                 <p className="text-xs text-gray-500">Across all companies</p>

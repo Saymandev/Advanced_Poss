@@ -540,17 +540,49 @@ export default function RegisterPage() {
                                 {(plan.displayName || plan.name).toUpperCase()}
                               </h3>
                               
+                              {/* Feature count badge if using enabledFeatureKeys */}
+                              {plan.enabledFeatureKeys && plan.enabledFeatureKeys.length > 0 && (
+                                <div className="mb-2">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    isPopular 
+                                      ? 'bg-white/20 text-white' 
+                                      : 'bg-primary-500/20 text-primary-300'
+                                  }`}>
+                                    {plan.enabledFeatureKeys.length} Features Included
+                                  </span>
+                                </div>
+                              )}
+                              
                               <div className="space-y-1">
                                 <div className={`text-3xl font-bold ${isPopular ? 'text-white' : 'text-primary-400'}`}>
-                                  {plan.currency} {plan.price.toLocaleString()}
-                                  {plan.price > 0 && <span className="text-lg">/{plan.billingCycle}</span>}
+                                  {plan.price === 0 ? (
+                                    <span>Free</span>
+                                  ) : (
+                                    <>
+                                      {plan.currency} {plan.price.toLocaleString()}
+                                      {plan.price > 0 && <span className="text-lg">/{plan.billingCycle}</span>}
+                                    </>
+                                  )}
                                 </div>
-                                <div className="text-xs text-gray-400">
-                                  *Per Branch
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                  + Installation & Training Fees
-                                </div>
+                                {plan.trialPeriod && plan.trialPeriod > 0 && (
+                                  <div className={`text-sm font-semibold ${
+                                    isPopular ? 'text-yellow-300' : 'text-primary-400'
+                                  }`}>
+                                    {plan.trialPeriod === 168 
+                                      ? '✓ 7 Days Free Trial' 
+                                      : `${Math.round(plan.trialPeriod / 24)} Days Free Trial`}
+                                  </div>
+                                )}
+                                {plan.price > 0 && (
+                                  <>
+                                    <div className="text-xs text-gray-400">
+                                      *Per Branch
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                      + Installation & Training Fees
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </div>
 

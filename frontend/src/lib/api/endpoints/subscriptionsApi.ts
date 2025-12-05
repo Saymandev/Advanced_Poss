@@ -8,7 +8,7 @@ export interface SubscriptionPlan {
   price: number;
   currency: string;
   billingCycle: 'monthly' | 'yearly';
-  trialPeriod: number; // Trial period in hours
+  trialPeriod: number; // Trial period in hours (e.g., 168 = 7 days)
   stripePriceId?: string;
   features: {
     pos: boolean;
@@ -20,6 +20,7 @@ export interface SubscriptionPlan {
     maxUsers: number;
     maxBranches: number;
   };
+  enabledFeatureKeys?: string[]; // Array of enabled feature keys (new flexible format)
   limits?: {
     maxBranches: number;
     maxUsers: number;
@@ -33,6 +34,14 @@ export interface SubscriptionPlan {
   featureList?: string[]; // Admin-manageable feature descriptions
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AvailableFeaturesResponse {
+  success: boolean;
+  data: {
+    featuresByCategory: Record<string, Array<{ key: string; name: string }>>;
+    allFeatureKeys: string[];
+  };
 }
 
 export interface Subscription {
@@ -97,8 +106,13 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Subscription'],
       transformResponse: (response: any) => {
-        const normalize = (plans: SubscriptionPlan[]) =>
-          plans.map((plan) => ({
+        console.log('getSubscriptionPlans transformResponse - Raw response:', response);
+        console.log('getSubscriptionPlans transformResponse - Response type:', typeof response);
+        console.log('getSubscriptionPlans transformResponse - Is array?', Array.isArray(response));
+        
+        const normalize = (plans: SubscriptionPlan[]) => {
+          console.log(`Normalizing ${plans.length} plans`);
+          return plans.map((plan) => ({
             ...plan,
             featureList:
               plan.featureList && plan.featureList.length > 0
@@ -112,37 +126,50 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
                     plan.features?.accounting ? 'Accounting & Reports' : null,
                   ].filter(Boolean) as string[],
           }));
+        };
 
         // Handle { success: true, data: [...] } format (from backend interceptor)
         if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
+          console.log('Handling { success, data } format');
           const data = response.data;
           if (Array.isArray(data)) {
-            return normalize(data);
+            const normalized = normalize(data);
+            console.log(`Returning ${normalized.length} normalized plans from success.data array`);
+            return normalized;
           }
           // If data is an object with plans property
           if (data && typeof data === 'object' && 'plans' in data) {
-            return {
+            const normalized = {
               ...data,
               plans: normalize(data.plans || []),
             };
+            console.log(`Returning ${normalized.plans.length} normalized plans from success.data.plans`);
+            return normalized;
           }
         }
 
         // Handle direct array format
         if (Array.isArray(response)) {
-          return normalize(response);
+          console.log('Handling direct array format');
+          const normalized = normalize(response);
+          console.log(`Returning ${normalized.length} normalized plans from direct array`);
+          return normalized;
         }
 
         // Handle { plans: [...] } format
         if (response && typeof response === 'object' && 'plans' in response) {
-          return {
+          console.log('Handling { plans } format');
+          const normalized = {
             ...response,
             plans: normalize(response.plans || []),
           };
+          console.log(`Returning ${normalized.plans.length} normalized plans from plans property`);
+          return normalized;
         }
 
         // Fallback: return empty array
         console.warn('Subscription plans response format not recognized:', response);
+        console.warn('Response keys:', response && typeof response === 'object' ? Object.keys(response) : 'N/A');
         return [];
       },
     }),
@@ -162,6 +189,14 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        // Handle { success: true, data: {...} } format (from backend interceptor)
+        if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
+          return response.data;
+        }
+        // Handle direct plan object
+        return response;
+      },
       invalidatesTags: ['Subscription'],
     }),
     // Super Admin: delete a subscription plan
@@ -206,7 +241,8 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
     }),
     createSubscription: builder.mutation<Subscription, { 
       companyId: string;
-      plan: string; // SubscriptionPlan enum value (e.g., 'basic', 'premium', 'enterprise') - REQUIRED
+      plan?: string; // SubscriptionPlan enum value (e.g., 'basic', 'premium', 'enterprise') - Optional if enabledFeatures provided
+      enabledFeatures?: string[]; // Array of feature keys for feature-based subscription
       billingCycle: string; // BillingCycle enum value (e.g., 'monthly', 'yearly') - REQUIRED
       email: string; // REQUIRED
       companyName: string; // REQUIRED
@@ -292,6 +328,135 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Subscription'],
     }),
+    // Get all available features for plan customization (Super Admin)
+    getAvailableFeatures: builder.query<AvailableFeaturesResponse, void>({
+      query: () => ({
+        url: '/subscription-plans/available-features',
+      }),
+      providesTags: ['Subscription'],
+    }),
+    // Get plan with normalized features
+    getPlanWithFeatures: builder.query<SubscriptionPlan, string>({
+      query: (id) => ({
+        url: `/subscription-plans/${id}/features`,
+      }),
+      providesTags: ['Subscription'],
+    }),
+    // Migrate legacy plan to new enabledFeatureKeys format (Super Admin)
+    migratePlanFeatures: builder.mutation<SubscriptionPlan, string>({
+      query: (id) => ({
+        url: `/subscription-plans/${id}/migrate-features`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    // Get subscription features catalog (for feature-based subscriptions)
+    getSubscriptionFeatures: builder.query<
+      {
+        id: string;
+        key: string;
+        name: string;
+        description?: string;
+        category: string;
+        basePriceMonthly: number;
+        basePriceYearly: number;
+        perBranchPriceMonthly?: number;
+        perUserPriceMonthly?: number;
+        isActive: boolean;
+        isRequired?: boolean;
+      }[],
+      void
+    >({
+      query: () => ({
+        url: '/subscription-features',
+      }),
+      providesTags: ['Subscription'],
+      transformResponse: (response: any) => {
+        console.log('getSubscriptionFeatures transformResponse - Raw response:', response);
+        
+        // Handle { success: true, data: [...] } format (from backend interceptor)
+        if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
+          const data = response.data;
+          if (Array.isArray(data)) {
+            console.log(`Returning ${data.length} features from success.data`);
+            return data;
+          }
+        }
+
+        // Handle direct array format
+        if (Array.isArray(response)) {
+          console.log(`Returning ${response.length} features from direct array`);
+          return response;
+        }
+
+        // Fallback: return empty array
+        console.warn('Subscription features response format not recognized:', response);
+        return [];
+      },
+    }),
+    // Calculate price for feature-based subscription
+    calculateFeaturePrice: builder.mutation<
+      {
+        basePrice: number;
+        branchPrice: number;
+        userPrice: number;
+        totalPrice: number;
+        features: any[];
+      },
+      {
+        featureKeys: string[];
+        billingCycle: 'monthly' | 'yearly';
+        branchCount?: number;
+        userCount?: number;
+      }
+    >({
+      query: (body) => ({
+        url: '/subscription-features/calculate-price',
+        method: 'POST',
+        body,
+      }),
+    }),
+    // Seed default features (Super Admin only)
+    seedSubscriptionFeatures: builder.mutation<
+      {
+        success: boolean;
+        message: string;
+        data: any[];
+      },
+      void
+    >({
+      query: () => ({
+        url: '/subscription-features/seed',
+        method: 'GET',
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    // Create subscription feature (Super Admin only)
+    createSubscriptionFeature: builder.mutation<any, any>({
+      query: (data) => ({
+        url: '/subscription-features',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    // Update subscription feature (Super Admin only)
+    updateSubscriptionFeature: builder.mutation<any, { id: string; data: any }>({
+      query: ({ id, data }) => ({
+        url: `/subscription-features/${id}`,
+        method: 'PUT',
+        body: data,
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    // Delete subscription feature (Super Admin only)
+    deleteSubscriptionFeature: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/subscription-features/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
   }),
 });
 
@@ -312,4 +477,13 @@ export const {
   useCreatePaymentMethodMutation,
   useGetPaymentMethodsQuery,
   useDeletePaymentMethodMutation,
+  useGetAvailableFeaturesQuery,
+  useGetPlanWithFeaturesQuery,
+  useMigratePlanFeaturesMutation,
+  useGetSubscriptionFeaturesQuery,
+  useCalculateFeaturePriceMutation,
+  useSeedSubscriptionFeaturesMutation,
+  useCreateSubscriptionFeatureMutation,
+  useUpdateSubscriptionFeatureMutation,
+  useDeleteSubscriptionFeatureMutation,
 } = subscriptionsApi;

@@ -1,12 +1,14 @@
 'use client';
 
+import { FeatureBasedSubscriptionSelector } from '@/components/subscriptions/FeatureBasedSubscriptionSelector';
+import { PlanFeatureSelector } from '@/components/subscriptions/PlanFeatureSelector';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
+import { useGetCompaniesQuery, useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
 import { useCreateCheckoutSessionMutation } from '@/lib/api/endpoints/paymentsApi';
 import {
   BillingHistory,
@@ -17,6 +19,7 @@ import {
   useGetAllSubscriptionsQuery,
   useGetBillingHistoryQuery,
   useGetCurrentSubscriptionQuery,
+  useGetPlanWithFeaturesQuery,
   useGetSubscriptionByCompanyQuery,
   useGetSubscriptionPlansQuery,
   useGetUsageStatsQuery,
@@ -43,33 +46,47 @@ export default function SubscriptionsPage() {
   const { user } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || '';
   const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'super_admin';
-  const { data: plansData, isLoading: isPlanLoading, error: plansError } = useGetSubscriptionPlansQuery({});
+  const { data: plansData, isLoading: isPlanLoading, error: plansError, refetch: refetchPlans } = useGetSubscriptionPlansQuery({});
   
   // Normalize plans data - transformResponse handles the normalization
   const plans = useMemo(() => {
-    if (!plansData) return [];
+    // Debug logging
+    console.log('Plans Query State:', { plansData, isPlanLoading, plansError });
+    
+    if (!plansData) {
+      console.log('No plansData available');
+      return [];
+    }
     
     // transformResponse returns normalized array or { plans: [...] }
     if (Array.isArray(plansData)) {
+      console.log(`Found ${plansData.length} plans (array format)`);
       return plansData;
     }
     
     // Handle { plans: [...] } format from transformResponse
     if (plansData && typeof plansData === 'object' && 'plans' in plansData) {
-      return Array.isArray((plansData as any).plans) ? (plansData as any).plans : [];
+      const plansArray = Array.isArray((plansData as any).plans) ? (plansData as any).plans : [];
+      console.log(`Found ${plansArray.length} plans (object with plans property)`);
+      return plansArray;
     }
     
+    // Log unexpected format for debugging
+    console.warn('Unexpected plans data format:', plansData);
+    
     return [];
-  }, [plansData]);
+  }, [plansData, isPlanLoading, plansError]);
   // Get company data to use as fallback for subscription info
-  const { data: companyData } = useGetCompanyByIdQuery(companyId, {
+  // CRITICAL: Company data is the source of truth after Stripe webhook updates
+  const { data: companyData, refetch: refetchCompany } = useGetCompanyByIdQuery(companyId, {
     skip: !companyId,
+    refetchOnMountOrArgChange: true, // Always refetch to get latest data
   });
 
   const { 
     data: currentSubscription, 
     isFetching: isSubscriptionLoading,
-    refetch: _refetchCurrentSubscription,
+    refetch: refetchCurrentSubscription,
   } = useGetCurrentSubscriptionQuery(
     { companyId },
     { 
@@ -84,7 +101,7 @@ export default function SubscriptionsPage() {
   // Always fetch this, even if currentSubscription exists, because currentSubscription might be stale
   const { 
     data: subscriptionByCompany, 
-    refetch: _refetchSubscriptionByCompany,
+    refetch: refetchSubscriptionByCompany,
   } = useGetSubscriptionByCompanyQuery(
     { companyId },
     { 
@@ -92,6 +109,43 @@ export default function SubscriptionsPage() {
       refetchOnMountOrArgChange: true, // Always refetch when component mounts or companyId changes
     },
   );
+
+  // Auto-refresh subscription data when returning from checkout or when URL has checkout parameter
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    const checkoutSuccess = urlParams.get('checkout') === 'success';
+    
+    if (sessionId || checkoutSuccess) {
+      console.log('🔄 Refreshing subscription data after checkout...');
+      
+      // CRITICAL: Refetch company data first (source of truth after webhook)
+      refetchCompany();
+      
+      // Then refetch subscription data
+      refetchCurrentSubscription();
+      refetchSubscriptionByCompany();
+      
+      // Clear the URL parameters after refetching
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+      
+      // Show success message
+      if (checkoutSuccess) {
+        toast.success('Subscription updated successfully! Refreshing data...');
+      }
+      
+      // Force another refetch after a short delay to ensure webhook has processed
+      setTimeout(() => {
+        console.log('🔄 Second refresh to ensure webhook data is loaded...');
+        refetchCompany();
+        refetchCurrentSubscription();
+        refetchSubscriptionByCompany();
+      }, 2000);
+    }
+  }, [refetchCurrentSubscription, refetchSubscriptionByCompany, refetchCompany]);
 
 
   // Extract subscription data - handle both wrapped { data: {...} } and direct {...} formats
@@ -158,6 +212,11 @@ export default function SubscriptionsPage() {
       currentPeriodEnd: companyData.subscriptionEndDate 
         ? new Date(companyData.subscriptionEndDate).toISOString()
         : (trialEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()),
+      nextBillingDate: (companyData as any).nextBillingDate 
+        ? new Date((companyData as any).nextBillingDate).toISOString()
+        : (companyData.subscriptionEndDate 
+            ? new Date(companyData.subscriptionEndDate).toISOString()
+            : (trialEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())),
       cancelAtPeriodEnd: false,
       trialEnd: trialEndDate,
       isTrial: isTrial,
@@ -169,6 +228,116 @@ export default function SubscriptionsPage() {
   // Use subscription from company if subscription record doesn't exist
   // Also ensure isTrial is correctly computed from actual subscription data
   let effectiveSubscription = actualSubscription || subscriptionFromCompany;
+  
+  // CRITICAL: Always prefer companyData for plan info (most up-to-date after Stripe webhook)
+  // This ensures we show the correct plan even if subscription record is stale
+  if (companyData && companyData.subscriptionPlan && plans.length > 0) {
+    const companyPlan = companyData.subscriptionPlan;
+    
+    // DEBUG: Log company data to see what plan it has
+    console.log('🔍 Company Data Check:', {
+      companyPlan,
+      companyStatus: companyData.subscriptionStatus,
+      companyNextBilling: (companyData as any).nextBillingDate,
+      companySubscriptionEnd: (companyData as any).subscriptionEndDate,
+      availablePlans: plans.map((p: any) => ({ name: p.name, displayName: p.displayName })),
+    });
+    
+    // Find the plan from company data
+    const plan = plans.find((p: any) => p.name === companyPlan);
+    
+    if (plan) {
+      // Check if subscription plan matches company plan
+      const subPlanKey = actualSubscription 
+        ? ((actualSubscription as any).planKey || (actualSubscription as any).plan?.name || (actualSubscription as any).plan)
+        : null;
+      
+      // Always use company plan (source of truth after Stripe webhook)
+      // Log the comparison
+      console.log('📊 Plan Comparison:', {
+        subscriptionPlan: subPlanKey,
+        companyPlan: companyPlan,
+        subscriptionId: actualSubscription?.id,
+        willUseCompanyPlan: true, // Always use company plan
+      });
+      
+      if (subPlanKey && subPlanKey !== companyPlan) {
+        console.log('⚠️ Plan mismatch detected - using company data:', {
+          subscriptionPlan: subPlanKey,
+          companyPlan: companyPlan,
+          subscriptionId: actualSubscription?.id,
+        });
+      }
+      
+      // Override subscription plan with company plan (always use company as source of truth)
+      // CRITICAL: Use company's nextBillingDate and subscriptionEndDate (updated by webhook)
+      const subscriptionPeriodEnd = (companyData as any).subscriptionEndDate 
+        ? new Date((companyData as any).subscriptionEndDate).toISOString()
+        : (actualSubscription as any)?.currentPeriodEnd;
+      
+      const subscriptionNextBilling = (companyData as any).nextBillingDate
+        ? new Date((companyData as any).nextBillingDate).toISOString()
+        : (actualSubscription as any)?.nextBillingDate;
+      
+      // CRITICAL: If nextBillingDate is in the past or equals trialEndDate, use currentPeriodEnd instead
+      // This fixes the issue where nextBillingDate is stuck at trial end date
+      let correctedNextBilling = subscriptionNextBilling;
+      if (subscriptionNextBilling && subscriptionPeriodEnd) {
+        const nextBillingDate = new Date(subscriptionNextBilling);
+        const trialEndDate = (actualSubscription as any)?.trialEndDate 
+          ? new Date((actualSubscription as any).trialEndDate)
+          : null;
+        const now = new Date();
+        
+        // If nextBillingDate is in the past, or equals trial end date, use currentPeriodEnd
+        const isPast = nextBillingDate < now;
+        const equalsTrialEnd = trialEndDate && Math.abs(nextBillingDate.getTime() - trialEndDate.getTime()) < 1000;
+        
+        if (isPast || equalsTrialEnd) {
+          console.log('⚠️ nextBillingDate is invalid - using currentPeriodEnd:', {
+            nextBillingDate: subscriptionNextBilling,
+            currentPeriodEnd: subscriptionPeriodEnd,
+            trialEndDate: trialEndDate?.toISOString(),
+            isPast,
+            equalsTrialEnd,
+          });
+          correctedNextBilling = subscriptionPeriodEnd;
+        }
+      }
+      
+      effectiveSubscription = {
+        ...(actualSubscription || {}),
+        plan: {
+          ...plan,
+          id: plan.id,
+        },
+        planKey: companyPlan,
+        price: plan.price,
+        // Preserve other subscription data, but prefer company dates
+        ...(actualSubscription ? {
+          status: (actualSubscription as any).status,
+          currentPeriodStart: (actualSubscription as any).currentPeriodStart,
+          currentPeriodEnd: subscriptionPeriodEnd || (actualSubscription as any).currentPeriodEnd,
+          nextBillingDate: correctedNextBilling || subscriptionPeriodEnd || (actualSubscription as any).nextBillingDate,
+          isTrial: (actualSubscription as any).isTrial,
+        } : {
+          // If no subscription record, use company data
+          status: companyData.subscriptionStatus || 'active',
+          currentPeriodEnd: subscriptionPeriodEnd,
+          nextBillingDate: correctedNextBilling || subscriptionPeriodEnd,
+          isTrial: false,
+        }),
+      };
+      
+      console.log('✅ Using company plan as source of truth:', {
+        companyPlan,
+        effectivePlan: effectiveSubscription.plan?.name,
+        effectivePrice: effectiveSubscription.price,
+        nextBillingDate: effectiveSubscription.nextBillingDate,
+        currentPeriodEnd: effectiveSubscription.currentPeriodEnd,
+      });
+    }
+  }
   
   // If we have actual subscription, ensure isTrial is correct based on status and trialEndDate
   if (actualSubscription) {
@@ -183,6 +352,8 @@ export default function SubscriptionsPage() {
       trialEndDate: sub.trialEndDate,
       trialEnd: sub.trialEnd,
       isTrialField: sub.isTrial,
+      planKey: sub.planKey || sub.plan?.name || sub.plan,
+      companyPlan: companyData?.subscriptionPlan,
       allKeys: Object.keys(sub),
     });
     
@@ -199,7 +370,7 @@ export default function SubscriptionsPage() {
     });
     
     effectiveSubscription = {
-      ...actualSubscription,
+      ...effectiveSubscription,
       isTrial: computedIsTrial,
       status: subscriptionStatus,
     };
@@ -229,7 +400,7 @@ export default function SubscriptionsPage() {
     { skip: !companyId },
   );
   
-  const [_createSubscription] = useCreateSubscriptionMutation();
+  const [createSubscription, { isLoading: isCreatingFeatureSubscription }] = useCreateSubscriptionMutation();
   const [_updateSubscription] = useUpdateSubscriptionMutation();
   const [cancelSubscription, { isLoading: isCancelling }] = useCancelSubscriptionMutation();
   const [reactivateSubscription, { isLoading: isReactivating }] = useReactivateSubscriptionMutation();
@@ -238,6 +409,25 @@ export default function SubscriptionsPage() {
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  
+  // View mode: 'plans' or 'features'
+  const [viewMode, setViewMode] = useState<'plans' | 'features'>('plans');
+  
+  // Feature-based subscription state
+  const [selectedSubscriptionFeatures, setSelectedSubscriptionFeatures] = useState<string[]>([]);
+  const [featureBillingCycle, setFeatureBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [featureSubscriptionPrice, setFeatureSubscriptionPrice] = useState<number>(0);
+  const [isFeatureSubscriptionModalOpen, setIsFeatureSubscriptionModalOpen] = useState(false);
+  
+  // Super Admin: selected company for feature-based subscription
+  const [selectedCompanyForSubscription, setSelectedCompanyForSubscription] = useState<string>('');
+  const { data: companiesData } = useGetCompaniesQuery({}, { skip: !isSuperAdmin });
+  
+  const companies = useMemo(() => {
+    if (!companiesData) return [];
+    if (Array.isArray(companiesData)) return companiesData;
+    return companiesData.companies || [];
+  }, [companiesData]);
   
   // Real-time trial countdown
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -328,6 +518,74 @@ export default function SubscriptionsPage() {
       console.error('Checkout creation error:', error);
       toast.dismiss('checkout-loading');
       toast.error(error?.data?.message || error?.message || 'Failed to create payment session. Please try again.');
+    }
+  };
+
+  const handleCreateFeatureSubscription = async () => {
+    if (!selectedSubscriptionFeatures || selectedSubscriptionFeatures.length === 0) {
+      toast.error('Please select at least one feature');
+      return;
+    }
+
+    let targetCompanyId: string;
+    let targetCompanyEmail: string;
+    let targetCompanyName: string;
+
+    if (isSuperAdmin) {
+      // Super Admin: Use selected company
+      if (!selectedCompanyForSubscription) {
+        toast.error('Please select a company');
+        return;
+      }
+      
+      const selectedCompany = companies.find((c: any) => String(c._id || c.id) === String(selectedCompanyForSubscription));
+      if (!selectedCompany) {
+        toast.error('Selected company not found');
+        return;
+      }
+      
+      targetCompanyId = (selectedCompany as any)._id || selectedCompany.id;
+      targetCompanyEmail = selectedCompany.email || '';
+      targetCompanyName = selectedCompany.name || '';
+    } else {
+      // Regular user: Use their own company
+      if (!companyId || !companyData) {
+        toast.error('Company information not found');
+        return;
+      }
+      
+      targetCompanyId = companyId;
+      targetCompanyEmail = user?.email || companyData.email || '';
+      targetCompanyName = companyData.name || '';
+    }
+
+    try {
+      await createSubscription({
+        companyId: targetCompanyId,
+        enabledFeatures: selectedSubscriptionFeatures,
+        billingCycle: featureBillingCycle,
+        email: targetCompanyEmail,
+        companyName: targetCompanyName,
+      }).unwrap();
+
+      toast.success('Feature-based subscription created successfully!');
+      setIsFeatureSubscriptionModalOpen(false);
+      setSelectedSubscriptionFeatures([]);
+      setSelectedCompanyForSubscription('');
+      setFeatureBillingCycle('monthly');
+      
+      if (!isSuperAdmin) {
+        setViewMode('plans');
+      }
+      
+      // Refetch subscription data
+      if (!isSuperAdmin) {
+        refetchCurrentSubscription();
+        refetchSubscriptionByCompany();
+      }
+    } catch (error: any) {
+      console.error('Feature subscription creation error:', error);
+      toast.error(error?.data?.message || error?.message || 'Failed to create subscription. Please try again.');
     }
   };
 
@@ -437,10 +695,31 @@ export default function SubscriptionsPage() {
   );
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'basic' | 'features'>('basic');
 
   const [createPlan, { isLoading: isCreatingPlan }] = useCreateSubscriptionPlanMutation();
   const [updatePlan, { isLoading: isUpdatingPlan }] = useUpdateSubscriptionPlanMutation();
   const [deletePlan, { isLoading: isDeletingPlan }] = useDeleteSubscriptionPlanMutation();
+
+  // Fetch plan with features when editing
+  const { data: planWithFeatures } = useGetPlanWithFeaturesQuery(editingPlan?.id || '', {
+    skip: !editingPlan?.id || !isPlanModalOpen,
+  });
+
+  // Load features when editing plan
+  useEffect(() => {
+    if (editingPlan && isPlanModalOpen) {
+      // Prefer enabledFeatureKeys, fallback to planWithFeatures
+      const features = editingPlan.enabledFeatureKeys || planWithFeatures?.enabledFeatureKeys || [];
+      setSelectedFeatures(features);
+      setActiveTab('basic'); // Reset to basic tab
+    } else if (!editingPlan) {
+      // Reset when creating new plan
+      setSelectedFeatures([]);
+      setActiveTab('basic');
+    }
+  }, [editingPlan, isPlanModalOpen, planWithFeatures]);
   
   // Flatten subscription data for table/export (avoid nested objects as cell values)
   const flattenedSubscriptions = useMemo(() => {
@@ -497,9 +776,21 @@ export default function SubscriptionsPage() {
         companyEmail = companyId;
       }
       
+      // Check if company data is populated (can be in companyId or company field)
+      const companyData = (sub.companyId && typeof sub.companyId === 'object' && sub.companyId.name)
+        ? sub.companyId
+        : (sub.company && typeof sub.company === 'object' && sub.company.name)
+        ? sub.company
+        : null;
+      
       // Safely extract plan key
+      // CRITICAL: Use company's subscriptionPlan as source of truth (updated by Stripe webhook)
       let planKey = 'N/A';
-      if (sub.planKey) {
+      
+      // First, check company data (source of truth after Stripe webhook)
+      if (companyData && companyData.subscriptionPlan) {
+        planKey = String(companyData.subscriptionPlan);
+      } else if (sub.planKey) {
         planKey = String(sub.planKey);
       } else if (sub.plan) {
         if (typeof sub.plan === 'object' && sub.plan !== null) {
@@ -509,6 +800,56 @@ export default function SubscriptionsPage() {
         }
       }
       
+      // Determine correct status: check if subscription has active status or if company status is active
+      // If company status is 'active', subscription should show as 'active', not 'trial'
+      let displayStatus = String(sub.status || '');
+      
+      // Extract company subscription data if populated
+      let companyNextBilling: string | undefined;
+      let companySubscriptionEnd: string | undefined;
+      let companyStatus: string | undefined;
+      
+      if (companyData) {
+        companyStatus = companyData.subscriptionStatus;
+        // If company status is 'active', override subscription status to 'active'
+        if (companyStatus === 'active' && displayStatus === 'trial') {
+          displayStatus = 'active';
+        }
+        
+        // CRITICAL: Use company data for dates (source of truth after Stripe webhook)
+        companyNextBilling = companyData.nextBillingDate;
+        companySubscriptionEnd = companyData.subscriptionEndDate;
+      }
+      
+      // Calculate correct expiration date
+      // Priority: company nextBillingDate > company subscriptionEndDate > subscription currentPeriodEnd > subscription nextBillingDate
+      let expirationDate: string | undefined;
+      
+      // First, try company data (most up-to-date after webhook)
+      if (companyNextBilling) {
+        expirationDate = companyNextBilling;
+      } else if (companySubscriptionEnd) {
+        expirationDate = companySubscriptionEnd;
+      } else if (sub.currentPeriodEnd) {
+        expirationDate = sub.currentPeriodEnd;
+      } else if (sub.nextBillingDate) {
+        // Only use subscription nextBillingDate if it's valid (not trial end date)
+        const nextBillingDate = new Date(sub.nextBillingDate);
+        const trialEndDate = sub.trialEndDate ? new Date(sub.trialEndDate) : null;
+        const now = new Date();
+        
+        // If nextBillingDate is in the past or equals trial end date, it's invalid
+        const isPast = nextBillingDate < now;
+        const equalsTrialEnd = trialEndDate && Math.abs(nextBillingDate.getTime() - trialEndDate.getTime()) < 1000;
+        
+        if (!isPast && !equalsTrialEnd) {
+          expirationDate = sub.nextBillingDate;
+        }
+      }
+      
+      // Fallback to currentPeriodEnd if we still don't have a valid date
+      const nextBilling = expirationDate || sub.currentPeriodEnd;
+      
       // Create a clean object with ONLY primitive string values
       const flattened: Record<string, string> = {
         id: String(sub.id || ''),
@@ -516,8 +857,8 @@ export default function SubscriptionsPage() {
         companyName: String(companyName),
         companyEmail: String(companyEmail),
         planKey: planKey,
-        status: String(sub.status || ''),
-        currentPeriodEnd: sub.currentPeriodEnd ? String(sub.currentPeriodEnd) : 'N/A',
+        status: displayStatus,
+        currentPeriodEnd: nextBilling ? String(nextBilling) : 'N/A',
       };
       
       // Final safety check: remove any object values that might have slipped through
@@ -581,11 +922,18 @@ export default function SubscriptionsPage() {
       {
         key: 'planKey',
         title: 'Plan',
-        render: (value: string, row: any) => (
-          <span className="capitalize">
-            {row.planKey || value || 'N/A'}
-          </span>
-        ),
+        render: (value: string, row: any) => {
+          // Get plan display name from plans list if available
+          const planName = row.planKey || value || 'N/A';
+          const plan = plans.find((p: any) => p.name === planName);
+          const displayName = plan?.displayName || planName;
+          
+          return (
+            <span className="capitalize font-semibold">
+              {displayName !== 'N/A' ? displayName.toUpperCase() : 'N/A'}
+            </span>
+          );
+        },
       },
       {
         key: 'status',
@@ -610,12 +958,24 @@ export default function SubscriptionsPage() {
         title: 'Plan',
         render: (value: string, row: any) => (
           <div>
-            <p className="font-semibold text-gray-900 dark:text-white">
-              {value || row.name}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-gray-900 dark:text-white">
+                {value || row.name}
+              </p>
+              {row.enabledFeatureKeys && row.enabledFeatureKeys.length > 0 && (
+                <Badge variant="info" className="text-xs">
+                  {row.enabledFeatureKeys.length} feature{row.enabledFeatureKeys.length !== 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
             <p className="text-xs text-gray-500">
               {row.description || 'No description'}
             </p>
+            {row.trialPeriod && row.trialPeriod > 0 && (
+              <p className="text-xs text-primary-600 dark:text-primary-400 mt-1">
+                {row.trialPeriod === 168 ? '7 days free trial' : `${Math.round(row.trialPeriod / 24)} days free trial`}
+              </p>
+            )}
           </div>
         ),
       },
@@ -650,7 +1010,7 @@ export default function SubscriptionsPage() {
                 setIsPlanModalOpen(true);
               }}
             >
-              Edit
+              Edit Plan
             </Button>
             <Button
               size="sm"
@@ -677,27 +1037,44 @@ export default function SubscriptionsPage() {
     const handleSavePlan = async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
+      
+      // Base payload - different for create vs update
+      // Note: Currency is handled globally in Settings, not per plan
       const payload: any = {
-        name: (formData.get('name') as string)?.trim(),
         displayName: (formData.get('displayName') as string)?.trim(),
         description: (formData.get('description') as string)?.trim(),
         price: Number(formData.get('price') || 0),
-        currency: (formData.get('currency') as string) || 'BDT',
         billingCycle: (formData.get('billingCycle') as string) || 'monthly',
         trialPeriod: Number(formData.get('trialPeriod') || 0),
         isActive: formData.get('isActive') === 'on',
       };
 
+      // Include name only for creation (not for updates - name is immutable)
+      if (!editingPlan?.id) {
+        payload.name = (formData.get('name') as string)?.trim();
+      }
+
+      // Include enabledFeatureKeys if features are selected
+      if (selectedFeatures.length > 0) {
+        payload.enabledFeatureKeys = selectedFeatures;
+      }
+
       try {
         if (editingPlan?.id) {
           await updatePlan({ id: editingPlan.id, data: payload }).unwrap();
-          toast.success('Plan updated');
+          toast.success('Plan updated successfully');
+          // Manually refetch plans to ensure UI updates
+          await refetchPlans();
         } else {
           await createPlan(payload).unwrap();
-          toast.success('Plan created');
+          toast.success('Plan created successfully');
+          // Manually refetch plans to ensure UI updates
+          await refetchPlans();
         }
         setIsPlanModalOpen(false);
         setEditingPlan(null);
+        setSelectedFeatures([]);
+        setActiveTab('basic');
       } catch (err: any) {
         toast.error(err?.data?.message || 'Failed to save plan');
       }
@@ -721,8 +1098,18 @@ export default function SubscriptionsPage() {
 
         {/* System-wide subscriptions */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>All Company Subscriptions</CardTitle>
+            <Button
+              variant="primary"
+              onClick={() => {
+                console.log('Create Feature-Based Subscription button clicked');
+                setIsFeatureSubscriptionModalOpen(true);
+                console.log('Modal state should be set to true');
+              }}
+            >
+              Create Feature-Based Subscription
+            </Button>
           </CardHeader>
           <CardContent>
             <DataTable
@@ -756,6 +1143,13 @@ export default function SubscriptionsPage() {
             </Button>
           </CardHeader>
           <CardContent>
+            {plansError && (
+              <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  Error loading plans: {plansError && 'message' in plansError ? plansError.message : 'Unknown error'}
+                </p>
+              </div>
+            )}
             <DataTable
               data={plans}
               columns={planColumns}
@@ -773,48 +1167,86 @@ export default function SubscriptionsPage() {
           onClose={() => {
             setIsPlanModalOpen(false);
             setEditingPlan(null);
+            setSelectedFeatures([]);
+            setActiveTab('basic');
           }}
           title={editingPlan ? 'Edit Subscription Plan' : 'Create Subscription Plan'}
-          className="max-w-lg"
+          className="max-w-4xl"
         >
+          {/* Tabs */}
+          <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+            <nav className="flex space-x-8">
+              <button
+                type="button"
+                onClick={() => setActiveTab('basic')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'basic'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Basic Information
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('features')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'features'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Features ({selectedFeatures.length})
+              </button>
+            </nav>
+          </div>
+
           <form onSubmit={handleSavePlan} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Internal Name
-                </label>
-                <Input
-                  name="name"
-                  defaultValue={editingPlan?.name || ''}
-                  placeholder="basic, premium, enterprise"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Display Name
-                </label>
-                <Input
-                  name="displayName"
-                  defaultValue={editingPlan?.displayName || ''}
-                  placeholder="Basic, Premium, Enterprise"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Description
-                </label>
-                <Input
-                  name="description"
-                  defaultValue={editingPlan?.description || ''}
-                  placeholder="Short description of the plan"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            {activeTab === 'basic' && (
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Internal Name
+                    {editingPlan?.id && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(Cannot be changed)</span>
+                    )}
+                  </label>
+                  <Input
+                    name="name"
+                    defaultValue={editingPlan?.name || ''}
+                    placeholder="basic, premium, enterprise"
+                    required
+                    disabled={!!editingPlan?.id}
+                    className={editingPlan?.id ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : ''}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Display Name
+                  </label>
+                  <Input
+                    name="displayName"
+                    defaultValue={editingPlan?.displayName || ''}
+                    placeholder="Basic, Premium, Enterprise"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Description
+                  </label>
+                  <Input
+                    name="description"
+                    defaultValue={editingPlan?.description || ''}
+                    placeholder="Short description of the plan"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Price
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      (Currency is set globally in Settings)
+                    </span>
                   </label>
                   <Input
                     name="price"
@@ -825,65 +1257,80 @@ export default function SubscriptionsPage() {
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Currency
-                  </label>
-                  <Input
-                    name="currency"
-                    defaultValue={editingPlan?.currency || 'BDT'}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Billing Cycle
+                    </label>
+                    <Input
+                      name="billingCycle"
+                      defaultValue={editingPlan?.billingCycle || 'monthly'}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Trial Period (hours)
+                    </label>
+                    <Input
+                      name="trialPeriod"
+                      type="number"
+                      min={0}
+                      defaultValue={editingPlan?.trialPeriod ?? 0}
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      168 hours = 7 days (for free trial)
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="isActive"
+                    name="isActive"
+                    type="checkbox"
+                    defaultChecked={editingPlan ? editingPlan.isActive : true}
+                    className="h-4 w-4 text-primary-600 border-gray-300 rounded"
                   />
+                  <label
+                    htmlFor="isActive"
+                    className="text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    Active
+                  </label>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Billing Cycle
-                  </label>
-                  <Input
-                    name="billingCycle"
-                    defaultValue={editingPlan?.billingCycle || 'monthly'}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Trial Period (hours)
-                  </label>
-                  <Input
-                    name="trialPeriod"
-                    type="number"
-                    min={0}
-                    defaultValue={editingPlan?.trialPeriod ?? 0}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="isActive"
-                  name="isActive"
-                  type="checkbox"
-                  defaultChecked={editingPlan ? editingPlan.isActive : true}
-                  className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+            )}
+
+            {activeTab === 'features' && (
+              <div>
+                <PlanFeatureSelector
+                  selectedFeatures={selectedFeatures}
+                  onChange={setSelectedFeatures}
                 />
-                <label
-                  htmlFor="isActive"
-                  className="text-sm text-gray-700 dark:text-gray-300"
-                >
-                  Active
-                </label>
               </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-4">
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => {
                   setIsPlanModalOpen(false);
                   setEditingPlan(null);
+                  setSelectedFeatures([]);
+                  setActiveTab('basic');
                 }}
               >
                 Cancel
               </Button>
+              {activeTab === 'features' && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setActiveTab('basic')}
+                >
+                  Back to Basic Info
+                </Button>
+              )}
               <Button
                 type="submit"
                 variant="primary"
@@ -893,6 +1340,79 @@ export default function SubscriptionsPage() {
               </Button>
             </div>
           </form>
+        </Modal>
+
+        {/* Feature-Based Subscription Creation Modal - Super Admin */}
+        <Modal
+          isOpen={isFeatureSubscriptionModalOpen}
+          onClose={() => {
+            setIsFeatureSubscriptionModalOpen(false);
+            setSelectedSubscriptionFeatures([]);
+            setSelectedCompanyForSubscription('');
+            setFeatureBillingCycle('monthly');
+          }}
+          title="Create Feature-Based Subscription"
+          size="xl"
+        >
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Company
+              </label>
+              <select
+                value={selectedCompanyForSubscription}
+                onChange={(e) => setSelectedCompanyForSubscription(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                required
+              >
+                <option value="">-- Select a company --</option>
+                {companies.map((company: any) => (
+                  <option key={company._id || company.id} value={company._id || company.id}>
+                    {company.name} ({company.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedCompanyForSubscription && (
+              <>
+                <FeatureBasedSubscriptionSelector
+                  selectedFeatures={selectedSubscriptionFeatures}
+                  onChange={setSelectedSubscriptionFeatures}
+                  billingCycle={featureBillingCycle}
+                  onBillingCycleChange={setFeatureBillingCycle}
+                  onPriceCalculated={setFeatureSubscriptionPrice}
+                />
+              </>
+            )}
+
+            {selectedSubscriptionFeatures.length > 0 && selectedCompanyForSubscription && (
+              <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setIsFeatureSubscriptionModalOpen(false);
+                    setSelectedSubscriptionFeatures([]);
+                    setSelectedCompanyForSubscription('');
+                    setFeatureBillingCycle('monthly');
+                  }}
+                  className="flex-1"
+                  disabled={isCreatingFeatureSubscription}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateFeatureSubscription}
+                  isLoading={isCreatingFeatureSubscription}
+                  className="flex-1"
+                  variant="primary"
+                  disabled={!selectedCompanyForSubscription || selectedSubscriptionFeatures.length === 0}
+                >
+                  {isCreatingFeatureSubscription ? 'Creating...' : 'Create Subscription'}
+                </Button>
+              </div>
+            )}
+          </div>
         </Modal>
       </div>
     );
@@ -1081,7 +1601,27 @@ export default function SubscriptionsPage() {
               <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Next Billing</p>
                 <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-                  {formatDateTime(effectiveSubscription.currentPeriodEnd).split(',')[0]}
+                  {(() => {
+                    // Use nextBillingDate if valid, otherwise use currentPeriodEnd
+                    const nextBilling = (effectiveSubscription as any).nextBillingDate;
+                    const periodEnd = effectiveSubscription.currentPeriodEnd;
+                    
+                    // If nextBillingDate exists and is in the future, use it
+                    if (nextBilling) {
+                      const nextBillingDate = new Date(nextBilling);
+                      const now = new Date();
+                      if (nextBillingDate > now) {
+                        return formatDateTime(nextBilling).split(',')[0];
+                      }
+                    }
+                    
+                    // Otherwise use currentPeriodEnd
+                    if (periodEnd) {
+                      return formatDateTime(periodEnd).split(',')[0];
+                    }
+                    
+                    return 'N/A';
+                  })()}
                 </p>
               </div>
               <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -1220,8 +1760,79 @@ export default function SubscriptionsPage() {
         </Card>
       )}
 
+      {/* View Mode Toggle - Only for non-Super Admin users */}
+      {!isSuperAdmin && (
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Choose Your Subscription Type
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Select from fixed plans or build your own custom subscription
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={viewMode === 'plans' ? 'primary' : 'secondary'}
+                  onClick={() => setViewMode('plans')}
+                  className="min-w-[140px]"
+                >
+                  Fixed Plans
+                </Button>
+                <Button
+                  variant={viewMode === 'features' ? 'primary' : 'secondary'}
+                  onClick={() => setViewMode('features')}
+                  className="min-w-[140px]"
+                >
+                  Custom Features
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Feature-Based Subscription View */}
+      {!isSuperAdmin && viewMode === 'features' && (
+        <div id="custom-features" className="mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Build Your Custom Subscription</CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Select only the features you need and pay only for what you use
+              </p>
+            </CardHeader>
+            <CardContent>
+              <FeatureBasedSubscriptionSelector
+                selectedFeatures={selectedSubscriptionFeatures}
+                onChange={setSelectedSubscriptionFeatures}
+                billingCycle={featureBillingCycle}
+                onBillingCycleChange={setFeatureBillingCycle}
+                onPriceCalculated={setFeatureSubscriptionPrice}
+              />
+              
+              {selectedSubscriptionFeatures.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <Button
+                    variant="primary"
+                    onClick={() => setIsFeatureSubscriptionModalOpen(true)}
+                    className="w-full"
+                    size="lg"
+                  >
+                    Create Custom Subscription - {formatCurrency(featureSubscriptionPrice)}
+                    /{featureBillingCycle === 'monthly' ? 'month' : 'year'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Available Plans */}
-      <div id="available-plans">
+      <div id="available-plans" className={!isSuperAdmin && viewMode === 'features' ? 'hidden' : ''}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Available Plans</h2>
@@ -1828,6 +2439,160 @@ export default function SubscriptionsPage() {
                   Close
                 </Button>
               )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Feature-Based Subscription Creation Modal */}
+      <Modal
+        isOpen={isFeatureSubscriptionModalOpen}
+        onClose={() => {
+          setIsFeatureSubscriptionModalOpen(false);
+          setSelectedSubscriptionFeatures([]);
+          setSelectedCompanyForSubscription('');
+          setFeatureBillingCycle('monthly');
+        }}
+        title={isSuperAdmin ? "Create Feature-Based Subscription" : "Confirm Custom Subscription"}
+        size={isSuperAdmin ? "xl" : "lg"}
+      >
+        {isSuperAdmin ? (
+          // Super Admin: Full creation flow with company selection
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Company
+              </label>
+              <select
+                value={selectedCompanyForSubscription}
+                onChange={(e) => setSelectedCompanyForSubscription(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                required
+              >
+                <option value="">-- Select a company --</option>
+                {companies.map((company: any) => (
+                  <option key={company._id || company.id} value={company._id || company.id}>
+                    {company.name} ({company.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedCompanyForSubscription && (
+              <>
+                <FeatureBasedSubscriptionSelector
+                  selectedFeatures={selectedSubscriptionFeatures}
+                  onChange={setSelectedSubscriptionFeatures}
+                  billingCycle={featureBillingCycle}
+                  onBillingCycleChange={setFeatureBillingCycle}
+                  onPriceCalculated={setFeatureSubscriptionPrice}
+                />
+              </>
+            )}
+
+            {selectedSubscriptionFeatures.length > 0 && selectedCompanyForSubscription && (
+              <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setIsFeatureSubscriptionModalOpen(false);
+                    setSelectedSubscriptionFeatures([]);
+                    setSelectedCompanyForSubscription('');
+                    setFeatureBillingCycle('monthly');
+                  }}
+                  className="flex-1"
+                  disabled={isCreatingFeatureSubscription}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateFeatureSubscription}
+                  isLoading={isCreatingFeatureSubscription}
+                  className="flex-1"
+                  variant="primary"
+                  disabled={!selectedCompanyForSubscription || selectedSubscriptionFeatures.length === 0}
+                >
+                  {isCreatingFeatureSubscription ? 'Creating...' : 'Create Subscription'}
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          // Regular users: Confirmation modal
+          <div className="space-y-6">
+            <div>
+              <p className="text-gray-600 dark:text-gray-400 mb-2">
+                Are you sure you want to create a custom subscription with the selected features?
+              </p>
+            </div>
+
+            {/* Subscription Summary */}
+            <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border-2 border-primary-500">
+            <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Subscription Summary</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">Billing Cycle:</span>
+                <span className="font-medium text-gray-900 dark:text-white capitalize">
+                  {featureBillingCycle}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">Selected Features:</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {selectedSubscriptionFeatures.length}
+                </span>
+              </div>
+              <div className="flex justify-between text-lg font-bold border-t border-primary-200 dark:border-primary-700 pt-2 mt-2">
+                <span className="text-gray-900 dark:text-white">Total Price:</span>
+                <span className="text-primary-600 dark:text-primary-400">
+                  {formatCurrency(featureSubscriptionPrice)}/{featureBillingCycle === 'monthly' ? 'month' : 'year'}
+                </span>
+              </div>
+            </div>
+            </div>
+
+            {/* Selected Features List */}
+            {selectedSubscriptionFeatures.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-semibold text-gray-900 dark:text-white">Selected Features:</h4>
+                <div className="space-y-1 max-h-48 overflow-y-auto p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  {selectedSubscriptionFeatures.map((featureKey, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm">
+                      <CheckCircleIcon className="w-4 h-4 text-green-500 flex-shrink-0" />
+                      <span className="text-gray-700 dark:text-gray-300">{featureKey}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <CreditCardIcon className="w-4 h-4 inline mr-2" />
+                Your custom subscription will be created immediately with the selected features.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsFeatureSubscriptionModalOpen(false);
+                }}
+                className="flex-1"
+                disabled={isCreatingFeatureSubscription}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateFeatureSubscription}
+                isLoading={isCreatingFeatureSubscription}
+                className="flex-1"
+                variant="primary"
+                disabled={selectedSubscriptionFeatures.length === 0}
+              >
+                {isCreatingFeatureSubscription ? 'Creating...' : 'Create Subscription'}
+              </Button>
             </div>
           </div>
         )}

@@ -101,6 +101,7 @@ export interface SystemStats {
   activeCompanies: number;
   trialCompanies: number;
   expiredCompanies: number;
+  totalUsers: number;
   companiesByPlan: Record<string, number>;
 }
 

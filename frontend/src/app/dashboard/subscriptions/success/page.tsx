@@ -124,18 +124,16 @@ export default function PaymentSuccessPage() {
               apiSlice.util.resetApiState();
               apiSlice.util.invalidateTags(['Subscription', 'Company']);
               
-              // Navigate after a brief delay to ensure cache is cleared
+              // Navigate to subscriptions page to see updated plan
+              router.push('/dashboard/subscriptions');
+              // Force a hard refresh after navigation to ensure fresh data
               setTimeout(() => {
-                router.push('/dashboard');
-                // Force a hard refresh after navigation to ensure fresh data
-                setTimeout(() => {
-                  window.location.reload();
-                }, 1000);
-              }, 500);
+                window.location.reload();
+              }, 1000);
             }}
             className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 text-lg font-semibold"
           >
-            Go to Dashboard
+            View Subscription
           </Button>
 
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">

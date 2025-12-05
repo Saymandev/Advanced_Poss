@@ -28,17 +28,21 @@ let globalCurrency = 'BDT';
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const { user, companyContext, isAuthenticated } = useAppSelector((state) => state.auth);
   
+  // Super admin doesn't need company-specific settings - use default currency
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN';
+  
   const companyId = 
     companyContext?.companyId || 
     (user as any)?.companyId || 
     '';
 
   // Only fetch company settings if user is authenticated and has permission
-  // This endpoint requires OWNER/MANAGER/SUPER_ADMIN role - skip for waiters/employees
-  const isAuthorized = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'super_admin';
+  // Skip for super admin (they don't need company-specific currency)
+  // Skip for waiters/employees (they don't have permission)
+  const isAuthorized = user?.role === 'owner' || user?.role === 'manager';
   const { data: companySettings, isLoading } = useGetCompanySettingsQuery(
     companyId,
-    { skip: !companyId || !isAuthenticated || !isAuthorized }
+    { skip: !companyId || !isAuthenticated || !isAuthorized || isSuperAdmin }
   );
 
   const currency = companySettings?.currency || 'BDT'; // Default to BDT to match settings page
