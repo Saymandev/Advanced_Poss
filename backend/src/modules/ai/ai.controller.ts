@@ -9,14 +9,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Schema as MongooseSchema } from 'mongoose';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { AiService } from './ai.service';
 
 @Controller('ai')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
@@ -59,6 +62,7 @@ export class AiController {
 
   // Get personalized menu recommendations for a customer
   @Get('customer-recommendations/:customerId')
+  @RequiresFeature(FEATURES.AI_CUSTOMER_LOYALTY)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.OWNER,
@@ -131,6 +135,7 @@ export class AiController {
 
   // Get menu optimization suggestions
   @Get('menu-optimization')
+  @RequiresFeature(FEATURES.AI_MENU_OPTIMIZATION)
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getMenuOptimization(
     @Query('branchId') branchId?: string,
@@ -169,6 +174,7 @@ export class AiController {
 
   // Generate personalized offers for a customer
   @Post('personalized-offers')
+  @RequiresFeature(FEATURES.AI_CUSTOMER_LOYALTY)
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getPersonalizedOffers(
     @Body() body: { customerId: string; branchId: string },

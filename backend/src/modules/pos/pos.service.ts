@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { EmailService } from '../../common/services/email.service';
+import { SmsService } from '../../common/services/sms.service';
 import { CustomersService } from '../customers/customers.service';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { KitchenService } from '../kitchen/kitchen.service';
@@ -29,6 +31,8 @@ export class POSService {
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
     private websocketsGateway: WebsocketsGateway,
+    private emailService: EmailService,
+    private smsService: SmsService,
     @Inject(forwardRef(() => TablesService))
     private tablesService: TablesService,
     @Inject(forwardRef(() => KitchenService))
@@ -132,12 +136,65 @@ export class POSService {
       })
     );
 
+    // Process loyalty points redemption if customerId is provided
+    let loyaltyPointsRedeemed = 0;
+    let loyaltyDiscount = 0;
+    let customer = null;
+    let finalOrderTotal = createOrderDto.totalAmount;
+
+    if (createOrderDto.customerId && companyId) {
+      try {
+        customer = await this.customersService.findOne(createOrderDto.customerId);
+        
+        if (customer) {
+          const MIN_ORDER_AMOUNT = 1000; // Minimum order amount in TK
+          const POINTS_PER_DISCOUNT = 2000; // 2000 points = 20 TK discount
+          const DISCOUNT_AMOUNT = 20; // 20 TK discount per 2000 points
+
+          // Check if order meets minimum amount requirement
+          if (createOrderDto.totalAmount >= MIN_ORDER_AMOUNT) {
+            const availablePoints = customer.loyaltyPoints || 0;
+            
+            // Calculate how many discount blocks can be applied
+            const discountBlocks = Math.floor(availablePoints / POINTS_PER_DISCOUNT);
+            
+            if (discountBlocks > 0) {
+              // Apply maximum discount blocks (can be limited by order total)
+              const maxDiscount = discountBlocks * DISCOUNT_AMOUNT;
+              const orderSubtotal = createOrderDto.totalAmount;
+              
+              // Discount cannot exceed order total
+              loyaltyDiscount = Math.min(maxDiscount, orderSubtotal);
+              
+              // Calculate points to redeem (in full blocks of 2000)
+              const blocksToRedeem = Math.floor(loyaltyDiscount / DISCOUNT_AMOUNT);
+              loyaltyPointsRedeemed = blocksToRedeem * POINTS_PER_DISCOUNT;
+              
+              // Update order total with discount
+              finalOrderTotal = orderSubtotal - loyaltyDiscount;
+              
+              console.log(`💰 Loyalty redemption: ${loyaltyPointsRedeemed} points = ${loyaltyDiscount} TK discount`);
+            }
+          } else {
+            console.log(`⚠️ Order amount ${createOrderDto.totalAmount} is below minimum ${MIN_ORDER_AMOUNT} TK for loyalty redemption`);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing loyalty redemption:', error);
+        // Don't fail order creation if loyalty processing fails
+      }
+    }
+
     const baseOrderData: any = {
       ...createOrderDto,
       branchId: new Types.ObjectId(branchId),
       userId: new Types.ObjectId(userId),
       companyId: companyId ? new Types.ObjectId(companyId) : undefined,
       items: itemsWithNames,
+      customerId: createOrderDto.customerId ? new Types.ObjectId(createOrderDto.customerId) : undefined,
+      loyaltyPointsRedeemed,
+      loyaltyDiscount,
+      totalAmount: finalOrderTotal, // Use discounted amount if loyalty was applied
     };
 
     if (createOrderDto.tableId) {
@@ -379,36 +436,80 @@ export class POSService {
           console.error('Failed to create kitchen order:', kitchenError);
         }
 
-        // Update customer statistics if customer email is provided and order is paid
-        if (createOrderDto.customerInfo?.email && companyId && savedOrder.status === 'paid') {
-          try {
-            console.log(`📧 Attempting to update customer stats for email: ${createOrderDto.customerInfo.email}, companyId: ${companyId}, orderAmount: ${savedOrder.totalAmount}`);
-            const customer = await this.customersService.findByEmail(companyId, createOrderDto.customerInfo.email);
-            if (customer) {
-              const customerId = (customer as any)._id?.toString() || (customer as any).id?.toString();
-              if (customerId) {
-                console.log(`💰 Updating customer stats for customer ID: ${customerId}, amount: ${savedOrder.totalAmount}`);
-                await this.customersService.updateOrderStats(customerId, savedOrder.totalAmount);
-                console.log(`✅ Successfully updated customer stats for ${customer.email}: +${savedOrder.totalAmount}`);
-              } else {
-                console.error(`❌ Could not extract customer ID from customer object`);
-              }
-            } else {
-              console.warn(`⚠️ Customer not found for email: ${createOrderDto.customerInfo.email}`);
+        // Handle customer loyalty redemption and stats update if order is paid
+        if (savedOrder.status === 'paid') {
+          // If loyalty points were redeemed, deduct them from customer
+          if (loyaltyPointsRedeemed > 0 && customer) {
+            try {
+              await this.customersService.redeemLoyaltyPoints(customer._id.toString(), loyaltyPointsRedeemed);
+              console.log(`✅ Redeemed ${loyaltyPointsRedeemed} loyalty points from customer ${customer._id}`);
+            } catch (error) {
+              console.error('❌ Failed to redeem loyalty points:', error);
             }
-          } catch (customerError) {
-            // Log error but don't fail order creation
-            console.error('❌ Failed to update customer statistics:', customerError);
           }
-        } else {
-          if (!createOrderDto.customerInfo?.email) {
-            console.log('⚠️ No customer email provided in order');
+
+          // Update customer statistics
+          if (createOrderDto.customerId && companyId) {
+            try {
+              const customerForStats = customer || await this.customersService.findOne(createOrderDto.customerId);
+              if (customerForStats) {
+                await this.customersService.updateOrderStats(customerForStats._id.toString(), savedOrder.totalAmount);
+                console.log(`✅ Updated customer stats for customer ID: ${customerForStats._id}, amount: ${savedOrder.totalAmount}`);
+              }
+            } catch (customerError) {
+              console.error('❌ Failed to update customer statistics:', customerError);
+            }
+          } else if (createOrderDto.customerInfo?.email && companyId) {
+            try {
+              console.log(`📧 Attempting to update customer stats for email: ${createOrderDto.customerInfo.email}, companyId: ${companyId}, orderAmount: ${savedOrder.totalAmount}`);
+              const customerByEmail = await this.customersService.findByEmail(companyId, createOrderDto.customerInfo.email);
+              if (customerByEmail) {
+                const customerId = (customerByEmail as any)._id?.toString() || (customerByEmail as any).id?.toString();
+                if (customerId) {
+                  console.log(`💰 Updating customer stats for customer ID: ${customerId}, amount: ${savedOrder.totalAmount}`);
+                  await this.customersService.updateOrderStats(customerId, savedOrder.totalAmount);
+                  console.log(`✅ Successfully updated customer stats for ${customerByEmail.email}: +${savedOrder.totalAmount}`);
+                }
+              }
+            } catch (customerError) {
+              console.error('❌ Failed to update customer statistics:', customerError);
+            }
           }
-          if (!companyId) {
-            console.log('⚠️ No companyId provided');
-          }
-          if (savedOrder.status !== 'paid') {
-            console.log(`⚠️ Order status is "${savedOrder.status}", not "paid" - stats will be updated when payment is processed`);
+
+          // Send purchase confirmation notification
+          if (customer || createOrderDto.customerInfo) {
+            try {
+              const customerEmail = customer?.email || createOrderDto.customerInfo?.email;
+              const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : createOrderDto.customerInfo?.name || 'Customer';
+              const customerPhone = customer?.phone || createOrderDto.customerInfo?.phone;
+
+              if (customerEmail) {
+                const orderItems = savedOrder.items.map((item: any) => ({
+                  name: item.name || 'Unknown Item',
+                  quantity: item.quantity,
+                  price: item.price,
+                }));
+
+                await this.emailService.sendPurchaseConfirmation(
+                  customerEmail,
+                  customerName,
+                  savedOrder.orderNumber,
+                  savedOrder.totalAmount,
+                  orderItems,
+                  loyaltyPointsRedeemed || undefined,
+                  loyaltyDiscount || undefined,
+                );
+                console.log(`✅ Sent purchase confirmation email to ${customerEmail}`);
+              }
+
+              if (customerPhone) {
+                const smsMessage = `Thank you for your order! Order #${savedOrder.orderNumber} has been confirmed.${loyaltyPointsRedeemed > 0 ? ` You redeemed ${loyaltyPointsRedeemed} points for ${loyaltyDiscount} TK discount.` : ''} Total: ${savedOrder.totalAmount} TK.`;
+                await this.smsService.sendSms(customerPhone, smsMessage);
+                console.log(`✅ Sent purchase confirmation SMS to ${customerPhone}`);
+              }
+            } catch (notificationError) {
+              console.error('❌ Failed to send purchase notifications:', notificationError);
+            }
           }
         }
 
@@ -720,33 +821,77 @@ export class POSService {
     // Tables remain occupied even after payment because customers may still be using them.
     // Tables are only freed when staff explicitly releases them or orders are cancelled.
 
-    // Update customer statistics if customer email is provided
-    if (order.customerInfo?.email && companyId) {
+    // Handle customer loyalty redemption and stats update
+    let customer = null;
+    if (order.customerId && companyId) {
       try {
-        console.log(`📧 Processing payment - attempting to update customer stats for email: ${order.customerInfo.email}, companyId: ${companyId}, orderAmount: ${order.totalAmount}`);
-        const customer = await this.customersService.findByEmail(companyId, order.customerInfo.email);
-        if (customer) {
-          const customerId = (customer as any)._id?.toString() || (customer as any).id?.toString();
-          if (customerId) {
-            console.log(`💰 Updating customer stats for customer ID: ${customerId}, amount: ${order.totalAmount}`);
-            await this.customersService.updateOrderStats(customerId, order.totalAmount);
-            console.log(`✅ Successfully updated customer stats for ${customer.email}: +${order.totalAmount}`);
-          } else {
-            console.error(`❌ Could not extract customer ID from customer object`);
+        customer = await this.customersService.findOne(order.customerId.toString());
+      } catch (error) {
+        console.error('Error fetching customer by ID:', error);
+      }
+    } else if (order.customerInfo?.email && companyId) {
+      try {
+        customer = await this.customersService.findByEmail(companyId, order.customerInfo.email);
+      } catch (error) {
+        console.error('Error fetching customer by email:', error);
+      }
+    }
+
+    if (customer) {
+      try {
+        const customerId = (customer as any)._id?.toString() || (customer as any).id?.toString();
+        
+        // Redeem loyalty points if they were used
+        if (order.loyaltyPointsRedeemed && order.loyaltyPointsRedeemed > 0) {
+          try {
+            await this.customersService.redeemLoyaltyPoints(customerId, order.loyaltyPointsRedeemed);
+            console.log(`✅ Redeemed ${order.loyaltyPointsRedeemed} loyalty points from customer ${customerId}`);
+          } catch (error) {
+            console.error('❌ Failed to redeem loyalty points:', error);
           }
-        } else {
-          console.warn(`⚠️ Customer not found for email: ${order.customerInfo.email}`);
         }
+
+        // Update customer statistics
+        await this.customersService.updateOrderStats(customerId, order.totalAmount);
+        console.log(`✅ Updated customer stats for customer ID: ${customerId}, amount: ${order.totalAmount}`);
       } catch (customerError) {
-        // Log error but don't fail payment processing
         console.error('❌ Failed to update customer statistics:', customerError);
       }
-    } else {
-      if (!order.customerInfo?.email) {
-        console.log('⚠️ No customer email provided in order');
-      }
-      if (!companyId) {
-        console.log('⚠️ No companyId provided');
+    }
+
+    // Send purchase confirmation notification
+    if (customer || order.customerInfo) {
+      try {
+        const customerEmail = customer?.email || order.customerInfo?.email;
+        const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : order.customerInfo?.name || 'Customer';
+        const customerPhone = customer?.phone || order.customerInfo?.phone;
+
+        if (customerEmail) {
+          const orderItems = order.items.map((item: any) => ({
+            name: item.name || 'Unknown Item',
+            quantity: item.quantity,
+            price: item.price,
+          }));
+
+          await this.emailService.sendPurchaseConfirmation(
+            customerEmail,
+            customerName,
+            order.orderNumber,
+            order.totalAmount,
+            orderItems,
+            order.loyaltyPointsRedeemed || undefined,
+            order.loyaltyDiscount || undefined,
+          );
+          console.log(`✅ Sent purchase confirmation email to ${customerEmail}`);
+        }
+
+        if (customerPhone) {
+          const smsMessage = `Thank you for your order! Order #${order.orderNumber} has been confirmed.${order.loyaltyPointsRedeemed ? ` You redeemed ${order.loyaltyPointsRedeemed} points for ${order.loyaltyDiscount || 0} TK discount.` : ''} Total: ${order.totalAmount} TK.`;
+          await this.smsService.sendSms(customerPhone, smsMessage);
+          console.log(`✅ Sent purchase confirmation SMS to ${customerPhone}`);
+        }
+      } catch (notificationError) {
+        console.error('❌ Failed to send purchase notifications:', notificationError);
       }
     }
 

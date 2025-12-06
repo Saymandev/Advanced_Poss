@@ -12,6 +12,8 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AttendanceFilterDto } from '../../common/dto/pagination.dto';
@@ -19,13 +21,15 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { AttendanceService } from './attendance.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, RoleFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, RoleFeatureGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.ATTENDANCE)
 @Controller('attendance')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}

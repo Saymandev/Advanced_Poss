@@ -39,20 +39,29 @@ export class MarketingSchedulerService {
 
       this.logger.log(`Found ${campaignsToSend.length} scheduled campaign(s) to send`);
 
+      // Process campaigns sequentially to avoid overwhelming the email/SMS services
       for (const campaign of campaignsToSend) {
         try {
           const companyId = campaign.companyId.toString();
           this.logger.log(`Sending scheduled campaign: ${campaign.name} (${campaign._id})`);
           
-          await this.marketingService.send(campaign._id.toString(), companyId);
+          const result = await this.marketingService.send(campaign._id.toString(), companyId);
           
-          this.logger.log(`Successfully sent scheduled campaign: ${campaign.name}`);
+          this.logger.log(
+            `Successfully sent scheduled campaign: ${campaign.name} - ${result.sent} sent, ${result.failed} failed`,
+          );
+          
+          // Add a small delay between campaigns to avoid rate limiting
+          if (campaignsToSend.length > 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second delay
+          }
         } catch (error: any) {
           this.logger.error(
-            `Failed to send scheduled campaign ${campaign._id}:`,
+            `Failed to send scheduled campaign ${campaign._id} (${campaign.name}):`,
             error.message || error,
           );
           // Campaign status will be updated to 'paused' by the send method on error
+          // Continue with next campaign instead of stopping
         }
       }
     } catch (error: any) {

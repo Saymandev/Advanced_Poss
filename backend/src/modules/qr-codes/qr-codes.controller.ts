@@ -1,14 +1,18 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CreateQRCodeDto } from './dto/create-qr-code.dto';
 import { UpdateQRCodeDto } from './dto/update-qr-code.dto';
 import { QRCodesService } from './qr-codes.service';
 
 @ApiTags('QR Codes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.QR_MENUS)
 @Controller('qr-codes')
 export class QRCodesController {
   constructor(private readonly qrCodesService: QRCodesService) {}

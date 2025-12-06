@@ -1,27 +1,31 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CustomerFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @ApiTags('Customers')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
@@ -124,6 +128,20 @@ export class CustomersController {
     @Body('points') points: number,
   ) {
     return this.customersService.redeemLoyaltyPoints(id, points);
+  }
+
+  @Patch(':id/loyalty')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Update loyalty points (add or subtract)' })
+  updateLoyaltyPoints(
+    @Param('id') id: string,
+    @Body() body: { points: number; type: 'add' | 'subtract'; description?: string },
+  ) {
+    if (body.type === 'add') {
+      return this.customersService.addLoyaltyPoints(id, body.points);
+    } else {
+      return this.customersService.redeemLoyaltyPoints(id, body.points);
+    }
   }
 
   @Post(':id/vip')

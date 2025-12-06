@@ -1,6 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
+import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { CategoriesController } from './categories.controller';
 import { CategoriesService } from './categories.service';
 import { Category, CategorySchema } from './schemas/category.schema';
@@ -11,6 +13,8 @@ import { Category, CategorySchema } from './schemas/category.schema';
       { name: Category.name, schema: CategorySchema },
     ]),
     forwardRef(() => MenuItemsModule),
+    forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
+    forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
   ],
   controllers: [CategoriesController],
   providers: [CategoriesService],

@@ -6,6 +6,7 @@ import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { CompaniesModule } from '../companies/companies.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { User, UserSchema } from './schemas/user.schema';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -19,7 +20,8 @@ import { UsersService } from './users.service';
     forwardRef(() => CompaniesModule),
     forwardRef(() => BranchesModule),
     forwardRef(() => SettingsModule),
-    SubscriptionPlansModule,
+    forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard (circular dependency)
+    forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard (circular dependency)
   ],
   controllers: [UsersController],
   providers: [UsersService, CloudinaryService],

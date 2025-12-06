@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -11,17 +12,21 @@ import {
     Res,
     UseGuards,
 } from '@nestjs/common';
+import { FEATURES } from '../../common/constants/features.constants';
 import { Public } from '../../common/decorators/public.decorator';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { MarketingService } from './marketing.service';
 
 @Controller('marketing')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.MARKETING)
 export class MarketingController {
   constructor(private readonly marketingService: MarketingService) {}
 
@@ -36,7 +41,7 @@ export class MarketingController {
     const userId = req.user?.userId || req.user?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const campaign = await this.marketingService.create(
@@ -58,7 +63,7 @@ export class MarketingController {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const campaigns = await this.marketingService.findAll(companyId, branchId);
@@ -76,7 +81,7 @@ export class MarketingController {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const stats = await this.marketingService.getStats(companyId, branchId);
@@ -93,7 +98,7 @@ export class MarketingController {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const campaign = await this.marketingService.findOne(id, companyId);
@@ -115,7 +120,7 @@ export class MarketingController {
     const userId = req.user?.userId || req.user?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const campaign = await this.marketingService.update(
@@ -137,7 +142,7 @@ export class MarketingController {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     await this.marketingService.remove(id, companyId);
@@ -154,7 +159,7 @@ export class MarketingController {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const campaign = await this.marketingService.pause(id, companyId);
@@ -171,7 +176,7 @@ export class MarketingController {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const campaign = await this.marketingService.resume(id, companyId);
@@ -188,7 +193,7 @@ export class MarketingController {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const result = await this.marketingService.send(id, companyId);
@@ -240,7 +245,7 @@ export class MarketingController {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new BadRequestException('Company ID is required');
     }
 
     const analytics = await this.marketingService.getAnalytics(id, companyId);

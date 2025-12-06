@@ -40,12 +40,18 @@ export class RolePermissionsController {
     @CurrentUser('companyId') companyId: string,
     @CurrentUser('role') role: string,
   ) {
+    console.log(`[RolePermissionsController] my-permissions endpoint called - Company: ${companyId}, Role: ${role}`);
+    
     if (!companyId) {
+      console.error(`[RolePermissionsController] Company ID is missing`);
       throw new Error('Company ID is required');
     }
     if (!role) {
+      console.error(`[RolePermissionsController] User role is missing`);
       throw new Error('User role is required');
     }
+    
+    console.log(`[RolePermissionsController] Calling service with companyId: ${companyId}, role: ${role.toLowerCase()}`);
     return this.rolePermissionsService.getRolePermission(companyId, role.toLowerCase());
   }
 

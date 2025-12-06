@@ -327,10 +327,30 @@ export class PaymentsService {
       subscription.nextBillingDate = subscriptionEndDate;
       subscription.lastPaymentDate = now;
       subscription.failedPaymentAttempts = 0;
-      subscription.isActive = true;
-      subscription.stripeCustomerId = session.customer as string;
-      subscription.stripeSubscriptionId = session.subscription as string || undefined;
+      // CRITICAL: Extract ID from customer/subscription objects if they're expanded
+      const customerId = typeof session.customer === 'string' 
+        ? session.customer 
+        : (session.customer as any)?.id || session.customer;
+      const subscriptionId = typeof session.subscription === 'string'
+        ? (session.subscription || undefined)
+        : (session.subscription as any)?.id || undefined;
+      
+      console.log(`[Payments] 🔍 Extracting Stripe IDs: customerId='${customerId}', subscriptionId='${subscriptionId}'`);
+      
+      subscription.isActive = true; // CRITICAL: Ensure isActive is true for active subscriptions
+      subscription.stripeCustomerId = customerId;
+      subscription.stripeSubscriptionId = subscriptionId;
       subscription.stripePriceId = plan.stripePriceId || undefined;
+      
+      // CRITICAL: Populate enabledFeatures from plan's enabledFeatureKeys
+      if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
+        subscription.enabledFeatures = plan.enabledFeatureKeys;
+        console.log(`[Payments] ✅ Set ${subscription.enabledFeatures.length} enabled features from plan:`, subscription.enabledFeatures.slice(0, 10));
+      } else {
+        // Fallback: convert legacy features to keys
+        subscription.enabledFeatures = [];
+        console.log(`[Payments] ⚠️ Plan has no enabledFeatureKeys, leaving enabledFeatures empty`);
+      }
       
       // Build limits from plan (using same logic as SubscriptionsService)
       const maxBranches = plan.limits?.maxBranches ?? plan.features?.maxBranches ?? -1;
@@ -355,6 +375,7 @@ export class PaymentsService {
       } as any;
       
       await subscription.save();
+      console.log(`[Payments] ✅ Subscription updated: id=${subscription._id}, plan=${subscription.plan}, status=${subscription.status}, isActive=${subscription.isActive}, enabledFeatures=${subscription.enabledFeatures?.length || 0}`);
     } else {
       // Create new subscription record
       const maxBranches = plan.limits?.maxBranches ?? plan.features?.maxBranches ?? -1;
@@ -368,9 +389,17 @@ export class PaymentsService {
         billingCycle: (plan.billingCycle || 'monthly') as BillingCycle,
         price: plan.price,
         currency: plan.currency || 'BDT',
-        stripeCustomerId: session.customer as string,
-        stripeSubscriptionId: session.subscription as string || undefined,
+        stripeCustomerId: typeof session.customer === 'string' 
+          ? session.customer 
+          : (session.customer as any)?.id || session.customer,
+        stripeSubscriptionId: typeof session.subscription === 'string'
+          ? (session.subscription || undefined)
+          : (session.subscription as any)?.id || undefined,
         stripePriceId: plan.stripePriceId || undefined,
+        // CRITICAL: Populate enabledFeatures from plan's enabledFeatureKeys
+        enabledFeatures: plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0
+          ? plan.enabledFeatureKeys
+          : [],
         currentPeriodStart: now,
         currentPeriodEnd: subscriptionEndDate,
         nextBillingDate: subscriptionEndDate,
@@ -407,6 +436,7 @@ export class PaymentsService {
       });
       
       await subscription.save();
+      console.log(`[Payments] ✅ New subscription created: id=${subscription._id}, plan=${subscription.plan}, status=${subscription.status}, isActive=${subscription.isActive}, enabledFeatures=${subscription.enabledFeatures?.length || 0}`);
     }
 
     console.log(`✅ Subscription activated for company ${companyId} with plan ${planName}`);

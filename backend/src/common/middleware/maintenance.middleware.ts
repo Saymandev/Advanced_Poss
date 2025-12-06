@@ -15,13 +15,29 @@ export class MaintenanceMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
-    // Skip maintenance check for super admin routes
-    const superAdminRoutes = [
-      '/api/v1/auth/super-admin',
-      '/api/v1/settings/system',
-    ];
-
-    if (superAdminRoutes.some(route => req.path.startsWith(route))) {
+    // Get the request path and URL (could be with or without /api/v1 prefix depending on NestJS routing)
+    const requestPath = req.path;
+    const originalUrl = (req as any).originalUrl || req.url || '';
+    const fullUrl = originalUrl || requestPath;
+    const method = req.method;
+    
+    // Skip maintenance check for super admin login route (POST only)
+    // Check multiple possible path formats that NestJS might use
+    const isSuperAdminLogin = method === 'POST' && (
+      fullUrl.includes('/login/super-admin') || 
+      fullUrl.includes('/auth/login/super-admin') ||
+      requestPath.includes('/login/super-admin') ||
+      requestPath.includes('/auth/login/super-admin') ||
+      (fullUrl.includes('super-admin') && fullUrl.includes('login')) ||
+      (requestPath.includes('super-admin') && requestPath.includes('login'))
+    );
+    
+    // Check if it's a system settings endpoint (super admin only)
+    const isSystemSettings = fullUrl.includes('/settings/system') || 
+                             fullUrl.includes('/system-settings') ||
+                             requestPath.includes('/settings/system');
+    
+    if (isSuperAdminLogin || isSystemSettings) {
       return next();
     }
 

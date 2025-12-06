@@ -8,18 +8,22 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { EndWorkPeriodDto } from './dto/end-work-period.dto';
 import { StartWorkPeriodDto } from './dto/start-work-period.dto';
 import { WorkPeriodsService } from './work-periods.service';
 
 @ApiTags('Work Periods')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.WORK_PERIODS)
 @Controller('work-periods')
 export class WorkPeriodsController {
   constructor(private readonly workPeriodsService: WorkPeriodsService) {}

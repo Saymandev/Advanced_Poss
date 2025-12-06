@@ -1,8 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CustomersModule } from '../customers/customers.module';
 import { IngredientsModule } from '../ingredients/ingredients.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
+import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
@@ -13,6 +15,8 @@ import { ReportsService } from './reports.service';
     CustomersModule,
     MenuItemsModule,
     IngredientsModule,
+    forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
+    forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
   ],
   controllers: [ReportsController],
   providers: [ReportsService],

@@ -16,11 +16,14 @@ import {
   UseGuards
 } from '@nestjs/common';
 import { ApiOperation } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
 import { POSOrderFiltersDto, POSStatsFiltersDto } from './dto/pos-filters.dto';
@@ -31,7 +34,8 @@ import { POSService } from './pos.service';
 import { ReceiptService } from './receipt.service';
 
 @Controller('pos')
-@UseGuards(JwtAuthGuard, RoleFeatureGuard, WorkPeriodCheckGuard)
+@UseGuards(JwtAuthGuard, RoleFeatureGuard, SubscriptionFeatureGuard, WorkPeriodCheckGuard)
+@RequiresFeature(FEATURES.ORDER_MANAGEMENT)
 export class POSController {
   constructor(
     private readonly posService: POSService,

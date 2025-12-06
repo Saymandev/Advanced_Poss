@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import * as qrcode from 'qrcode';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
 import { SettingsService } from '../settings/settings.service';
@@ -247,6 +248,15 @@ export class ReceiptService {
       notes: order?.notes || undefined,
       publicUrl,
       currency, // Add currency to receipt data
+      // Generate order review URL for QR code
+      orderReviewUrl: (() => {
+        const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+        const orderId = (order as any)._id?.toString() || (order as any).id?.toString();
+        if (orderId) {
+          return `${baseUrl}/display/customerreview/${orderId}`;
+        }
+        return null;
+      })(),
     };
 
     return receiptData;
@@ -255,6 +265,16 @@ export class ReceiptService {
   // Generate receipt HTML
   async generateReceiptHTML(orderId: string): Promise<string> {
     const receiptData = await this.generateReceiptData(orderId);
+    
+    // Generate QR code image if order review URL exists
+    let qrCodeImageData = '';
+    if (receiptData.orderReviewUrl) {
+      try {
+        qrCodeImageData = await this.generateQRCodeImage(receiptData.orderReviewUrl);
+      } catch (error) {
+        console.error('Failed to generate QR code for receipt:', error);
+      }
+    }
     
     const html = `
 <!DOCTYPE html>
@@ -442,6 +462,20 @@ export class ReceiptService {
         </div>
     ` : ''}
 
+    ${receiptData.orderReviewUrl && qrCodeImageData ? `
+        <div style="margin-top: 20px; text-align: center; padding: 15px; border-top: 1px solid #ddd;">
+            <div style="font-size: 11px; margin-bottom: 10px; color: #111827;">
+                <strong>Scan to review your order:</strong>
+            </div>
+            <div style="display: flex; justify-content: center; padding: 10px; background: white; border: 2px solid #e5e7eb; border-radius: 5px; margin: 0 auto; width: fit-content;">
+                <img src="${qrCodeImageData}" alt="Order Review QR Code" style="width: 150px; height: 150px;" />
+            </div>
+            <div style="font-size: 9px; margin-top: 8px; color: #666; word-break: break-all;">
+                ${receiptData.orderReviewUrl}
+            </div>
+        </div>
+    ` : ''}
+
     <div class="footer">
         <div>${receiptData.receiptSettings.footer}</div>
         ${receiptData.publicUrl ? `
@@ -460,6 +494,25 @@ export class ReceiptService {
 </html>`;
 
     return html;
+  }
+
+  // Generate QR code image as data URL
+  private async generateQRCodeImage(url: string): Promise<string> {
+    try {
+      return await qrcode.toDataURL(url, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+        width: 150,
+      });
+    } catch (error) {
+      console.error('Failed to generate QR code:', error);
+      return '';
+    }
   }
 
   // Generate receipt PDF using Puppeteer

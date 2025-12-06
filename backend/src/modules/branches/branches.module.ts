@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { CompaniesModule } from '../companies/companies.module';
 import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { Table, TableSchema } from '../tables/schemas/table.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { BranchesController } from './branches.controller';
@@ -18,7 +19,8 @@ import { Branch, BranchSchema } from './schemas/branch.schema';
       { name: POSOrder.name, schema: POSOrderSchema },
     ]),
     forwardRef(() => CompaniesModule),
-    SubscriptionPlansModule,
+    forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard (circular dependency)
+    forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard (circular dependency)
   ],
   controllers: [BranchesController],
   providers: [BranchesService],

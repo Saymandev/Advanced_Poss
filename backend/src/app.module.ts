@@ -18,6 +18,7 @@ import { BackupsModule } from './modules/backups/backups.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { CompaniesModule } from './modules/companies/companies.module';
+import { Company, CompanySchema } from './modules/companies/schemas/company.schema';
 import { CompanyModule } from './modules/company/company.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { DeliveryZonesModule } from './modules/delivery-zones/delivery-zones.module';
@@ -55,6 +56,7 @@ import { WorkPeriodsModule } from './modules/work-periods/work-periods.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
+import { SubscriptionLockMiddleware } from './common/middleware/subscription-lock.middleware';
 
 @Module({
   imports: [
@@ -117,8 +119,10 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
     NestScheduleModule.forRoot(),
 
     // System Settings Schema (for maintenance middleware)
+    // Company Schema (for subscription lock middleware)
     MongooseModule.forFeature([
       { name: SystemSettings.name, schema: SystemSettingsSchema },
+      { name: Company.name, schema: CompanySchema },
     ]),
 
     // Feature Modules
@@ -162,13 +166,19 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
     PurchaseOrdersModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, SubscriptionLockMiddleware],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply maintenance mode middleware globally (runs before other middleware)
+    // Apply maintenance mode middleware globally (runs first)
     consumer
       .apply(MaintenanceMiddleware)
+      .forRoutes('*');
+    
+    // Apply subscription lock middleware globally (runs after maintenance)
+    // This ensures ALL routes require an active subscription
+    consumer
+      .apply(SubscriptionLockMiddleware)
       .forRoutes('*');
   }
 }

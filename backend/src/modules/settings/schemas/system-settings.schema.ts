@@ -125,11 +125,14 @@ export class SystemSettings {
   @Prop({
     type: {
       enabled: { type: Boolean, default: false },
-      provider: { type: String, enum: ['twilio', 'aws-sns'], default: 'twilio' },
+      provider: { type: String, enum: ['twilio', 'aws-sns', 'bulksmsbd'], default: 'twilio' },
       accountSid: { type: String, default: '' },
       authToken: { type: String, default: '' },
       fromNumber: { type: String, default: '' },
       apiKey: { type: String, default: '' },
+      senderId: { type: String, default: '' },
+      endpoint: { type: String, default: '' },
+      defaultCountry: { type: String, default: 'BD' },
     },
     default: {
       enabled: false,
@@ -138,15 +141,21 @@ export class SystemSettings {
       authToken: '',
       fromNumber: '',
       apiKey: '',
+      senderId: '',
+      endpoint: '',
+      defaultCountry: 'BD',
     },
   })
   sms: {
     enabled: boolean;
-    provider: 'twilio' | 'aws-sns';
+    provider: 'twilio' | 'aws-sns' | 'bulksmsbd';
     accountSid: string;
     authToken: string;
     fromNumber: string;
     apiKey: string;
+    senderId: string;
+    endpoint: string;
+    defaultCountry: string;
   };
 
   @Prop({

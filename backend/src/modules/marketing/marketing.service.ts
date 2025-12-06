@@ -1,8 +1,8 @@
 import {
-    BadRequestException,
-    Injectable,
-    Logger,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
@@ -11,12 +11,12 @@ import { EmailService } from '../../common/services/email.service';
 import { SmsService } from '../../common/services/sms.service';
 import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import {
-    CreateCampaignDto,
+  CreateCampaignDto,
 } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import {
-    MarketingCampaign,
-    MarketingCampaignDocument,
+  MarketingCampaign,
+  MarketingCampaignDocument,
 } from './schemas/marketing-campaign.schema';
 
 @Injectable()
@@ -242,6 +242,21 @@ export class MarketingService {
       throw new BadRequestException('Cannot send a draft campaign. Please activate it first.');
     }
 
+    // Validate message length for SMS campaigns
+    if (campaign.type === 'sms') {
+      const maxSmsLength = 1600; // Maximum for concatenated SMS
+      if (campaign.message.length > maxSmsLength) {
+        throw new BadRequestException(
+          `SMS message exceeds maximum length of ${maxSmsLength} characters. Current length: ${campaign.message.length}`,
+        );
+      }
+      if (campaign.message.length > 160) {
+        this.logger.warn(
+          `SMS campaign ${id} message is ${campaign.message.length} characters. Will be sent as concatenated SMS.`,
+        );
+      }
+    }
+
     // Get recipients based on campaign target
     const recipients = await this.getRecipients(
       companyId,
@@ -254,10 +269,25 @@ export class MarketingService {
       throw new BadRequestException('No recipients found for this campaign');
     }
 
+    // Check if SMS service is enabled for SMS campaigns
+    if (campaign.type === 'sms') {
+      const smsEnabled = await this.smsService.isServiceEnabled();
+      if (!smsEnabled) {
+        throw new BadRequestException(
+          'SMS service is not enabled. Please configure SMS settings in system settings.',
+        );
+      }
+    }
+
     let sent = 0;
     let failed = 0;
 
     try {
+      // Update campaign status to active before sending
+      await this.campaignModel.findByIdAndUpdate(id, {
+        status: 'active',
+      }).exec();
+
       // Send based on campaign type
       if (campaign.type === 'email') {
         const frontendUrl = this.configService.get('frontend.url');
@@ -281,10 +311,7 @@ export class MarketingService {
         sent = result.sent;
         failed = result.failed;
 
-        // Update campaign stats
-        await this.campaignModel.findByIdAndUpdate(id, {
-          $inc: { opened: 0, clicked: 0, converted: 0 },
-        }).exec();
+        // Note: Stats will be updated via tracking endpoints
 
       } else if (campaign.type === 'sms') {
         const smsRecipients = recipients
@@ -324,14 +351,24 @@ export class MarketingService {
         }
       }
 
-      // Update campaign status
+      // Update campaign status and stats
+      const updateData: any = {
+        sentDate: new Date(),
+        recipients: sent + failed, // Total recipients attempted
+      };
+
+      // Only mark as completed if at least some messages were sent
+      // If all failed, keep as paused for retry
+      if (sent > 0) {
+        updateData.status = 'completed';
+      } else {
+        updateData.status = 'paused';
+        this.logger.warn(`Campaign ${id} failed to send to all recipients. Status set to paused.`);
+      }
+
       const updated = await this.campaignModel.findByIdAndUpdate(
         id,
-        {
-          status: 'completed',
-          sentDate: new Date(),
-          recipients: sent,
-        },
+        updateData,
         { new: true },
       ).lean().exec();
 
@@ -340,21 +377,34 @@ export class MarketingService {
       }
 
       this.logger.log(
-        `Campaign ${id} sent: ${sent} successful, ${failed} failed`,
+        `Campaign ${id} (${campaign.name}) sent: ${sent} successful, ${failed} failed out of ${recipients.length} recipients`,
       );
 
       return {
-        message: `Campaign sent successfully. ${sent} delivered, ${failed} failed.`,
+        message: sent > 0
+          ? `Campaign sent successfully. ${sent} delivered, ${failed} failed.`
+          : `Campaign failed to send. All ${failed} attempts failed. Campaign paused for review.`,
         sent,
         failed,
       };
     } catch (error: any) {
       this.logger.error(`Failed to send campaign ${id}:`, error);
       
-      // Update campaign with error status
-      await this.campaignModel.findByIdAndUpdate(id, {
-        status: 'paused',
-      }).exec();
+      // Update campaign with error status only if it's not already paused
+      try {
+        await this.campaignModel.findByIdAndUpdate(
+          id,
+          { status: 'paused' },
+          { new: true },
+        ).exec();
+      } catch (updateError) {
+        this.logger.error(`Failed to update campaign ${id} status after error:`, updateError);
+      }
+
+      // Re-throw BadRequestException as-is, wrap others
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
 
       throw new BadRequestException(
         `Failed to send campaign: ${error.message || 'Unknown error'}`,

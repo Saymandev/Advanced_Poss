@@ -1,19 +1,22 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CreateTableDto } from './dto/create-table.dto';
 import { ReserveTableDto } from './dto/reserve-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
@@ -22,7 +25,8 @@ import { TablesService } from './tables.service';
 
 @ApiTags('Tables')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.TABLE_MANAGEMENT)
 @Controller('tables')
 export class TablesController {
   constructor(private readonly tablesService: TablesService) {}

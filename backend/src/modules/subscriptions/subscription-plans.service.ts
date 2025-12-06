@@ -86,8 +86,51 @@ export class SubscriptionPlansService {
       throw new NotFoundException('Subscription plan not found');
     }
 
-    // Prepare update data
-    const updateData: any = { ...updateDto };
+    // Prepare update data - ONLY include fields that are actually provided
+    // This prevents accidentally removing fields that weren't in the update request
+    const updateData: any = {};
+
+    // Only update fields that are explicitly provided in the DTO
+    // CRITICAL: Check for undefined AND null to prevent accidental overwrites
+    // Frontend now only sends fields with actual values, so we can safely update what's provided
+    if (updateDto.displayName !== undefined && updateDto.displayName !== null && updateDto.displayName !== '') {
+      updateData.displayName = updateDto.displayName;
+    }
+    if (updateDto.description !== undefined && updateDto.description !== null && updateDto.description !== '') {
+      updateData.description = updateDto.description;
+    }
+    // Price: Only update if explicitly provided (frontend now only sends if field has value)
+    if (updateDto.price !== undefined && updateDto.price !== null) {
+      updateData.price = updateDto.price;
+    }
+    // Note: currency is not in UpdateSubscriptionPlanDto, so we skip it
+    // Currency is typically set from system settings and shouldn't be changed per plan
+    if (updateDto.billingCycle !== undefined && updateDto.billingCycle !== null && updateDto.billingCycle !== '') {
+      updateData.billingCycle = updateDto.billingCycle;
+    }
+    // Trial Period: Only update if explicitly provided (frontend now only sends if field has value)
+    if (updateDto.trialPeriod !== undefined && updateDto.trialPeriod !== null) {
+      updateData.trialPeriod = updateDto.trialPeriod;
+    }
+    if (updateDto.stripePriceId !== undefined && updateDto.stripePriceId !== null && updateDto.stripePriceId !== '') {
+      updateData.stripePriceId = updateDto.stripePriceId;
+    }
+    // isActive: Only update if explicitly provided (checkbox state is always sent when present)
+    if (updateDto.isActive !== undefined && updateDto.isActive !== null) {
+      updateData.isActive = updateDto.isActive;
+    }
+    if (updateDto.isPopular !== undefined && updateDto.isPopular !== null) {
+      updateData.isPopular = updateDto.isPopular;
+    }
+    if (updateDto.sortOrder !== undefined && updateDto.sortOrder !== null) {
+      updateData.sortOrder = updateDto.sortOrder;
+    }
+    if (updateDto.limits !== undefined && updateDto.limits !== null) {
+      updateData.limits = updateDto.limits;
+    }
+    if (updateDto.featureList !== undefined && updateDto.featureList !== null) {
+      updateData.featureList = updateDto.featureList;
+    }
 
     // Handle enabledFeatureKeys if provided
     if (updateDto.enabledFeatureKeys !== undefined) {
@@ -103,15 +146,24 @@ export class SubscriptionPlansService {
         // Empty array means no custom features, use core features only
         updateData.enabledFeatureKeys = ensureCoreFeatures([]);
       }
-    } else if (updateDto.features) {
+    } else if (updateDto.features !== undefined) {
       // If updating legacy features, convert to enabledFeatureKeys
       const convertedKeys = convertLegacyFeaturesToKeys(updateDto.features);
       updateData.enabledFeatureKeys = convertedKeys;
+      // Also preserve the legacy features object for backward compatibility
+      updateData.features = updateDto.features;
+    }
+    // If neither enabledFeatureKeys nor features are provided, preserve existing ones
+    // Don't touch them if they're not in the update
+
+    // Only update if there's actually something to update
+    if (Object.keys(updateData).length === 0) {
+      return existingPlan;
     }
 
     const plan = await this.subscriptionPlanModel.findByIdAndUpdate(
       id,
-      updateData,
+      { $set: updateData }, // Use $set operator to only update specified fields
       { new: true },
     );
 

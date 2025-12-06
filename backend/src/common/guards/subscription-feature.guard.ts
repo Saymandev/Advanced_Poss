@@ -1,12 +1,12 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Request } from 'express';
 import { InjectModel } from '@nestjs/mongoose';
+import { Request } from 'express';
 import { Model, Types } from 'mongoose';
+import { Subscription, SubscriptionDocument, SubscriptionStatus } from '../../modules/subscriptions/schemas/subscription.schema';
 import { SubscriptionPlansService } from '../../modules/subscriptions/subscription-plans.service';
-import { REQUIRES_FEATURE } from '../decorators/requires-feature.decorator';
-import { Subscription, SubscriptionDocument } from '../../modules/subscriptions/schemas/subscription.schema';
 import { isFeatureEnabledInPlan } from '../../modules/subscriptions/utils/plan-features.helper';
+import { REQUIRES_FEATURE } from '../decorators/requires-feature.decorator';
 
 @Injectable()
 export class SubscriptionFeatureGuard implements CanActivate {
@@ -35,17 +35,19 @@ export class SubscriptionFeatureGuard implements CanActivate {
     }
 
     // Fetch the actual subscription document
+    // CRITICAL: Only allow ACTIVE or TRIAL subscriptions, exclude EXPIRED, CANCELLED, PAST_DUE, PAUSED
     const companyId = new Types.ObjectId(user.companyId);
     const subscription = await this.subscriptionModel
       .findOne({
         companyId,
         isActive: true,
+        status: { $in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL] },
       })
       .lean()
       .exec();
 
     if (!subscription) {
-      throw new ForbiddenException('Active subscription not found');
+      throw new ForbiddenException('Active subscription not found. Your subscription may have expired or been cancelled.');
     }
 
     // Check if feature-based subscription (new flexible model)

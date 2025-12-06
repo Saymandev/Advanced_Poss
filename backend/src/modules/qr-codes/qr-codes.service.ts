@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as qrcode from 'qrcode';
+import { BranchesService } from '../branches/branches.service';
+import { CompaniesService } from '../companies/companies.service';
 import { CreateQRCodeDto } from './dto/create-qr-code.dto';
 import { UpdateQRCodeDto } from './dto/update-qr-code.dto';
 import { QRCode, QRCodeDocument } from './schemas/qr-code.schema';
@@ -10,17 +12,61 @@ import { QRCode, QRCodeDocument } from './schemas/qr-code.schema';
 export class QRCodesService {
   constructor(
     @InjectModel(QRCode.name) private qrCodeModel: Model<QRCodeDocument>,
+    private branchesService: BranchesService,
+    private companiesService: CompaniesService,
   ) {}
 
   async generate(createQRCodeDto: CreateQRCodeDto, userId: string): Promise<QRCode> {
-    // Generate unique URL for the QR code
-    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-    const urlParams = new URLSearchParams({
-      branchId: createQRCodeDto.branchId,
-      ...(createQRCodeDto.tableNumber && { table: createQRCodeDto.tableNumber.toString() }),
-      type: createQRCodeDto.menuType,
-    });
-    const url = `${baseUrl}/display/menu?${urlParams.toString()}`;
+    // Get branch and company to build slug-based URL
+    const branch = await this.branchesService.findOne(createQRCodeDto.branchId);
+    let companySlug: string | undefined;
+    let branchSlug: string | undefined;
+    
+    // Get company slug
+    if (branch?.companyId) {
+      let companyIdStr: string;
+      if (typeof branch.companyId === 'object' && branch.companyId !== null) {
+        companyIdStr = (branch.companyId as any)._id?.toString() || (branch.companyId as any).id?.toString() || branch.companyId.toString();
+      } else {
+        companyIdStr = branch.companyId.toString();
+      }
+      
+      if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
+        try {
+          const company = await this.companiesService.findOne(companyIdStr);
+          companySlug = company?.slug;
+        } catch (error) {
+          console.warn('Could not fetch company for QR code URL:', error);
+        }
+      }
+    }
+    
+    branchSlug = branch?.slug;
+    
+    // Generate URL using company/branch slugs if available, otherwise fallback to branchId
+    const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+    let url: string;
+    
+    if (companySlug && branchSlug) {
+      // Use slug-based URL: /[companySlug]/[branchSlug]/shop?type=...
+      const urlParams = new URLSearchParams();
+      if (createQRCodeDto.menuType && createQRCodeDto.menuType !== 'full') {
+        urlParams.append('type', createQRCodeDto.menuType);
+      }
+      if (createQRCodeDto.tableNumber) {
+        urlParams.append('table', createQRCodeDto.tableNumber.toString());
+      }
+      const queryString = urlParams.toString();
+      url = `${baseUrl}/${companySlug}/${branchSlug}/shop${queryString ? `?${queryString}` : ''}`;
+    } else {
+      // Fallback to old format with branchId
+      const urlParams = new URLSearchParams({
+        branchId: createQRCodeDto.branchId,
+        ...(createQRCodeDto.tableNumber && { table: createQRCodeDto.tableNumber.toString() }),
+        type: createQRCodeDto.menuType,
+      });
+      url = `${baseUrl}/display/menu?${urlParams.toString()}`;
+    }
 
     // Generate QR code image
     const qrCodeImage = await qrcode.toDataURL(url, {
@@ -95,13 +141,56 @@ export class QRCodesService {
 
     // If menuType is being updated, regenerate the URL
     if (updateQRCodeDto.menuType && updateQRCodeDto.menuType !== qrCode.menuType) {
-      const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-      const urlParams = new URLSearchParams({
-        branchId: qrCode.branchId.toString(),
-        ...(qrCode.tableNumber && { table: qrCode.tableNumber.toString() }),
-        type: updateQRCodeDto.menuType,
-      });
-      const newUrl = `${baseUrl}/display/menu?${urlParams.toString()}`;
+      // Get branch and company to build slug-based URL
+      const branch = await this.branchesService.findOne(qrCode.branchId.toString());
+      let companySlug: string | undefined;
+      let branchSlug: string | undefined;
+      
+      // Get company slug
+      if (branch?.companyId) {
+        let companyIdStr: string;
+        if (typeof branch.companyId === 'object' && branch.companyId !== null) {
+          companyIdStr = (branch.companyId as any)._id?.toString() || (branch.companyId as any).id?.toString() || branch.companyId.toString();
+        } else {
+          companyIdStr = branch.companyId.toString();
+        }
+        
+        if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
+          try {
+            const company = await this.companiesService.findOne(companyIdStr);
+            companySlug = company?.slug;
+          } catch (error) {
+            console.warn('Could not fetch company for QR code URL update:', error);
+          }
+        }
+      }
+      
+      branchSlug = branch?.slug;
+      
+      // Generate URL using company/branch slugs if available, otherwise fallback to branchId
+      const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+      let newUrl: string;
+      
+      if (companySlug && branchSlug) {
+        // Use slug-based URL: /[companySlug]/[branchSlug]/shop?type=...
+        const urlParams = new URLSearchParams();
+        if (updateQRCodeDto.menuType && updateQRCodeDto.menuType !== 'full') {
+          urlParams.append('type', updateQRCodeDto.menuType);
+        }
+        if (qrCode.tableNumber) {
+          urlParams.append('table', qrCode.tableNumber.toString());
+        }
+        const queryString = urlParams.toString();
+        newUrl = `${baseUrl}/${companySlug}/${branchSlug}/shop${queryString ? `?${queryString}` : ''}`;
+      } else {
+        // Fallback to old format with branchId
+        const urlParams = new URLSearchParams({
+          branchId: qrCode.branchId.toString(),
+          ...(qrCode.tableNumber && { table: qrCode.tableNumber.toString() }),
+          type: updateQRCodeDto.menuType,
+        });
+        newUrl = `${baseUrl}/display/menu?${urlParams.toString()}`;
+      }
       
       // Regenerate QR code image with new URL
       const qrCodeImage = await qrcode.toDataURL(newUrl, {

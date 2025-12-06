@@ -1,5 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { Subscription, SubscriptionSchema } from '../subscriptions/schemas/subscription.schema';
+import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { RolePermissionsController } from './role-permissions.controller';
 import { RolePermissionsService } from './role-permissions.service';
 import {
@@ -11,7 +13,9 @@ import {
   imports: [
     MongooseModule.forFeature([
       { name: RolePermission.name, schema: RolePermissionSchema },
+      { name: Subscription.name, schema: SubscriptionSchema },
     ]),
+    forwardRef(() => SubscriptionPlansModule), // Required for subscription feature filtering
   ],
   controllers: [RolePermissionsController],
   providers: [RolePermissionsService],

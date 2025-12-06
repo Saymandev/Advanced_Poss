@@ -16,6 +16,72 @@ export class ReviewsService {
     private websocketsGateway: WebsocketsGateway,
   ) {}
 
+  /**
+   * Create a review from order - extracts branch and company info automatically
+   */
+  async createFromOrder(createReviewDto: CreateReviewDto): Promise<Review> {
+    // Get order with branch and company info
+    const order = await this.posOrderModel
+      .findById(createReviewDto.orderId)
+      .populate('branchId', 'companyId')
+      .populate('userId', 'firstName lastName name email')
+      .populate('items.menuItemId', 'name')
+      .exec();
+    
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Extract branchId from order
+    let branchId: string;
+    if (order.branchId) {
+      if (typeof order.branchId === 'object' && order.branchId !== null) {
+        branchId = (order.branchId as any)._id?.toString() || order.branchId.toString() || String(order.branchId);
+      } else {
+        branchId = String(order.branchId);
+      }
+    } else {
+      throw new NotFoundException('Order branchId is missing');
+    }
+
+    // Extract companyId from populated branch
+    let companyId: string | undefined;
+    if (order.branchId && typeof order.branchId === 'object' && order.branchId !== null) {
+      const branch = order.branchId as any;
+      if (branch.companyId) {
+        if (typeof branch.companyId === 'object' && branch.companyId !== null) {
+          companyId = branch.companyId._id?.toString() || branch.companyId.toString() || String(branch.companyId);
+        } else {
+          companyId = String(branch.companyId);
+        }
+      }
+    }
+
+    // If companyId is still not found, fetch it from branch separately
+    if (!companyId && branchId) {
+      const BranchModel = this.posOrderModel.db.model('Branch');
+      const branch = await BranchModel.findById(branchId).select('companyId').lean().exec();
+      if (branch && (branch as any).companyId) {
+        const branchCompanyId = (branch as any).companyId;
+        if (typeof branchCompanyId === 'object' && branchCompanyId !== null) {
+          companyId = branchCompanyId._id?.toString() || branchCompanyId.toString() || String(branchCompanyId);
+        } else {
+          companyId = String(branchCompanyId);
+        }
+      }
+    }
+
+    if (!companyId) {
+      throw new NotFoundException('Could not determine companyId from order branch');
+    }
+
+    // Now call the internal create method with branch and company info
+    return this.create(createReviewDto, branchId, companyId);
+  }
+
+  /**
+   * Internal create method - requires branchId and companyId to be provided
+   */
   async create(createReviewDto: CreateReviewDto, branchId: string, companyId: string): Promise<Review> {
     // Verify order exists and belongs to branch - populate userId to get waiter info
     const order = await this.posOrderModel
@@ -28,7 +94,9 @@ export class ReviewsService {
       throw new NotFoundException('Order not found');
     }
 
-    if (order.branchId.toString() !== branchId) {
+    // Validate that order belongs to the specified branch
+    const orderBranchId = order.branchId.toString();
+    if (orderBranchId !== branchId) {
       throw new BadRequestException('Order does not belong to this branch');
     }
 

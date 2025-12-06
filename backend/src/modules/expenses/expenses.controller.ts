@@ -10,7 +10,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
 import { ExpenseFilterDto } from '../../common/dto/pagination.dto';
@@ -18,13 +20,15 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { ExpensesService } from './expenses.service';
 
 @ApiTags('Expenses')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RoleFeatureGuard)
+@UseGuards(JwtAuthGuard, RoleFeatureGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.EXPENSES)
 @Controller('expenses')
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}

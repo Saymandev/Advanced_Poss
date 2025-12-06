@@ -261,9 +261,11 @@ export class SubscriptionsService {
         });
 
         if (!plan) {
-          throw new BadRequestException('Invalid subscription plan');
+          console.error(`[Subscriptions] ❌ Plan '${createSubscriptionDto.plan}' not found or is inactive for company ${createSubscriptionDto.companyId}`);
+          throw new BadRequestException(`Plan '${createSubscriptionDto.plan}' not found or is inactive`);
         }
 
+        console.log(`[Subscriptions] ✅ Plan '${plan.name}' (${plan.displayName}) found and validated for company ${createSubscriptionDto.companyId}`);
         price = plan.price;
         currency = plan.currency;
         trialPeriodHours = plan.trialPeriod;
@@ -273,16 +275,40 @@ export class SubscriptionsService {
       // Check if company already has a subscription (active or inactive)
       const existingSubscription = await this.subscriptionModel.findOne({
         companyId: createSubscriptionDto.companyId,
-      });
+      }).sort({ createdAt: -1 }); // Get the most recent one
 
       if (existingSubscription) {
+        // If subscription is expired, mark it as inactive first
+        if (existingSubscription.status === SubscriptionStatus.EXPIRED && existingSubscription.isActive) {
+          existingSubscription.isActive = false;
+          await existingSubscription.save();
+          
+          // Sync company record for expired subscription
+          const expiredPlan = existingSubscription.plan ? await this.planModel.findOne({ name: existingSubscription.plan }).exec() : null;
+          await this.companyModel.findByIdAndUpdate(
+            createSubscriptionDto.companyId,
+            {
+              subscriptionStatus: 'expired',
+              ...(expiredPlan && { subscriptionPlan: expiredPlan.name }),
+            },
+            { new: true },
+          ).exec();
+        }
+        
         // If subscription exists but is inactive, we can reuse it by updating it
         if (!existingSubscription.isActive) {
           // Update existing inactive subscription instead of creating new one
           if (isFeatureBased) {
             existingSubscription.enabledFeatures = enabledFeatures;
+            // Clear plan when using feature-based subscription
+            existingSubscription.plan = undefined;
           } else {
-            existingSubscription.plan = createSubscriptionDto.plan as any;
+            // Use the validated plan variable, not the DTO string
+            if (!plan) {
+              throw new BadRequestException('Plan validation failed - plan not found or inactive');
+            }
+            const planKey = this.resolvePlanKey(plan.name);
+            existingSubscription.plan = planKey;
           }
           
           existingSubscription.status = SubscriptionStatus.TRIAL;
@@ -314,7 +340,24 @@ export class SubscriptionsService {
           existingSubscription.limits = limits;
           existingSubscription.usage = this.getInitialUsage();
           
-          return await existingSubscription.save();
+          const savedSubscription = await existingSubscription.save();
+          
+          // CRITICAL: Update company record to sync subscription data
+          if (!isFeatureBased && plan) {
+            await this.companyModel.findByIdAndUpdate(
+              createSubscriptionDto.companyId,
+              {
+                subscriptionPlan: plan.name, // Use plan.name for frontend matching
+                subscriptionStatus: 'trial',
+                subscriptionStartDate: savedSubscription.trialStartDate,
+                subscriptionEndDate: savedSubscription.trialEndDate,
+                nextBillingDate: savedSubscription.nextBillingDate,
+              },
+              { new: true },
+            ).exec();
+          }
+          
+          return savedSubscription;
         }
         
         throw new BadRequestException(
@@ -370,13 +413,52 @@ export class SubscriptionsService {
       // Set plan or enabledFeatures based on subscription type
       if (isFeatureBased) {
         subscriptionData.enabledFeatures = enabledFeatures;
+        console.log(`[Subscriptions] Creating feature-based subscription with ${enabledFeatures.length} features`);
+        // Don't set plan for feature-based subscriptions
       } else {
-        subscriptionData.plan = createSubscriptionDto.plan;
+        // Use the validated plan variable, not the DTO string
+        if (!plan) {
+          console.error(`[Subscriptions] ❌ Plan validation failed for company ${createSubscriptionDto.companyId}`);
+          throw new BadRequestException('Plan validation failed - plan not found or inactive');
+        }
+        const planKey = this.resolvePlanKey(plan.name);
+        subscriptionData.plan = planKey;
+        console.log(`[Subscriptions] Creating plan-based subscription: plan='${plan.name}' (${plan.displayName}), planKey='${planKey}', price=${price}, status=TRIAL`);
       }
 
-      const subscription = new this.subscriptionModel(subscriptionData);
+      subscriptionData.isActive = true; // Explicitly set isActive
+      console.log(`[Subscriptions] Subscription data:`, {
+        companyId: createSubscriptionDto.companyId,
+        plan: subscriptionData.plan,
+        status: subscriptionData.status,
+        isActive: subscriptionData.isActive,
+        price: subscriptionData.price,
+      });
 
-      return await subscription.save();
+      const subscription = new this.subscriptionModel(subscriptionData);
+      const savedSubscription = await subscription.save();
+      
+      console.log(`[Subscriptions] ✅ Subscription created: ID=${savedSubscription._id}, plan=${savedSubscription.plan}, status=${savedSubscription.status}, isActive=${savedSubscription.isActive}`);
+      
+      // CRITICAL: Update company record to sync subscription data
+      if (!isFeatureBased && plan) {
+        const companyUpdate = {
+          subscriptionPlan: plan.name, // Use plan.name for frontend matching
+          subscriptionStatus: 'trial',
+          subscriptionStartDate: savedSubscription.trialStartDate,
+          subscriptionEndDate: savedSubscription.trialEndDate,
+          nextBillingDate: savedSubscription.nextBillingDate,
+        };
+        console.log(`[Subscriptions] Syncing company record:`, companyUpdate);
+        await this.companyModel.findByIdAndUpdate(
+          createSubscriptionDto.companyId,
+          companyUpdate,
+          { new: true },
+        ).exec();
+        console.log(`[Subscriptions] ✅ Company record synced for company ${createSubscriptionDto.companyId}`);
+      }
+
+      return savedSubscription;
     } catch (error) {
       // this.logger.error('Failed to create subscription', error);
       throw error;
@@ -440,13 +522,34 @@ export class SubscriptionsService {
 
   // Get subscription by ID
   async findById(id: string): Promise<SubscriptionDocument> {
+    // Don't filter by isActive - we need to find expired subscriptions too
     const subscription = await this.subscriptionModel
-      .findOne({ _id: id, isActive: true })
+      .findOne({ _id: id })
       .populate('companyId', 'name email')
       .exec();
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
+    }
+
+    // CRITICAL: If subscription is expired but isActive is still true, fix it and sync company
+    if (subscription.status === SubscriptionStatus.EXPIRED && subscription.isActive) {
+      console.log(`[Subscriptions] ⚠️ Found expired subscription ${id} with isActive=true, fixing...`);
+      subscription.isActive = false;
+      await subscription.save();
+      
+      // Sync company record
+      const plan = subscription.plan ? await this.planModel.findOne({ name: subscription.plan }).exec() : null;
+      await this.companyModel.findByIdAndUpdate(
+        subscription.companyId,
+        {
+          subscriptionStatus: 'expired',
+          ...(plan && { subscriptionPlan: plan.name }),
+        },
+        { new: true },
+      ).exec();
+      
+      console.log(`[Subscriptions] ✅ Fixed expired subscription ${id} and synced company record`);
     }
 
     return subscription;
@@ -483,6 +586,26 @@ export class SubscriptionsService {
       throw new NotFoundException('Subscription not found for this company');
     }
 
+    // CRITICAL: If subscription is expired but isActive is still true, fix it and sync company
+    if (subscription.status === SubscriptionStatus.EXPIRED && subscription.isActive) {
+      console.log(`[Subscriptions] ⚠️ Found expired subscription for company ${companyId} with isActive=true, fixing...`);
+      subscription.isActive = false;
+      await subscription.save();
+      
+      // Sync company record
+      const plan = subscription.plan ? await this.planModel.findOne({ name: subscription.plan }).exec() : null;
+      await this.companyModel.findByIdAndUpdate(
+        companyId,
+        {
+          subscriptionStatus: 'expired',
+          ...(plan && { subscriptionPlan: plan.name }),
+        },
+        { new: true },
+      ).exec();
+      
+      console.log(`[Subscriptions] ✅ Fixed expired subscription for company ${companyId} and synced company record`);
+    }
+
     return subscription;
   }
 
@@ -501,23 +624,220 @@ export class SubscriptionsService {
       subscription.metadata.lastUpdatedAt = new Date();
     }
 
-    Object.assign(subscription, updateSubscriptionDto);
-    await subscription.save();
-    return this.composeSubscriptionResponse(subscription);
+    // Cast to any to access all possible fields safely
+    const updateData = updateSubscriptionDto as any;
+
+    // Only update fields that are explicitly provided (avoid overwriting with undefined)
+    if (updateData.status !== undefined) {
+      subscription.status = updateData.status as SubscriptionStatus;
+    }
+    if (updateData.billingCycle !== undefined) {
+      subscription.billingCycle = updateData.billingCycle as BillingCycle;
+    }
+    if (updateData.price !== undefined) {
+      subscription.price = updateData.price;
+    }
+    if (updateData.currency !== undefined) {
+      subscription.currency = updateData.currency;
+    }
+    if (updateData.autoRenew !== undefined) {
+      subscription.autoRenew = updateData.autoRenew;
+    }
+    if (updateData.enabledFeatures !== undefined) {
+      subscription.enabledFeatures = updateData.enabledFeatures;
+      // If switching to feature-based, clear plan
+      if (updateData.enabledFeatures.length > 0) {
+        subscription.plan = undefined;
+      }
+    }
+    if (updateData.limits !== undefined) {
+      subscription.limits = updateData.limits;
+    }
+    if (updateData.usage !== undefined) {
+      subscription.usage = updateData.usage;
+    }
+    
+    // CRITICAL: If plan is being updated, validate it
+    if (updateData.plan !== undefined) {
+      const plan = await this.planModel.findOne({
+        name: updateData.plan,
+        isActive: true,
+      });
+      
+      if (!plan) {
+        throw new BadRequestException(`Plan '${updateData.plan}' not found or is inactive`);
+      }
+      
+      const planKey = this.resolvePlanKey(plan.name);
+      subscription.plan = planKey;
+      subscription.price = plan.price;
+      subscription.limits = this.buildLimitsFromPlan(plan) as SubscriptionLimits;
+      
+      // Sync company record
+      await this.companyModel.findByIdAndUpdate(
+        subscription.companyId,
+        {
+          subscriptionPlan: plan.name,
+          subscriptionStatus: subscription.status === SubscriptionStatus.ACTIVE ? 'active' : subscription.status,
+        },
+        { new: true },
+      ).exec();
+    }
+    
+    const savedSubscription = await subscription.save();
+    return this.composeSubscriptionResponse(savedSubscription);
   }
 
   async getCurrentSubscription(companyId: string) {
-    const subscription = await this.subscriptionModel
+    // CRITICAL: Only return ACTIVE or TRIAL subscriptions
+    // Do NOT return expired/cancelled subscriptions to avoid confusion
+    // CRITICAL: Sort by createdAt DESC to get the MOST RECENT subscription first
+    // This ensures we get the latest subscription (e.g., new BASIC) not an old one (e.g., expired PREMIUM)
+    let subscription = await this.subscriptionModel
       .findOne({
         companyId: this.toObjectId(companyId),
         isActive: true,
+        status: { 
+          $in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL, 'active', 'trial']
+        },
       })
+      .sort({ createdAt: -1 }) // CRITICAL: Get most recent subscription first
       .lean();
-
-    if (!subscription) {
-      throw new NotFoundException('Subscription not found for this company');
+    
+    console.log(`[Subscriptions] 🔍 Querying for active subscription for company ${companyId}`);
+    if (subscription) {
+      console.log(`[Subscriptions] ✅ Found active subscription: plan='${subscription.plan}', status='${subscription.status}', subscriptionId='${subscription._id}'`);
+    } else {
+      console.log(`[Subscriptions] ⚠️ No active subscription found for company ${companyId}`);
     }
 
+    // If no active subscription found, check for any subscription to sync company record
+    // But DO NOT return expired subscriptions
+    if (!subscription) {
+      console.log(`[Subscriptions] ⚠️ No active subscription found for company ${companyId}, checking for inactive subscriptions to sync company record...`);
+      const anySubscription = await this.subscriptionModel
+        .findOne({
+          companyId: this.toObjectId(companyId),
+        })
+        .sort({ createdAt: -1 }) // Get the most recent one
+        .lean();
+
+      // If we found an inactive/expired subscription, sync the company record but DON'T return it
+      if (anySubscription) {
+        console.log(`[Subscriptions] ⚠️ Found inactive subscription (status: ${anySubscription.status}, isActive: ${anySubscription.isActive}) for company ${companyId}, syncing company record...`);
+        
+        // Fix subscription if it's expired but still marked as active
+        if (anySubscription.status === SubscriptionStatus.EXPIRED && anySubscription.isActive) {
+          await this.subscriptionModel.findByIdAndUpdate(
+            anySubscription._id,
+            { isActive: false },
+            { new: true },
+          ).exec();
+          anySubscription.isActive = false;
+        }
+        
+        // CRITICAL: Look up plan using the subscription's plan value
+        // subscription.plan is stored as enum value (e.g., 'basic', 'premium')
+        const planName = anySubscription.plan as string;
+        console.log(`[Subscriptions] 🔍 Looking up plan for inactive subscription: planName='${planName}', subscriptionId=${anySubscription._id}`);
+        const plan = planName ? await this.planModel.findOne({ name: planName }).exec() : null;
+        
+        if (plan) {
+          console.log(`[Subscriptions] ✅ Found plan: name='${plan.name}', displayName='${plan.displayName}'`);
+        } else {
+          console.error(`[Subscriptions] ❌ Plan '${planName}' NOT FOUND in database for subscription ${anySubscription._id}!`);
+        }
+        
+        const companyUpdate: any = {
+          subscriptionStatus: anySubscription.status === SubscriptionStatus.EXPIRED ? 'expired' : 
+                              anySubscription.status === SubscriptionStatus.ACTIVE ? 'active' :
+                              anySubscription.status === SubscriptionStatus.TRIAL ? 'trial' :
+                              anySubscription.status?.toLowerCase() || 'expired',
+        };
+        
+        if (plan) {
+          companyUpdate.subscriptionPlan = plan.name; // Use plan.name to ensure consistency
+          console.log(`[Subscriptions] 📝 Updating company subscriptionPlan to: '${plan.name}' (from subscription plan: '${planName}')`);
+        } else {
+          // If plan not found, use the subscription's plan value directly
+          companyUpdate.subscriptionPlan = planName || 'free';
+          console.log(`[Subscriptions] ⚠️ Plan not found, using subscription plan value directly: '${planName || 'free'}'`);
+        }
+        
+        await this.companyModel.findByIdAndUpdate(
+          companyId,
+          companyUpdate,
+          { new: true },
+        ).exec();
+        
+        console.log(`[Subscriptions] ✅ Synced company record for company ${companyId} with subscription status: ${companyUpdate.subscriptionStatus}`);
+      } else {
+        // No subscription found at all - sync company to show no active subscription
+        console.log(`[Subscriptions] ⚠️ No subscription found for company ${companyId}, syncing company record...`);
+        await this.companyModel.findByIdAndUpdate(
+          companyId,
+          {
+            subscriptionStatus: 'expired',
+            subscriptionPlan: 'free',
+          },
+          { new: true },
+        ).exec();
+      }
+      
+      // CRITICAL: Don't return expired subscriptions - throw 404 instead
+      throw new NotFoundException('No active subscription found for this company. Subscription may have expired.');
+    } else {
+      // CRITICAL: Double-check that subscription is not expired (safety check)
+      if (subscription.status === SubscriptionStatus.EXPIRED) {
+        console.log(`[Subscriptions] ⚠️ Found expired subscription with isActive=true for company ${companyId}, fixing...`);
+        await this.subscriptionModel.findByIdAndUpdate(
+          subscription._id,
+          { isActive: false },
+          { new: true },
+        ).exec();
+        
+        // Sync company record
+        const planName = subscription.plan as string;
+        console.log(`[Subscriptions] 🔍 Looking up plan for expired subscription: planName='${planName}'`);
+        const plan = planName ? await this.planModel.findOne({ name: planName }).exec() : null;
+        
+        if (plan) {
+          console.log(`[Subscriptions] ✅ Found plan: name='${plan.name}'`);
+        } else {
+          console.error(`[Subscriptions] ❌ Plan '${planName}' NOT FOUND!`);
+        }
+        
+        await this.companyModel.findByIdAndUpdate(
+          companyId,
+          {
+            subscriptionStatus: 'expired',
+            ...(plan && { subscriptionPlan: plan.name }),
+          },
+          { new: true },
+        ).exec();
+        
+        console.log(`[Subscriptions] 📝 Updated company record: subscriptionStatus='expired', subscriptionPlan='${plan?.name || planName || 'free'}'`);
+        
+        // Don't return expired subscription
+        throw new NotFoundException('No active subscription found for this company. Subscription may have expired.');
+      }
+    }
+
+    // CRITICAL: Verify the plan lookup before returning
+    if (subscription) {
+      const planName = subscription.plan as string;
+      console.log(`[Subscriptions] ✅ Returning active subscription: plan='${planName}', status='${subscription.status}', isActive=${subscription.isActive}, subscriptionId=${subscription._id}`);
+      
+      // Double-check plan exists and log it
+      const plan = planName ? await this.planModel.findOne({ name: planName }).exec() : null;
+      if (!plan) {
+        console.error(`[Subscriptions] ❌ CRITICAL: Plan '${planName}' from subscription NOT FOUND in database!`);
+      } else {
+        console.log(`[Subscriptions] ✅ Plan verified: '${plan.name}' (${plan.displayName})`);
+      }
+    }
+    
+    // Only return active/trial subscriptions
     return this.composeSubscriptionResponse(subscription);
   }
 
@@ -1144,8 +1464,34 @@ export class SubscriptionsService {
           // this.logger.error(`Failed to charge subscription ${subscription._id}`, error);
         }
       } else {
+        // Mark subscription as expired
         subscription.status = SubscriptionStatus.EXPIRED;
+        subscription.isActive = false; // CRITICAL: Set isActive to false when expired
+        
         await subscription.save();
+        
+        // CRITICAL: Sync company record when subscription expires
+        const companyUpdate: any = {
+          subscriptionStatus: 'expired',
+        };
+        
+        // Update plan name if subscription has a plan
+        if (subscription.plan) {
+          const plan = await this.planModel.findOne({ 
+            name: subscription.plan 
+          }).exec();
+          if (plan) {
+            companyUpdate.subscriptionPlan = plan.name;
+          }
+        }
+        
+        await this.companyModel.findByIdAndUpdate(
+          subscription.companyId,
+          companyUpdate,
+          { new: true },
+        ).exec();
+        
+        console.log(`[Subscriptions] ✅ Subscription ${subscription._id} expired and company ${subscription.companyId} synced`);
       }
     }
 

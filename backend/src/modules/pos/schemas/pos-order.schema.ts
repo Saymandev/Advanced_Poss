@@ -112,6 +112,15 @@ export class POSOrder {
 
   @Prop({ type: Number })
   guestCount?: number;
+
+  @Prop({ type: Types.ObjectId, ref: 'Customer' })
+  customerId?: Types.ObjectId; // Customer ID for loyalty points
+
+  @Prop({ type: Number, default: 0 })
+  loyaltyPointsRedeemed?: number; // Loyalty points redeemed for this order
+
+  @Prop({ type: Number, default: 0 })
+  loyaltyDiscount?: number; // Discount amount from loyalty points
 }
 
 export const POSOrderSchema = SchemaFactory.createForClass(POSOrder);

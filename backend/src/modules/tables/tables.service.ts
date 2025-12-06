@@ -3,17 +3,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Types, Connection } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 import * as QRCode from 'qrcode';
 import { GeneratorUtil } from '../../common/utils/generator.util';
+import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateTableDto } from './dto/create-table.dto';
 import { ReserveTableDto } from './dto/reserve-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
 import { Table, TableDocument } from './schemas/table.schema';
-import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 
 @Injectable()
 export class TablesService {
@@ -65,12 +65,12 @@ export class TablesService {
   }
 
   async findAll(filter: any = {}): Promise<Table[]> {
-    return this.tableModel
+    const tables = await this.tableModel
       .find(filter)
       .populate('branchId', 'name code')
       .populate({
         path: 'currentOrderId',
-        select: 'orderNumber total subtotal customer createdAt',
+        select: 'orderNumber total subtotal customer createdAt status',
         populate: {
           path: 'customer',
           select: 'firstName lastName phone'
@@ -78,7 +78,82 @@ export class TablesService {
       })
       .populate('occupiedBy', 'firstName lastName')
       .sort({ tableNumber: 1 })
+      .lean()
       .exec();
+
+    // Calculate status dynamically based on pending orders (same logic as POS)
+    // This ensures Table Management and POS show the same status
+    if (tables.length === 0) {
+      return tables as any;
+    }
+
+    // Extract branchId from filter or from first table
+    let branchId: Types.ObjectId | null = null;
+    if (filter.branchId) {
+      branchId = new Types.ObjectId(filter.branchId);
+    } else if (tables.length > 0 && tables[0].branchId) {
+      const firstTableBranchId = (tables[0] as any).branchId;
+      if (typeof firstTableBranchId === 'object' && firstTableBranchId !== null) {
+        branchId = firstTableBranchId._id ? new Types.ObjectId(firstTableBranchId._id) : 
+                   new Types.ObjectId(firstTableBranchId.toString());
+      } else {
+        branchId = new Types.ObjectId(firstTableBranchId);
+      }
+    }
+
+    // If we have a branchId, check for pending orders to calculate real-time status
+    if (branchId) {
+      // Get today's pending orders for this branch
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const pendingOrders = await this.posOrderModel.find({
+        branchId: branchId,
+        createdAt: { $gte: today, $lt: tomorrow },
+        status: 'pending', // Only pending orders keep tables occupied
+        orderType: 'dine-in',
+      })
+      .select('tableId status')
+      .lean()
+      .exec();
+
+      // Group pending orders by table
+      const occupiedTableIds = new Set<string>();
+      pendingOrders.forEach(order => {
+        if (order.tableId) {
+          const tableIdStr = order.tableId.toString();
+          occupiedTableIds.add(tableIdStr);
+        }
+      });
+
+      // Update table status based on pending orders (same logic as POS)
+      return tables.map((table: any) => {
+        const tableId = table._id?.toString() || table.id;
+        const hasPendingOrder = occupiedTableIds.has(tableId);
+        
+        // Calculate status: occupied if has pending order, otherwise use stored status
+        // But if stored status is 'occupied' but no pending orders, make it 'available'
+        let calculatedStatus = table.status;
+        if (hasPendingOrder) {
+          calculatedStatus = 'occupied';
+        } else if (table.status === 'occupied') {
+          // Table was marked as occupied but has no pending orders - make it available
+          // (This handles cases where orders were paid/completed but status wasn't updated)
+          calculatedStatus = 'available';
+        }
+        // Keep 'reserved' and 'cleaning' statuses as-is
+        
+        return {
+          ...table,
+          status: calculatedStatus,
+        };
+      });
+    }
+
+    // If no branchId, return tables as-is (shouldn't happen in normal flow)
+    return tables as any;
   }
 
   async findOne(id: string): Promise<Table> {
@@ -100,19 +175,8 @@ export class TablesService {
   }
 
   async findByBranch(branchId: string): Promise<Table[]> {
-    return this.tableModel
-      .find({ branchId: new Types.ObjectId(branchId) })
-      .populate({
-        path: 'currentOrderId',
-        select: 'orderNumber total subtotal customer createdAt',
-        populate: {
-          path: 'customer',
-          select: 'firstName lastName phone'
-        }
-      })
-      .populate('occupiedBy', 'firstName lastName')
-      .sort({ tableNumber: 1 })
-      .exec();
+    // Use findAll with branchId filter to get dynamic status calculation
+    return this.findAll({ branchId });
   }
 
   async findAvailable(branchId: string): Promise<Table[]> {
@@ -332,17 +396,16 @@ export class TablesService {
   }
 
   async getStats(branchId: string): Promise<any> {
-    const tables = await this.tableModel.find({
-      branchId: new Types.ObjectId(branchId),
-    });
+    // Use findAll to get tables with dynamically calculated status
+    const tables = await this.findAll({ branchId });
 
     const stats = {
       total: tables.length,
-      available: tables.filter((t) => t.status === 'available').length,
-      occupied: tables.filter((t) => t.status === 'occupied').length,
-      reserved: tables.filter((t) => t.status === 'reserved').length,
-      cleaning: tables.filter((t) => t.status === 'cleaning').length,
-      totalCapacity: tables.reduce((sum, t) => sum + t.capacity, 0),
+      available: tables.filter((t: any) => t.status === 'available').length,
+      occupied: tables.filter((t: any) => t.status === 'occupied').length,
+      reserved: tables.filter((t: any) => t.status === 'reserved').length,
+      cleaning: tables.filter((t: any) => t.status === 'cleaning').length,
+      totalCapacity: tables.reduce((sum: number, t: any) => sum + (t.capacity || 0), 0),
       occupancyRate: 0,
     };
 

@@ -449,6 +449,149 @@ export class EmailService {
     return await this.sendEmail(email, subject, html);
   }
 
+  async sendPurchaseConfirmation(
+    email: string,
+    customerName: string,
+    orderNumber: string,
+    orderTotal: number,
+    items: Array<{ name: string; quantity: number; price: number }>,
+    loyaltyPointsUsed?: number,
+    loyaltyDiscount?: number,
+  ): Promise<boolean> {
+    const subject = `Order Confirmation - ${orderNumber}`;
+    const currency = '৳'; // BDT symbol
+    const formattedTotal = orderTotal.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const itemsHtml = items.map(item => `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.name}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">${currency}${(item.price * item.quantity).toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+    const loyaltySection = loyaltyPointsUsed && loyaltyDiscount ? `
+      <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px;">
+        <p style="margin: 0;"><strong>🎁 Loyalty Points Applied!</strong></p>
+        <p style="margin: 5px 0 0 0;">You redeemed ${loyaltyPointsUsed} points for ${currency}${loyaltyDiscount.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} discount.</p>
+      </div>
+    ` : '';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0;">Order Confirmed!</h1>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #ddd;">
+          <p>Dear ${customerName},</p>
+          
+          <p>Thank you for your order! We've received your order and it's being prepared.</p>
+          
+          <div style="background: #fff; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h2 style="margin-top: 0; color: #667eea;">Order Details</h2>
+            <p><strong>Order Number:</strong> ${orderNumber}</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+              <thead>
+                <tr style="background: #f5f5f5;">
+                  <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Item</th>
+                  <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd;">Qty</th>
+                  <th style="padding: 10px; text-align: right; border-bottom: 2px solid #ddd;">Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+            
+            ${loyaltySection}
+            
+            <div style="text-align: right; margin-top: 20px; padding-top: 15px; border-top: 2px solid #ddd;">
+              <p style="font-size: 18px; font-weight: bold; margin: 0;">
+                Total: ${currency}${formattedTotal}
+              </p>
+            </div>
+          </div>
+          
+          <p style="margin-top: 30px;">We'll notify you once your order is ready!</p>
+          
+          <p>Best regards,<br><strong>RestaurantPOS Team</strong></p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+          <p>This is an automated email. Please do not reply to this message.</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    return await this.sendEmail(email, subject, html);
+  }
+
+  async sendLoyaltyOffer(
+    email: string,
+    customerName: string,
+    pointsAvailable: number,
+    discountAmount: number,
+    minimumOrder: number,
+  ): Promise<boolean> {
+    const subject = `🎁 Special Loyalty Offer - Redeem Your Points!`;
+    const currency = '৳'; // BDT symbol
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0;">🎁 Special Offer!</h1>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #ddd;">
+          <p>Dear ${customerName},</p>
+          
+          <p>Great news! You have <strong>${pointsAvailable.toLocaleString()}</strong> loyalty points available!</p>
+          
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 5px;">
+            <h2 style="margin-top: 0; color: #856404;">Redeem Your Points</h2>
+            <p style="margin: 10px 0;"><strong>2000 points = ${currency}${discountAmount.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} discount</strong></p>
+            <p style="margin: 10px 0;">Minimum order amount: ${currency}${minimumOrder.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <p style="font-size: 24px; font-weight: bold; color: #667eea; margin: 0;">
+              ${pointsAvailable.toLocaleString()} Points Available
+            </p>
+            <p style="color: #666; margin: 10px 0;">Use your points on your next order!</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Visit us soon to redeem your loyalty points and enjoy great savings!</p>
+          
+          <p>Best regards,<br><strong>RestaurantPOS Team</strong></p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+          <p>This is an automated email. Please do not reply to this message.</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    return await this.sendEmail(email, subject, html);
+  }
+
   private stripHtml(html: string): string {
     return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
   }

@@ -1,11 +1,11 @@
 import {
-  Body,
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  Post,
-  Query
+    Body,
+    Controller,
+    Get,
+    NotFoundException,
+    Param,
+    Post,
+    Query
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
@@ -166,7 +166,9 @@ export class PublicController {
   @ApiOperation({ summary: 'Get menu items for a branch (public)' })
   async getBranchMenu(
     @Param('companySlug') companySlug: string,
-    @Param('branchSlug') branchSlug: string) {
+    @Param('branchSlug') branchSlug: string,
+    @Query('type') menuType?: string,
+  ) {
     const company = await this.companiesService.findBySlug(companySlug);
     const companyId = (company as any)._id?.toString() || (company as any).id;
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
@@ -179,9 +181,35 @@ export class PublicController {
 
     // Extract menuItems array from the result object
     // menuItemsService.findAll returns { menuItems: [], total, page, limit }
-    const rawMenuItems = Array.isArray(menuItemsResult)
+    let rawMenuItems = Array.isArray(menuItemsResult)
       ? menuItemsResult
       : (menuItemsResult as any)?.menuItems || [];
+
+    // Filter by menu type if provided
+    if (menuType && menuType !== 'full') {
+      const categoryTypes: Record<string, string[]> = {
+        food: ['food', 'main', 'appetizer', 'entree'],
+        drinks: ['beverage', 'drink', 'beverages'],
+        desserts: ['dessert', 'sweets'],
+      };
+      
+      const allowedTypes = categoryTypes[menuType] || [];
+      if (allowedTypes.length > 0) {
+        const filteredCategories = (categories as any[]).filter((cat: any) => {
+          const catType = (cat as any).type?.toLowerCase();
+          return allowedTypes.some(type => catType?.includes(type));
+        });
+        const categoryIds = filteredCategories.map((cat: any) => 
+          (cat as any)._id?.toString() || (cat as any).id
+        );
+        rawMenuItems = rawMenuItems.filter((item: any) => {
+          const itemCategoryId = (item as any).categoryId?._id?.toString() || 
+                                (item as any).categoryId?.id ||
+                                (item as any).categoryId;
+          return categoryIds.includes(itemCategoryId);
+        });
+      }
+    }
 
     // For public menu, hide items whose tracked ingredients are low or out of stock
     const menuItems = (rawMenuItems as any[]).filter((item) => {
@@ -201,6 +229,11 @@ export class PublicController {
     return {
       success: true,
       data: {
+        branch: {
+          id: branchId,
+          name: (branch as any).name,
+          address: (branch as any).address,
+        },
         categories: Array.isArray(categories) ? categories : [],
         menuItems,
       },

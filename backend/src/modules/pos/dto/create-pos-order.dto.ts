@@ -1,15 +1,15 @@
 import { Type } from 'class-transformer';
 import {
-  IsArray,
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-  Min,
-  ValidateIf,
-  ValidateNested,
+    IsArray,
+    IsEnum,
+    IsNotEmpty,
+    IsNumber,
+    IsObject,
+    IsOptional,
+    IsString,
+    Min,
+    ValidateIf,
+    ValidateNested,
 } from 'class-validator';
 
 export class POSOrderItemDto {
@@ -154,5 +154,19 @@ export class CreatePOSOrderDto {
   @IsOptional()
   @IsString()
   waiterId?: string; // Optional waiter/user ID to assign the order to
+
+  @IsOptional()
+  @IsString()
+  customerId?: string; // Customer ID for loyalty points
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  loyaltyPointsRedeemed?: number; // Loyalty points redeemed for this order
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  loyaltyDiscount?: number; // Discount amount from loyalty points
 }
 
