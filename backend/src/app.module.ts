@@ -44,6 +44,7 @@ import { SystemSettings, SystemSettingsSchema } from './modules/settings/schemas
 import { SettingsModule } from './modules/settings/settings.module';
 import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { SuperAdminNotificationsModule } from './modules/super-admin-notifications/super-admin-notifications.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { TablesModule } from './modules/tables/tables.module';
 import { UsersModule } from './modules/users/users.module';
@@ -157,6 +158,7 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
     AiModule,
     WebsocketsModule,
     WorkPeriodsModule,
+    SuperAdminNotificationsModule,
     PurchaseOrdersModule,
   ],
   controllers: [AppController],

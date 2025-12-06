@@ -4,6 +4,7 @@ import { EmailService } from '../../common/services/email.service';
 import { CustomersModule } from '../customers/customers.module';
 import { POSModule } from '../pos/pos.module';
 import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
+import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schemas/subscription-plan.schema';
 import { DigitalReceiptsController } from './digital-receipts.controller';
 import { DigitalReceiptsService } from './digital-receipts.service';
 import { DigitalReceipt, DigitalReceiptSchema } from './schemas/digital-receipt.schema';
@@ -13,6 +14,7 @@ import { DigitalReceipt, DigitalReceiptSchema } from './schemas/digital-receipt.
     MongooseModule.forFeature([
       { name: DigitalReceipt.name, schema: DigitalReceiptSchema },
       { name: POSOrder.name, schema: POSOrderSchema },
+      { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
     ]),
     POSModule,
     CustomersModule,

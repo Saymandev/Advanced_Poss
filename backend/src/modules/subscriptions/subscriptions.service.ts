@@ -12,6 +12,7 @@ import { Company, CompanyDocument } from '../companies/schemas/company.schema';
 import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
 import { Table, TableDocument } from '../tables/schemas/table.schema';
+import { SuperAdminNotificationsService } from '../super-admin-notifications/super-admin-notifications.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
@@ -63,6 +64,7 @@ export class SubscriptionsService {
     private companyModel: Model<CompanyDocument>,
     private stripeService: StripeService,
     private featuresService: SubscriptionFeaturesService,
+    private superAdminNotificationsService: SuperAdminNotificationsService,
   ) {}
 
   private toObjectId(id: string | Types.ObjectId): Types.ObjectId {
@@ -596,6 +598,9 @@ export class SubscriptionsService {
       return null;
     }
 
+    const previousStatus = subscription.status;
+    const previousPlan = subscription.plan;
+
     // Update plan if price ID changed
     if (stripeSubscriptionData.items?.data?.[0]?.price?.id) {
       const newStripePriceId = stripeSubscriptionData.items.data[0].price.id;
@@ -674,6 +679,55 @@ export class SubscriptionsService {
       companyUpdate,
       { new: true },
     ).exec();
+
+    // Emit super-admin notifications for key events
+    try {
+      const company = await this.companyModel.findById(subscription.companyId).lean().exec();
+      const companyName = company?.name || 'Company';
+      const planName = companyUpdate.subscriptionPlan || subscription.plan || 'plan';
+
+      if (previousPlan && companyUpdate.subscriptionPlan && previousPlan !== companyUpdate.subscriptionPlan) {
+        await this.superAdminNotificationsService.create({
+          type: 'subscription.plan_changed',
+          title: 'Subscription plan changed',
+          message: `${companyName} switched to ${companyUpdate.subscriptionPlan}`,
+          companyId: subscription.companyId.toString(),
+          metadata: {
+            previousPlan,
+            newPlan: companyUpdate.subscriptionPlan,
+          },
+        });
+      }
+
+      if (subscription.status === SubscriptionStatus.ACTIVE && previousStatus !== SubscriptionStatus.ACTIVE) {
+        await this.superAdminNotificationsService.create({
+          type: 'subscription.renewed',
+          title: 'Subscription renewed',
+          message: `${companyName} subscription is active on ${planName}`,
+          companyId: subscription.companyId.toString(),
+        });
+      }
+
+      if (subscription.status === SubscriptionStatus.CANCELLED && previousStatus !== SubscriptionStatus.CANCELLED) {
+        await this.superAdminNotificationsService.create({
+          type: 'subscription.cancelled',
+          title: 'Subscription cancelled',
+          message: `${companyName} subscription was cancelled`,
+          companyId: subscription.companyId.toString(),
+        });
+      }
+
+      if (subscription.status === SubscriptionStatus.PAST_DUE && previousStatus !== SubscriptionStatus.PAST_DUE) {
+        await this.superAdminNotificationsService.create({
+          type: 'subscription.payment_failed',
+          title: 'Subscription payment issue',
+          message: `${companyName} payment failed or is past due`,
+          companyId: subscription.companyId.toString(),
+        });
+      }
+    } catch (error) {
+      // Non-blocking
+    }
 
     return subscription;
   }

@@ -1,13 +1,13 @@
 import { Logger } from '@nestjs/common';
 import {
-  ConnectedSocket,
-  MessageBody,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  OnGatewayInit,
-  SubscribeMessage,
-  WebSocketGateway,
-  WebSocketServer,
+    ConnectedSocket,
+    MessageBody,
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnGatewayInit,
+    SubscribeMessage,
+    WebSocketGateway,
+    WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
@@ -27,7 +27,9 @@ export class WebsocketsGateway
   private logger: Logger = new Logger('WebSocketGateway');
   private rooms: Map<string, Set<string>> = new Map(); // branchId -> Set<socketId>
   private userRooms: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
+  private roleRooms: Map<string, Set<string>> = new Map(); // role -> Set<socketId>
   private socketToUser: Map<string, string> = new Map(); // socketId -> userId
+  private socketToRole: Map<string, string> = new Map(); // socketId -> role
 
   afterInit(server: Server) {
     this.logger.log('WebSocket Gateway initialized');
@@ -73,6 +75,20 @@ export class WebsocketsGateway
       this.socketToUser.delete(client.id);
       client.leave(`user:${userId}`);
     }
+
+    // Remove from role room
+    const role = this.socketToRole.get(client.id);
+    if (role) {
+      const sockets = this.roleRooms.get(role);
+      if (sockets) {
+        sockets.delete(client.id);
+        if (sockets.size === 0) {
+          this.roleRooms.delete(role);
+        }
+      }
+      this.socketToRole.delete(client.id);
+      client.leave(`role:${role}`);
+    }
   }
 
   @SubscribeMessage('join-branch')
@@ -116,6 +132,39 @@ export class WebsocketsGateway
       success: true,
       message: `Left branch ${branchId}`,
     };
+  }
+
+  @SubscribeMessage('join-role')
+  handleJoinRole(
+    @MessageBody() data: { role: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { role } = data;
+    if (!role) {
+      return { success: false, message: 'Role is required' };
+    }
+
+    const normalizedRole = role.toLowerCase();
+
+    if (!this.roleRooms.has(normalizedRole)) {
+      this.roleRooms.set(normalizedRole, new Set());
+    }
+
+    this.roleRooms.get(normalizedRole).add(client.id);
+    this.socketToRole.set(client.id, normalizedRole);
+    client.join(`role:${normalizedRole}`);
+
+    this.logger.log(`Client ${client.id} joined role ${normalizedRole}`);
+
+    return {
+      success: true,
+      message: `Joined role ${normalizedRole}`,
+    };
+  }
+
+  broadcastToRole(role: string, event: string, payload: any) {
+    const normalizedRole = role.toLowerCase();
+    this.server.to(`role:${normalizedRole}`).emit(event, payload);
   }
 
   @SubscribeMessage('join-table')

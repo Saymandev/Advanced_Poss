@@ -11,3 +11,18 @@ export class Verify2FADto {
   backupCode?: string;
 }
 
+export class Verify2FALoginDto {
+  @IsString()
+  @IsNotEmpty()
+  temporaryToken: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Length(6, 6)
+  token?: string;
+
+  @IsString()
+  @IsOptional()
+  backupCode?: string;
+}
+

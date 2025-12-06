@@ -56,6 +56,9 @@ export class User {
   @Prop({ select: false })
   twoFactorSecret?: string;
 
+  @Prop({ type: [String], select: false, default: [] })
+  twoFactorBackupCodes?: string[];
+
   // Role-specific fields
   @Prop({ type: Types.ObjectId, ref: 'Company' })
   companyId?: Types.ObjectId;
@@ -124,6 +127,7 @@ UserSchema.set('toJSON', {
     delete ret.pin;
     delete ret.refreshToken;
     delete ret.twoFactorSecret;
+    delete ret.twoFactorBackupCodes;
     delete ret.emailVerificationToken;
     delete ret.resetPasswordToken;
     return ret;

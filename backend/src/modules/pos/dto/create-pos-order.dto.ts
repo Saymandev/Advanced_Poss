@@ -144,7 +144,7 @@ export class CreatePOSOrderDto {
   status: string;
 
   @IsOptional()
-  @IsEnum(['cash', 'card', 'split'])
+  @IsString()
   paymentMethod?: string;
 
   @IsOptional()

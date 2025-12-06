@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Types } from 'mongoose';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { EmailService } from '../../common/services/email.service';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
@@ -24,6 +25,9 @@ import { PinLoginWithRoleDto } from './dto/pin-login-with-role.dto';
 import { PinLoginDto } from './dto/pin-login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SuperAdminLoginDto } from './dto/super-admin-login.dto';
+import { Verify2FALoginDto } from './dto/verify-2fa.dto';
+import { TwoFactorService } from './two-factor.service';
+import { SuperAdminNotificationsService } from '../super-admin-notifications/super-admin-notifications.service';
 
 @Injectable()
 export class AuthService {
@@ -38,6 +42,9 @@ export class AuthService {
     private loginSecurityService: LoginSecurityService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private emailService: EmailService,
+    private twoFactorService: TwoFactorService,
+    private superAdminNotificationsService: SuperAdminNotificationsService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -152,6 +159,32 @@ export class AuthService {
 
     if (!user.isActive) {
       throw new UnauthorizedException('Account is deactivated');
+    }
+
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      const temporaryToken = await this.generateTemporaryToken(user);
+
+      this.logger.log(`✅ SUPER ADMIN LOGIN - 2FA Required`);
+      this.logger.log(`👤 User: ${user.email} (${user.firstName} ${user.lastName})`);
+      this.logger.log(`🔐 Temporary token issued for 2FA verification`);
+      this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+      return {
+        requires2FA: true,
+        temporaryToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          companyId: user.companyId,
+          branchId: user.branchId,
+          isSuperAdmin: true,
+        },
+        message: '2FA verification required. Please verify your 2FA code.',
+      };
     }
 
     // Generate tokens
@@ -319,8 +352,16 @@ export class AuthService {
       emailVerificationToken: verificationToken,
     } as any);
 
-    // TODO: Send verification email
-    // await this.mailService.sendVerificationEmail(user.email, verificationToken);
+    // Send verification email
+    try {
+      await this.emailService.sendVerificationEmail(
+        user.email,
+        verificationToken,
+        user.firstName,
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to send verification email to ${user.email}:`, error);
+    }
 
     const tokens = await this.generateTokens(user);
     // @ts-ignore - Mongoose virtual property
@@ -445,6 +486,22 @@ export class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user);
     await this.usersService.updateRefreshToken((user as any)._id.toString(), tokens.refreshToken);
+
+    // Notify super admins about the new company registration
+    try {
+      await this.superAdminNotificationsService.create({
+        type: 'company.registered',
+        title: 'New company registered',
+        message: `${company.name} just registered with plan ${subscriptionPlan.displayName || subscriptionPlan.name}`,
+        companyId: (company as any)._id.toString(),
+        metadata: {
+          companyName,
+          plan: subscriptionPlan.name,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to create super-admin notification for new company: ${error?.message || error}`);
+    }
 
     // Format branch address for response
     let formattedBranchAddress = '';
@@ -658,6 +715,25 @@ export class AuthService {
     await this.usersService.updatePassword(user.id, newPassword);
 
     return { message: 'Password reset successfully' };
+  }
+
+  private async generateTemporaryToken(user: any) {
+    const payload = {
+      sub: user.id || user._id?.toString(),
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId?.toString(),
+      branchId: user.branchId?.toString(),
+      twoFactorRequired: true,
+    };
+
+    const accessSecret = this.configService.get('jwt.secret');
+    const expiresIn = '5m'; // 5 minutes for 2FA verification
+
+    return this.jwtService.signAsync(payload, {
+      secret: accessSecret,
+      expiresIn,
+    });
   }
 
   private async generateTokens(user: any) {
@@ -1255,6 +1331,38 @@ export class AuthService {
     // ObjectId casting issues from legacy data. Login activity already records
     // the last successful login time, so this is safe to omit.
 
+    // Check if 2FA is enabled
+    if (userWithPin.twoFactorEnabled) {
+      const temporaryToken = await this.generateTemporaryToken(userWithPin);
+
+      this.logger.log(`✅ PIN LOGIN WITH ROLE - 2FA Required`);
+      this.logger.log(`👤 User: ${user.email} (${user.firstName} ${user.lastName})`);
+      this.logger.log(`🎭 Role: ${user.role}`);
+      this.logger.log(`🏢 Company: ${user.companyId}`);
+      this.logger.log(`📍 Branch: ${user.branchId}`);
+      this.logger.log(`🔐 Temporary token issued for 2FA verification`);
+      this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+      return {
+        success: true,
+        requires2FA: true,
+        temporaryToken,
+        data: {
+          user: {
+            id: validUserId,
+            email: userWithPin.email,
+            firstName: userWithPin.firstName,
+            lastName: userWithPin.lastName,
+            role: userWithPin.role,
+            companyId: userWithPin.companyId,
+            branchId: userWithPin.branchId
+          },
+          sessionId
+        },
+        message: '2FA verification required. Please verify your 2FA code.',
+      };
+    }
+
     const result = {
       success: true,
       data: {
@@ -1308,6 +1416,191 @@ export class AuthService {
       // Log error but don't fail the login process
       console.error('Failed to log login activity:', error);
     }
+  }
+
+  // 2FA Methods
+  async setup2FA(userId: string) {
+    const user = await this.usersService.findOne(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is already enabled');
+    }
+
+    const { secret, qrCode } = await this.twoFactorService.generateSecret(user.email);
+    const backupCodes = this.twoFactorService.generateBackupCodes(10);
+
+    // Store secret and backup codes temporarily (not enabled yet)
+    await this.usersService.update(userId, {
+      twoFactorSecret: secret,
+      twoFactorBackupCodes: backupCodes,
+    } as any);
+
+    return {
+      secret,
+      qrCode,
+      backupCodes, // Show backup codes only during setup
+      message: 'Scan the QR code with your authenticator app and enter the code to enable 2FA',
+    };
+  }
+
+  async enable2FA(userId: string, token: string) {
+    const user = await this.usersService.findOne(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.twoFactorSecret) {
+      throw new BadRequestException('2FA setup not initiated. Please call /auth/2fa/setup first');
+    }
+
+    if (user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is already enabled');
+    }
+
+    // Verify the token
+    const isValid = this.twoFactorService.verifyToken(token, user.twoFactorSecret);
+    if (!isValid) {
+      throw new BadRequestException('Invalid 2FA token');
+    }
+
+    // Enable 2FA
+    await this.usersService.update(userId, {
+      twoFactorEnabled: true,
+    } as any);
+
+    return {
+      message: '2FA enabled successfully',
+      backupCodes: user.twoFactorBackupCodes || [],
+    };
+  }
+
+  async disable2FA(userId: string, password: string) {
+    const user = await this.usersService.findOne(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is not enabled');
+    }
+
+    // Verify password before disabling
+    const isPasswordValid = await PasswordUtil.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    // Disable 2FA
+    await this.usersService.update(userId, {
+      twoFactorEnabled: false,
+      twoFactorSecret: undefined,
+      twoFactorBackupCodes: [],
+    } as any);
+
+    return {
+      message: '2FA disabled successfully',
+    };
+  }
+
+  async verify2FAToken(userId: string, token: string, backupCode?: string): Promise<boolean> {
+    const user = await this.usersService.findOne(userId);
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      return false;
+    }
+
+    // Try backup code first if provided
+    if (backupCode && user.twoFactorBackupCodes && user.twoFactorBackupCodes.length > 0) {
+      const isValidBackup = this.twoFactorService.verifyBackupCode(backupCode, user.twoFactorBackupCodes);
+      if (isValidBackup) {
+        // Remove used backup code
+        const updatedCodes = this.twoFactorService.removeBackupCode(backupCode, user.twoFactorBackupCodes);
+        await this.usersService.update(userId, {
+          twoFactorBackupCodes: updatedCodes,
+        } as any);
+        return true;
+      }
+    }
+
+    // Verify TOTP token
+    return this.twoFactorService.verifyToken(token, user.twoFactorSecret);
+  }
+
+  async regenerateBackupCodes(userId: string, password: string) {
+    const user = await this.usersService.findOne(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is not enabled');
+    }
+
+    // Verify password
+    const isPasswordValid = await PasswordUtil.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    // Generate new backup codes
+    const backupCodes = this.twoFactorService.generateBackupCodes(10);
+    await this.usersService.update(userId, {
+      twoFactorBackupCodes: backupCodes,
+    } as any);
+
+    return {
+      backupCodes,
+      message: 'Backup codes regenerated successfully',
+    };
+  }
+
+  async verify2FALogin(verify2FALoginDto: Verify2FALoginDto) {
+    const { temporaryToken, token, backupCode } = verify2FALoginDto;
+
+    // Verify the temporary token
+    const payload = this.jwtService.verify(temporaryToken, {
+      secret: this.configService.get('jwt.secret'),
+    });
+
+    if (!payload || !payload.sub || !payload.twoFactorRequired) {
+      throw new UnauthorizedException('Invalid temporary token');
+    }
+
+    // Get the user
+    const user = await this.usersService.findOne(payload.sub);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Get user ID safely
+    const userId = (user as any).id || (user as any)._id?.toString();
+
+    // Verify 2FA token
+    const is2FAValid = await this.verify2FAToken(userId, token, backupCode);
+    if (!is2FAValid) {
+      throw new UnauthorizedException('Invalid 2FA token or backup code');
+    }
+
+    // Generate full access tokens
+    const tokens = await this.generateTokens(user);
+
+    // Save refresh token
+    await this.usersService.updateRefreshToken(userId, tokens.refreshToken);
+
+    return {
+      user: {
+        id: userId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        companyId: user.companyId,
+        branchId: user.branchId,
+      },
+      tokens,
+    };
   }
 }
 

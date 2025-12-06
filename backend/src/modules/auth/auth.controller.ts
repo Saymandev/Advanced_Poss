@@ -1,11 +1,11 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Req,
-  UseGuards,
+    Body,
+    Controller,
+    Get,
+    Param,
+    Post,
+    Req,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -15,6 +15,7 @@ import { AuthService } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangePinDto } from './dto/change-pin.dto';
 import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
+import { Enable2FADto } from './dto/enable-2fa.dto';
 import { FindCompanyDto } from './dto/find-company.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -24,6 +25,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SuperAdminLoginDto } from './dto/super-admin-login.dto';
+import { Verify2FADto, Verify2FALoginDto } from './dto/verify-2fa.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -293,6 +295,129 @@ export class AuthController {
       changePinDto.currentPin,
       changePinDto.newPin,
     );
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('2fa/setup')
+  @ApiOperation({ summary: 'Setup 2FA - Generate QR code and secret' })
+  @ApiResponse({
+    status: 200,
+    description: '2FA setup initiated',
+    schema: {
+      example: {
+        secret: 'JBSWY3DPEHPK3PXP',
+        qrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...',
+        backupCodes: ['ABCD-1234', 'EFGH-5678'],
+        message: 'Scan the QR code with your authenticator app and enter the code to enable 2FA',
+      },
+    },
+  })
+  setup2FA(@CurrentUser('id') userId: string) {
+    return this.authService.setup2FA(userId);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/enable')
+  @ApiOperation({ summary: 'Enable 2FA with verification token' })
+  @ApiResponse({
+    status: 200,
+    description: '2FA enabled successfully',
+    schema: {
+      example: {
+        message: '2FA enabled successfully',
+        backupCodes: ['ABCD-1234', 'EFGH-5678'],
+      },
+    },
+  })
+  enable2FA(
+    @CurrentUser('id') userId: string,
+    @Body() enable2FADto: Enable2FADto,
+  ) {
+    return this.authService.enable2FA(userId, enable2FADto.token);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/disable')
+  @ApiOperation({ summary: 'Disable 2FA (requires password verification)' })
+  @ApiResponse({
+    status: 200,
+    description: '2FA disabled successfully',
+  })
+  disable2FA(
+    @CurrentUser('id') userId: string,
+    @Body() body: { password: string },
+  ) {
+    return this.authService.disable2FA(userId, body.password);
+  }
+
+  @Public()
+  @Post('2fa/verify')
+  @ApiOperation({ summary: 'Verify 2FA token during login' })
+  @ApiResponse({
+    status: 200,
+    description: '2FA token verified successfully',
+  })
+  verify2FA(
+    @Body() verify2FADto: Verify2FADto & { userId: string },
+  ) {
+    return this.authService.verify2FAToken(
+      verify2FADto.userId,
+      verify2FADto.token || '',
+      verify2FADto.backupCode,
+    );
+  }
+
+  @Public()
+  @Post('2fa/verify-login')
+  @ApiOperation({ summary: 'Verify 2FA token after login and get full access tokens' })
+  @ApiResponse({
+    status: 200,
+    description: '2FA verified successfully, full access tokens provided',
+    schema: {
+      example: {
+        user: {
+          id: '507f1f77bcf86cd799439010',
+          email: 'user@restaurant.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          role: 'waiter',
+          companyId: '507f1f77bcf86cd799439012',
+          branchId: '507f1f77bcf86cd799439011'
+        },
+        tokens: {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Invalid temporary token or 2FA code' })
+  verify2FALogin(@Body() verify2FALoginDto: Verify2FALoginDto) {
+    return this.authService.verify2FALogin(verify2FALoginDto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/regenerate-backup-codes')
+  @ApiOperation({ summary: 'Regenerate 2FA backup codes (requires password)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Backup codes regenerated',
+    schema: {
+      example: {
+        backupCodes: ['ABCD-1234', 'EFGH-5678'],
+        message: 'Backup codes regenerated successfully',
+      },
+    },
+  })
+  regenerateBackupCodes(
+    @CurrentUser('id') userId: string,
+    @Body() body: { password: string },
+  ) {
+    return this.authService.regenerateBackupCodes(userId, body.password);
   }
 }
 

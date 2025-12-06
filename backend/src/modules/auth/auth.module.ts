@@ -1,12 +1,16 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
+import { EmailService } from '../../common/services/email.service';
 import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { LoginActivityModule } from '../login-activity/login-activity.module';
 import { SettingsModule } from '../settings/settings.module';
+import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schemas/subscription-plan.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
+import { SuperAdminNotificationsModule } from '../super-admin-notifications/super-admin-notifications.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -21,8 +25,12 @@ import { TwoFactorService } from './two-factor.service';
     forwardRef(() => BranchesModule),
     forwardRef(() => SubscriptionPlansModule),
     forwardRef(() => LoginActivityModule),
+    forwardRef(() => SuperAdminNotificationsModule),
     SettingsModule,
     PassportModule,
+    MongooseModule.forFeature([
+      { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -35,7 +43,7 @@ import { TwoFactorService } from './two-factor.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, TwoFactorService, JwtStrategy, LocalStrategy],
+  providers: [AuthService, TwoFactorService, JwtStrategy, LocalStrategy, EmailService],
   exports: [AuthService, TwoFactorService],
 })
 export class AuthModule {}

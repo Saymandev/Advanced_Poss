@@ -1,19 +1,22 @@
 import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    Logger,
+    NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { EmailService } from '../../common/services/email.service';
+import { SmsService } from '../../common/services/sms.service';
 import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import {
-  CreateCampaignDto,
+    CreateCampaignDto,
 } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import {
-  MarketingCampaign,
-  MarketingCampaignDocument,
+    MarketingCampaign,
+    MarketingCampaignDocument,
 } from './schemas/marketing-campaign.schema';
 
 @Injectable()
@@ -25,6 +28,9 @@ export class MarketingService {
     private campaignModel: Model<MarketingCampaignDocument>,
     @InjectModel(Customer.name)
     private customerModel: Model<CustomerDocument>,
+    private emailService: EmailService,
+    private smsService: SmsService,
+    private configService: ConfigService,
   ) {}
 
   async create(
@@ -224,6 +230,7 @@ export class MarketingService {
   async send(id: string, companyId: string): Promise<{
     message: string;
     sent: number;
+    failed: number;
   }> {
     const campaign = await this.findOne(id, companyId);
 
@@ -235,32 +242,177 @@ export class MarketingService {
       throw new BadRequestException('Cannot send a draft campaign. Please activate it first.');
     }
 
-    // TODO: Implement actual sending logic (email, SMS, push notifications)
-    // For now, just mark as sent
-    const updated = await this.campaignModel
-      .findByIdAndUpdate(
+    // Get recipients based on campaign target
+    const recipients = await this.getRecipients(
+      companyId,
+      campaign.branchId?.toString(),
+      campaign.target,
+      campaign.segment,
+    );
+
+    if (recipients.length === 0) {
+      throw new BadRequestException('No recipients found for this campaign');
+    }
+
+    let sent = 0;
+    let failed = 0;
+
+    try {
+      // Send based on campaign type
+      if (campaign.type === 'email') {
+        const frontendUrl = this.configService.get('frontend.url');
+        const unsubscribeUrl = `${frontendUrl}/unsubscribe?campaign=${id}&email={email}`;
+        
+        const emailRecipients = recipients
+          .filter((r) => r.email)
+          .map((r) => ({
+            email: r.email!,
+            name: `${r.firstName} ${r.lastName}`.trim(),
+          }));
+
+        const result = await this.emailService.sendBulkMarketingEmails(
+          emailRecipients,
+          campaign.subject || 'Marketing Campaign',
+          campaign.message,
+          undefined, // Company name could be fetched if needed
+          unsubscribeUrl,
+        );
+
+        sent = result.sent;
+        failed = result.failed;
+
+        // Update campaign stats
+        await this.campaignModel.findByIdAndUpdate(id, {
+          $inc: { opened: 0, clicked: 0, converted: 0 },
+        }).exec();
+
+      } else if (campaign.type === 'sms') {
+        const smsRecipients = recipients
+          .filter((r) => r.phone)
+          .map((r) => r.phone!);
+
+        const result = await this.smsService.sendBulkSms(
+          smsRecipients,
+          campaign.message,
+        );
+
+        sent = result.sent;
+        failed = result.failed;
+
+      } else if (campaign.type === 'push') {
+        // Push notifications would require a push notification service
+        this.logger.warn('Push notification campaigns are not yet implemented');
+        throw new BadRequestException('Push notification campaigns are not yet supported');
+      } else if (campaign.type === 'loyalty' || campaign.type === 'coupon') {
+        // Loyalty and coupon campaigns might need different handling
+        // For now, send as email if email exists
+        const emailRecipients = recipients
+          .filter((r) => r.email)
+          .map((r) => ({
+            email: r.email!,
+            name: `${r.firstName} ${r.lastName}`.trim(),
+          }));
+
+        if (emailRecipients.length > 0) {
+          const result = await this.emailService.sendBulkMarketingEmails(
+            emailRecipients,
+            campaign.subject || 'Special Offer',
+            campaign.message,
+          );
+          sent = result.sent;
+          failed = result.failed;
+        }
+      }
+
+      // Update campaign status
+      const updated = await this.campaignModel.findByIdAndUpdate(
         id,
         {
-          status: 'active',
+          status: 'completed',
           sentDate: new Date(),
+          recipients: sent,
         },
         { new: true },
-      )
+      ).lean().exec();
+
+      if (!updated) {
+        throw new NotFoundException('Campaign not found');
+      }
+
+      this.logger.log(
+        `Campaign ${id} sent: ${sent} successful, ${failed} failed`,
+      );
+
+      return {
+        message: `Campaign sent successfully. ${sent} delivered, ${failed} failed.`,
+        sent,
+        failed,
+      };
+    } catch (error: any) {
+      this.logger.error(`Failed to send campaign ${id}:`, error);
+      
+      // Update campaign with error status
+      await this.campaignModel.findByIdAndUpdate(id, {
+        status: 'paused',
+      }).exec();
+
+      throw new BadRequestException(
+        `Failed to send campaign: ${error.message || 'Unknown error'}`,
+      );
+    }
+  }
+
+  private async getRecipients(
+    companyId: string,
+    branchId?: string,
+    target?: 'all' | 'loyalty' | 'new' | 'inactive' | 'segment',
+    segment?: string,
+  ): Promise<Array<{ email?: string; phone?: string; firstName: string; lastName: string }>> {
+    const query: any = {
+      companyId: new Types.ObjectId(companyId),
+      isActive: true,
+    };
+
+    // Filter by branch
+    if (branchId && Types.ObjectId.isValid(branchId)) {
+      const branchObjectId = new Types.ObjectId(branchId);
+      query.$or = [
+        { branchId: branchObjectId },
+        { branchId: { $exists: false } },
+        { branchId: null },
+      ];
+    }
+
+    // Filter by target audience
+    if (target === 'loyalty') {
+      query.loyaltyPoints = { $gt: 0 };
+    } else if (target === 'new') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      query.firstOrderDate = { $gte: thirtyDaysAgo };
+    } else if (target === 'inactive') {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      query.$or = [
+        { lastOrderDate: { $lt: ninetyDaysAgo } },
+        { lastOrderDate: { $exists: false } },
+      ];
+    } else if (target === 'segment' && segment) {
+      query.tags = { $in: [segment] };
+    }
+
+    const customers = await this.customerModel
+      .find(query)
+      .select('email phone firstName lastName')
       .lean()
       .exec();
 
-    if (!updated) {
-      throw new NotFoundException('Campaign not found');
-    }
-
-    this.logger.log(
-      `Campaign ${id} marked as sent to ${updated.recipients} recipients`,
-    );
-
-    return {
-      message: 'Campaign sent successfully',
-      sent: updated.recipients,
-    };
+    return customers.map((c: any) => ({
+      email: c.email,
+      phone: c.phone,
+      firstName: c.firstName || '',
+      lastName: c.lastName || '',
+    }));
   }
 
   private async calculateRecipients(
@@ -352,6 +504,87 @@ export class MarketingService {
       completed,
       paused,
       draft,
+    };
+  }
+
+  async trackOpen(campaignId: string, email?: string): Promise<void> {
+    try {
+      const campaign = await this.campaignModel.findById(campaignId).exec();
+      if (!campaign) {
+        this.logger.warn(`Campaign ${campaignId} not found for open tracking`);
+        return;
+      }
+
+      // Increment opened count (deduplication would require storing individual opens)
+      await this.campaignModel.findByIdAndUpdate(campaignId, {
+        $inc: { opened: 1 },
+      }).exec();
+
+      this.logger.debug(`Tracked open for campaign ${campaignId}${email ? ` from ${email}` : ''}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to track open for campaign ${campaignId}:`, error);
+    }
+  }
+
+  async trackClick(campaignId: string, email?: string, url?: string): Promise<void> {
+    try {
+      const campaign = await this.campaignModel.findById(campaignId).exec();
+      if (!campaign) {
+        this.logger.warn(`Campaign ${campaignId} not found for click tracking`);
+        return;
+      }
+
+      // Increment clicked count
+      await this.campaignModel.findByIdAndUpdate(campaignId, {
+        $inc: { clicked: 1 },
+      }).exec();
+
+      this.logger.debug(
+        `Tracked click for campaign ${campaignId}${email ? ` from ${email}` : ''}${url ? ` to ${url}` : ''}`,
+      );
+    } catch (error: any) {
+      this.logger.error(`Failed to track click for campaign ${campaignId}:`, error);
+    }
+  }
+
+  async trackConversion(campaignId: string): Promise<void> {
+    try {
+      await this.campaignModel.findByIdAndUpdate(campaignId, {
+        $inc: { converted: 1 },
+      }).exec();
+
+      this.logger.debug(`Tracked conversion for campaign ${campaignId}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to track conversion for campaign ${campaignId}:`, error);
+    }
+  }
+
+  async getAnalytics(
+    campaignId: string,
+    companyId: string,
+  ): Promise<{
+    campaign: MarketingCampaign;
+    openRate: number;
+    clickRate: number;
+    conversionRate: number;
+  }> {
+    const campaign = await this.findOne(campaignId, companyId);
+
+    const openRate = campaign.recipients > 0
+      ? (campaign.opened / campaign.recipients) * 100
+      : 0;
+    const clickRate = campaign.recipients > 0
+      ? (campaign.clicked / campaign.recipients) * 100
+      : 0;
+    const conversionRate = campaign.recipients > 0
+      ? (campaign.converted / campaign.recipients) * 100
+      : 0;
+
+    return {
+      campaign,
+      openRate: Math.round(openRate * 100) / 100,
+      clickRate: Math.round(clickRate * 100) / 100,
+      conversionRate: Math.round(conversionRate * 100) / 100,
     };
   }
 }
