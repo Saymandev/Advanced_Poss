@@ -231,19 +231,19 @@ const navigation: NavigationItem[] = [
     name: 'AI Features',
     href: '/dashboard/ai-menu-optimization',
     icon: ChartBarIcon,
-    requiredFeature: ['menu-management', 'customer-management'], // Show if user has ANY
+    requiredFeature: ['ai-menu-optimization', 'ai-customer-loyalty'], // Show if user has ANY AI feature
     children: [
       {
         name: 'Menu Optimization',
         href: '/dashboard/ai-menu-optimization',
         icon: ChartBarIcon,
-        requiredFeature: 'menu-management',
+        requiredFeature: 'ai-menu-optimization', // Must match backend guard
       },
       {
         name: 'Customer Loyalty AI',
         href: '/dashboard/customer-loyalty-ai',
         icon: UserGroupIcon,
-        requiredFeature: ['customer-management', 'loyalty-program'],
+        requiredFeature: 'ai-customer-loyalty', // Must match backend guard and route map
       },
     ],
   },
@@ -251,7 +251,7 @@ const navigation: NavigationItem[] = [
     name: 'Marketing',
     href: '/dashboard/marketing',
     icon: GiftIcon,
-    requiredFeature: 'customer-management',
+    requiredFeature: 'marketing', // Only show for plans that include marketing feature
   },
   {
     name: 'Settings',

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
-import { useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
+import { useGetCustomerByIdQuery, useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import { useGetDeliveryZonesByBranchQuery } from '@/lib/api/endpoints/deliveryZonesApi';
 import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
@@ -273,6 +273,53 @@ export default function POSPage() {
     }
     return '';
   });
+
+  // Fetch customer details for loyalty points
+  const { data: selectedCustomer } = useGetCustomerByIdQuery(selectedCustomerId, {
+    skip: !selectedCustomerId,
+  });
+
+  // Calculate cart subtotal (before discounts) for loyalty redemption
+  const cartSubtotal = useMemo(() => {
+    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }, [cart]);
+
+  // Calculate loyalty redemption based on cart subtotal
+  const loyaltyRedemption = useMemo(() => {
+    if (!selectedCustomer || !selectedCustomerId) {
+      return { pointsRedeemed: 0, discount: 0 };
+    }
+
+    const MIN_ORDER_AMOUNT = 1000; // Minimum order amount in TK
+    const POINTS_PER_DISCOUNT = 2000; // 2000 points = 20 TK discount
+    const DISCOUNT_AMOUNT = 20; // 20 TK discount per 2000 points
+
+    const availablePoints = selectedCustomer.loyaltyPoints || 0;
+
+    // Check if order meets minimum amount requirement
+    if (cartSubtotal < MIN_ORDER_AMOUNT) {
+      return { pointsRedeemed: 0, discount: 0 };
+    }
+
+    // Calculate how many discount blocks can be applied
+    const discountBlocks = Math.floor(availablePoints / POINTS_PER_DISCOUNT);
+
+    if (discountBlocks > 0) {
+      // Apply maximum discount blocks (can be limited by order total)
+      const maxDiscount = discountBlocks * DISCOUNT_AMOUNT;
+      
+      // Discount cannot exceed cart subtotal
+      const discount = Math.min(maxDiscount, cartSubtotal);
+      
+      // Calculate points to redeem (in full blocks of 2000)
+      const blocksToRedeem = Math.floor(discount / DISCOUNT_AMOUNT);
+      const pointsRedeemed = blocksToRedeem * POINTS_PER_DISCOUNT;
+
+      return { pointsRedeemed, discount };
+    }
+
+    return { pointsRedeemed: 0, discount: 0 };
+  }, [selectedCustomer, selectedCustomerId, cartSubtotal]);
   const [deliveryDetails, setDeliveryDetails] = useState<DeliveryDetailsState>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pos_deliveryDetails');
@@ -815,17 +862,22 @@ export default function POSPage() {
             : Math.min(base.subtotal, parsed);
       }
     } else {
+      // Item-wise discounts
       discountAmount = cart.reduce((sum, item) => sum + getItemDiscountAmount(item), 0);
       discountAmount = Math.min(discountAmount, base.subtotal);
     }
 
-    const taxableSubtotal = Math.max(base.subtotal - discountAmount, 0);
+    // Add loyalty discount
+    const loyaltyDiscount = loyaltyRedemption.discount || 0;
+    const totalDiscount = discountAmount + loyaltyDiscount;
+
+    const taxableSubtotal = Math.max(base.subtotal - totalDiscount, 0);
     const taxAmount = (taxableSubtotal * taxRate) / 100;
     const total = taxableSubtotal + taxAmount + deliveryFeeValue;
 
     return {
       subtotal: base.subtotal,
-      discount: discountAmount,
+      discount: totalDiscount,
       tax: taxAmount,
       total,
       itemCount: base.itemCount,
@@ -839,6 +891,7 @@ export default function POSPage() {
     discountType,
     discountValue,
     getItemDiscountAmount,
+    loyaltyRedemption.discount,
   ]);
 
   // Initialize payment method when payment methods load
@@ -1711,6 +1764,15 @@ export default function POSPage() {
         totalAmount: Number(orderSummary.total.toFixed(2)),
         status: 'pending' as const,
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
+        ...(selectedCustomerId && loyaltyRedemption.pointsRedeemed > 0
+          ? {
+              customerId: selectedCustomerId,
+              loyaltyPointsRedeemed: loyaltyRedemption.pointsRedeemed,
+              loyaltyDiscount: loyaltyRedemption.discount,
+            }
+          : selectedCustomerId
+          ? { customerId: selectedCustomerId }
+          : {}),
       };
 
       const orderResponse = await createOrderWithRetry(orderData);
@@ -1762,6 +1824,8 @@ export default function POSPage() {
     discountValue,
     buildItemNotes,
     selectedCustomerId,
+    loyaltyRedemption.pointsRedeemed,
+    loyaltyRedemption.discount,
     refetchQueue,
     guestCount,
     refetchTables,
@@ -1933,6 +1997,15 @@ export default function POSPage() {
         paymentMethod: paymentMethodForBackend,
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
         ...(selectedWaiterId ? { waiterId: selectedWaiterId } : {}),
+        ...(selectedCustomerId && loyaltyRedemption.pointsRedeemed > 0
+          ? {
+              customerId: selectedCustomerId,
+              loyaltyPointsRedeemed: loyaltyRedemption.pointsRedeemed,
+              loyaltyDiscount: loyaltyRedemption.discount,
+            }
+          : selectedCustomerId
+          ? { customerId: selectedCustomerId }
+          : {}),
       };
 
       const orderResponse = await createOrderWithRetry(orderData);
@@ -3329,6 +3402,16 @@ export default function POSPage() {
                       Linked
                     </Badge>
                   )}
+                  {selectedCustomer && (
+                    <Badge className="bg-amber-500/10 text-amber-200 border border-amber-500/30">
+                      {selectedCustomer.loyaltyPoints || 0} Points
+                    </Badge>
+                  )}
+                  {loyaltyRedemption.pointsRedeemed > 0 && (
+                    <Badge className="bg-purple-500/10 text-purple-200 border border-purple-500/30">
+                      -{formatCurrency(loyaltyRedemption.discount)} Discount
+                    </Badge>
+                  )}
                         <Button
                           size="sm"
                     variant="secondary"
@@ -3372,6 +3455,36 @@ export default function POSPage() {
                   className="bg-slate-950/60 border-slate-850 text-slate-100"
                 />
               </div>
+              {selectedCustomer && (
+                <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-amber-200">Available Points:</span>
+                    <span className="font-semibold text-amber-100">{selectedCustomer.loyaltyPoints || 0}</span>
+                  </div>
+                  {loyaltyRedemption.pointsRedeemed > 0 && (
+                    <div className="mt-2 pt-2 border-t border-amber-500/30">
+                      <div className="flex items-center justify-between text-xs text-amber-300">
+                        <span>Redeeming:</span>
+                        <span>{loyaltyRedemption.pointsRedeemed} points</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-amber-200 mt-1">
+                        <span>Discount Applied:</span>
+                        <span className="font-semibold">-{formatCurrency(loyaltyRedemption.discount)}</span>
+                      </div>
+                    </div>
+                  )}
+                  {cartSubtotal >= 1000 && loyaltyRedemption.pointsRedeemed === 0 && (selectedCustomer.loyaltyPoints || 0) >= 2000 && (
+                    <div className="mt-2 text-xs text-amber-300">
+                      💡 You can redeem {Math.floor((selectedCustomer.loyaltyPoints || 0) / 2000) * 2000} points for {formatCurrency(Math.floor((selectedCustomer.loyaltyPoints || 0) / 2000) * 20)} discount
+                    </div>
+                  )}
+                  {cartSubtotal < 1000 && (selectedCustomer.loyaltyPoints || 0) >= 2000 && (
+                    <div className="mt-2 text-xs text-amber-400">
+                      ⚠️ Minimum order amount ৳1,000 required for loyalty redemption
+                    </div>
+                  )}
+                </div>
+              )}
           </div>
 
           {/* Delivery Details Section */}

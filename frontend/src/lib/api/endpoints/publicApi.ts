@@ -110,11 +110,21 @@ export const publicApi = apiSlice.injectEndpoints({
     }),
 
     getBranchMenu: builder.query<{
+      branch?: {
+        id: string;
+        name: string;
+        address?: any;
+      };
       categories: PublicCategory[];
       menuItems: PublicMenuItem[];
-    }, { companySlug: string; branchSlug: string }>({
-      query: ({ companySlug, branchSlug }) =>
-        `/public/companies/${companySlug}/branches/${branchSlug}/menu`,
+    }, { companySlug: string; branchSlug: string; menuType?: string }>({
+      query: ({ companySlug, branchSlug, menuType }) => {
+        const params = new URLSearchParams();
+        if (menuType && menuType !== 'full') {
+          params.append('type', menuType);
+        }
+        return `/public/companies/${companySlug}/branches/${branchSlug}/menu${params.toString() ? `?${params.toString()}` : ''}`;
+      },
       transformResponse: (response: any) => {
         const data = response.data || response;
         
@@ -137,6 +147,7 @@ export const publicApi = apiSlice.injectEndpoints({
         }
         
         return {
+          branch: data.branch,
           categories,
           menuItems,
         };

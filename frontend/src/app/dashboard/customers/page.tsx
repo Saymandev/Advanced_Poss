@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { CreateCustomerRequest, Customer, useCreateCustomerMutation, useDeleteCustomerMutation, useGetCustomerByIdQuery, useGetCustomerLoyaltyHistoryQuery, useGetCustomerOrdersQuery, useGetCustomersQuery, useUpdateCustomerMutation, useUpdateLoyaltyPointsMutation } from '@/lib/api/endpoints/customersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
@@ -24,7 +25,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 const LOYALTY_TIERS = [
   { value: 'bronze', label: 'Bronze', minPoints: 0, color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
@@ -185,7 +185,7 @@ export default function CustomersPage() {
     firstName: '',
     lastName: '',
     email: '',
-    phoneNumber: '',
+    phone: '',
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -201,7 +201,7 @@ export default function CustomersPage() {
       firstName: '',
       lastName: '',
       email: '',
-      phoneNumber: '',
+      phone: '',
     });
     setSelectedCustomer(null);
     setSelectedCustomerId('');
@@ -225,8 +225,8 @@ export default function CustomersPage() {
       errors.email = 'Please enter a valid email address';
     }
 
-    if (formData.phoneNumber && !/^[\d\s\-\+\(\)]+$/.test(formData.phoneNumber)) {
-      errors.phoneNumber = 'Please enter a valid phone number';
+    if (formData.phone && !/^[\d\s\-\+\(\)]+$/.test(formData.phone)) {
+      errors.phone = 'Please enter a valid phone number';
     }
 
     setFormErrors(errors);
@@ -253,8 +253,8 @@ export default function CustomersPage() {
       };
       
       // Only include phone if provided (now optional)
-      if (formData.phoneNumber && formData.phoneNumber.trim()) {
-        payload.phone = formData.phoneNumber.trim();
+      if (formData.phone && formData.phone.trim()) {
+        payload.phone = formData.phone.trim();
       }
       
       // Include branchId if available (now supported by CreateCustomerDto)
@@ -288,7 +288,7 @@ export default function CustomersPage() {
           setFormErrors({ email: 'This email is already registered' });
         } else if (errorMessage.includes('phone')) {
           errorMessage = 'A customer with this phone number already exists';
-          setFormErrors({ phoneNumber: 'This phone number is already registered' });
+          setFormErrors({ phone: 'This phone number is already registered' });
         } else {
           errorMessage = 'This customer already exists';
         }
@@ -317,10 +317,10 @@ export default function CustomersPage() {
     try {
       await updateCustomer({
         id: selectedCustomer.id,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phoneNumber: formData.phoneNumber,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      phone: formData.phone,
       }).unwrap();
       toast.success('Customer updated successfully');
       setIsEditModalOpen(false);
@@ -401,7 +401,7 @@ export default function CustomersPage() {
       firstName: customer.firstName,
       lastName: customer.lastName,
       email: customer.email,
-      phoneNumber: customer.phoneNumber || '',
+      phone: customer.phone || customer.phoneNumber || '',
     });
     setIsEditModalOpen(true);
   };
@@ -794,8 +794,8 @@ export default function CustomersPage() {
 
           <Input
             label="Phone Number (Optional)"
-            value={formData.phoneNumber}
-            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
           />
 
           <div className="flex justify-end gap-3 pt-4">
@@ -1057,8 +1057,8 @@ export default function CustomersPage() {
 
           <Input
             label="Phone Number (Optional)"
-            value={formData.phoneNumber}
-            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
           />
 
           <div className="flex justify-end gap-3 pt-4">

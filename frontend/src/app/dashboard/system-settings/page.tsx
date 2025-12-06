@@ -7,35 +7,56 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import {
-    SystemSettings,
-    useGetSystemSettingsQuery,
-    useUpdateSystemSettingsMutation,
-} from '@/lib/api/endpoints/settingsApi';
-import {
   useCreatePaymentMethodMutation,
   useDeletePaymentMethodMutation,
   useGetSystemPaymentMethodsQuery,
   useUpdatePaymentMethodMutation,
   type PaymentMethod,
 } from '@/lib/api/endpoints/paymentMethodsApi';
+import {
+  SystemSettings,
+  useGetSystemSettingsQuery,
+  useUpdateSystemSettingsMutation,
+} from '@/lib/api/endpoints/settingsApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import {
-    CheckCircleIcon,
-    CloudArrowDownIcon,
-    CogIcon,
-    CreditCardIcon,
-    DevicePhoneMobileIcon,
-    EnvelopeIcon,
-    ExclamationTriangleIcon,
-    LockClosedIcon,
-    PlusIcon,
-    ShieldCheckIcon,
-    TrashIcon,
+  CheckCircleIcon,
+  CloudArrowDownIcon,
+  CogIcon,
+  CreditCardIcon,
+  DevicePhoneMobileIcon,
+  EnvelopeIcon,
+  ExclamationTriangleIcon,
+  LockClosedIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+
+// Helper function to deep clone objects (prevents read-only property errors)
+// Moved outside component to prevent recreation on every render
+const deepClone = <T,>(obj: T): T => {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (obj instanceof Date) {
+    return new Date(obj.getTime()) as any;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => deepClone(item)) as any;
+  }
+  const cloned = {} as T;
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      cloned[key] = deepClone(obj[key]);
+    }
+  }
+  return cloned;
+};
 
 export default function SystemSettingsPage() {
   const { user } = useAppSelector((state) => state.auth);
@@ -61,7 +82,7 @@ export default function SystemSettingsPage() {
   const { data: paymentMethods = [], isLoading: paymentMethodsLoading, refetch: refetchPaymentMethods } = useGetSystemPaymentMethodsQuery();
   const [createPaymentMethod, { isLoading: isCreatingPaymentMethod }] = useCreatePaymentMethodMutation();
   const [updatePaymentMethod, { isLoading: isUpdatingPaymentMethod }] = useUpdatePaymentMethodMutation();
-  const [deletePaymentMethod, { isLoading: isDeletingPaymentMethod }] = useDeletePaymentMethodMutation();
+  const [deletePaymentMethod] = useDeletePaymentMethodMutation();
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
   const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentMethodForm, setPaymentMethodForm] = useState({
@@ -79,26 +100,6 @@ export default function SystemSettingsPage() {
     allowsPartialPayment: false,
     allowsChangeDue: true,
   });
-
-  // Helper function to deep clone objects (prevents read-only property errors)
-  const deepClone = <T,>(obj: T): T => {
-    if (obj === null || typeof obj !== 'object') {
-      return obj;
-    }
-    if (obj instanceof Date) {
-      return new Date(obj.getTime()) as any;
-    }
-    if (Array.isArray(obj)) {
-      return obj.map(item => deepClone(item)) as any;
-    }
-    const cloned = {} as T;
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        cloned[key] = deepClone(obj[key]);
-      }
-    }
-    return cloned;
-  };
 
   const [formData, setFormData] = useState<Partial<SystemSettings>>({});
 
@@ -593,6 +594,7 @@ export default function SystemSettingsPage() {
                 onChange={(value) => updateField('sms.provider', value)}
                 options={[
                   { value: 'twilio', label: 'Twilio' },
+                  { value: 'bulksmsbd', label: 'BulkSMSBD' },
                   { value: 'aws-sns', label: 'AWS SNS' },
                 ]}
               />
@@ -613,6 +615,32 @@ export default function SystemSettingsPage() {
                     label="From Number"
                     value={formData.sms?.fromNumber || ''}
                     onChange={(e) => updateField('sms.fromNumber', e.target.value)}
+                  />
+                </>
+              )}
+              {formData.sms?.provider === 'bulksmsbd' && (
+                <>
+                  <Input
+                    label="API Key"
+                    type="password"
+                    value={formData.sms?.apiKey || ''}
+                    onChange={(e) => updateField('sms.apiKey', e.target.value)}
+                  />
+                  <Input
+                    label="Sender ID"
+                    value={formData.sms?.senderId || ''}
+                    onChange={(e) => updateField('sms.senderId', e.target.value)}
+                  />
+                  <Input
+                    label="Endpoint (optional)"
+                    value={formData.sms?.endpoint || ''}
+                    onChange={(e) => updateField('sms.endpoint', e.target.value)}
+                    placeholder="https://bulksmsbd.net/api/smsapi"
+                  />
+                  <Input
+                    label="Default Country (e.g., BD)"
+                    value={formData.sms?.defaultCountry || 'BD'}
+                    onChange={(e) => updateField('sms.defaultCountry', e.target.value)}
                   />
                 </>
               )}
@@ -923,7 +951,7 @@ export default function SystemSettingsPage() {
           <Select
             label="Type"
             value={paymentMethodForm.type}
-            onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, type: e.target.value as PaymentMethod['type'] })}
+            onChange={(value) => setPaymentMethodForm({ ...paymentMethodForm, type: value as PaymentMethod['type'] })}
             options={[
               { value: 'cash', label: 'Cash' },
               { value: 'card', label: 'Card' },

@@ -9,7 +9,7 @@ import { useGetBranchMenuQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpo
 import { formatCurrency } from '@/lib/utils';
 import { ExclamationTriangleIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -24,8 +24,10 @@ interface CartItem {
 export default function BranchShopPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
+  const menuType = searchParams.get('type') || 'full';
 
   const { 
     data: company, 
@@ -41,7 +43,7 @@ export default function BranchShopPage() {
     isError: menuError,
     error: menuErrorData 
   } = useGetBranchMenuQuery(
-    { companySlug, branchSlug },
+    { companySlug, branchSlug, menuType: menuType !== 'full' ? menuType : undefined },
     { skip: !companySlug || !branchSlug }
   );
   

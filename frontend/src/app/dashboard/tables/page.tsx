@@ -582,41 +582,48 @@ export default function TablesPage() {
             {filteredTables.map((table: any) => (
               <div
                 key={table.id}
-                className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  table.status === 'available' ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' :
-                  table.status === 'occupied' ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20' :
-                  table.status === 'reserved' ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20' :
-                  'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'
+                className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-lg ${
+                  table.status === 'available' ? 'border-green-200 bg-white dark:bg-slate-900/60 dark:border-green-800' :
+                  table.status === 'occupied' ? 'border-red-200 bg-white dark:bg-slate-900/60 dark:border-red-800' :
+                  table.status === 'reserved' ? 'border-yellow-200 bg-white dark:bg-slate-900/60 dark:border-yellow-800' :
+                  'border-blue-200 bg-white dark:bg-slate-900/60 dark:border-blue-800'
                 }`}
                 onClick={() => openEditModal(table)}
               >
-                <div className="text-center">
-                  <div className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center ${
-                    table.status === 'available' ? 'bg-green-100 dark:bg-green-900/30' :
-                    table.status === 'occupied' ? 'bg-red-100 dark:bg-red-900/30' :
-                    table.status === 'reserved' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
-                    'bg-blue-100 dark:bg-blue-900/30'
-                  }`}>
-                    <span className={`text-sm font-bold ${
-                      table.status === 'available' ? 'text-green-600 dark:text-green-400' :
-                      table.status === 'occupied' ? 'text-red-600 dark:text-red-400' :
-                      table.status === 'reserved' ? 'text-yellow-600 dark:text-yellow-400' :
-                      'text-blue-600 dark:text-blue-400'
-                    }`}>
-                      {(table as any).tableNumber || table.number}
-                    </span>
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">TABLE NO.</p>
+                      <p className="text-xl font-bold text-gray-900 dark:text-white">
+                        {(table as any).tableNumber || table.number}
+                      </p>
+                    </div>
+                    {(table as any).location && (
+                      <Badge variant="secondary" className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700 px-2 py-1">
+                        {(table as any).location}
+                      </Badge>
+                    )}
                   </div>
-                  <p className={`text-xs font-medium ${
-                    table.status === 'available' ? 'text-green-700 dark:text-green-300' :
-                    table.status === 'occupied' ? 'text-red-700 dark:text-red-300' :
-                    table.status === 'reserved' ? 'text-yellow-700 dark:text-yellow-300' :
-                    'text-blue-700 dark:text-blue-300'
+                  <Badge className={`w-full justify-center ${
+                    table.status === 'available' 
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700' 
+                      : table.status === 'occupied'
+                      ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                      : table.status === 'reserved'
+                      ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700'
+                      : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700'
                   }`}>
-                    {table.status.replace('_', ' ')}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {table.capacity} seats
-                  </p>
+                    {table.status === 'available' 
+                      ? 'Available' 
+                      : table.status === 'reserved'
+                      ? 'Reserved'
+                      : 'Occupied'}
+                  </Badge>
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      Capacity: <span className="font-semibold text-gray-900 dark:text-white">{table.capacity} seats</span>
+                    </p>
+                  </div>
                 </div>
 
                 {table.currentOrderId && (

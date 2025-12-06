@@ -103,11 +103,14 @@ export interface SystemSettings {
   };
   sms: {
     enabled: boolean;
-    provider: 'twilio' | 'aws-sns';
+    provider: 'twilio' | 'aws-sns' | 'bulksmsbd';
     accountSid: string;
     authToken: string;
     fromNumber: string;
     apiKey: string;
+    senderId: string;
+    endpoint: string;
+    defaultCountry: string;
   };
   backup: {
     enabled: boolean;

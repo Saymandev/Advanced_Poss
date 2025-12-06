@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { CustomerLoyaltyInsight, useGetPersonalizedOffersMutation } from '@/lib/api/endpoints/aiApi';
 import { useGetCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import { useAppSelector } from '@/lib/store';
@@ -21,7 +22,7 @@ import {
   UserIcon,
   UsersIcon
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 const LOYALTY_TIERS = [
@@ -38,6 +39,10 @@ export default function CustomerLoyaltyAIPage() {
   const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerLoyaltyInsight | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Check subscription feature access using the standard hook
+  // This will automatically redirect to /dashboard/subscriptions if user doesn't have the feature
+  useFeatureRedirect('ai-customer-loyalty', '/dashboard/subscriptions');
 
   const companyId = (user as any)?.companyId || 
                    (companyContext as any)?.companyId;

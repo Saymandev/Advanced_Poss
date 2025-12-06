@@ -38,7 +38,7 @@ export const FEATURE_ROUTE_MAP: Record<string, string | string[] | null> = {
   
   // Customers
   '/dashboard/customers': 'customer-management',
-  '/dashboard/customer-loyalty-ai': ['customer-management', 'loyalty-program'],
+  '/dashboard/customer-loyalty-ai': 'ai-customer-loyalty', // Requires AI Customer Loyalty feature
   '/dashboard/marketing': 'marketing',
   
   // Inventory
@@ -62,7 +62,7 @@ export const FEATURE_ROUTE_MAP: Record<string, string | string[] | null> = {
   // '/dashboard/marketing': 'customer-management',
   
   // AI Features
-  '/dashboard/ai-menu-optimization': 'menu-management',
+  '/dashboard/ai-menu-optimization': 'ai-menu-optimization', // Must match backend guard FEATURES.AI_MENU_OPTIMIZATION
 };
 
 /**

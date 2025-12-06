@@ -14,6 +14,7 @@ import {
   useGetCampaignsQuery,
   usePauseCampaignMutation,
   useResumeCampaignMutation,
+  useSendCampaignMutation,
   useUpdateCampaignMutation
 } from '@/lib/api/endpoints/marketingApi';
 import { useAppSelector } from '@/lib/store';
@@ -59,6 +60,7 @@ export default function MarketingPage() {
   const [deleteCampaign] = useDeleteCampaignMutation();
   const [pauseCampaign] = usePauseCampaignMutation();
   const [resumeCampaign] = useResumeCampaignMutation();
+  const [sendCampaign, { isLoading: isSending }] = useSendCampaignMutation();
 
   // Use API campaigns as primary source, with localStorage as fallback
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
@@ -76,7 +78,7 @@ export default function MarketingPage() {
         }
       }
     }
-  }, []);
+  }, [apiCampaigns.length, isLoadingCampaigns]);
 
   // Update campaigns when API data is available
   useEffect(() => {
@@ -142,7 +144,7 @@ export default function MarketingPage() {
 
       // Try API first
       try {
-        const result = await createCampaign(formData).unwrap();
+        await createCampaign(formData).unwrap();
         await refetch();
         toast.success('Campaign created successfully');
         setIsCreateModalOpen(false);
@@ -471,6 +473,24 @@ export default function MarketingPage() {
                   </div>
 
                   <div className="flex items-center gap-2 ml-4">
+                    {!campaign.sentDate && campaign.status !== 'draft' && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await sendCampaign(campaignId.toString()).unwrap();
+                            await refetch();
+                            toast.success('Campaign sent successfully!');
+                          } catch (error: any) {
+                            toast.error(error?.data?.message || 'Failed to send campaign');
+                          }
+                        }}
+                        disabled={isSending}
+                      >
+                        {isSending ? 'Sending...' : 'Send Now'}
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -508,32 +528,77 @@ export default function MarketingPage() {
                         {campaign.recipients.toLocaleString()}
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Recipients</p>
+                      {campaign.sentDate && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Sent: {new Date(campaign.sentDate).toLocaleDateString()}
+                        </p>
+                      )}
+                      {!campaign.sentDate && campaign.status !== 'draft' && (
+                        <p className="text-xs text-yellow-600 mt-1">Not sent yet</p>
+                      )}
                     </div>
-                    {campaign.opened && (
-                      <div>
-                        <p className="text-2xl font-bold text-green-600">
-                          {((campaign.opened / campaign.recipients) * 100).toFixed(1)}%
+                    <div>
+                      <p className="text-2xl font-bold text-green-600">
+                        {campaign.opened ? ((campaign.opened / campaign.recipients) * 100).toFixed(1) : '0.0'}%
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Open Rate</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {campaign.opened || 0} opened
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {campaign.clicked 
+                          ? campaign.opened 
+                            ? ((campaign.clicked / campaign.opened) * 100).toFixed(1)
+                            : '0.0'
+                          : '0.0'}%
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Click Rate</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {campaign.clicked || 0} clicked
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {campaign.converted || 0}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Conversions</p>
+                      {campaign.recipients > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {((campaign.converted || 0) / campaign.recipients * 100).toFixed(1)}% rate
                         </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Opened</p>
-                      </div>
-                    )}
-                    {campaign.clicked && (
-                      <div>
-                        <p className="text-2xl font-bold text-blue-600">
-                          {((campaign.clicked / campaign.opened!) * 100).toFixed(1)}%
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Clicked</p>
-                      </div>
-                    )}
-                    {campaign.converted && (
-                      <div>
-                        <p className="text-2xl font-bold text-purple-600">
-                          {campaign.converted}
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Converted</p>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
+                  {campaign.sentDate && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between text-sm">
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-400">Performance: </span>
+                          <span className={`font-semibold ${
+                            campaign.opened && campaign.opened > 0
+                              ? 'text-green-600'
+                              : 'text-gray-400'
+                          }`}>
+                            {campaign.opened && campaign.opened > 0
+                              ? 'Active Engagement'
+                              : 'No Engagement Yet'}
+                          </span>
+                        </div>
+                        {campaign.type === 'email' && (
+                          <span className="text-gray-500 text-xs">
+                            Opens tracked via email pixel
+                          </span>
+                        )}
+                        {campaign.type === 'sms' && (
+                          <span className="text-gray-500 text-xs">
+                            SMS delivery confirmed
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
                 );

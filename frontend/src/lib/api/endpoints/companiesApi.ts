@@ -106,6 +106,7 @@ export interface SystemStats {
 }
 
 export const companiesApi = apiSlice.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     getCompanies: builder.query<{ companies: Company[]; total: number } | Company[], any>({
       query: (params) => ({

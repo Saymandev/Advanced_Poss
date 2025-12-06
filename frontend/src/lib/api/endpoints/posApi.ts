@@ -41,6 +41,9 @@ export interface CreatePOSOrderRequest {
   notes?: string;
   guestCount?: number;
   waiterId?: string; // Optional waiter/user ID to assign the order to
+  customerId?: string; // Customer ID for loyalty points
+  loyaltyPointsRedeemed?: number; // Loyalty points redeemed for this order
+  loyaltyDiscount?: number; // Discount amount from loyalty points
 }
 
 export interface POSOrder extends CreatePOSOrderRequest {
@@ -50,6 +53,9 @@ export interface POSOrder extends CreatePOSOrderRequest {
   updatedAt: string;
   branchId: string;
   userId: string;
+  customerId?: string;
+  loyaltyPointsRedeemed?: number;
+  loyaltyDiscount?: number;
 }
 
 export interface POSPayment {

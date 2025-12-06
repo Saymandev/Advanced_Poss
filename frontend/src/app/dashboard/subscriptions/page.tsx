@@ -1038,20 +1038,54 @@ export default function SubscriptionsPage() {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
       
+      const isUpdate = !!editingPlan?.id;
+      
       // Base payload - different for create vs update
       // Note: Currency is handled globally in Settings, not per plan
-      const payload: any = {
-        displayName: (formData.get('displayName') as string)?.trim(),
-        description: (formData.get('description') as string)?.trim(),
-        price: Number(formData.get('price') || 0),
-        billingCycle: (formData.get('billingCycle') as string) || 'monthly',
-        trialPeriod: Number(formData.get('trialPeriod') || 0),
-        isActive: formData.get('isActive') === 'on',
-      };
-
-      // Include name only for creation (not for updates - name is immutable)
-      if (!editingPlan?.id) {
+      const payload: any = {};
+      
+      // Always include displayName and description (text fields)
+      const displayName = (formData.get('displayName') as string)?.trim();
+      const description = (formData.get('description') as string)?.trim();
+      if (displayName) payload.displayName = displayName;
+      if (description) payload.description = description;
+      
+      if (isUpdate) {
+        // For updates: Only include fields that have actual values (not empty/0)
+        // This prevents overwriting existing data with empty values
+        const priceValue = formData.get('price') as string;
+        if (priceValue && priceValue.trim() !== '') {
+          const price = Number(priceValue);
+          if (!isNaN(price) && price >= 0) {
+            payload.price = price;
+          }
+        }
+        
+        const trialPeriodValue = formData.get('trialPeriod') as string;
+        if (trialPeriodValue && trialPeriodValue.trim() !== '') {
+          const trialPeriod = Number(trialPeriodValue);
+          if (!isNaN(trialPeriod) && trialPeriod >= 0) {
+            payload.trialPeriod = trialPeriod;
+          }
+        }
+        
+        // Always include isActive if checkbox exists (user explicitly sets it)
+        const isActiveCheckbox = formData.get('isActive');
+        if (isActiveCheckbox !== null) {
+          payload.isActive = isActiveCheckbox === 'on';
+        }
+        
+        const billingCycle = (formData.get('billingCycle') as string)?.trim();
+        if (billingCycle) {
+          payload.billingCycle = billingCycle;
+        }
+      } else {
+        // For creation: Include all required fields with defaults
         payload.name = (formData.get('name') as string)?.trim();
+        payload.price = Number(formData.get('price') || 0);
+        payload.billingCycle = (formData.get('billingCycle') as string) || 'monthly';
+        payload.trialPeriod = Number(formData.get('trialPeriod') || 0);
+        payload.isActive = formData.get('isActive') === 'on';
       }
 
       // Include enabledFeatureKeys if features are selected
@@ -1060,7 +1094,7 @@ export default function SubscriptionsPage() {
       }
 
       try {
-        if (editingPlan?.id) {
+        if (isUpdate) {
           await updatePlan({ id: editingPlan.id, data: payload }).unwrap();
           toast.success('Plan updated successfully');
           // Manually refetch plans to ensure UI updates

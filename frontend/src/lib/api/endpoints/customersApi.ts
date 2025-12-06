@@ -5,7 +5,8 @@ export interface Customer {
   firstName: string;
   lastName: string;
   email: string;
-  phoneNumber: string;
+  phone?: string;
+  phoneNumber?: string;
   dateOfBirth?: string;
   address?: {
     street: string;
@@ -34,7 +35,7 @@ export interface CreateCustomerRequest {
   firstName: string;
   lastName: string;
   email: string;
-  phoneNumber: string;
+  phone?: string;
   dateOfBirth?: string;
   address?: {
     street: string;
@@ -116,6 +117,7 @@ export const customersApi = apiSlice.injectEndpoints({
           firstName: data.firstName || '',
           lastName: data.lastName || '',
           email: data.email || '',
+          phone: data.phone || data.phoneNumber || '',
           phoneNumber: data.phone || data.phoneNumber || '',
           dateOfBirth: data.dateOfBirth,
           address: data.address,
@@ -141,7 +143,10 @@ export const customersApi = apiSlice.injectEndpoints({
       query: (data) => ({
         url: '/customers',
         method: 'POST',
-        body: data,
+        body: {
+          ...data,
+          phone: data.phone || (data as any).phoneNumber,
+        },
       }),
       transformResponse: (response: any) => {
         const data = response.data || response;
@@ -150,6 +155,7 @@ export const customersApi = apiSlice.injectEndpoints({
           firstName: data.firstName || '',
           lastName: data.lastName || '',
           email: data.email || '',
+          phone: data.phone || data.phoneNumber || '',
           phoneNumber: data.phone || data.phoneNumber || '',
           dateOfBirth: data.dateOfBirth,
           address: data.address,
@@ -188,7 +194,10 @@ export const customersApi = apiSlice.injectEndpoints({
       query: ({ id, ...data }) => ({
         url: `/customers/${id}`,
         method: 'PATCH',
-        body: data,
+        body: {
+          ...data,
+          phone: data.phone || (data as any).phoneNumber,
+        },
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: 'Customer', id }, 
