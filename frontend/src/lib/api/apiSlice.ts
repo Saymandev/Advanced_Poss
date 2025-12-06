@@ -402,6 +402,7 @@ export const apiSlice = createApi({
     'RolePermission',
     'MyPermissions',
     'Gallery',
+    'SuperAdminNotifications',
   ],
   endpoints: () => ({}),
 });

@@ -310,14 +310,38 @@ export default function DashboardPage() {
       }));
   }, [orders]);
 
+  // Payment method name mapping for better display
+  const getPaymentMethodDisplayName = (method: string): string => {
+    if (!method || method === 'unknown') return 'Unknown';
+
+    const methodMap: Record<string, string> = {
+      'cash': 'Cash',
+      'card': 'Card',
+      'bkash': 'bKash',
+      'nagad': 'Nagad',
+      'rocket': 'Rocket',
+      'upay': 'Upay',
+      'visa': 'Visa',
+      'mastercard': 'Mastercard',
+      'amex': 'American Express',
+      'split': 'Split Payment',
+      'bank_transfer': 'Bank Transfer',
+      'mobile_wallet': 'Mobile Wallet',
+      'due': 'Due',
+      'complimentary': 'Complimentary',
+    };
+
+    return methodMap[method.toLowerCase()] || method.charAt(0).toUpperCase() + method.slice(1);
+  };
+
   // Breakdown by Payment Methods
   const breakdownByPayment = useMemo(() => {
     if (!Array.isArray(orders) || orders.length === 0) {
       return [];
     }
-    
+
     const breakdown: Record<string, { orders: number; amount: number }> = {};
-    
+
     orders.forEach((order: any) => {
       const method = order.paymentMethod || order.payment_method || 'unknown';
       if (!breakdown[method]) {
@@ -329,11 +353,11 @@ export default function DashboardPage() {
         breakdown[method].amount += amount;
       }
     });
-    
+
     return Object.entries(breakdown)
       .filter(([, data]) => data.orders > 0) // Only show methods with orders
       .map(([method, data]) => ({
-        method: method.charAt(0).toUpperCase() + method.slice(1),
+        method: getPaymentMethodDisplayName(method),
         orders: data.orders,
         amount: data.amount,
       }));

@@ -96,6 +96,7 @@ export const useSocket = (): UseSocketReturn => {
   // Get user role for filtering notifications
   const userRole = (user as any)?.role?.toLowerCase();
   const isWaiter = userRole === 'waiter' || userRole === 'server';
+  const isSuperAdmin = userRole === 'super_admin';
 
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
@@ -104,7 +105,7 @@ export const useSocket = (): UseSocketReturn => {
 
   // Initialize socket connection
   useEffect(() => {
-    if (!branchId) return;
+    if (!branchId && !isSuperAdmin) return;
 
     const token = typeof window !== 'undefined' 
       ? localStorage.getItem('token') || sessionStorage.getItem('token')
@@ -126,6 +127,11 @@ export const useSocket = (): UseSocketReturn => {
       if (branchId) {
         newSocket.emit('join-branch', { branchId });
         branchIdRef.current = branchId;
+      }
+
+      // Join role room (for super admin notifications)
+      if (userRole) {
+        newSocket.emit('join-role', { role: userRole });
       }
 
       // Auto-join user room for personal notifications

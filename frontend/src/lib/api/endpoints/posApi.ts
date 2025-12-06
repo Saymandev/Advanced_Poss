@@ -37,7 +37,7 @@ export interface CreatePOSOrderRequest {
   };
   totalAmount: number;
   status: 'pending' | 'paid' | 'cancelled';
-  paymentMethod?: 'cash' | 'card' | 'split';
+  paymentMethod?: string;
   notes?: string;
   guestCount?: number;
   waiterId?: string; // Optional waiter/user ID to assign the order to

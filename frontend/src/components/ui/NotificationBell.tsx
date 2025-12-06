@@ -3,6 +3,8 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useSuperAdminNotifications } from '@/lib/hooks/useSuperAdminNotifications';
+import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
   BellIcon,
@@ -17,8 +19,38 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ className }: NotificationBellProps) {
-  const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotification, clearAll } = useNotifications();
-  const [isOpen, setIsOpen] = useState(false);
+  const { user } = useAppSelector((state) => state.auth);
+  const isSuperAdmin = user?.role?.toLowerCase() === 'super_admin';
+
+  const superAdmin = useSuperAdminNotifications();
+  const fallbackNotifications = useNotifications();
+  const [localOpen, setLocalOpen] = useState(false);
+
+  const active = isSuperAdmin ? superAdmin : {
+    notifications: fallbackNotifications.notifications,
+    unreadCount: fallbackNotifications.unreadCount,
+    markAsRead: fallbackNotifications.markAsRead,
+    markAllAsRead: fallbackNotifications.markAllAsRead,
+    clearNotification: fallbackNotifications.clearNotification,
+    clearAll: fallbackNotifications.clearAll,
+    refresh: () => {},
+    isFetching: false,
+    isOpen: localOpen,
+    setIsOpen: setLocalOpen,
+  };
+
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    clearNotification,
+    clearAll,
+    setIsOpen,
+    isOpen,
+    refresh,
+    isFetching,
+  } = active as any;
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -80,6 +112,17 @@ export function NotificationBell({ className }: NotificationBellProps) {
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
             <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
             <div className="flex items-center gap-2">
+              {isSuperAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => refresh?.()}
+                  className="text-xs"
+                  disabled={isFetching}
+                >
+                  {isFetching ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              )}
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"
