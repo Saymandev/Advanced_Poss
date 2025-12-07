@@ -37,14 +37,43 @@ export class TwoFactorService {
   // Verify 2FA token
   verifyToken(token: string, secret: string): boolean {
     try {
-      return speakeasy.totp.verify({
+      if (!secret || !token) {
+        console.error('Missing secret or token for 2FA verification');
+        return false;
+      }
+
+      // Clean the token (remove any whitespace)
+      const cleanToken = token.trim();
+      
+      console.log(`🔍 Verifying 2FA token: ${cleanToken}`);
+      console.log(`🔍 Secret (first 10 chars): ${secret.substring(0, 10)}...`);
+      console.log(`🔍 Secret length: ${secret.length}`);
+      
+      // Verify the token with wider window first (5 steps = 2.5 minutes tolerance)
+      const isValid = speakeasy.totp.verify({
         secret,
         encoding: 'base32',
-        token,
-        window: 2, // Allow 2 time steps (60 seconds) of tolerance
+        token: cleanToken,
+        window: 5, // Allow 5 time steps (2.5 minutes) of tolerance for clock drift
       });
+
+      console.log(`🔍 Verification result: ${isValid}`);
+      
+      if (!isValid) {
+        // Try generating what the current token should be for debugging
+        const currentToken = speakeasy.totp({
+          secret,
+          encoding: 'base32',
+        });
+        console.log(`🔍 Current expected token: ${currentToken}`);
+        console.log(`🔍 Token match: ${cleanToken === currentToken}`);
+      }
+
+      return isValid;
     } catch (error) {
       console.error('Failed to verify 2FA token', error);
+      console.error('Secret:', secret ? `${secret.substring(0, 10)}...` : 'missing');
+      console.error('Token:', token);
       return false;
     }
   }

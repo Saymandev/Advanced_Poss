@@ -9,6 +9,7 @@ import { GalleryModule } from '../gallery/gallery.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { OrdersModule } from '../orders/orders.module';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
+import { SystemFeedbackModule } from '../system-feedback/system-feedback.module';
 import { UsersModule } from '../users/users.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
 import { PublicController } from './public.controller';
@@ -31,6 +32,7 @@ import { ContactForm, ContactFormSchema } from './schemas/contact-form.schema';
     GalleryModule,
     UsersModule,
     WebsocketsModule,
+    SystemFeedbackModule,
   ],
   controllers: [PublicController],
   providers: [PublicService],

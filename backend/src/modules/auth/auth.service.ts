@@ -18,6 +18,7 @@ import { LoginActivityService } from '../login-activity/login-activity.service';
 import { LoginMethod, LoginStatus } from '../login-activity/schemas/login-activity.schema';
 import { LoginSecurityService } from '../settings/login-security.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
+import { SuperAdminNotificationsService } from '../super-admin-notifications/super-admin-notifications.service';
 import { UsersService } from '../users/users.service';
 import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -27,7 +28,6 @@ import { RegisterDto } from './dto/register.dto';
 import { SuperAdminLoginDto } from './dto/super-admin-login.dto';
 import { Verify2FALoginDto } from './dto/verify-2fa.dto';
 import { TwoFactorService } from './two-factor.service';
-import { SuperAdminNotificationsService } from '../super-admin-notifications/super-admin-notifications.service';
 
 @Injectable()
 export class AuthService {
@@ -1420,6 +1420,7 @@ export class AuthService {
 
   // 2FA Methods
   async setup2FA(userId: string) {
+    // Get user to check if 2FA is already enabled and get email
     const user = await this.usersService.findOne(userId);
     if (!user) {
       throw new NotFoundException('User not found');
@@ -1433,10 +1434,20 @@ export class AuthService {
     const backupCodes = this.twoFactorService.generateBackupCodes(10);
 
     // Store secret and backup codes temporarily (not enabled yet)
+    // The update method now properly handles 2FA fields via UpdateUserDto
     await this.usersService.update(userId, {
       twoFactorSecret: secret,
       twoFactorBackupCodes: backupCodes,
     } as any);
+
+    // Verify the secret was saved by retrieving it
+    const userWithSecret = await this.usersService.findOneWithSecret(userId);
+    if (!userWithSecret || !userWithSecret.twoFactorSecret) {
+      this.logger.error(`Failed to save 2FA secret for user ${userId}`);
+      throw new BadRequestException('Failed to save 2FA secret. Please try again.');
+    }
+
+    this.logger.log(`2FA setup completed for user ${userId}. Secret saved successfully.`);
 
     return {
       secret,
@@ -1447,7 +1458,9 @@ export class AuthService {
   }
 
   async enable2FA(userId: string, token: string) {
-    const user = await this.usersService.findOne(userId);
+    // Need to get user with twoFactorSecret field explicitly selected
+    // since it has select: false in the schema
+    const user = await this.usersService.findOneWithSecret(userId);
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -1461,9 +1474,17 @@ export class AuthService {
     }
 
     // Verify the token
+    this.logger.log(`🔐 Verifying 2FA token for user ${userId}`);
+    this.logger.log(`🔑 Secret exists: ${!!user.twoFactorSecret}`);
+    this.logger.log(`🔑 Secret length: ${user.twoFactorSecret?.length || 0}`);
+    this.logger.log(`🔑 Token received: ${token}`);
+    
     const isValid = this.twoFactorService.verifyToken(token, user.twoFactorSecret);
+    this.logger.log(`✅ Token verification result: ${isValid}`);
+    
     if (!isValid) {
-      throw new BadRequestException('Invalid 2FA token');
+      this.logger.error(`❌ Invalid 2FA token for user ${userId}. Token: ${token}, Secret length: ${user.twoFactorSecret?.length || 0}`);
+      throw new BadRequestException('Invalid 2FA token. Please make sure you entered the correct 6-digit code from your authenticator app.');
     }
 
     // Enable 2FA
@@ -1506,8 +1527,9 @@ export class AuthService {
   }
 
   async verify2FAToken(userId: string, token: string, backupCode?: string): Promise<boolean> {
-    const user = await this.usersService.findOne(userId);
+    const user = await this.usersService.findOneWithSecret(userId);
     if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      this.logger.debug(`❌ verify2FAToken: User ${userId} - enabled: ${user?.twoFactorEnabled}, has secret: ${!!user?.twoFactorSecret}`);
       return false;
     }
 
@@ -1525,7 +1547,10 @@ export class AuthService {
     }
 
     // Verify TOTP token
-    return this.twoFactorService.verifyToken(token, user.twoFactorSecret);
+    this.logger.log(`🔍 Verifying 2FA token for user ${userId}. Token: ${token}, Secret exists: ${!!user.twoFactorSecret}`);
+    const isValid = this.twoFactorService.verifyToken(token, user.twoFactorSecret);
+    this.logger.log(`🔍 Verification result: ${isValid}`);
+    return isValid;
   }
 
   async regenerateBackupCodes(userId: string, password: string) {
@@ -1568,8 +1593,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid temporary token');
     }
 
-    // Get the user
-    const user = await this.usersService.findOne(payload.sub);
+    // Get the user with 2FA secret (needs findOneWithSecret to include select: false fields)
+    const user = await this.usersService.findOneWithSecret(payload.sub);
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -1580,6 +1605,7 @@ export class AuthService {
     // Verify 2FA token
     const is2FAValid = await this.verify2FAToken(userId, token, backupCode);
     if (!is2FAValid) {
+      this.logger.error(`❌ 2FA verification failed for user ${userId}. Token: ${token}, Has secret: ${!!user.twoFactorSecret}`);
       throw new UnauthorizedException('Invalid 2FA token or backup code');
     }
 

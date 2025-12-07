@@ -5,12 +5,16 @@ import {
     Param,
     Post,
     Req,
+    Res,
     UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { clearAuthCookies, getRefreshToken, setAuthCookies } from '../../common/utils/cookie.util';
 import { AuthService } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangePinDto } from './dto/change-pin.dto';
@@ -21,7 +25,6 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { PinLoginWithRoleDto } from './dto/pin-login-with-role.dto';
 import { PinLoginDto } from './dto/pin-login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SuperAdminLoginDto } from './dto/super-admin-login.dto';
@@ -30,7 +33,10 @@ import { Verify2FADto, Verify2FALoginDto } from './dto/verify-2fa.dto';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -169,24 +175,52 @@ export class AuthController {
           role: 'waiter',
           companyId: '507f1f77bcf86cd799439012',
           branchId: '507f1f77bcf86cd799439011'
-        },
-        tokens: {
-          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-          refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
         }
       }
     }
   })
   @ApiResponse({ status: 401, description: 'Invalid PIN or role not found' })
   @ApiResponse({ status: 400, description: 'Account locked or deactivated' })
-  pinLoginWithRole(@Body() pinLoginDto: PinLoginWithRoleDto, @Req() req: any) {
+  async pinLoginWithRole(
+    @Body() pinLoginDto: PinLoginWithRoleDto,
+    @Req() req: any,
+    @Res({ passthrough: false }) res: Response,
+  ) {
     const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     
-    return this.authService.loginWithRole({
+    const result: any = await this.authService.loginWithRole({
       ...pinLoginDto,
       ipAddress,
       userAgent,
+    });
+
+    // If 2FA is required, return early without setting cookies
+    if (result.requires2FA) {
+      return res.json(result);
+    }
+
+    // Set httpOnly cookies instead of returning tokens
+    const isProduction = process.env.NODE_ENV === 'production';
+    const accessExpiresIn = this.configService.get('jwt.expiresIn') || '15m';
+    const refreshExpiresIn = this.configService.get('jwt.refreshExpiresIn') || '7d';
+    
+    setAuthCookies(
+      res,
+      result.data.accessToken,
+      result.data.refreshToken,
+      accessExpiresIn,
+      refreshExpiresIn,
+      isProduction,
+    );
+
+    // Send user data without tokens
+    return res.json({
+      success: true,
+      data: {
+        user: result.data.user,
+        sessionId: result.data.sessionId,
+      },
     });
   }
 
@@ -207,18 +241,41 @@ export class AuthController {
           companyId: null,
           branchId: null,
           isSuperAdmin: true
-        },
-        tokens: {
-          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-          refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
         }
       }
     }
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials or access denied' })
   @ApiResponse({ status: 400, description: 'Account locked' })
-  superAdminLogin(@Body() superAdminLoginDto: SuperAdminLoginDto) {
-    return this.authService.superAdminLogin(superAdminLoginDto);
+  async superAdminLogin(
+    @Body() superAdminLoginDto: SuperAdminLoginDto,
+    @Res({ passthrough: false }) res: Response,
+  ) {
+    const result = await this.authService.superAdminLogin(superAdminLoginDto);
+    
+    // If 2FA is required, return early without setting cookies
+    if (result.requires2FA) {
+      return res.json(result);
+    }
+
+    // Set httpOnly cookies instead of returning tokens
+    const isProduction = process.env.NODE_ENV === 'production';
+    const accessExpiresIn = this.configService.get('jwt.expiresIn') || '15m';
+    const refreshExpiresIn = this.configService.get('jwt.refreshExpiresIn') || '7d';
+    
+    setAuthCookies(
+      res,
+      result.tokens.accessToken,
+      result.tokens.refreshToken,
+      accessExpiresIn,
+      refreshExpiresIn,
+      isProduction,
+    );
+
+    // Send user data without tokens
+    return res.json({
+      user: result.user,
+    });
   }
 
   @Public()
@@ -231,16 +288,55 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
-  refresh(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshTokens(refreshTokenDto.refreshToken);
+  async refresh(
+    @Req() req: any,
+    @Res({ passthrough: false }) res: Response,
+  ) {
+    // Get refresh token from cookie or body (backward compatibility)
+    const refreshToken = getRefreshToken(req) || req.body?.refreshToken;
+    
+    if (!refreshToken) {
+      throw new Error('Refresh token is required');
+    }
+
+    const result = await this.authService.refreshTokens(refreshToken);
+    
+    // Set new httpOnly cookies
+    const isProduction = process.env.NODE_ENV === 'production';
+    const accessExpiresIn = this.configService.get('jwt.expiresIn') || '15m';
+    const refreshExpiresIn = this.configService.get('jwt.refreshExpiresIn') || '7d';
+    
+    setAuthCookies(
+      res,
+      result.accessToken,
+      result.refreshToken,
+      accessExpiresIn,
+      refreshExpiresIn,
+      isProduction,
+    );
+
+    // Send success without tokens
+    return res.json({
+      success: true,
+      message: 'Tokens refreshed successfully',
+    });
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @ApiOperation({ summary: 'Logout user' })
-  logout(@CurrentUser('id') userId: string) {
-    return this.authService.logout(userId);
+  async logout(
+    @CurrentUser('id') userId: string,
+    @Res({ passthrough: false }) res: Response,
+  ) {
+    await this.authService.logout(userId);
+    
+    // Clear httpOnly cookies
+    const isProduction = process.env.NODE_ENV === 'production';
+    clearAuthCookies(res, isProduction);
+    
+    return { message: 'Logged out successfully' };
   }
 
   @Public()
@@ -395,8 +491,33 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 401, description: 'Invalid temporary token or 2FA code' })
-  verify2FALogin(@Body() verify2FALoginDto: Verify2FALoginDto) {
-    return this.authService.verify2FALogin(verify2FALoginDto);
+  @Public()
+  @Post('verify-2fa-login')
+  @ApiOperation({ summary: 'Verify 2FA code during login' })
+  async verify2FALogin(
+    @Body() verify2FALoginDto: Verify2FALoginDto,
+    @Res({ passthrough: false }) res: Response,
+  ) {
+    const result = await this.authService.verify2FALogin(verify2FALoginDto);
+    
+    // Set httpOnly cookies
+    const isProduction = process.env.NODE_ENV === 'production';
+    const accessExpiresIn = this.configService.get('jwt.expiresIn') || '15m';
+    const refreshExpiresIn = this.configService.get('jwt.refreshExpiresIn') || '7d';
+    
+    setAuthCookies(
+      res,
+      result.tokens.accessToken,
+      result.tokens.refreshToken,
+      accessExpiresIn,
+      refreshExpiresIn,
+      isProduction,
+    );
+
+    // Send user data without tokens
+    return res.json({
+      user: result.user,
+    });
   }
 
   @ApiBearerAuth()

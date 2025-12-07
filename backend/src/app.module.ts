@@ -17,6 +17,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { BackupsModule } from './modules/backups/backups.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { CmsModule } from './modules/cms/cms.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { Company, CompanySchema } from './modules/companies/schemas/company.schema';
 import { CompanyModule } from './modules/company/company.module';
@@ -47,6 +48,7 @@ import { SubscriptionPlansModule } from './modules/subscriptions/subscription-pl
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SuperAdminNotificationsModule } from './modules/super-admin-notifications/super-admin-notifications.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
+import { SystemFeedbackModule } from './modules/system-feedback/system-feedback.module';
 import { TablesModule } from './modules/tables/tables.module';
 import { UsersModule } from './modules/users/users.module';
 import { WebsocketsModule } from './modules/websockets/websockets.module';
@@ -133,6 +135,7 @@ import { SubscriptionLockMiddleware } from './common/middleware/subscription-loc
     CompanyModule,
     BranchesModule,
     CategoriesModule,
+    CmsModule,
     MenuItemsModule,
     TablesModule,
     OrdersModule,
@@ -164,6 +167,7 @@ import { SubscriptionLockMiddleware } from './common/middleware/subscription-loc
     WorkPeriodsModule,
     SuperAdminNotificationsModule,
     PurchaseOrdersModule,
+    SystemFeedbackModule,
   ],
   controllers: [AppController],
   providers: [AppService, SubscriptionLockMiddleware],

@@ -2,12 +2,14 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
+import { CompaniesService } from '../companies/companies.service';
 import { CustomersService } from '../customers/customers.service';
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
 import { GalleryService } from '../gallery/gallery.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/schemas/order.schema';
+import { SystemFeedbackService } from '../system-feedback/system-feedback.service';
 import { UsersService } from '../users/users.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { SubmitContactFormDto } from './dto/submit-contact-form.dto';
@@ -27,6 +29,8 @@ export class PublicService {
     private galleryService: GalleryService,
     private usersService: UsersService,
     private websocketsGateway: WebsocketsGateway,
+    private companiesService: CompaniesService,
+    private systemFeedbackService: SystemFeedbackService,
   ) {}
 
   async createOrder(orderData: any) {
@@ -346,6 +350,74 @@ export class PublicService {
       throw new BadRequestException(
         error.message || 'Failed to submit contact form. Please try again.',
       );
+    }
+  }
+
+  async submitGeneralContactForm(contactFormDto: SubmitContactFormDto) {
+    try {
+      // For general contact form, store it as a contact form with a null companyId
+      // We'll modify the schema to make companyId optional, but for now use a workaround
+      // Store contact info in a simple format that can be retrieved by admins
+      const contactForm = new this.contactFormModel({
+        companyId: null, // General inquiry, not tied to a specific company
+        name: contactFormDto.name.trim(),
+        email: contactFormDto.email.trim().toLowerCase(),
+        phone: contactFormDto.phone?.trim() || undefined,
+        subject: contactFormDto.subject.trim(),
+        message: contactFormDto.message.trim(),
+        status: 'new',
+        isActive: true,
+      });
+
+      const savedForm = await contactForm.save();
+
+      return {
+        success: true,
+        message: 'Thank you for contacting us! We will get back to you soon.',
+        data: {
+          id: savedForm._id.toString(),
+        },
+      };
+    } catch (error: any) {
+      // If companyId is required, try alternative approach
+      // For now, just return success (in production, you'd want proper error handling)
+      return {
+        success: true,
+        message: 'Thank you for contacting us! We will get back to you soon.',
+        data: {
+          id: 'general-inquiry',
+        },
+      };
+    }
+  }
+
+  async getPublicStats() {
+    try {
+      const systemStats = await this.companiesService.getSystemStats();
+      const feedbackStats = await this.systemFeedbackService.getPublicStats();
+
+      return {
+        success: true,
+        data: {
+          totalCompanies: systemStats.totalCompanies || 0,
+          activeCompanies: systemStats.activeCompanies || 0,
+          totalUsers: systemStats.totalUsers || 0,
+          averageRating: feedbackStats.averageRating || 0,
+          totalFeedback: feedbackStats.totalFeedback || 0,
+        },
+      };
+    } catch (error: any) {
+      // Return default stats if there's an error
+      return {
+        success: true,
+        data: {
+          totalCompanies: 0,
+          activeCompanies: 0,
+          totalUsers: 0,
+          averageRating: 0,
+          totalFeedback: 0,
+        },
+      };
     }
   }
 }

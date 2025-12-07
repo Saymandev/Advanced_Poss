@@ -375,5 +375,21 @@ export class PublicController {
     const companyId = (company as any)._id?.toString() || (company as any).id;
     return this.publicService.submitContactForm(companyId, contactFormDto);
   }
+
+  @Public()
+  @Post('contact')
+  @ApiOperation({ summary: 'Submit general contact form (no company required)' })
+  async submitGeneralContactForm(@Body() contactFormDto: any) {
+    // Use a system/default company ID or null for general inquiries
+    // For now, we'll use a special handling in the service
+    return this.publicService.submitGeneralContactForm(contactFormDto);
+  }
+
+  @Public()
+  @Get('stats')
+  @ApiOperation({ summary: 'Get public system statistics' })
+  async getPublicStats() {
+    return this.publicService.getPublicStats();
+  }
 }
 

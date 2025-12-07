@@ -205,6 +205,22 @@ export class UsersService {
     } as User;
   }
 
+  async findOneWithSecret(id: string): Promise<UserDocument | null> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    // Explicitly select twoFactorSecret and twoFactorBackupCodes even though they have select: false
+    const user = await this.userModel
+      .findById(id)
+      .select('+twoFactorSecret +twoFactorBackupCodes')
+      .populate('companyId', 'name email')
+      .populate('branchId', 'name address')
+      .exec();
+
+    return user;
+  }
+
   async findByEmail(email: string): Promise<UserDocument | null> {
     return this.userModel
       .findOne({ email: email.toLowerCase() })
@@ -303,8 +319,22 @@ export class UsersService {
       updateUserDto.pin = await PasswordUtil.hash(updateUserDto.pin);
     }
 
+    // Build update object, ensuring 2FA fields are included if present
+    const updateData: any = { ...updateUserDto };
+    
+    // Explicitly handle 2FA fields to ensure they're saved
+    if ('twoFactorSecret' in updateUserDto) {
+      updateData.twoFactorSecret = updateUserDto.twoFactorSecret;
+    }
+    if ('twoFactorBackupCodes' in updateUserDto) {
+      updateData.twoFactorBackupCodes = updateUserDto.twoFactorBackupCodes;
+    }
+    if ('twoFactorEnabled' in updateUserDto) {
+      updateData.twoFactorEnabled = updateUserDto.twoFactorEnabled;
+    }
+
     const user = await this.userModel
-      .findByIdAndUpdate(id, updateUserDto, { new: true })
+      .findByIdAndUpdate(id, updateData, { new: true })
       .select('-password -pin')
       .populate('companyId', 'name email')
       .populate('branchId', 'name address');

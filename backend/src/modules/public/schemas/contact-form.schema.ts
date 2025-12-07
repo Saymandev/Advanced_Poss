@@ -5,8 +5,8 @@ export type ContactFormDocument = ContactForm & Document;
 
 @Schema({ timestamps: true })
 export class ContactForm {
-  @Prop({ type: Types.ObjectId, ref: 'Company', required: true, index: true })
-  companyId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Company', required: false, index: true })
+  companyId?: Types.ObjectId;
 
   @Prop({ required: true, trim: true })
   name: string;
