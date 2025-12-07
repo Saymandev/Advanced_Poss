@@ -13,6 +13,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts",
+    "seed-payment-methods": "ts-node -r tsconfig-paths/register src/scripts/seed-subscription-payment-methods.ts",
     "create-super-admin": "ts-node -r tsconfig-paths/register src/scripts/create-super-admin.ts",
     "reset-super-admin-password": "ts-node -r tsconfig-paths/register src/scripts/reset-super-admin-password.ts",
     "unlock": "ts-node -r tsconfig-paths/register src/scripts/unlock-user.ts",

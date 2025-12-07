@@ -8,6 +8,7 @@ import { Model, Types } from 'mongoose';
 import * as QRCode from 'qrcode';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
+import { POSSettings, POSSettingsDocument } from '../pos/schemas/pos-settings.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateTableDto } from './dto/create-table.dto';
 import { ReserveTableDto } from './dto/reserve-table.dto';
@@ -22,6 +23,8 @@ export class TablesService {
     private tableModel: Model<TableDocument>,
     @InjectModel(POSOrder.name)
     private posOrderModel: Model<POSOrderDocument>,
+    @InjectModel(POSSettings.name)
+    private posSettingsModel: Model<POSSettingsDocument>,
     private websocketsGateway: WebsocketsGateway,
   ) {}
 
@@ -101,9 +104,17 @@ export class TablesService {
       }
     }
 
-    // If we have a branchId, check for pending orders to calculate real-time status
+    // If we have a branchId, check for orders to calculate real-time status
     if (branchId) {
-      // Get today's pending orders for this branch
+      // Get POS settings to check payment mode
+      let posSettings = await this.posSettingsModel.findOne({ branchId: branchId }).exec();
+      if (!posSettings) {
+        // Default to pay-later if no settings found
+        posSettings = { defaultPaymentMode: 'pay-later' } as any;
+      }
+      const isPayFirstMode = posSettings.defaultPaymentMode === 'pay-first';
+
+      // Get today's orders for this branch
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
@@ -112,35 +123,69 @@ export class TablesService {
       const pendingOrders = await this.posOrderModel.find({
         branchId: branchId,
         createdAt: { $gte: today, $lt: tomorrow },
-        status: 'pending', // Only pending orders keep tables occupied
+        status: 'pending',
         orderType: 'dine-in',
+        tableId: { $exists: true, $ne: null }, // Only get orders with tableId
       })
       .select('tableId status')
       .lean()
       .exec();
 
-      // Group pending orders by table
+      // ALWAYS check for paid orders with tableId
+      // If there's a paid order with tableId, the customer paid and is using the table
+      // This works regardless of payment mode setting (handles frontend toggle vs backend setting mismatch)
+      const paidOrders = await this.posOrderModel.find({
+        branchId: branchId,
+        createdAt: { $gte: today, $lt: tomorrow },
+        status: 'paid',
+        orderType: 'dine-in',
+        tableId: { $exists: true, $ne: null }, // Only get orders with tableId
+      })
+      .select('tableId status')
+      .lean()
+      .exec();
+
+      // Group orders by table
       const occupiedTableIds = new Set<string>();
       pendingOrders.forEach(order => {
         if (order.tableId) {
-          const tableIdStr = order.tableId.toString();
-          occupiedTableIds.add(tableIdStr);
+          const tableIdStr = typeof order.tableId === 'object' && order.tableId 
+            ? (order.tableId._id || order.tableId).toString() 
+            : String(order.tableId || '');
+          if (tableIdStr) occupiedTableIds.add(tableIdStr);
         }
       });
+      
+      // ALWAYS mark tables with paid orders as occupied (regardless of payment mode setting)
+      // If there's a paid order with tableId, the customer is using the table
+      paidOrders.forEach(order => {
+        if (order.tableId) {
+          const tableIdStr = typeof order.tableId === 'object' && order.tableId 
+            ? (order.tableId._id || order.tableId).toString() 
+            : String(order.tableId || '');
+          if (tableIdStr) occupiedTableIds.add(tableIdStr);
+        }
+      });
+      
+      // Log for debugging
+      if (paidOrders.length > 0) {
+        console.log(`🔍 [TablesService.findAll] Found ${paidOrders.length} paid orders with tableId (payment mode setting: ${posSettings.defaultPaymentMode}). Marking tables as occupied.`);
+      }
 
-      // Update table status based on pending orders (same logic as POS)
+      // Update table status based on orders
       return tables.map((table: any) => {
         const tableId = table._id?.toString() || table.id;
-        const hasPendingOrder = occupiedTableIds.has(tableId);
+        const hasOrder = occupiedTableIds.has(tableId);
         
-        // Calculate status: occupied if has pending order, otherwise use stored status
-        // But if stored status is 'occupied' but no pending orders, make it 'available'
+        // Calculate status: occupied if has order (pending or paid)
+        // Paid orders with tableId always occupy tables (customer paid and is using the table)
+        // This works regardless of payment mode setting (handles frontend toggle vs backend setting mismatch)
         let calculatedStatus = table.status;
-        if (hasPendingOrder) {
+        if (hasOrder) {
           calculatedStatus = 'occupied';
         } else if (table.status === 'occupied') {
-          // Table was marked as occupied but has no pending orders - make it available
-          // (This handles cases where orders were paid/completed but status wasn't updated)
+          // Table was marked as occupied but has no orders - make it available
+          // (This handles cases where orders were completed/cancelled but status wasn't updated)
           calculatedStatus = 'available';
         }
         // Keep 'reserved' and 'cleaning' statuses as-is
@@ -255,14 +300,17 @@ export class TablesService {
       updateData.currentOrderId = null;
       updateData.occupiedBy = null;
       
-      // Cancel all pending orders for this table to free up seats
-      // This ensures that when a table is released, seats are actually freed
+      // When releasing a table, we need to:
+      // 1. Cancel pending orders (they're not paid yet)
+      // 2. Clear tableId from paid orders (they're paid but table is being released)
+      // This ensures the table becomes truly available and won't be recalculated as occupied
       try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         
+        // Cancel all pending orders for this table
         const pendingOrders = await this.posOrderModel.find({
           tableId: new Types.ObjectId(id),
           createdAt: { $gte: today, $lt: tomorrow },
@@ -270,7 +318,6 @@ export class TablesService {
           orderType: 'dine-in',
         }).exec();
         
-        // Cancel all pending orders for this table
         if (pendingOrders.length > 0) {
           await this.posOrderModel.updateMany(
             {
@@ -287,9 +334,31 @@ export class TablesService {
           
           console.log(`✅ Cancelled ${pendingOrders.length} pending order(s) for table ${id} when releasing`);
         }
+        
+        // Clear tableId from paid orders (don't cancel them, just remove table association)
+        // This allows the table to be released while keeping the order history intact
+        const paidOrders = await this.posOrderModel.find({
+          tableId: new Types.ObjectId(id),
+          createdAt: { $gte: today, $lt: tomorrow },
+          status: 'paid',
+          orderType: 'dine-in',
+        }).exec();
+        
+        if (paidOrders.length > 0) {
+          await this.posOrderModel.updateMany(
+            {
+              _id: { $in: paidOrders.map(o => o._id) },
+            },
+            {
+              $unset: { tableId: '' },
+            }
+          ).exec();
+          
+          console.log(`✅ Cleared tableId from ${paidOrders.length} paid order(s) for table ${id} when releasing`);
+        }
       } catch (orderCancelError) {
         // Log error but don't fail table release
-        console.error('Failed to cancel pending orders when releasing table:', orderCancelError);
+        console.error('Failed to process orders when releasing table:', orderCancelError);
       }
     }
 

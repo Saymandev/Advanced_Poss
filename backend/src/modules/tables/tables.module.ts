@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BranchesModule } from '../branches/branches.module';
 import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
+import { POSSettings, POSSettingsSchema } from '../pos/schemas/pos-settings.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
@@ -14,6 +15,7 @@ import { TablesService } from './tables.service';
     MongooseModule.forFeature([
       { name: Table.name, schema: TableSchema },
       { name: POSOrder.name, schema: POSOrderSchema },
+      { name: POSSettings.name, schema: POSSettingsSchema },
     ]),
     forwardRef(() => BranchesModule),
     forwardRef(() => WebsocketsModule),

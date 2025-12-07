@@ -44,6 +44,7 @@ import { RolePermissionsModule } from './modules/role-permissions/role-permissio
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { SystemSettings, SystemSettingsSchema } from './modules/settings/schemas/system-settings.schema';
 import { SettingsModule } from './modules/settings/settings.module';
+import { SubscriptionPaymentsModule } from './modules/subscription-payments/subscription-payments.module';
 import { SubscriptionPlansModule } from './modules/subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SuperAdminNotificationsModule } from './modules/super-admin-notifications/super-admin-notifications.module';
@@ -151,6 +152,7 @@ import { SubscriptionLockMiddleware } from './common/middleware/subscription-loc
     GalleryModule,
     AttendanceModule,
     SubscriptionsModule,
+    SubscriptionPaymentsModule,
     LoginActivityModule,
     SubscriptionPlansModule,
     BackupsModule,

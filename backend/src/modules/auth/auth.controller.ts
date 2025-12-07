@@ -1,12 +1,12 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Post,
-    Req,
-    Res,
-    UseGuards,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -184,7 +184,7 @@ export class AuthController {
   async pinLoginWithRole(
     @Body() pinLoginDto: PinLoginWithRoleDto,
     @Req() req: any,
-    @Res({ passthrough: false }) res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
@@ -197,7 +197,7 @@ export class AuthController {
 
     // If 2FA is required, return early without setting cookies
     if (result.requires2FA) {
-      return res.json(result);
+      return result;
     }
 
     // Set httpOnly cookies instead of returning tokens
@@ -214,14 +214,14 @@ export class AuthController {
       isProduction,
     );
 
-    // Send user data without tokens
-    return res.json({
+    // Return user data without tokens (NestJS will handle response via interceptors)
+    return {
       success: true,
       data: {
         user: result.data.user,
         sessionId: result.data.sessionId,
       },
-    });
+    };
   }
 
   @Public()
@@ -249,13 +249,13 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Account locked' })
   async superAdminLogin(
     @Body() superAdminLoginDto: SuperAdminLoginDto,
-    @Res({ passthrough: false }) res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.superAdminLogin(superAdminLoginDto);
     
     // If 2FA is required, return early without setting cookies
     if (result.requires2FA) {
-      return res.json(result);
+      return result;
     }
 
     // Set httpOnly cookies instead of returning tokens
@@ -272,10 +272,10 @@ export class AuthController {
       isProduction,
     );
 
-    // Send user data without tokens
-    return res.json({
+    // Return user data without tokens (NestJS will handle response via interceptors)
+    return {
       user: result.user,
-    });
+    };
   }
 
   @Public()
@@ -290,7 +290,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token' })
   async refresh(
     @Req() req: any,
-    @Res({ passthrough: false }) res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     // Get refresh token from cookie or body (backward compatibility)
     const refreshToken = getRefreshToken(req) || req.body?.refreshToken;
@@ -315,11 +315,11 @@ export class AuthController {
       isProduction,
     );
 
-    // Send success without tokens
-    return res.json({
+    // Return success without tokens (NestJS will handle response via interceptors)
+    return {
       success: true,
       message: 'Tokens refreshed successfully',
-    });
+    };
   }
 
   @ApiBearerAuth()
@@ -328,7 +328,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Logout user' })
   async logout(
     @CurrentUser('id') userId: string,
-    @Res({ passthrough: false }) res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     await this.authService.logout(userId);
     
@@ -336,6 +336,7 @@ export class AuthController {
     const isProduction = process.env.NODE_ENV === 'production';
     clearAuthCookies(res, isProduction);
     
+    // Return message (NestJS will handle response via interceptors)
     return { message: 'Logged out successfully' };
   }
 
@@ -496,7 +497,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify 2FA code during login' })
   async verify2FALogin(
     @Body() verify2FALoginDto: Verify2FALoginDto,
-    @Res({ passthrough: false }) res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.verify2FALogin(verify2FALoginDto);
     
@@ -514,10 +515,10 @@ export class AuthController {
       isProduction,
     );
 
-    // Send user data without tokens
-    return res.json({
+    // Return user data without tokens (NestJS will handle response via interceptors)
+    return {
       user: result.user,
-    });
+    };
   }
 
   @ApiBearerAuth()

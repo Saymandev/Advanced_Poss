@@ -1,13 +1,13 @@
 import { Logger } from '@nestjs/common';
 import {
-    ConnectedSocket,
-    MessageBody,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    OnGatewayInit,
-    SubscribeMessage,
-    WebSocketGateway,
-    WebSocketServer,
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnGatewayInit,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
@@ -452,8 +452,11 @@ export class WebsocketsGateway
     });
 
     if (order.tableId) {
+      // Include order object in table:payment-received so frontend can access tableId
       this.emitToTable(order.tableId, 'table:payment-received', {
         payment,
+        order, // Include order object for consistency
+        orderId: order.id || order._id?.toString(),
       });
     }
   }
