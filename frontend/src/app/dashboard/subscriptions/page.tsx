@@ -1,6 +1,8 @@
 'use client';
 
 import { FeatureBasedSubscriptionSelector } from '@/components/subscriptions/FeatureBasedSubscriptionSelector';
+import { PaymentInstructionsModal } from '@/components/subscriptions/PaymentInstructionsModal';
+import { PaymentMethodSelector } from '@/components/subscriptions/PaymentMethodSelector';
 import { PlanFeatureSelector } from '@/components/subscriptions/PlanFeatureSelector';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +12,11 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useGetCompaniesQuery, useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
 import { useCreateCheckoutSessionMutation } from '@/lib/api/endpoints/paymentsApi';
+import {
+  SubscriptionPaymentMethod,
+  useInitializeSubscriptionPaymentMutation,
+  useManualActivateSubscriptionMutation,
+} from '@/lib/api/endpoints/subscriptionPaymentsApi';
 import {
   BillingHistory,
   useCancelSubscriptionMutation,
@@ -404,11 +411,18 @@ export default function SubscriptionsPage() {
   const [_updateSubscription] = useUpdateSubscriptionMutation();
   const [cancelSubscription, { isLoading: isCancelling }] = useCancelSubscriptionMutation();
   const [reactivateSubscription, { isLoading: isReactivating }] = useReactivateSubscriptionMutation();
-  const [createCheckoutSession, { isLoading: isUpdating }] = useCreateCheckoutSessionMutation();
+  const [_createCheckoutSession, { isLoading: isUpdating }] = useCreateCheckoutSessionMutation();
 
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [isPaymentInstructionsModalOpen, setIsPaymentInstructionsModalOpen] = useState(false);
+  const [paymentInstructions, setPaymentInstructions] = useState<any>(null);
+  const [paymentGateway, setPaymentGateway] = useState<string>('');
+  const [_selectedPaymentMethod, setSelectedPaymentMethod] = useState<SubscriptionPaymentMethod | null>(null);
+  const [initializePayment, { isLoading: isInitializingPayment }] = useInitializeSubscriptionPaymentMutation();
+  const [manualActivate, { isLoading: isActivating }] = useManualActivateSubscriptionMutation();
   
   // View mode: 'plans' or 'features'
   const [viewMode, setViewMode] = useState<'plans' | 'features'>('plans');
@@ -460,7 +474,9 @@ export default function SubscriptionsPage() {
     return { days, hours: remainingHours, minutes, totalHours: hours };
   }, [effectiveSubscription, currentTime]);
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = () => {
+    console.log('🔵 handleUpgrade called', { selectedPlan, effectiveSubscription });
+    
     if (!selectedPlan || !effectiveSubscription) {
       toast.error('Please select a plan');
       return;
@@ -480,44 +496,118 @@ export default function SubscriptionsPage() {
       return;
     }
 
-      try {
-      // ALL plan changes MUST go through Stripe checkout for payment verification
-      // This prevents unauthorized plan upgrades without payment
-      
-      // For free plans, we can skip checkout, but for security, let's still use checkout
-      // This ensures all plan changes are properly tracked and verified
-      
-      // Prepare URLs for Stripe checkout
-      const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
-      const successUrl = `${origin}/dashboard/subscriptions/success`;
-      const cancelUrl = `${origin}/dashboard/subscriptions?plan=${selectedPlan.name}`;
-      
-      toast.loading('Redirecting to payment...', { id: 'checkout-loading' });
-      
-      // Create Stripe checkout session
-      const response = await createCheckoutSession({
-        companyId: companyId,
-        planName: selectedPlan.name, // Use plan name (e.g., 'basic', 'premium') not display name
-        successUrl,
-        cancelUrl,
+    console.log('🔵 Opening payment method selector modal', { 
+      selectedPlanPrice: selectedPlan.price, 
+      selectedPlanCurrency: selectedPlan.currency,
+      selectedPlanName: selectedPlan.name 
+    });
+    
+    // Close upgrade modal and open payment method selector
+    setIsUpgradeModalOpen(false);
+    // Small delay to ensure modal closes before opening new one
+    setTimeout(() => {
+      setIsPaymentMethodModalOpen(true);
+    }, 100);
+  };
+
+  const handlePaymentMethodSelected = async (method: SubscriptionPaymentMethod) => {
+    console.log('🔵 handlePaymentMethodSelected called', { method, selectedPlan, companyId });
+    
+    if (!selectedPlan || !companyId) {
+      toast.error('Missing plan or company information');
+      return;
+    }
+
+    setSelectedPaymentMethod(method);
+
+    try {
+      toast.loading('Initializing payment...', { id: 'payment-init' });
+
+      console.log('🔵 Calling initializePayment with:', {
+        companyId,
+        planName: selectedPlan.name,
+        paymentGateway: method.gateway,
+        billingCycle: 'monthly',
+      });
+
+      // Initialize payment based on selected method
+      const paymentResponse = await initializePayment({
+        companyId,
+        planName: selectedPlan.name,
+        paymentGateway: method.gateway,
+        billingCycle: 'monthly',
       }).unwrap();
 
-      toast.dismiss('checkout-loading');
-      
-      // Redirect to Stripe Checkout
-      const checkoutUrl = (response as any).url || (response as any).data?.url;
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+      console.log('🔵 Payment response received:', paymentResponse);
+
+      toast.dismiss('payment-init');
+
+      // Handle different payment gateway responses
+      if (paymentResponse.url) {
+        // Redirect to payment URL (Stripe, PayPal, Google Pay, etc.)
+        console.log('🔵 Redirecting to payment URL:', paymentResponse.url);
+        window.location.href = paymentResponse.url;
+      } else if (paymentResponse.requiresManualVerification && paymentResponse.instructions) {
+        // For mobile wallets (bKash, Nagad) with manual verification, show instructions modal
+        console.log('🔵 Showing payment instructions modal:', paymentResponse.instructions);
+        setPaymentInstructions(paymentResponse.instructions);
+        setPaymentGateway(paymentResponse.gateway);
+        setIsPaymentMethodModalOpen(false);
+        setIsPaymentInstructionsModalOpen(true);
+        toast.success('Please follow the payment instructions below', {
+          duration: 5000,
+        });
+      } else if (paymentResponse.clientSecret) {
+        // For payment methods that require client secret (future implementation)
+        console.log('🔵 Payment requires client secret:', paymentResponse.clientSecret);
+        toast.error('This payment method requires additional setup. Please contact support.');
       } else {
-        toast.error('Payment session creation failed. Please try again.');
+        console.error('🔴 Payment initialization failed - no URL, clientSecret, or requiresManualVerification');
+        toast.error('Payment initialization failed - no payment URL received');
       }
-      
+
+      // Only close modals if we're redirecting (not showing instructions)
+      if (paymentResponse.url) {
+        setIsPaymentMethodModalOpen(false);
+        setIsUpgradeModalOpen(false);
+      }
+    } catch (error: any) {
+      console.error('🔴 Payment initialization error:', error);
+      toast.dismiss('payment-init');
+      toast.error(error?.data?.message || error?.message || 'Failed to initialize payment');
+    }
+  };
+
+  const handleManualActivation = async () => {
+    const targetCompanyId = isSuperAdmin ? (selectedCompanyForSubscription || companyId) : companyId;
+    
+    if (!targetCompanyId || !selectedPlan) {
+      toast.error('Please select a company and plan');
+      return;
+    }
+
+    try {
+      toast.loading('Activating subscription...', { id: 'manual-activate' });
+      await manualActivate({
+        companyId: targetCompanyId,
+        planName: selectedPlan.name,
+        billingCycle: 'monthly',
+        notes: `Manually activated by Super Admin${user?.firstName ? ` (${user.firstName} ${user.lastName})` : ''}`,
+      }).unwrap();
+      toast.dismiss('manual-activate');
+      toast.success('Subscription activated successfully');
       setIsUpgradeModalOpen(false);
       setSelectedPlan(null);
+      if (isSuperAdmin) {
+        setSelectedCompanyForSubscription('');
+      }
+      refetchCompany();
+      if (isSuperAdmin) {
+        refetchAllSubscriptions();
+      }
     } catch (error: any) {
-      console.error('Checkout creation error:', error);
-      toast.dismiss('checkout-loading');
-      toast.error(error?.data?.message || error?.message || 'Failed to create payment session. Please try again.');
+      toast.dismiss('manual-activate');
+      toast.error(error?.data?.message || 'Failed to activate subscription');
     }
   };
 
@@ -689,7 +779,7 @@ export default function SubscriptionsPage() {
   };
 
   // SUPER ADMIN data/hooks (always declared, conditionally used in render)
-  const { data: subsData, isFetching: isSubsLoading } = useGetAllSubscriptionsQuery(
+  const { data: subsData, isFetching: isSubsLoading, refetch: refetchAllSubscriptions } = useGetAllSubscriptionsQuery(
     { limit: 100 },
     { skip: !isSuperAdmin },
   );
@@ -2251,6 +2341,62 @@ export default function SubscriptionsPage() {
         </Card>
       )}
 
+      {/* Payment Method Selector Modal */}
+      {isPaymentMethodModalOpen && selectedPlan && (() => {
+        // Get the actual plan from the plans array to ensure we have the latest price
+        const actualPlan = plans.find((p: any) => p.id === selectedPlan.id || p.name === selectedPlan.name) || selectedPlan;
+        const planPrice = actualPlan.price || selectedPlan.price || 0;
+        const planCurrency = actualPlan.currency || selectedPlan.currency || 'BDT';
+        
+        console.log('🔵 PaymentMethodSelector rendering:', { 
+          selectedPlanId: selectedPlan.id,
+          selectedPlanName: selectedPlan.name,
+          selectedPlanPrice: selectedPlan.price,
+          actualPlanPrice: actualPlan.price,
+          finalPrice: planPrice,
+          currency: planCurrency
+        });
+        
+        return (
+          <PaymentMethodSelector
+            isOpen={isPaymentMethodModalOpen}
+            onClose={() => {
+              console.log('🔵 PaymentMethodSelector onClose called');
+              setIsPaymentMethodModalOpen(false);
+            }}
+            onSelect={handlePaymentMethodSelected}
+            amount={planPrice}
+            currency={planCurrency}
+            country="BD"
+          />
+        );
+      })()}
+
+      {/* Payment Instructions Modal */}
+      {paymentInstructions && (
+        <PaymentInstructionsModal
+          isOpen={isPaymentInstructionsModalOpen}
+          onClose={() => {
+            setIsPaymentInstructionsModalOpen(false);
+            setPaymentInstructions(null);
+            setPaymentGateway('');
+          }}
+          instructions={paymentInstructions}
+          gateway={paymentGateway}
+          onPaymentCompleted={() => {
+            toast.success('Thank you! Our support team will verify your payment and activate your subscription within 24 hours.');
+            setIsPaymentInstructionsModalOpen(false);
+            setPaymentInstructions(null);
+            setPaymentGateway('');
+            // Refresh subscription data
+            refetchCompany();
+            if (currentSubscription) {
+              refetchCurrentSubscription();
+            }
+          }}
+        />
+      )}
+
       {/* Upgrade Modal */}
       <Modal
         isOpen={isUpgradeModalOpen}
@@ -2258,7 +2404,7 @@ export default function SubscriptionsPage() {
           setIsUpgradeModalOpen(false);
           setSelectedPlan(null);
         }}
-        title="Confirm Plan Change"
+        title={isSuperAdmin ? "Activate Subscription" : "Confirm Plan Change"}
         size="lg"
       >
         {(() => {
@@ -2373,27 +2519,68 @@ export default function SubscriptionsPage() {
               </p>
             </div>
 
+            {/* Super Admin: Manual Activation */}
+            {isSuperAdmin && (
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Super Admin Mode:</strong> You can manually activate this subscription without payment.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Select Company
+                  </label>
+                  <select
+                    value={selectedCompanyForSubscription || companyId}
+                    onChange={(e) => setSelectedCompanyForSubscription(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Select a company...</option>
+                    {companies?.map((company: any) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsUpgradeModalOpen(false);
                   setSelectedPlan(null);
+                  setSelectedCompanyForSubscription('');
                 }}
                 className="flex-1"
-                disabled={isUpdating}
+                disabled={isUpdating || isActivating}
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleUpgrade}
-                isLoading={isUpdating}
-                className="flex-1"
-                variant="primary"
-                disabled={!selectedPlan || !effectiveSubscription}
-              >
-                {isUpdating ? 'Processing...' : `Confirm ${selectedPlan?.price && effectiveSubscription?.plan?.price && selectedPlan.price > effectiveSubscription.plan.price ? 'Upgrade' : selectedPlan?.price && effectiveSubscription?.plan?.price && selectedPlan.price < effectiveSubscription.plan.price ? 'Downgrade' : 'Switch'}`}
-              </Button>
+              {isSuperAdmin ? (
+                <Button
+                  onClick={handleManualActivation}
+                  isLoading={isActivating}
+                  className="flex-1"
+                  variant="primary"
+                  disabled={!selectedPlan || !selectedCompanyForSubscription}
+                >
+                  {isActivating ? 'Activating...' : 'Activate Subscription'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleUpgrade}
+                  isLoading={isUpdating || isInitializingPayment}
+                  className="flex-1"
+                  variant="primary"
+                  disabled={!selectedPlan || !effectiveSubscription}
+                >
+                  {isUpdating || isInitializingPayment ? 'Processing...' : `Continue to Payment`}
+                </Button>
+              )}
             </div>
           </div>
           );

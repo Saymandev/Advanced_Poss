@@ -12,6 +12,7 @@ import { useGetDeliveryZonesByBranchQuery } from '@/lib/api/endpoints/deliveryZo
 import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
+  posApi,
   useCancelPOSOrderMutation,
   useCreatePOSOrderMutation,
   useDownloadReceiptPDFMutation,
@@ -32,7 +33,7 @@ import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { useSocket } from '@/lib/hooks/useSocket';
-import { useAppSelector } from '@/lib/store';
+import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
 import { getEncryptedItemWithTTL, removeEncryptedItem, setEncryptedItemWithTTL } from '@/lib/utils/storage-encryption';
 import {
@@ -47,6 +48,7 @@ import {
   DocumentArrowDownIcon,
   FunnelIcon,
   HomeModernIcon,
+  InformationCircleIcon,
   LockClosedIcon,
   MagnifyingGlassIcon,
   MinusIcon,
@@ -224,6 +226,7 @@ const generateClientId = () => {
 };
 
 export default function POSPage() {
+  const dispatch = useAppDispatch();
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const formatCurrency = useFormatCurrency(); // Use hook to get reactive currency formatting
   const isOwnerOrManager =
@@ -725,7 +728,7 @@ export default function POSPage() {
   // Fetch waiter active orders count for busy indicator
   const { data: waiterActiveOrdersCount = {} } = useGetWaiterActiveOrdersCountQuery(undefined, {
     skip: !branchId,
-    pollingInterval: 30000, // Refresh every 30 seconds
+    pollingInterval: 60000, // Refresh every 60 seconds (reduced from 30s to reduce load)
   });
 
   const waiterOptions = useMemo<Array<{ id: string; name: string; activeOrdersCount: number }>>(() => {
@@ -1454,11 +1457,96 @@ export default function POSPage() {
   
   const [updateTableStatus] = useUpdateTableStatusMutation();
 
-  // Auto-suggestion: Check for tables paid > 15 minutes
+  // Show notification for tables paid > 15 minutes using Socket.IO events
+  // Instead of polling with setInterval, we listen for payment events and set timeouts
   useEffect(() => {
-    if (!tables || tables.length === 0) return;
+    if (!socket || !isConnected) return;
 
-    const checkPaidTables = () => {
+    // Store active timeouts to clean them up
+    const activeTimeouts = new Map<string, NodeJS.Timeout>();
+
+    const showReleaseNotification = (tableId: string, tableNumber: string) => {
+      if (notifiedTables.has(tableId)) return; // Already notified
+
+      toast(
+        (t) => (
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Table {tableNumber} - Ready to Release</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Payment received 15 minutes ago
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await updateTableStatus({
+                    id: tableId,
+                    status: 'available'
+                  }).unwrap();
+                  toast.dismiss(t.id);
+                  toast.success('Table released successfully');
+                  setNotifiedTables(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(tableId);
+                    return newSet;
+                  });
+                  // Clear timeout if exists
+                  const timeout = activeTimeouts.get(tableId);
+                  if (timeout) {
+                    clearTimeout(timeout);
+                    activeTimeouts.delete(tableId);
+                  }
+                  refetchTables();
+                } catch (error: any) {
+                  toast.error(error?.data?.message || 'Failed to release table');
+                }
+              }}
+              className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-colors"
+            >
+              Release
+            </button>
+          </div>
+        ),
+        {
+          duration: 10000, // Show for 10 seconds
+          icon: '🔔',
+        }
+      );
+      setNotifiedTables(prev => new Set(prev).add(tableId));
+    };
+
+    // Listen for payment received events
+    const handlePaymentReceived = (data: any) => {
+      const order = data.order || data;
+      const tableId = order.tableId?.toString() || order.tableId;
+      
+      if (!tableId) return;
+
+      // Find table number from current tables data
+      const table = tables?.find((t: any) => t.id === tableId);
+      if (!table) return;
+
+      // Clear any existing timeout for this table
+      const existingTimeout = activeTimeouts.get(tableId);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      // Set timeout to show notification after 15 minutes
+      const timeout = setTimeout(() => {
+        showReleaseNotification(tableId, table.number || table.tableNumber || 'Unknown');
+        activeTimeouts.delete(tableId);
+      }, 15 * 60 * 1000); // 15 minutes
+
+      activeTimeouts.set(tableId, timeout);
+      console.log(`⏰ Scheduled release notification for table ${tableId} in 15 minutes`);
+    };
+
+    // Also check existing paid tables on mount (one-time check for tables already paid)
+    const checkExistingPaidTables = () => {
+      if (!tables || tables.length === 0) return;
+      
       const now = new Date();
       const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
 
@@ -1471,70 +1559,54 @@ export default function POSPage() {
           || 'pending';
         
         if (orderStatus === 'paid') {
-          // Try to get payment time from order details
-          // If we have completedAt or payment time, use it; otherwise skip
           const paymentTime = table.orderDetails.completedAt 
             || table.orderDetails.allOrders?.[0]?.completedAt
             || table.orderDetails.paidAt;
           
           if (paymentTime) {
             const paidAt = new Date(paymentTime);
+            const timeSincePayment = now.getTime() - paidAt.getTime();
+            
             if (paidAt < fifteenMinutesAgo && !notifiedTables.has(table.id)) {
-              // Show notification
-              toast(
-                (t) => (
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm">Table {table.number || table.tableNumber} - Ready to Release</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Payment received {Math.round((now.getTime() - paidAt.getTime()) / 60000)} minutes ago
-                      </p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await updateTableStatus({
-                            id: table.id,
-                            status: 'available'
-                          }).unwrap();
-                          toast.dismiss(t.id);
-                          toast.success('Table released successfully');
-                          setNotifiedTables(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete(table.id);
-                            return newSet;
-                          });
-                          refetchTables();
-                        } catch (error: any) {
-                          toast.error(error?.data?.message || 'Failed to release table');
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-colors"
-                    >
-                      Release
-                    </button>
-                  </div>
-                ),
-                {
-                  duration: 10000, // Show for 10 seconds
-                  icon: '🔔',
-                }
-              );
-              setNotifiedTables(prev => new Set(prev).add(table.id));
+              // Already past 15 minutes, show immediately
+              showReleaseNotification(table.id, table.number || table.tableNumber || 'Unknown');
+            } else if (timeSincePayment > 0 && timeSincePayment < 15 * 60 * 1000) {
+              // Paid less than 15 minutes ago, schedule notification
+              const remainingTime = 15 * 60 * 1000 - timeSincePayment;
+              const timeout = setTimeout(() => {
+                showReleaseNotification(table.id, table.number || table.tableNumber || 'Unknown');
+                activeTimeouts.delete(table.id);
+              }, remainingTime);
+              activeTimeouts.set(table.id, timeout);
             }
           }
         }
       });
     };
 
-    // Check immediately
-    checkPaidTables();
-    
-    // Check every minute
-    const interval = setInterval(checkPaidTables, 60000);
-    
-    return () => clearInterval(interval);
-  }, [tables, notifiedTables, updateTableStatus, refetchTables]);
+    // Listen to Socket.IO events
+    socket.on('order:payment-received', handlePaymentReceived);
+    socket.on('table:payment-received', handlePaymentReceived);
+    socket.on('order:status-changed', (data: any) => {
+      // If order status changed to 'paid', treat it as payment received
+      if (data.status === 'paid' && data.order) {
+        handlePaymentReceived(data.order);
+      }
+    });
+
+    // Check existing paid tables on mount
+    checkExistingPaidTables();
+
+    // Cleanup
+    return () => {
+      socket.off('order:payment-received', handlePaymentReceived);
+      socket.off('table:payment-received', handlePaymentReceived);
+      socket.off('order:status-changed', handlePaymentReceived);
+      // Clear all active timeouts
+      activeTimeouts.forEach(timeout => clearTimeout(timeout));
+      activeTimeouts.clear();
+    };
+  }, [socket, isConnected, tables, notifiedTables, updateTableStatus, refetchTables]);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -1973,9 +2045,17 @@ export default function POSPage() {
       }
       noteSegments.push(...paymentNotes);
  
+      // Determine the actual payment method to store in order
+      // For full payment, use the actual method code (bkash, nagad, etc.)
+      // For split payment, use the primary method or 'split' with breakdown
+      const actualPaymentMethod = paymentTab === 'full' 
+        ? fullPaymentMethod  // Store actual method code (bkash, nagad, cash, etc.)
+        : paymentMethodForBackend; // For split, keep as 'split'
+
       const orderData: CreatePOSOrderRequest = {
         orderType,
         ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
+        ...(requiresTable && selectedTable ? { guestCount: guestCount || 1 } : {}),
         ...(isDelivery
           ? {
               deliveryFee: deliveryFeeValue,
@@ -1998,7 +2078,7 @@ export default function POSPage() {
         // In "pay-first" mode, create order as 'paid' (payment happens before order creation)
         // In "pay-later" mode, create order as 'pending' then process payment
         status: paymentMode === 'pay-first' ? 'paid' as const : 'pending' as const,
-        paymentMethod: paymentMethodForBackend,
+        paymentMethod: actualPaymentMethod, // Store actual method code (bkash, nagad, etc.)
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
         ...(selectedWaiterId ? { waiterId: selectedWaiterId } : {}),
         ...(selectedCustomerId && loyaltyRedemption.pointsRedeemed > 0
@@ -2039,7 +2119,14 @@ export default function POSPage() {
       });
       toast.success('Payment completed successfully');
       refetchQueue();
-      refetchTables(); // Refetch tables to update status after payment
+      // Invalidate cache and refetch tables to update status after payment
+      dispatch(posApi.util.invalidateTags(['Table', 'POS']));
+      // Use a longer delay to ensure backend has fully processed the payment,
+      // updated order status, and cleared table associations if needed
+      // Increased from 300ms to 1000ms to avoid race conditions
+      setTimeout(() => {
+        refetchTables(); // Refetch tables to update status after payment
+      }, 1000);
       
       clearCart();
       if (requiresTable) {
@@ -2179,8 +2266,11 @@ export default function POSPage() {
         || 'pending';
       
       if (orderStatus === 'paid') {
-        // Green badge: Paid - Ready to Release
-        return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border-2 border-green-500/50';
+        // In pay-first mode: Paid orders mean customer is still using table (orange/yellow)
+        // In pay-later mode: Paid orders mean table is ready to release (green)
+        return paymentMode === 'pay-first'
+          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 border-2 border-amber-500/50'
+          : 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border-2 border-green-500/50';
       } else if (orderStatus === 'pending') {
         // Yellow badge: Pending Payment
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 border-2 border-yellow-500/50';
@@ -2206,7 +2296,11 @@ export default function POSPage() {
         || 'pending';
       
       if (orderStatus === 'paid') {
-        return 'Paid - Ready to Release';
+        // In pay-first mode, paid orders mean customer is still using the table
+        // In pay-later mode, paid orders mean table is ready to release
+        return paymentMode === 'pay-first' 
+          ? 'Paid - In Use' 
+          : 'Paid - Ready to Release';
       } else if (orderStatus === 'pending') {
         return 'Pending Payment';
       } else {
@@ -2604,7 +2698,7 @@ export default function POSPage() {
               </Button>
               
               {/* Payment Mode Toggle - In the middle */}
-              <div className="flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2">
+              <div className="flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 relative group" style={{ zIndex: 1 }}>
                 <span className="text-xs font-medium text-gray-600 dark:text-slate-400 whitespace-nowrap">
                   {paymentMode === 'pay-first' ? 'Pay First' : 'Pay Later'}
                 </span>
@@ -2619,6 +2713,19 @@ export default function POSPage() {
                     }`}
                   />
                 </button>
+                <div className="relative" style={{ zIndex: 10000 }}>
+                  <InformationCircleIcon className="h-4 w-4 text-gray-400 dark:text-slate-500 cursor-help" />
+                  <div className="absolute right-0 top-6 w-64 p-3 bg-slate-900 dark:bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-slate-700 pointer-events-none group-hover:pointer-events-auto" style={{ zIndex: 10001 }}>
+                    <div className="space-y-2">
+                      <p className="font-semibold text-sky-300">Payment Mode Info:</p>
+                      <div className="space-y-1">
+                        <p><strong className="text-emerald-300">Pay First:</strong> Customer pays before sitting. Tables with paid orders remain occupied until customer leaves.</p>
+                        <p><strong className="text-amber-300">Pay Later:</strong> Customer orders first, pays after. Only pending orders keep tables occupied.</p>
+                      </div>
+                    </div>
+                    <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 dark:bg-slate-800 border-l border-t border-slate-700 transform rotate-45"></div>
+                  </div>
+                </div>
               </div>
               
               <Button
@@ -3847,6 +3954,63 @@ export default function POSPage() {
             </div>
           </div>
 
+          {/* Payment Method Selection - Quick Access */}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-slate-200">Payment Method</label>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsPaymentModalOpen(true)}
+                className="text-xs text-sky-400 hover:text-sky-300"
+              >
+                Change
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {paymentMethodsLoading ? (
+                <div className="col-span-full text-center text-slate-400 py-2 text-xs">Loading payment methods...</div>
+              ) : paymentMethods.length > 0 ? (
+                paymentMethods.slice(0, 6).map((method) => {
+                  const isSelected = fullPaymentMethod === method.code;
+                  return (
+                    <Button
+                      key={method.id}
+                      size="sm"
+                      variant={isSelected ? 'primary' : 'secondary'}
+                      onClick={() => setFullPaymentMethod(method.code)}
+                      className={`flex items-center justify-center gap-2 text-xs ${
+                        isSelected
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                      }`}
+                    >
+                      {method.icon ? (
+                        <span>{method.icon}</span>
+                      ) : method.type === 'cash' ? (
+                        '💵'
+                      ) : (
+                        <CreditCardIcon className="h-3 w-3" />
+                      )}
+                      <span className="truncate">{method.displayName || method.name}</span>
+                    </Button>
+                  );
+                })
+              ) : (
+                <div className="col-span-full text-center text-slate-400 py-2 text-xs">
+                  No payment methods available
+                </div>
+              )}
+            </div>
+            {fullPaymentMethod && (
+              <div className="text-xs text-slate-400">
+                Selected: <span className="font-semibold text-slate-200">
+                  {paymentMethods.find(m => m.code === fullPaymentMethod)?.displayName || fullPaymentMethod}
+                </span>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-slate-500">
               {selectedWaiterName ? `Assigned waiter: ${selectedWaiterName}` : 'Waiter not set'}
@@ -3873,13 +4037,22 @@ export default function POSPage() {
                 )}
                 <Button
                   variant="primary"
-                  onClick={handlePayment}
+                  onClick={() => {
+                    // If payment method is selected and it's not cash, open payment modal for amount entry
+                    const selectedMethod = paymentMethods.find(m => m.code === fullPaymentMethod);
+                    const needsAmountEntry = selectedMethod?.code !== 'cash' || paymentMode === 'pay-first';
+                    if (needsAmountEntry) {
+                      setIsPaymentModalOpen(true);
+                    } else {
+                      handlePayment();
+                    }
+                  }}
                   disabled={checkoutBlocked || cart.length === 0}
                   className="bg-emerald-600 hover:bg-emerald-500"
                   title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : paymentMode === 'pay-first' ? 'Pay-first mode: Payment required before order creation' : ''}
                 >
                   <CreditCardIcon className="mr-2 h-4 w-4" />
-                  {paymentMode === 'pay-first' ? 'Pay & Create Order' : 'Process Payment'}
+                  {paymentMode === 'pay-first' ? 'Checkout' : 'Checkout'}
                 </Button>
               </div>
             </div>
@@ -4920,29 +5093,50 @@ export default function POSPage() {
                       </Button>
                     )}
                     {currentStatus === 'paid' && (
-                      <Button
-                        onClick={async () => {
-                          if (!occupiedTableModal.orderDetails?.currentOrderId) return;
-                          try {
-                            await updateOrder({
-                              id: occupiedTableModal.orderDetails.currentOrderId,
-                              data: { status: 'pending' }
-                            }).unwrap();
-                            toast.success('Order marked as pending');
-                            setOccupiedTableModal(null);
-                            refetchTables();
-                            refetchQueue();
-                          } catch (error: any) {
-                            toast.error(error?.data?.message || 'Failed to update order status');
-                          }
-                        }}
-                        disabled={paymentMode === 'pay-first'}
-                        variant="secondary"
-                        className="w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={paymentMode === 'pay-first' ? 'Pay-first mode is enabled. Orders cannot be marked as pending.' : ''}
-                      >
-                        Mark as Pending
-                      </Button>
+                      <>
+                        <Button
+                          onClick={async () => {
+                            if (!occupiedTableModal.tableId) return;
+                            try {
+                              await updateTableStatus({
+                                id: occupiedTableModal.tableId,
+                                status: 'available'
+                              }).unwrap();
+                              toast.success('Table released successfully');
+                              setOccupiedTableModal(null);
+                              refetchTables();
+                            } catch (error: any) {
+                              toast.error(error?.data?.message || 'Failed to release table');
+                            }
+                          }}
+                          className="w-full bg-green-600 hover:bg-green-500"
+                        >
+                          Release Table
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            if (!occupiedTableModal.orderDetails?.currentOrderId) return;
+                            try {
+                              await updateOrder({
+                                id: occupiedTableModal.orderDetails.currentOrderId,
+                                data: { status: 'pending' }
+                              }).unwrap();
+                              toast.success('Order marked as pending');
+                              setOccupiedTableModal(null);
+                              refetchTables();
+                              refetchQueue();
+                            } catch (error: any) {
+                              toast.error(error?.data?.message || 'Failed to update order status');
+                            }
+                          }}
+                          disabled={true}
+                          variant="secondary"
+                          className="w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Cannot mark paid orders as pending. Use 'Release Table' to free the table."
+                        >
+                          Mark as Pending
+                        </Button>
+                      </>
                     )}
                   </>
                 );

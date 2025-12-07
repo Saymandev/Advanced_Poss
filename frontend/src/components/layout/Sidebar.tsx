@@ -344,6 +344,12 @@ const superAdminNavigation: NavigationItem[] = [
     icon: DocumentTextIcon,
     roles: ['super_admin'],
   },
+  {
+    name: 'Payment Methods',
+    href: '/dashboard/subscription-payment-methods',
+    icon: CurrencyDollarIcon,
+    roles: ['super_admin'],
+  },
 ];
 
 interface SidebarProps {
