@@ -6,21 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import {
-    useChangePasswordMutation,
-    useChangePinMutation,
-    useGetProfileQuery,
-    useUpdateProfileMutation,
-    useUploadAvatarMutation,
+  useDisable2FAMutation,
+  useEnable2FAMutation,
+  useSetup2FAMutation,
+} from '@/lib/api/endpoints/authApi';
+import {
+  useChangePasswordMutation,
+  useChangePinMutation,
+  useGetProfileQuery,
+  useUpdateProfileMutation,
+  useUploadAvatarMutation,
 } from '@/lib/api/endpoints/usersApi';
 import { setUser } from '@/lib/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import {
-    CheckCircleIcon,
-    KeyIcon,
-    LockClosedIcon,
-    PencilIcon,
-    PhotoIcon,
-    UserCircleIcon
+  CheckCircleIcon,
+  KeyIcon,
+  LockClosedIcon,
+  PencilIcon,
+  PhotoIcon,
+  UserCircleIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
@@ -35,10 +40,21 @@ export default function ProfilePage() {
     useChangePasswordMutation();
   const [changePin, { isLoading: isChangingPin }] = useChangePinMutation();
   const [uploadAvatar, { isLoading: isUploadingAvatar }] = useUploadAvatarMutation();
+  const [setup2FA, { isLoading: isSettingUp2FA }] = useSetup2FAMutation();
+  const [enable2FA, { isLoading: isEnabling2FA }] = useEnable2FAMutation();
+  const [disable2FA, { isLoading: isDisabling2FA }] = useDisable2FAMutation();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [is2FASetupModalOpen, setIs2FASetupModalOpen] = useState(false);
+  const [is2FADisableModalOpen, setIs2FADisableModalOpen] = useState(false);
+  const [qrCode, setQrCode] = useState<string>('');
+  const [secret, setSecret] = useState<string>('');
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [twoFactorToken, setTwoFactorToken] = useState('');
+  const [disablePassword, setDisablePassword] = useState('');
+  const [showManualEntry, setShowManualEntry] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -229,6 +245,100 @@ export default function ProfilePage() {
       setAvatarPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleSetup2FA = async () => {
+    try {
+      const result = await setup2FA().unwrap();
+      setQrCode(result.qrCode);
+      setSecret(result.secret || '');
+      setBackupCodes(result.backupCodes || []);
+      setTwoFactorToken(''); // Reset token when setting up
+      setShowManualEntry(false);
+      setIs2FASetupModalOpen(true);
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || 'Failed to setup 2FA';
+      toast.error(errorMessage);
+      
+      // If 2FA is already enabled, show different message
+      if (errorMessage.includes('already enabled')) {
+        refetch(); // Refresh profile to get updated status
+      }
+    }
+  };
+
+  const handleEnable2FA = async () => {
+    if (!twoFactorToken.trim() || twoFactorToken.length !== 6) {
+      toast.error('Please enter a valid 6-digit code');
+      return;
+    }
+
+    // If QR code is not set, we need to setup first
+    if (!qrCode) {
+      toast.error('Please setup 2FA first by clicking Enable');
+      return;
+    }
+
+    try {
+      const result = await enable2FA({ token: twoFactorToken }).unwrap();
+      toast.success(result.message || '2FA enabled successfully');
+      setIs2FASetupModalOpen(false);
+      setTwoFactorToken('');
+      setQrCode('');
+      setBackupCodes([]);
+      refetch();
+      
+      // Show backup codes if available
+      if (result.backupCodes && result.backupCodes.length > 0) {
+        // Show backup codes in a toast or you could show them in a modal
+        const codesText = result.backupCodes.join(', ');
+        toast.success(
+          `2FA enabled! Backup codes: ${codesText}. Please save them securely.`,
+          { duration: 10000 }
+        );
+      }
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || 'Failed to enable 2FA';
+      
+      // If setup not initiated, we need to setup again
+      if (errorMessage.includes('setup not initiated') || errorMessage.includes('Please call /auth/2fa/setup')) {
+        // Clear current state
+        setQrCode('');
+        setSecret('');
+        setBackupCodes([]);
+        setTwoFactorToken('');
+        setIs2FASetupModalOpen(false);
+        
+        // Show message and let user click Enable again
+        toast.error('2FA setup expired. Please click "Enable" again to start a new setup.', { duration: 5000 });
+      } else if (errorMessage.includes('Invalid 2FA token') || errorMessage.includes('Invalid 2FA code')) {
+        // Invalid token - just clear the input and let them try again
+        setTwoFactorToken('');
+        toast.error('Invalid code. Please check your authenticator app and try again.');
+      } else {
+        // Show generic error for other cases
+        toast.error(errorMessage);
+        setTwoFactorToken('');
+      }
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    if (!disablePassword.trim()) {
+      toast.error('Please enter your password');
+      return;
+    }
+
+    try {
+      await disable2FA({ password: disablePassword }).unwrap();
+      toast.success('2FA disabled successfully');
+      setIs2FADisableModalOpen(false);
+      setDisablePassword('');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to disable 2FA');
+      setDisablePassword('');
+    }
   };
 
   const handleAvatarUpload = async () => {
@@ -572,9 +682,29 @@ export default function ProfilePage() {
                         Add an extra layer of security to your account
                       </p>
                     </div>
-                    <Badge variant={profile.twoFactorEnabled ? 'success' : 'secondary'}>
-                      {profile.twoFactorEnabled ? 'Enabled' : 'Disabled'}
-                    </Badge>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={profile.twoFactorEnabled ? 'success' : 'secondary'}>
+                        {profile.twoFactorEnabled ? 'Enabled' : 'Disabled'}
+                      </Badge>
+                      {profile.twoFactorEnabled ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setIs2FADisableModalOpen(true)}
+                          disabled={isDisabling2FA}
+                        >
+                          Disable
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => handleSetup2FA()}
+                          disabled={isSettingUp2FA}
+                        >
+                          {isSettingUp2FA ? 'Setting up...' : 'Enable'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -830,6 +960,184 @@ export default function ProfilePage() {
               disabled={isChangingPin}
             >
               {isChangingPin ? 'Changing...' : 'Change PIN'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 2FA Setup Modal */}
+      <Modal
+        isOpen={is2FASetupModalOpen}
+        onClose={() => {
+          setIs2FASetupModalOpen(false);
+          setQrCode('');
+          setSecret('');
+          setBackupCodes([]);
+          setShowManualEntry(false);
+        }}
+        title="Setup Two-Factor Authentication"
+        size="lg"
+      >
+        <div className="space-y-6">
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              {showManualEntry 
+                ? 'Enter this secret key manually into your authenticator app:'
+                : 'Scan this QR code with your authenticator app (Google Authenticator, Authy, Microsoft Authenticator, etc.)'}
+            </p>
+            
+            {!showManualEntry && qrCode && (
+              <div className="flex flex-col items-center mb-4">
+                <div className="flex justify-center mb-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qrCode} alt="2FA QR Code" className="w-64 h-64 border-2 border-gray-300 dark:border-gray-600 rounded-lg" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowManualEntry(true)}
+                  className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  Can't scan? Enter code manually
+                </button>
+              </div>
+            )}
+            
+            {showManualEntry && secret && (
+              <div className="space-y-3 mb-4">
+                <div className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Secret Key:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-sm font-mono bg-white dark:bg-gray-900 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 break-all">
+                      {secret}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(secret);
+                        toast.success('Secret key copied to clipboard');
+                      }}
+                      className="px-3 py-2 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    <strong>Instructions:</strong> Open your authenticator app, select "Enter a setup key", 
+                    enter the account name (e.g., "Restaurant POS (your@email.com)"), select "Time-based", 
+                    and paste the secret key above.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowManualEntry(false)}
+                  className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  ← Back to QR code
+                </button>
+              </div>
+            )}
+            {backupCodes.length > 0 && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+                <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                  ⚠️ Save these backup codes securely:
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {backupCodes.map((code, index) => (
+                    <code key={index} className="text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded">
+                      {code}
+                    </code>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Enter the 6-digit code from your authenticator app
+              </label>
+              <Input
+                value={twoFactorToken}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setTwoFactorToken(value);
+                }}
+                placeholder="000000"
+                maxLength={6}
+                className="text-center text-2xl tracking-widest"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIs2FASetupModalOpen(false);
+                setQrCode('');
+                setSecret('');
+                setBackupCodes([]);
+                setTwoFactorToken('');
+                setShowManualEntry(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEnable2FA}
+              disabled={isEnabling2FA || twoFactorToken.length !== 6}
+            >
+              {isEnabling2FA ? 'Enabling...' : 'Enable 2FA'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 2FA Disable Modal */}
+      <Modal
+        isOpen={is2FADisableModalOpen}
+        onClose={() => {
+          setIs2FADisableModalOpen(false);
+          setDisablePassword('');
+        }}
+        title="Disable Two-Factor Authentication"
+        size="md"
+      >
+        <div className="space-y-6">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Please enter your password to disable two-factor authentication.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Password
+            </label>
+            <Input
+              type="password"
+              value={disablePassword}
+              onChange={(e) => setDisablePassword(e.target.value)}
+              placeholder="Enter your password"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIs2FADisableModalOpen(false);
+                setDisablePassword('');
+              }}
+              disabled={isDisabling2FA}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDisable2FA}
+              disabled={isDisabling2FA || !disablePassword.trim()}
+              variant="danger"
+            >
+              {isDisabling2FA ? 'Disabling...' : 'Disable 2FA'}
             </Button>
           </div>
         </div>

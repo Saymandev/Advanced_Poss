@@ -5,6 +5,7 @@ import { Topbar } from '@/components/layout/Topbar';
 import { OrderNotificationManager } from '@/components/orders/OrderNotificationManager';
 import { DashboardSkeleton } from '@/components/ui/DashboardSkeleton';
 import { SubscriptionIndicator } from '@/components/ui/SubscriptionIndicator';
+import { FeedbackTrigger } from '@/components/feedback/FeedbackTrigger';
 import { useAppSelector } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -89,6 +90,9 @@ export default function DashboardLayout({
         
         {/* Order Notification Manager - Shows modal for new orders (owner/manager only) */}
         <OrderNotificationManager />
+        
+        {/* Feedback Trigger - Shows feedback modal randomly for company owners */}
+        <FeedbackTrigger />
         
         {/* Main content with top padding to account for fixed navbar */}
         <main className="pt-0 py-6" suppressHydrationWarning>

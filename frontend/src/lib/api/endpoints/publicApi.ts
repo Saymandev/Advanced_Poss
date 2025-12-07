@@ -243,6 +243,20 @@ export const publicApi = apiSlice.injectEndpoints({
         body: formData,
       }),
     }),
+    
+    submitGeneralContactForm: builder.mutation<{ success: boolean; message: string }, {
+      name: string;
+      email: string;
+      phone?: string;
+      subject: string;
+      message: string;
+    }>({
+      query: (formData) => ({
+        url: '/public/contact',
+        method: 'POST',
+        body: formData,
+      }),
+    }),
   }),
 });
 
@@ -260,5 +274,6 @@ export const {
   useGetBranchZonesQuery,
   useFindDeliveryZoneMutation,
   useSubmitContactFormMutation,
+  useSubmitGeneralContactFormMutation,
 } = publicApi;
 

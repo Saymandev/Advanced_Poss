@@ -4,6 +4,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
+import { useGetPublicStatsQuery, useGetPublicTestimonialsQuery } from '@/lib/api/endpoints/systemFeedbackApi';
 import {
   ArrowRightIcon,
   BellAlertIcon,
@@ -51,48 +52,10 @@ const features = [
   },
 ];
 
-// Legacy pricing plans removed - now fetched from API
-
-const testimonials = [
-  {
-    name: 'Sarah Johnson',
-    role: 'Restaurant Owner',
-    image: 'https://i.pravatar.cc/150?img=1',
-    content: 'This POS system transformed our restaurant operations. The interface is intuitive and our staff loves it!',
-    rating: 5,
-  },
-  {
-    name: 'Michael Chen',
-    role: 'Café Manager',
-    image: 'https://i.pravatar.cc/150?img=2',
-    content: 'Real-time analytics helped us increase revenue by 30%. Best investment we made this year.',
-    rating: 5,
-  },
-  {
-    name: 'Emily Rodriguez',
-    role: 'Chain Director',
-    image: 'https://i.pravatar.cc/150?img=3',
-    content: 'Managing multiple locations is now effortless. The reporting features are exceptional.',
-    rating: 5,
-  },
-];
-
 export default function LandingPage() {
-  const { data: plansData, isLoading: isLoadingPlans, error } = useGetSubscriptionPlansQuery({});
-  
-  // Debug logging
-  useEffect(() => {
-    if (plansData) {
-      console.log('📦 Plans Data:', { 
-        isArray: Array.isArray(plansData), 
-        type: typeof plansData,
-        data: plansData 
-      });
-    }
-    if (error) {
-      console.error('❌ Plans API Error:', error);
-    }
-  }, [plansData, error]);
+  const { data: plansData, isLoading: isLoadingPlans } = useGetSubscriptionPlansQuery({});
+  const { data: statsData, isLoading: isLoadingStats } = useGetPublicStatsQuery();
+  const { data: testimonialsData = [], isLoading: isLoadingTestimonials } = useGetPublicTestimonialsQuery({ limit: 3 });
   
   // Get available plans from API - handle both array and object responses
   const plans = useMemo(() => {
@@ -114,17 +77,55 @@ export default function LandingPage() {
     return plans.filter((plan: any) => plan.isActive !== false).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }, [plans]);
   
-  // Debug logging for plans processing
-  useEffect(() => {
-    if (plansData !== undefined) {
-      console.log('🔍 Plans Processing:', { 
-        plansCount: plans.length, 
-        activePlansCount: activePlans.length,
-        plansData,
-        plans: plans.map((p: any) => ({ name: p.name, isActive: p.isActive, displayName: p.displayName }))
-      });
+  // Format testimonials from API
+  const testimonials = useMemo(() => {
+    if (!testimonialsData || testimonialsData.length === 0) {
+      // Fallback testimonials if no data
+      return [
+        {
+          name: 'Sarah Johnson',
+          role: 'Restaurant Owner',
+          image: 'https://i.pravatar.cc/150?img=1',
+          content: 'This POS system transformed our restaurant operations. The interface is intuitive and our staff loves it!',
+          rating: 5,
+        },
+        {
+          name: 'Michael Chen',
+          role: 'Café Manager',
+          image: 'https://i.pravatar.cc/150?img=2',
+          content: 'Real-time analytics helped us increase revenue by 30%. Best investment we made this year.',
+          rating: 5,
+        },
+        {
+          name: 'Emily Rodriguez',
+          role: 'Chain Director',
+          image: 'https://i.pravatar.cc/150?img=3',
+          content: 'Managing multiple locations is now effortless. The reporting features are exceptional.',
+          rating: 5,
+        },
+      ];
     }
-  }, [plans, activePlans, plansData]);
+    
+    return testimonialsData.map((feedback: any) => {
+      const user = feedback.userId || {};
+      const company = feedback.companyId || {};
+      const firstName = user.firstName || '';
+      const lastName = user.lastName || '';
+      const name = feedback.isAnonymous 
+        ? 'Anonymous' 
+        : `${firstName} ${lastName}`.trim() || 'Customer';
+      
+      return {
+        name,
+        role: company.name ? `${company.name} Owner` : 'Restaurant Owner',
+        image: feedback.isAnonymous 
+          ? 'https://i.pravatar.cc/150?img=0' 
+          : `https://i.pravatar.cc/150?img=${Math.abs(name.charCodeAt(0)) % 10}`,
+        content: feedback.message || feedback.title || 'Great experience!',
+        rating: feedback.rating || 5,
+      };
+    });
+  }, [testimonialsData]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -200,16 +201,40 @@ export default function LandingPage() {
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-20">
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow">
-                <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">10K+</div>
+                <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">
+                  {isLoadingStats ? (
+                    <span className="inline-block w-16 h-10 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></span>
+                  ) : statsData?.totalCompanies ? (
+                    `${(statsData.totalCompanies / 1000).toFixed(1)}K+`
+                  ) : (
+                    '10K+'
+                  )}
+                </div>
                 <div className="text-gray-600 dark:text-gray-300">Active Restaurants</div>
               </div>
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow">
-                <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">99.9%</div>
-                <div className="text-gray-600 dark:text-gray-300">Uptime Guarantee</div>
+                <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">
+                  {isLoadingStats ? (
+                    <span className="inline-block w-16 h-10 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></span>
+                  ) : statsData?.averageRating ? (
+                    `${statsData.averageRating.toFixed(1)}★`
+                  ) : (
+                    '4.9★'
+                  )}
+                </div>
+                <div className="text-gray-600 dark:text-gray-300">Average Rating</div>
               </div>
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow">
-                <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">24/7</div>
-                <div className="text-gray-600 dark:text-gray-300">Customer Support</div>
+                <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">
+                  {isLoadingStats ? (
+                    <span className="inline-block w-16 h-10 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></span>
+                  ) : statsData?.totalFeedback ? (
+                    `${(statsData.totalFeedback / 1000).toFixed(1)}K+`
+                  ) : (
+                    '5K+'
+                  )}
+                </div>
+                <div className="text-gray-600 dark:text-gray-300">Happy Customers</div>
               </div>
             </div>
           </div>
@@ -420,44 +445,69 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div
-                key={index}
-                className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300"
-              >
-                <div className="flex items-center mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <svg
-                      key={i}
-                      className="w-5 h-5 text-yellow-400 fill-current"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 mb-6 italic">
-                  "{testimonial.content}"
-                </p>
-                <div className="flex items-center">
-                  <img
-                    src={testimonial.image}
-                    alt={testimonial.name}
-                    className="w-12 h-12 rounded-full mr-4"
-                  />
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-white">
-                      {testimonial.name}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
-                      {testimonial.role}
+          {isLoadingTestimonials ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 p-8 rounded-2xl shadow-lg animate-pulse"
+                >
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-4 w-24"></div>
+                  <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded mb-6"></div>
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mr-4"></div>
+                    <div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-32"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : testimonials.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {testimonials.map((testimonial, index) => (
+                <div
+                  key={index}
+                  className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300"
+                >
+                  <div className="flex items-center mb-4">
+                    {[...Array(testimonial.rating)].map((_, i) => (
+                      <svg
+                        key={i}
+                        className="w-5 h-5 text-yellow-400 fill-current"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-300 mb-6 italic">
+                    "{testimonial.content}"
+                  </p>
+                  <div className="flex items-center">
+                    <img
+                      src={testimonial.image}
+                      alt={testimonial.name}
+                      className="w-12 h-12 rounded-full mr-4"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white">
+                        {testimonial.name}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-300">
+                        {testimonial.role}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-600 dark:text-gray-400">No testimonials available yet.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -501,23 +551,24 @@ export default function LandingPage() {
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
                 <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
+                <li><Link href="/security" className="hover:text-white transition-colors">Security</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
+                <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
+                <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+                <li><Link href="/careers" className="hover:text-white transition-colors">Careers</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
+                <li><Link href="/help-center" className="hover:text-white transition-colors">Help Center</Link></li>
+                <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+                <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
+                <li><Link href="/terms" className="hover:text-white transition-colors">Terms</Link></li>
               </ul>
             </div>
           </div>

@@ -25,10 +25,16 @@ export function Topbar() {
 
   const handleLogout = async () => {
     try {
-      // Call logout API to invalidate tokens on server
-      // Note: This might fail if token is already invalid, so we continue anyway
+      // Call logout API to clear httpOnly cookies on server
       try {
-        // await logout().unwrap();
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/auth/logout`, {
+          method: 'POST',
+          credentials: 'include', // Include cookies
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        // Ignore errors - cookies will be cleared by backend
       } catch (error) {
         // Ignore logout API errors - we'll clear local state anyway
         console.log('Logout API call failed (token may already be invalid):', error);
@@ -40,7 +46,7 @@ export function Topbar() {
     // Clear auth state from Redux
     dispatch(logout());
     
-    // Clear all localStorage
+    // Clear all localStorage (tokens are cleared by backend via httpOnly cookies)
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');

@@ -34,6 +34,7 @@ import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
+import { getEncryptedItemWithTTL, removeEncryptedItem, setEncryptedItemWithTTL } from '@/lib/utils/storage-encryption';
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -262,8 +263,9 @@ export default function POSPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [customerInfo, setCustomerInfo] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('pos_customerInfo');
-      return saved ? JSON.parse(saved) : { name: '', phone: '', email: '' };
+      // Use encrypted storage with 24-hour TTL for customer PII
+      const saved = getEncryptedItemWithTTL<{ name: string; phone: string; email: string }>('pos_customerInfo');
+      return saved || { name: '', phone: '', email: '' };
     }
     return { name: '', phone: '', email: '' };
   });
@@ -322,14 +324,10 @@ export default function POSPage() {
   }, [selectedCustomer, selectedCustomerId, cartSubtotal]);
   const [deliveryDetails, setDeliveryDetails] = useState<DeliveryDetailsState>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('pos_deliveryDetails');
+      // Use encrypted storage with 24-hour TTL for delivery PII
+      const saved = getEncryptedItemWithTTL<DeliveryDetailsState>('pos_deliveryDetails');
       if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return { ...createDefaultDeliveryDetails(), ...parsed };
-        } catch (error) {
-          console.warn('Failed to parse saved delivery details:', error);
-        }
+        return { ...createDefaultDeliveryDetails(), ...saved };
       }
     }
     return createDefaultDeliveryDetails();
@@ -430,7 +428,7 @@ export default function POSPage() {
     setDeliveryDetails(defaults);
     setDeliveryFee('0');
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('pos_deliveryDetails');
+      removeEncryptedItem('pos_deliveryDetails');
       localStorage.removeItem('pos_deliveryFee');
     }
   }, []);
@@ -935,9 +933,11 @@ export default function POSPage() {
     if (typeof window !== 'undefined') {
       const hasCustomerInfo = customerInfo.name || customerInfo.phone || customerInfo.email;
       if (hasCustomerInfo) {
-        localStorage.setItem('pos_customerInfo', JSON.stringify(customerInfo));
+        // Encrypt customer PII with 24-hour TTL
+        const CUSTOMER_DATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
+        setEncryptedItemWithTTL('pos_customerInfo', customerInfo, CUSTOMER_DATA_TTL);
       } else {
-        localStorage.removeItem('pos_customerInfo');
+        removeEncryptedItem('pos_customerInfo');
       }
     }
   }, [customerInfo]);
@@ -978,14 +978,16 @@ export default function POSPage() {
     }
   }, [orderType, selectedTable]);
 
-  // Save delivery details to localStorage
+  // Save delivery details to encrypted storage
   useEffect(() => {
     if (typeof window !== 'undefined' && orderType === 'delivery') {
       const hasDeliveryDetails = Object.values(deliveryDetails).some(v => v.trim() !== '') || deliveryFee !== '0';
       if (hasDeliveryDetails) {
-        localStorage.setItem('pos_deliveryDetails', JSON.stringify(deliveryDetails));
+        // Encrypt delivery PII with 24-hour TTL
+        const DELIVERY_DATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
+        setEncryptedItemWithTTL('pos_deliveryDetails', deliveryDetails, DELIVERY_DATA_TTL);
       } else {
-        localStorage.removeItem('pos_deliveryDetails');
+        removeEncryptedItem('pos_deliveryDetails');
       }
     }
   }, [deliveryDetails, deliveryFee, orderType]);
@@ -1009,9 +1011,11 @@ export default function POSPage() {
 
     const hasDeliveryDetails = Object.values(deliveryDetails).some((value) => value.trim() !== '');
     if (hasDeliveryDetails) {
-      localStorage.setItem('pos_deliveryDetails', JSON.stringify(deliveryDetails));
+      // Encrypt delivery PII with 24-hour TTL
+      const DELIVERY_DATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
+      setEncryptedItemWithTTL('pos_deliveryDetails', deliveryDetails, DELIVERY_DATA_TTL);
     } else {
-      localStorage.removeItem('pos_deliveryDetails');
+      removeEncryptedItem('pos_deliveryDetails');
     }
 
     const parsedFee = parseFloat(deliveryFee);
@@ -1419,7 +1423,7 @@ export default function POSPage() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('pos_cart');
       localStorage.removeItem('pos_customerId');
-      localStorage.removeItem('pos_customerInfo');
+      removeEncryptedItem('pos_customerInfo');
     }
     toast.success('Cart cleared');
   };
@@ -1796,7 +1800,7 @@ export default function POSPage() {
         resetTakeawayDetails();
       }
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('pos_customerInfo');
+        removeEncryptedItem('pos_customerInfo');
       }
       setCustomerInfo({ name: '', phone: '', email: '' });
       setHasStartedOrder(false);
@@ -2053,7 +2057,7 @@ export default function POSPage() {
         resetTakeawayDetails();
       }
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('pos_customerInfo');
+        removeEncryptedItem('pos_customerInfo');
       }
       setCustomerInfo({ name: '', phone: '', email: '' });
       setHasStartedOrder(false);

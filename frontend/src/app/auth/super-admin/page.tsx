@@ -1,5 +1,6 @@
 'use client';
 
+import { TwoFactorVerificationModal } from '@/components/auth/TwoFactorVerificationModal';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -19,6 +20,8 @@ export default function SuperAdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [superAdminLogin, { isLoading }] = useSuperAdminLoginMutation();
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [temporaryToken, setTemporaryToken] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,33 +29,35 @@ export default function SuperAdminLoginPage() {
     try {
       const response: any = await superAdminLogin({ email, password }).unwrap();
 
-      // Handle response structure: { success, data: { user, tokens: { accessToken, refreshToken } } }
-      // or direct: { user, tokens: { accessToken, refreshToken } }
-      let loggedInUser, accessToken, refreshToken;
+      // Check if 2FA is required
+      if (response.requires2FA && response.temporaryToken) {
+        setShow2FAModal(true);
+        setTemporaryToken(response.temporaryToken);
+        return;
+      }
+
+      // Tokens are now in httpOnly cookies, response only contains user data
+      // Handle response structure: { success, data: { user } } or direct: { user }
+      let loggedInUser;
       
       if (response.data) {
         // TransformInterceptor wrapped response
         loggedInUser = response.data.user || response.data;
-        accessToken = response.data.tokens?.accessToken || response.data.accessToken;
-        refreshToken = response.data.tokens?.refreshToken || response.data.refreshToken;
       } else {
         // Direct response from service
         loggedInUser = response.user;
-        accessToken = response.tokens?.accessToken || response.accessToken;
-        refreshToken = response.tokens?.refreshToken || response.refreshToken;
       }
 
-      if (!accessToken || !refreshToken) {
-        console.error('Missing tokens in response:', response);
+      if (!loggedInUser) {
+        console.error('Missing user in response:', response);
         toast.error('Login failed: Invalid response from server');
         return;
       }
       
+      // Tokens are in httpOnly cookies, only store user data
       dispatch(
         setCredentials({
           user: loggedInUser,
-          accessToken,
-          refreshToken,
         })
       );
 
@@ -123,6 +128,16 @@ export default function SuperAdminLoginPage() {
           </p>
         </div>
       </div>
+      
+      {/* 2FA Verification Modal */}
+      <TwoFactorVerificationModal
+        isOpen={show2FAModal}
+        temporaryToken={temporaryToken}
+        onClose={() => {
+          setShow2FAModal(false);
+          setTemporaryToken('');
+        }}
+      />
     </div>
   );
 }

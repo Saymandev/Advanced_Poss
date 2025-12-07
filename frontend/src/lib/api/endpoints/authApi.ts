@@ -34,6 +34,8 @@ export interface PinLoginRequest {
 
 export interface LoginResponse {
   success?: boolean;
+  requires2FA?: boolean;
+  temporaryToken?: string;
   data?: {
     user?: {
       id: string;
@@ -70,6 +72,12 @@ export interface LoginResponse {
   };
   accessToken?: string;
   refreshToken?: string;
+}
+
+export interface Verify2FALoginRequest {
+  temporaryToken: string;
+  token?: string;
+  backupCode?: string;
 }
 
 export interface SuperAdminLoginRequest {
@@ -143,6 +151,36 @@ export const authApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+    verify2FALogin: builder.mutation<LoginResponse, Verify2FALoginRequest>({
+      query: (data) => ({
+        url: '/auth/2fa/verify-login',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Auth'],
+    }),
+    setup2FA: builder.mutation<{ secret: string; qrCode: string; backupCodes: string[]; message: string }, void>({
+      query: () => ({
+        url: '/auth/2fa/setup',
+        method: 'GET',
+      }),
+    }),
+    enable2FA: builder.mutation<{ message: string; backupCodes: string[] }, { token: string }>({
+      query: (data) => ({
+        url: '/auth/2fa/enable',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Auth', 'User'],
+    }),
+    disable2FA: builder.mutation<{ message: string }, { password: string }>({
+      query: (data) => ({
+        url: '/auth/2fa/disable',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Auth', 'User'],
+    }),
   }),
 });
 
@@ -153,5 +191,9 @@ export const {
   useRegisterCompanyOwnerMutation,
   useLogoutMutation,
   useRefreshTokenMutation,
+  useVerify2FALoginMutation,
+  useSetup2FAMutation,
+  useEnable2FAMutation,
+  useDisable2FAMutation,
 } = authApi;
 

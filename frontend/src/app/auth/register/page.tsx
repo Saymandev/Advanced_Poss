@@ -164,11 +164,10 @@ export default function RegisterPage() {
         pin: formData.pin,
       } as any).unwrap();
 
+      // Tokens are now in httpOnly cookies, response only contains user data
       dispatch(
         setCredentials({
           user: response.data.user,
-          accessToken: response.data.accessToken,
-          refreshToken: response.data.refreshToken,
         })
       );
 

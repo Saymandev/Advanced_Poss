@@ -6,8 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetBranchesQuery, useUpdateBranchPublicUrlMutation } from '@/lib/api/endpoints/branchesApi';
-import { useGetCompanyByIdQuery, useUploadCompanyLogoMutation } from '@/lib/api/endpoints/companiesApi';
+import { useGetCompaniesQuery, useGetCompanyByIdQuery, useUploadCompanyLogoMutation } from '@/lib/api/endpoints/companiesApi';
+import {
+  useCreatePaymentMethodMutation,
+  useDeletePaymentMethodMutation,
+  useGetPaymentMethodsByCompanyQuery,
+  useUpdatePaymentMethodMutation,
+  type PaymentMethod,
+} from '@/lib/api/endpoints/paymentMethodsApi';
 import {
   useCreateServiceChargeSettingMutation,
   useCreateTaxSettingMutation,
@@ -40,16 +48,8 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
-import {
-  useCreatePaymentMethodMutation,
-  useDeletePaymentMethodMutation,
-  useGetPaymentMethodsByCompanyQuery,
-  useUpdatePaymentMethodMutation,
-  type PaymentMethod,
-} from '@/lib/api/endpoints/paymentMethodsApi';
 
 interface TaxSetting {
   id: string;
@@ -76,9 +76,33 @@ export default function SettingsPage() {
   // Redirect if user doesn't have settings feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('settings');
   
-  const companyId = companyContext?.companyId || user?.companyId || '';
-  const branchId = user?.branchId || '';
   const isSuperAdmin = user?.role === 'super_admin';
+  
+  // For Super Admin: Use selected company from state, or fallback to companyContext/user
+  // For regular users: Use their companyId
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  
+  // Get companies list for Super Admin selector
+  const { data: companiesData } = useGetCompaniesQuery({}, { skip: !isSuperAdmin });
+  const companies = useMemo(() => {
+    if (!companiesData || !isSuperAdmin) return [];
+    if (Array.isArray(companiesData)) return companiesData;
+    return companiesData.companies || [];
+  }, [companiesData, isSuperAdmin]);
+  
+  // Determine the actual companyId to use
+  const companyId = isSuperAdmin 
+    ? (selectedCompanyId || companyContext?.companyId || '')
+    : (companyContext?.companyId || user?.companyId || '');
+  const branchId = user?.branchId || '';
+  
+  // Clear stale companyContext for Super Admin on mount
+  useEffect(() => {
+    if (isSuperAdmin && companyContext?.companyId && !selectedCompanyId) {
+      // Don't auto-use companyContext for Super Admin - they should select explicitly
+      setSelectedCompanyId('');
+    }
+  }, [isSuperAdmin, companyContext, selectedCompanyId]);
   const [activeTab, setActiveTab] = useState<'general' | 'taxes' | 'service-charges' | 'invoice' | 'payment-methods'>('general');
   const [invoiceForm, setInvoiceForm] = useState<Partial<InvoiceSettings>>({});
   const [editingBranchUrl, setEditingBranchUrl] = useState<{ branchId: string; url: string } | null>(null);
@@ -604,6 +628,53 @@ export default function SettingsPage() {
     }
   };
 
+  // Show company selector for Super Admin if no company selected
+  if (isSuperAdmin && !companyId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Configure restaurant settings and preferences
+          </p>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Select Company</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-gray-600 dark:text-gray-400">
+                As a Super Admin, please select a company to view or manage its settings.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Company
+                </label>
+                <Select
+                  options={companies.map((c: any) => ({
+                    value: c._id || c.id,
+                    label: c.name || 'Unknown Company',
+                  }))}
+                  value={selectedCompanyId}
+                  onChange={(value) => setSelectedCompanyId(value)}
+                  placeholder="Select a company..."
+                />
+              </div>
+              {companies.length === 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No companies found. <a href="/dashboard/companies" className="text-primary-600 hover:underline">Create a company</a> first.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Show message for non-Super Admin users without company
   if (!companyId) {
     return (
       <div className="flex items-center justify-center h-96 text-center">
@@ -626,8 +697,24 @@ export default function SettingsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Configure your restaurant settings and preferences
+            {isSuperAdmin ? 'Manage company settings (Super Admin View)' : 'Configure your restaurant settings and preferences'}
           </p>
+          {isSuperAdmin && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Selected Company
+              </label>
+              <Select
+                options={companies.map((c: any) => ({
+                  value: c._id || c.id,
+                  label: c.name || 'Unknown Company',
+                }))}
+                value={companyId}
+                onChange={(value) => setSelectedCompanyId(value)}
+                placeholder="Select a company..."
+              />
+            </div>
+          )}
           <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
             <strong>Note:</strong> These are company-wide settings. For branch-specific POS settings (receipt printing, tax rates for POS), visit{' '}
             <a href="/dashboard/pos-settings" className="text-blue-600 dark:text-blue-400 hover:underline">

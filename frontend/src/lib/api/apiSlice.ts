@@ -1,6 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { logout, setCredentials } from '../slices/authSlice';
-import { RootState } from '../store';
+import { logout } from '../slices/authSlice';
 
 // Helper to transparently decrypt AES-encrypted API responses
 const decryptIfNeeded = async (response: any) => {
@@ -99,25 +98,10 @@ const decryptIfNeeded = async (response: any) => {
 
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
-  prepareHeaders: (headers, { getState }) => {
-    // Try to get token from Redux state first
-    let token = (getState() as RootState).auth.accessToken;
-    
-    // Fallback to localStorage if not in Redux (for edge cases)
-    if (!token && typeof window !== 'undefined') {
-      token = localStorage.getItem('accessToken');
-    }
-    
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    } else {
-      // Log when token is missing for debugging
-      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ No access token found for API request');
-        console.warn('Redux token:', (getState() as RootState).auth.accessToken ? 'EXISTS' : 'MISSING');
-        console.warn('localStorage token:', localStorage.getItem('accessToken') ? 'EXISTS' : 'MISSING');
-      }
-    }
+  credentials: 'include', // Include cookies in requests (required for httpOnly cookies)
+  prepareHeaders: (headers) => {
+    // Tokens are now in httpOnly cookies, so we don't need to set Authorization header
+    // Cookies are automatically sent by the browser
     return headers;
   },
 });
@@ -173,13 +157,6 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       return result;
     }
 
-    // Try to refresh the token
-    const state = api.getState() as RootState;
-    const refreshToken = state.auth.refreshToken || 
-      (typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null);
-    
-    console.warn('Refresh token available:', refreshToken ? 'YES' : 'NO');
-    
     // Don't try to refresh if this is a refresh token request itself
     if (requestUrl === '/auth/refresh' || requestUrl.includes('/auth/refresh')) {
       console.error('❌ Refresh token request failed - logging out');
@@ -190,8 +167,10 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       return result;
     }
     
-    if (refreshToken) {
-      // If refresh is already in progress, wait for it
+    // Refresh token is in httpOnly cookie, so we can attempt refresh
+    // (No need to check for refreshToken - it's in cookie)
+    
+    // If refresh is already in progress, wait for it
       if (isRefreshing && refreshPromise) {
         console.log('⏳ Token refresh already in progress, waiting...');
         console.log('⏳ Current refresh state:', { isRefreshing, hasPromise: !!refreshPromise });
@@ -236,11 +215,12 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
             baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
           });
 
+          // Refresh token is in httpOnly cookie, no need to send in body
           let refreshResult = await refreshQuery(
             {
               url: '/auth/refresh',
               method: 'POST',
-              body: { refreshToken },
+              body: {}, // Empty body - refresh token is in cookie
             },
             api,
             extraOptions
@@ -268,51 +248,17 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
           fullData: refreshResult.data,
         });
 
-        // Handle wrapped response from TransformInterceptor: { success: true, data: { accessToken, refreshToken } }
-        // or direct response: { accessToken, refreshToken }
-        let tokenData: { accessToken: string; refreshToken?: string } | null = null;
+        // Tokens are now in httpOnly cookies, backend sets them automatically
+        // Check if refresh was successful (backend returns { success: true })
+        const refreshSuccess = refreshResult.data && 
+          ((refreshResult.data as any).success === true || 
+           (refreshResult.data as any).success === undefined); // undefined means no error
         
-        if (refreshResult.data) {
-          if (refreshResult.data.success && refreshResult.data.data) {
-            // Wrapped response from TransformInterceptor
-            tokenData = refreshResult.data.data as { accessToken: string; refreshToken?: string };
-            console.log('📦 Detected wrapped response format');
-          } else if (refreshResult.data.accessToken) {
-            // Direct response
-            tokenData = refreshResult.data as { accessToken: string; refreshToken?: string };
-            console.log('📦 Detected direct response format');
-          }
-        }
-
-        if (tokenData && tokenData.accessToken) {
-          console.log('✅ Token refreshed successfully');
-          console.log('🔑 New access token (first 30 chars):', tokenData.accessToken.substring(0, 30) + '...');
-          console.log('🔑 New refresh token (first 30 chars):', tokenData.refreshToken?.substring(0, 30) + '...' || 'NOT PROVIDED');
+        if (refreshSuccess) {
+          console.log('✅ Token refreshed successfully - new cookies set by backend');
           
-          // Store the new tokens
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('accessToken', tokenData.accessToken);
-            if (tokenData.refreshToken) {
-              localStorage.setItem('refreshToken', tokenData.refreshToken);
-            }
-          }
-          
-          // Update Redux state with new tokens
-          const currentState = api.getState() as RootState;
-          if (currentState.auth.user) {
-            // Update tokens, keep user
-            api.dispatch(setCredentials({
-              user: currentState.auth.user,
-              accessToken: tokenData.accessToken,
-              refreshToken: tokenData.refreshToken || currentState.auth.refreshToken || '',
-            }));
-            console.log('✅ Redux state updated with new tokens');
-          } else {
-            console.warn('⚠️ No user in Redux state, tokens saved to localStorage only');
-          }
-
-          // Retry the original query with new token
-          console.log('🔄 Retrying original request with new token...');
+          // Retry the original query (cookies are automatically sent)
+          console.log('🔄 Retrying original request with new cookies...');
           console.log('🔄 Original request URL:', args?.url || args?.toString() || 'Unknown');
           result = await baseQuery(args, api, extraOptions);
           if (result.error) {
@@ -324,9 +270,8 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
           }
         } else {
           // Refresh failed, logout user
-          console.error('❌ Token refresh failed - invalid response structure');
+          console.error('❌ Token refresh failed');
           console.error('Refresh result:', refreshResult);
-          console.error('Refresh result.data:', refreshResult.data);
           api.dispatch(logout());
           if (typeof window !== 'undefined') {
             window.location.href = '/auth/login';
@@ -349,13 +294,6 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
           window.location.href = '/auth/login';
         }
       }
-    } else {
-      // No refresh token available, logout user
-      api.dispatch(logout());
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/login';
-      }
-    }
   }
   
   return result;
@@ -403,6 +341,8 @@ export const apiSlice = createApi({
     'MyPermissions',
     'Gallery',
     'SuperAdminNotifications',
+    'ContentPages',
+    'SystemFeedback',
   ],
   endpoints: () => ({}),
 });

@@ -14,8 +14,7 @@ export interface User {
 
 export interface AuthState {
   user: User | null;
-  accessToken: string | null;
-  refreshToken: string | null;
+  // Tokens are now stored in httpOnly cookies, not in state/localStorage
   isAuthenticated: boolean;
   companyContext?: {
     companyId: string;
@@ -28,8 +27,6 @@ export interface AuthState {
 
 const initialState: AuthState = {
   user: null,
-  accessToken: null,
-  refreshToken: null,
   isAuthenticated: false,
   companyContext: undefined,
 };
@@ -42,20 +39,31 @@ const authSlice = createSlice({
       state,
       action: PayloadAction<{
         user: User;
-        accessToken: string;
-        refreshToken: string;
+        // Tokens are now in httpOnly cookies, not passed here
+        accessToken?: string; // Optional for backward compatibility during migration
+        refreshToken?: string; // Optional for backward compatibility during migration
       }>
     ) => {
       state.user = action.payload.user;
-      state.accessToken = action.payload.accessToken;
-      state.refreshToken = action.payload.refreshToken;
       state.isAuthenticated = true;
       
-      // Save to localStorage
+      // Store minimal user data (exclude sensitive fields like email, phone)
+      // Tokens are in httpOnly cookies, not stored in localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem('accessToken', action.payload.accessToken);
-        localStorage.setItem('refreshToken', action.payload.refreshToken);
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
+        const minimalUser = {
+          id: action.payload.user.id,
+          firstName: action.payload.user.firstName,
+          lastName: action.payload.user.lastName,
+          role: action.payload.user.role,
+          companyId: action.payload.user.companyId,
+          branchId: action.payload.user.branchId,
+          isSuperAdmin: action.payload.user.isSuperAdmin,
+        };
+        localStorage.setItem('user', JSON.stringify(minimalUser));
+        
+        // Clear old tokens from localStorage if they exist (migration cleanup)
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
       }
     },
     setCompanyContext: (state, action: PayloadAction<any>) => {
@@ -74,12 +82,10 @@ const authSlice = createSlice({
     },
     logout: (state) => {
       state.user = null;
-      state.accessToken = null;
-      state.refreshToken = null;
       state.isAuthenticated = false;
       state.companyContext = undefined;
       
-      // Clear localStorage
+      // Clear localStorage (tokens are cleared by backend via httpOnly cookies)
       if (typeof window !== 'undefined') {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -89,8 +95,6 @@ const authSlice = createSlice({
     },
     restoreAuth: (state) => {
       if (typeof window !== 'undefined') {
-        const accessToken = localStorage.getItem('accessToken');
-        const refreshToken = localStorage.getItem('refreshToken');
         const userStr = localStorage.getItem('user');
         const companyContextStr = localStorage.getItem('companyContext');
         
@@ -103,13 +107,21 @@ const authSlice = createSlice({
           }
         }
         
-        // Restore user auth if tokens exist
-        if (accessToken && refreshToken && userStr) {
-          state.accessToken = accessToken;
-          state.refreshToken = refreshToken;
-          state.user = JSON.parse(userStr);
-          state.isAuthenticated = true;
+        // Restore user data if exists
+        // Note: Authentication is verified via httpOnly cookies, not localStorage tokens
+        if (userStr) {
+          try {
+            state.user = JSON.parse(userStr);
+            // Set authenticated if user exists (actual auth verified by backend via cookies)
+            state.isAuthenticated = true;
+          } catch (error) {
+            // Silent error - invalid JSON
+          }
         }
+        
+        // Clear old tokens from localStorage (migration cleanup)
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
       }
     },
     restoreCompanyContext: (state) => {
@@ -128,9 +140,18 @@ const authSlice = createSlice({
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
         
-        // Update localStorage
+        // Update localStorage with minimal user data (exclude sensitive fields)
         if (typeof window !== 'undefined') {
-          localStorage.setItem('user', JSON.stringify(state.user));
+          const minimalUser = {
+            id: state.user.id,
+            firstName: state.user.firstName,
+            lastName: state.user.lastName,
+            role: state.user.role,
+            companyId: state.user.companyId,
+            branchId: state.user.branchId,
+            isSuperAdmin: state.user.isSuperAdmin,
+          };
+          localStorage.setItem('user', JSON.stringify(minimalUser));
         }
       }
     },

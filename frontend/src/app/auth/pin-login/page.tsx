@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Button } from '@/components/ui/Button';
+import { TwoFactorVerificationModal } from '@/components/auth/TwoFactorVerificationModal';
 import { Card } from '@/components/ui/Card';
 import { usePinLoginMutation } from '@/lib/api/endpoints/authApi';
 import { clearCompanyContext, restoreCompanyContext, setCompanyContext, setCredentials } from '@/lib/slices/authSlice';
@@ -29,6 +30,8 @@ export default function PinLoginPage() {
   const [showPin, setShowPin] = useState(false);
   const [pinLogin, { isLoading }] = usePinLoginMutation();
   const [isCheckingContext, setIsCheckingContext] = useState(true);
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [temporaryToken, setTemporaryToken] = useState<string>('');
 
   useEffect(() => {
     const storedContextStr = typeof window !== 'undefined' ? localStorage.getItem('companyContext') : null;
@@ -156,33 +159,37 @@ export default function PinLoginPage() {
     try {
       const response: any = await pinLogin(loginData).unwrap();
 
-      // Handle response structure: { success, data: { user, tokens: { accessToken, refreshToken } } }
-      // or direct: { user, tokens: { accessToken, refreshToken } }
-      let loggedInUser, accessToken, refreshToken;
+      // Check if 2FA is required
+      if (response.requires2FA && response.temporaryToken) {
+        setShow2FAModal(true);
+        setTemporaryToken(response.temporaryToken);
+        return;
+      }
+
+      // Tokens are now in httpOnly cookies, response only contains user data
+      // Handle response structure: { success, data: { user, sessionId } } or direct: { user, sessionId }
+      let loggedInUser, sessionId;
       
       if (response.data) {
         // TransformInterceptor wrapped response
         loggedInUser = response.data.user || response.data;
-        accessToken = response.data.tokens?.accessToken || response.data.accessToken;
-        refreshToken = response.data.tokens?.refreshToken || response.data.refreshToken;
+        sessionId = response.data.sessionId;
       } else {
         // Direct response from service
         loggedInUser = response.user;
-        accessToken = response.tokens?.accessToken || response.accessToken;
-        refreshToken = response.tokens?.refreshToken || response.refreshToken;
+        sessionId = response.sessionId;
       }
 
-      if (!accessToken || !refreshToken) {
-        console.error('Missing tokens in response:', response);
+      if (!loggedInUser) {
+        console.error('Missing user in response:', response);
         toast.error('Login failed: Invalid response from server');
         return;
       }
       
+      // Tokens are in httpOnly cookies, only store user data
       dispatch(
         setCredentials({
           user: loggedInUser,
-          accessToken,
-          refreshToken,
         })
       );
       
@@ -523,6 +530,16 @@ export default function PinLoginPage() {
           </div>
         </Card>
       </div>
+      
+      {/* 2FA Verification Modal */}
+      <TwoFactorVerificationModal
+        isOpen={show2FAModal}
+        temporaryToken={temporaryToken}
+        onClose={() => {
+          setShow2FAModal(false);
+          setTemporaryToken('');
+        }}
+      />
     </div>
   );
 }
