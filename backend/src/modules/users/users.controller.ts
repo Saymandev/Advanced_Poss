@@ -22,6 +22,8 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { AdminUpdatePasswordDto } from './dto/admin-update-password.dto';
 import { AdminUpdatePinDto } from './dto/admin-update-pin.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -30,7 +32,7 @@ import { UsersService } from './users.service';
 
 @ApiTags('Users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
 @Controller('users')
 export class UsersController {
@@ -38,6 +40,7 @@ export class UsersController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresLimit('maxUsers')
   @ApiOperation({ summary: 'Create new user' })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);

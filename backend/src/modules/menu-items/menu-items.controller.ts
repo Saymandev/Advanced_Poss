@@ -21,6 +21,8 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
@@ -28,7 +30,7 @@ import { MenuItemsService } from './menu-items.service';
 
 @ApiTags('Menu')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.MENU_MANAGEMENT)
 @Controller('menu-items')
 export class MenuItemsController {
@@ -69,6 +71,7 @@ export class MenuItemsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresLimit('maxMenuItems')
   @ApiOperation({ summary: 'Create new menu item' })
   create(@Body() createMenuItemDto: CreateMenuItemDto) {
     return this.menuItemsService.create(createMenuItemDto);

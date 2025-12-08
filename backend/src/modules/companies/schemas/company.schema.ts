@@ -87,6 +87,19 @@ export class Company {
   @Prop()
   stripeCustomerId?: string;
 
+  // Custom Domain
+  @Prop({ unique: true, sparse: true, trim: true, lowercase: true })
+  customDomain?: string;
+
+  @Prop({ default: false })
+  domainVerified: boolean;
+
+  @Prop()
+  domainVerificationToken?: string;
+
+  @Prop()
+  domainVerifiedAt?: Date;
+
   // Settings
   @Prop({
     type: {
@@ -132,6 +145,7 @@ export const CompanySchema = SchemaFactory.createForClass(Company);
 CompanySchema.index({ ownerId: 1 });
 CompanySchema.index({ email: 1 });
 CompanySchema.index({ slug: 1 }, { unique: true, sparse: true });
+CompanySchema.index({ customDomain: 1 }, { unique: true, sparse: true });
 CompanySchema.index({ subscriptionStatus: 1 });
 
 // Transform output

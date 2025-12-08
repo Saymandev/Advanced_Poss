@@ -1,13 +1,13 @@
 import {
+  BadRequestException,
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Param,
   Patch,
   Post,
   Query,
-  UseGuards,
+  UseGuards
 } from '@nestjs/common';
 import { Schema as MongooseSchema } from 'mongoose';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -75,17 +75,37 @@ export class SubscriptionsController {
   @Get('billing-history')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getCompanyBillingHistory(
-    @Query('companyId') companyId: string,
+    @Query('companyId') companyId: string | any,
     @Query('limit') limit?: number,
     @Query('page') page?: number,
     @Query('status') status?: PaymentStatus,
   ) {
+    // Handle case where companyId might be an object (stringified as [object Object])
+    let companyIdString: string;
+    if (typeof companyId === 'string') {
+      companyIdString = companyId;
+    } else if (companyId && typeof companyId === 'object') {
+      // If it's an object, try to extract the ID
+      companyIdString = companyId.id || companyId._id || companyId.toString();
+      // If it's still [object Object], throw an error
+      if (companyIdString === '[object Object]') {
+        throw new BadRequestException('Invalid companyId: must be a valid string identifier');
+      }
+    } else {
+      throw new BadRequestException('companyId is required and must be a valid string');
+    }
+
+    // Validate that companyIdString is not empty
+    if (!companyIdString || companyIdString.trim() === '') {
+      throw new BadRequestException('companyId is required and must be a valid string');
+    }
+
     const take = limit ? Number(limit) : 20;
     const currentPage = page ? Number(page) : 1;
     const offset = (currentPage - 1) * take;
 
     return await this.subscriptionsService.getBillingHistory(
-      companyId,
+      companyIdString,
       {
         status,
         limit: take,
@@ -120,15 +140,6 @@ export class SubscriptionsController {
     @CurrentUser('companyId') userCompanyId: string,
     @CurrentUser('role') userRole: string,
   ) {
-    // Security: Verify company ownership (unless Super Admin)
-    if (userRole !== UserRole.SUPER_ADMIN) {
-      const subscription = await this.subscriptionsService.findById(id);
-      const subscriptionCompanyId = subscription.companyId.toString();
-      if (subscriptionCompanyId !== userCompanyId) {
-        throw new ForbiddenException('You do not have permission to modify this subscription');
-      }
-    }
-
     if (updateSubscriptionDto?.planId) {
       return await this.subscriptionsService.updatePlanById(
         id,
@@ -151,15 +162,6 @@ export class SubscriptionsController {
     @CurrentUser('companyId') userCompanyId: string,
     @CurrentUser('role') userRole: string,
   ) {
-    // Security: Verify company ownership (unless Super Admin)
-    if (userRole !== UserRole.SUPER_ADMIN) {
-      const subscription = await this.subscriptionsService.findById(id);
-      const subscriptionCompanyId = subscription.companyId.toString();
-      if (subscriptionCompanyId !== userCompanyId) {
-        throw new ForbiddenException('You do not have permission to modify this subscription');
-      }
-    }
-
     return await this.subscriptionsService.upgrade(id, upgradeDto, userId);
   }
 

@@ -1,14 +1,17 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
+import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
+import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import { CustomersService } from '../customers/customers.service';
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
 import { GalleryService } from '../gallery/gallery.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/schemas/order.schema';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SystemFeedbackService } from '../system-feedback/system-feedback.service';
 import { UsersService } from '../users/users.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
@@ -22,6 +25,8 @@ export class PublicService {
     private orderModel: Model<any>,
     @InjectModel(ContactForm.name)
     private contactFormModel: Model<ContactForm>,
+    @InjectModel(Customer.name)
+    private customerModel: Model<CustomerDocument>,
     private ordersService: OrdersService,
     private customersService: CustomersService,
     private menuItemsService: MenuItemsService,
@@ -31,9 +36,41 @@ export class PublicService {
     private websocketsGateway: WebsocketsGateway,
     private companiesService: CompaniesService,
     private systemFeedbackService: SystemFeedbackService,
+    private subscriptionsService: SubscriptionsService,
+    private branchesService: BranchesService,
   ) {}
 
   async createOrder(orderData: any) {
+    // Check subscription limits for public ordering
+    // Convert to MongooseSchema.Types.ObjectId (same pattern as controller)
+    const companyIdObj = new Types.ObjectId(orderData.companyId) as unknown as any;
+    const subscription = await this.subscriptionsService.findByCompany(companyIdObj);
+    
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found. Public ordering is not available.');
+    }
+
+    const limits = subscription.limits as any;
+    
+    // Check if public ordering is enabled
+    if (limits.publicOrderingEnabled === false) {
+      throw new ForbiddenException('Public ordering is not enabled for your subscription plan. Please upgrade to enable this feature.');
+    }
+
+    // Check maxPublicBranches limit
+    if (limits.maxPublicBranches !== undefined && limits.maxPublicBranches !== -1) {
+      // Count branches with public URLs (slugs) for this company
+      const branches = await this.branchesService.findAll({ companyId: orderData.companyId } as any);
+      const branchList = Array.isArray(branches) ? branches : (branches as any)?.branches || [];
+      const publicBranches = branchList.filter((b: any) => b.slug && b.isActive);
+      
+      if (publicBranches.length >= limits.maxPublicBranches) {
+        throw new ForbiddenException(
+          `You have reached the maximum public branches limit (${limits.maxPublicBranches}) for your subscription plan. Please upgrade to add more public branches.`
+        );
+      }
+    }
+
     try {
       // Find or create customer
       let customerId = null;
@@ -395,6 +432,19 @@ export class PublicService {
     try {
       const systemStats = await this.companiesService.getSystemStats();
       const feedbackStats = await this.systemFeedbackService.getPublicStats();
+      
+      // Count total customers - for "Happy Customers" we count all customers
+      // Option 1: Count all customers (including inactive)
+      // Option 2: Count only customers who have made at least one order (more meaningful)
+      // Using Option 2: customers with totalOrders > 0 are "happy customers" who actually used the service
+      const totalCustomers = await this.customerModel.countDocuments({ 
+        totalOrders: { $gt: 0 } // Customers who have placed at least one order
+      }).exec();
+      
+      // Fallback: If no customers with orders, count all customers
+      // This ensures we show something even if customers exist but haven't placed orders yet
+      const fallbackCount = await this.customerModel.countDocuments({}).exec();
+      const finalCustomerCount = totalCustomers > 0 ? totalCustomers : fallbackCount;
 
       return {
         success: true,
@@ -404,6 +454,7 @@ export class PublicService {
           totalUsers: systemStats.totalUsers || 0,
           averageRating: feedbackStats.averageRating || 0,
           totalFeedback: feedbackStats.totalFeedback || 0,
+          totalCustomers: finalCustomerCount || 0,
         },
       };
     } catch (error: any) {
@@ -416,6 +467,7 @@ export class PublicService {
           totalUsers: 0,
           averageRating: 0,
           totalFeedback: 0,
+          totalCustomers: 0,
         },
       };
     }

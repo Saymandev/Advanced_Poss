@@ -81,6 +81,12 @@ export class PublicController {
     }
     
     const companyId = (company as any)._id?.toString() || (company as any).id;
+    
+    // Check subscription limits for public ordering access
+    const { SubscriptionsService } = await import('../subscriptions/subscriptions.service');
+    const subscriptionsModule = await import('../subscriptions/subscriptions.module');
+    // Note: This validation should ideally be done via dependency injection, but for now we'll check in the service layer
+    
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
     
     if (!branch) {

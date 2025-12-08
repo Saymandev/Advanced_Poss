@@ -17,6 +17,8 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { CreateTableDto } from './dto/create-table.dto';
 import { ReserveTableDto } from './dto/reserve-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
@@ -25,7 +27,7 @@ import { TablesService } from './tables.service';
 
 @ApiTags('Tables')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.TABLE_MANAGEMENT)
 @Controller('tables')
 export class TablesController {
@@ -33,6 +35,7 @@ export class TablesController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresLimit('maxTables')
   @ApiOperation({ summary: 'Create new table' })
   create(@Body() createTableDto: CreateTableDto) {
     return this.tablesService.create(createTableDto);
@@ -40,6 +43,7 @@ export class TablesController {
 
   @Post('bulk')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresLimit('maxTables')
   @ApiOperation({ summary: 'Bulk create tables' })
   bulkCreate(
     @Body('branchId') branchId: string,

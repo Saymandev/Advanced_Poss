@@ -22,7 +22,9 @@ export class QRCodesService {
     let companySlug: string | undefined;
     let branchSlug: string | undefined;
     
-    // Get company slug
+    // Get company slug and check for custom domain
+    let company: any = null;
+    let customDomain: string | null = null;
     if (branch?.companyId) {
       let companyIdStr: string;
       if (typeof branch.companyId === 'object' && branch.companyId !== null) {
@@ -33,8 +35,12 @@ export class QRCodesService {
       
       if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
         try {
-          const company = await this.companiesService.findOne(companyIdStr);
+          company = await this.companiesService.findOne(companyIdStr);
           companySlug = company?.slug;
+          // Check for custom domain
+          if (company?.customDomain && company?.domainVerified) {
+            customDomain = company.customDomain;
+          }
         } catch (error) {
           console.warn('Could not fetch company for QR code URL:', error);
         }
@@ -43,11 +49,33 @@ export class QRCodesService {
     
     branchSlug = branch?.slug;
     
-    // Generate URL using company/branch slugs if available, otherwise fallback to branchId
+    // Generate URL - prioritize custom domain, then slug-based, then fallback to branchId
     const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
     let url: string;
     
-    if (companySlug && branchSlug) {
+    if (customDomain) {
+      // Use custom domain: https://customDomain.com/[branchSlug]/shop?type=...
+      const protocol = 'https://';
+      const urlParams = new URLSearchParams();
+      if (createQRCodeDto.menuType && createQRCodeDto.menuType !== 'full') {
+        urlParams.append('type', createQRCodeDto.menuType);
+      }
+      if (createQRCodeDto.tableNumber) {
+        urlParams.append('table', createQRCodeDto.tableNumber.toString());
+      }
+      const queryString = urlParams.toString();
+      if (branchSlug) {
+        url = `${protocol}${customDomain}/${branchSlug}/shop${queryString ? `?${queryString}` : ''}`;
+      } else {
+        // Fallback to display/menu format with custom domain
+        const urlParams = new URLSearchParams({
+          branchId: createQRCodeDto.branchId,
+          ...(createQRCodeDto.tableNumber && { table: createQRCodeDto.tableNumber.toString() }),
+          type: createQRCodeDto.menuType,
+        });
+        url = `${protocol}${customDomain}/display/menu?${urlParams.toString()}`;
+      }
+    } else if (companySlug && branchSlug) {
       // Use slug-based URL: /[companySlug]/[branchSlug]/shop?type=...
       const urlParams = new URLSearchParams();
       if (createQRCodeDto.menuType && createQRCodeDto.menuType !== 'full') {
@@ -145,8 +173,10 @@ export class QRCodesService {
       const branch = await this.branchesService.findOne(qrCode.branchId.toString());
       let companySlug: string | undefined;
       let branchSlug: string | undefined;
+      let customDomain: string | null = null;
+      let company: any = null;
       
-      // Get company slug
+      // Get company slug and check for custom domain
       if (branch?.companyId) {
         let companyIdStr: string;
         if (typeof branch.companyId === 'object' && branch.companyId !== null) {
@@ -157,8 +187,12 @@ export class QRCodesService {
         
         if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
           try {
-            const company = await this.companiesService.findOne(companyIdStr);
+            company = await this.companiesService.findOne(companyIdStr);
             companySlug = company?.slug;
+            // Check for custom domain
+            if (company?.customDomain && company?.domainVerified) {
+              customDomain = company.customDomain;
+            }
           } catch (error) {
             console.warn('Could not fetch company for QR code URL update:', error);
           }
@@ -167,11 +201,33 @@ export class QRCodesService {
       
       branchSlug = branch?.slug;
       
-      // Generate URL using company/branch slugs if available, otherwise fallback to branchId
+      // Generate URL - prioritize custom domain, then slug-based, then fallback to branchId
       const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
       let newUrl: string;
       
-      if (companySlug && branchSlug) {
+      if (customDomain) {
+        // Use custom domain: https://customDomain.com/[branchSlug]/shop?type=...
+        const protocol = 'https://';
+        const urlParams = new URLSearchParams();
+        if (updateQRCodeDto.menuType && updateQRCodeDto.menuType !== 'full') {
+          urlParams.append('type', updateQRCodeDto.menuType);
+        }
+        if (qrCode.tableNumber) {
+          urlParams.append('table', qrCode.tableNumber.toString());
+        }
+        const queryString = urlParams.toString();
+        if (branchSlug) {
+          newUrl = `${protocol}${customDomain}/${branchSlug}/shop${queryString ? `?${queryString}` : ''}`;
+        } else {
+          // Fallback to display/menu format with custom domain
+          const urlParams = new URLSearchParams({
+            branchId: qrCode.branchId.toString(),
+            ...(qrCode.tableNumber && { table: qrCode.tableNumber.toString() }),
+            type: updateQRCodeDto.menuType,
+          });
+          newUrl = `${protocol}${customDomain}/display/menu?${urlParams.toString()}`;
+        }
+      } else if (companySlug && branchSlug) {
         // Use slug-based URL: /[companySlug]/[branchSlug]/shop?type=...
         const urlParams = new URLSearchParams();
         if (updateQRCodeDto.menuType && updateQRCodeDto.menuType !== 'full') {

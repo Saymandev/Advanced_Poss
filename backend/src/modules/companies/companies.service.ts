@@ -13,7 +13,10 @@ import { SubscriptionPlansService } from '../subscriptions/subscription-plans.se
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { AddCustomDomainDto } from './dto/add-custom-domain.dto';
+import { VerifyCustomDomainDto } from './dto/verify-custom-domain.dto';
 import { Company, CompanyDocument } from './schemas/company.schema';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class CompaniesService {
@@ -433,6 +436,119 @@ export class CompaniesService {
         acc[item._id || 'none'] = item.count;
         return acc;
       }, {}),
+    };
+  }
+
+  async addCustomDomain(companyId: string, addDomainDto: AddCustomDomainDto): Promise<Company> {
+    if (!Types.ObjectId.isValid(companyId)) {
+      throw new BadRequestException('Invalid company ID');
+    }
+
+    const company = await this.companyModel.findById(companyId);
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    // Check if domain is already taken by another company
+    const existingCompany = await this.companyModel.findOne({
+      customDomain: addDomainDto.domain.toLowerCase(),
+      _id: { $ne: companyId },
+    });
+
+    if (existingCompany) {
+      throw new BadRequestException('This domain is already in use by another company');
+    }
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenValue = `domain-verification-${verificationToken}`;
+
+    // Update company with custom domain
+    company.customDomain = addDomainDto.domain.toLowerCase();
+    company.domainVerified = false;
+    company.domainVerificationToken = tokenValue;
+    company.domainVerifiedAt = undefined;
+
+    await company.save();
+
+    return company.toObject();
+  }
+
+  async verifyCustomDomain(companyId: string, verifyDto: VerifyCustomDomainDto): Promise<Company> {
+    if (!Types.ObjectId.isValid(companyId)) {
+      throw new BadRequestException('Invalid company ID');
+    }
+
+    const company = await this.companyModel.findById(companyId);
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    if (!company.customDomain) {
+      throw new BadRequestException('No custom domain configured for this company');
+    }
+
+    if (!company.domainVerificationToken) {
+      throw new BadRequestException('No verification token found. Please add the domain again.');
+    }
+
+    // Verify token matches
+    if (company.domainVerificationToken !== verifyDto.token) {
+      throw new BadRequestException('Invalid verification token');
+    }
+
+    // Mark domain as verified
+    company.domainVerified = true;
+    company.domainVerifiedAt = new Date();
+
+    await company.save();
+
+    return company.toObject();
+  }
+
+  async removeCustomDomain(companyId: string): Promise<Company> {
+    if (!Types.ObjectId.isValid(companyId)) {
+      throw new BadRequestException('Invalid company ID');
+    }
+
+    const company = await this.companyModel.findById(companyId);
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    // Remove custom domain
+    company.customDomain = undefined;
+    company.domainVerified = false;
+    company.domainVerificationToken = undefined;
+    company.domainVerifiedAt = undefined;
+
+    await company.save();
+
+    return company.toObject();
+  }
+
+  async getCustomDomainInfo(companyId: string) {
+    if (!Types.ObjectId.isValid(companyId)) {
+      throw new BadRequestException('Invalid company ID');
+    }
+
+    const company = await this.companyModel.findById(companyId).select('customDomain domainVerified domainVerificationToken domainVerifiedAt').lean();
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    return {
+      domain: company.customDomain || null,
+      verified: company.domainVerified || false,
+      verificationToken: company.domainVerificationToken || null,
+      verifiedAt: company.domainVerifiedAt || null,
+      dnsInstructions: company.customDomain && !company.domainVerified ? {
+        recordType: 'TXT',
+        recordName: company.customDomain,
+        recordValue: company.domainVerificationToken,
+        instructions: `Add a TXT record to your DNS settings for ${company.customDomain} with the value: ${company.domainVerificationToken}`,
+      } : null,
     };
   }
 }

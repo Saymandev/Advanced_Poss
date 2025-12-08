@@ -77,6 +77,13 @@ export class SubscriptionPlan {
       whitelabelEnabled: Boolean,
       customDomainEnabled: Boolean,
       prioritySupportEnabled: Boolean,
+      // Public ordering system
+      publicOrderingEnabled: Boolean,
+      maxPublicBranches: Number,
+      // Review system
+      reviewsEnabled: Boolean,
+      reviewModerationRequired: Boolean,
+      maxReviewsPerMonth: Number,
     },
     default: {},
   })
@@ -91,6 +98,13 @@ export class SubscriptionPlan {
     whitelabelEnabled?: boolean;
     customDomainEnabled?: boolean;
     prioritySupportEnabled?: boolean;
+    // Public ordering system
+    publicOrderingEnabled?: boolean; // Enable/disable public ordering pages
+    maxPublicBranches?: number; // Max branches that can have public ordering pages (-1 = unlimited)
+    // Review system
+    reviewsEnabled?: boolean; // Enable/disable customer reviews
+    reviewModerationRequired?: boolean; // Require admin approval before publishing reviews
+    maxReviewsPerMonth?: number; // Max reviews per month (-1 = unlimited)
   };
 
   @Prop({ default: 0 })

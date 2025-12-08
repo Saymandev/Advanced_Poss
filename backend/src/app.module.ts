@@ -52,6 +52,7 @@ import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { SystemFeedbackModule } from './modules/system-feedback/system-feedback.module';
 import { TablesModule } from './modules/tables/tables.module';
 import { UsersModule } from './modules/users/users.module';
+import { WastageModule } from './modules/wastage/wastage.module';
 import { WebsocketsModule } from './modules/websockets/websockets.module';
 import { WorkPeriodsModule } from './modules/work-periods/work-periods.module';
 
@@ -159,6 +160,7 @@ import { SubscriptionLockMiddleware } from './common/middleware/subscription-loc
     MarketingModule,
     ReportsModule,
     ReviewsModule,
+    WastageModule,
     RolePermissionsModule,
     SettingsModule,
     QRCodesModule,

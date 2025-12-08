@@ -221,6 +221,22 @@ export class UsersService {
     return user;
   }
 
+  async findOneWithPassword(id: string): Promise<UserDocument | null> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    // Include password and pin fields for authentication purposes
+    const user = await this.userModel
+      .findById(id)
+      .select('+password +pin')
+      .populate('companyId', 'name email')
+      .populate('branchId', 'name address')
+      .exec();
+
+    return user;
+  }
+
   async findByEmail(email: string): Promise<UserDocument | null> {
     return this.userModel
       .findOne({ email: email.toLowerCase() })

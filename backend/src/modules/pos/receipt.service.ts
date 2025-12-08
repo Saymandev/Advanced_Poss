@@ -103,13 +103,24 @@ export class ReceiptService {
                 companyKeys: company ? Object.keys(company) : [],
               });
             }
-            // Fallback: generate from company slug if branch doesn't have publicUrl
-            if (!publicUrl && company?.slug) {
-              const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-              publicUrl = `${baseUrl}/${company.slug}`;
-              // If branch has slug, use it too
-              if (branch.slug) {
-                publicUrl = `${baseUrl}/${company.slug}/${branch.slug}`;
+            // Generate public URL - prioritize custom domain, then slug-based
+            if (!publicUrl) {
+              if (company?.customDomain && company?.domainVerified) {
+                // Use custom domain
+                const protocol = 'https://';
+                if (branch.slug) {
+                  publicUrl = `${protocol}${company.customDomain}/${branch.slug}`;
+                } else {
+                  publicUrl = `${protocol}${company.customDomain}`;
+                }
+              } else if (company?.slug) {
+                // Fallback to slug-based URL
+                const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+                publicUrl = `${baseUrl}/${company.slug}`;
+                // If branch has slug, use it too
+                if (branch.slug) {
+                  publicUrl = `${baseUrl}/${company.slug}/${branch.slug}`;
+                }
               }
             }
           } catch (companyError) {
@@ -248,14 +259,39 @@ export class ReceiptService {
       notes: order?.notes || undefined,
       publicUrl,
       currency, // Add currency to receipt data
-      // Generate order review URL for QR code
+      // Generate order review URL for QR code - use custom domain if available
       orderReviewUrl: (() => {
-        const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
         const orderId = (order as any)._id?.toString() || (order as any).id?.toString();
-        if (orderId) {
-          return `${baseUrl}/display/customerreview/${orderId}`;
+        if (!orderId) return null;
+        
+        // Get company to check for custom domain
+        let company: any = null;
+        try {
+          const branch = await this.branchesService.findOne(order.branchId.toString());
+          if (branch?.companyId) {
+            let companyIdStr: string;
+            if (typeof branch.companyId === 'object' && branch.companyId !== null) {
+              companyIdStr = (branch.companyId as any)._id?.toString() || (branch.companyId as any).id?.toString() || branch.companyId.toString();
+            } else {
+              companyIdStr = branch.companyId.toString();
+            }
+            
+            if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
+              company = await this.companiesService.findOne(companyIdStr);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not fetch company for review URL:', error);
         }
-        return null;
+        
+        // Use custom domain if available and verified
+        if (company?.customDomain && company?.domainVerified) {
+          return `https://${company.customDomain}/display/customerreview/${orderId}`;
+        }
+        
+        // Fallback to base URL
+        const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+        return `${baseUrl}/display/customerreview/${orderId}`;
       })(),
     };
 

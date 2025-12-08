@@ -146,8 +146,14 @@ export class ExpensesController {
   @Post(':id/approve')
   @RequiresRoleFeature('expenses')
   @ApiOperation({ summary: 'Approve expense' })
-  approve(@Param('id') id: string, @Body('approverId') approverId: string) {
-    return this.expensesService.approve(id, approverId);
+  approve(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body('approverId') approverId?: string,
+  ) {
+    // Use approverId from body if provided, otherwise use current user ID
+    const approver = approverId || userId;
+    return this.expensesService.approve(id, approver);
   }
 
   @Post(':id/reject')
@@ -155,10 +161,13 @@ export class ExpensesController {
   @ApiOperation({ summary: 'Reject expense' })
   reject(
     @Param('id') id: string,
-    @Body('approverId') approverId: string,
+    @CurrentUser('id') userId: string,
+    @Body('approverId') approverId?: string,
     @Body('reason') reason?: string,
   ) {
-    return this.expensesService.reject(id, approverId, reason);
+    // Use approverId from body if provided, otherwise use current user ID
+    const approver = approverId || userId;
+    return this.expensesService.reject(id, approver, reason);
   }
 
   @Post(':id/mark-paid')

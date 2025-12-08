@@ -41,6 +41,13 @@ export interface SubscriptionLimits {
   customDomainEnabled: boolean;
   prioritySupportEnabled: boolean;
   storageGB?: number;
+  // Public ordering system
+  publicOrderingEnabled?: boolean;
+  maxPublicBranches?: number;
+  // Review system
+  reviewsEnabled?: boolean;
+  reviewModerationRequired?: boolean;
+  maxReviewsPerMonth?: number;
 }
 
 export interface UsageMetrics {

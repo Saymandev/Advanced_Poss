@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -438,16 +439,17 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('2fa/disable')
-  @ApiOperation({ summary: 'Disable 2FA (requires password verification)' })
+  @ApiOperation({ summary: 'Disable 2FA (requires password or PIN verification if set)' })
   @ApiResponse({
     status: 200,
     description: '2FA disabled successfully',
   })
   disable2FA(
     @CurrentUser('id') userId: string,
-    @Body() body: { password: string },
+    @Body() body: { password?: string; pin?: string },
   ) {
-    return this.authService.disable2FA(userId, body.password);
+    // Allow empty body - the service will check if user has password/PIN and require it if they do
+    return this.authService.disable2FA(userId, body?.password, body?.pin);
   }
 
   @Public()

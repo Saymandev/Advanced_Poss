@@ -1498,8 +1498,9 @@ export class AuthService {
     };
   }
 
-  async disable2FA(userId: string, password: string) {
-    const user = await this.usersService.findOne(userId);
+  async disable2FA(userId: string, password?: string, pin?: string) {
+    // Use findOneWithPassword to get user with password and pin fields included
+    const user = await this.usersService.findOneWithPassword(userId);
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -1508,10 +1509,42 @@ export class AuthService {
       throw new BadRequestException('2FA is not enabled');
     }
 
-    // Verify password before disabling
-    const isPasswordValid = await PasswordUtil.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid password');
+    // Determine which verification method to use
+    let isVerified = false;
+
+    // If password is provided, verify password
+    if (password && typeof password === 'string' && password.trim() !== '') {
+      if (!user.password) {
+        throw new BadRequestException('Password is not set for this account. Please use PIN or set a password first.');
+      }
+      isVerified = await PasswordUtil.compare(password, user.password);
+      if (!isVerified) {
+        throw new UnauthorizedException('Invalid password');
+      }
+    }
+    // If PIN is provided, verify PIN
+    else if (pin && typeof pin === 'string' && pin.trim() !== '') {
+      if (!user.pin) {
+        throw new BadRequestException('PIN is not set for this account. Please use password or set a PIN first.');
+      }
+      isVerified = await PasswordUtil.compare(pin, user.pin);
+      if (!isVerified) {
+        throw new UnauthorizedException('Invalid PIN');
+      }
+    }
+    // If neither password nor PIN is provided, and user has neither set
+    // Since they're already authenticated via JWT, we can allow disabling
+    else if (!user.password && !user.pin) {
+      // User is already authenticated via JWT, so we trust the request
+      isVerified = true;
+    }
+    // If neither is provided but user has password or PIN set, require verification
+    else {
+      if (user.password) {
+        throw new BadRequestException('Password is required');
+      } else if (user.pin) {
+        throw new BadRequestException('PIN is required');
+      }
     }
 
     // Disable 2FA

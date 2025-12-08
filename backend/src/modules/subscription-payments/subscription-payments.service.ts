@@ -10,9 +10,9 @@ import { CreateSubscriptionPaymentDto } from './dto/create-subscription-payment.
 import { ManualActivationDto } from './dto/manual-activation.dto';
 import { UpdateSubscriptionPaymentMethodDto } from './dto/update-subscription-payment-method.dto';
 import {
-    PaymentGateway,
-    SubscriptionPaymentMethod,
-    SubscriptionPaymentMethodDocument,
+  PaymentGateway,
+  SubscriptionPaymentMethod,
+  SubscriptionPaymentMethodDocument,
 } from './schemas/subscription-payment-method.schema';
 
 @Injectable()
@@ -238,7 +238,7 @@ export class SubscriptionPaymentsService {
         },
       ],
       mode: 'subscription',
-      success_url: `${this.configService.get('APP_URL')}/dashboard/subscriptions?success=true`,
+      success_url: `${this.configService.get('APP_URL')}/dashboard/subscriptions/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${this.configService.get('APP_URL')}/dashboard/subscriptions?canceled=true`,
       metadata: {
         companyId: company._id.toString(),
@@ -461,7 +461,7 @@ export class SubscriptionPaymentsService {
         },
       ],
       mode: 'subscription',
-      success_url: `${this.configService.get('APP_URL')}/dashboard/subscriptions?success=true&gateway=google_pay`,
+      success_url: `${this.configService.get('APP_URL')}/dashboard/subscriptions/success?gateway=google_pay&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${this.configService.get('APP_URL')}/dashboard/subscriptions?canceled=true&gateway=google_pay`,
       metadata: {
         companyId: company._id.toString(),

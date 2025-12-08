@@ -18,13 +18,15 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @ApiTags('Customers')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
 @Controller('customers')
 export class CustomersController {
@@ -37,6 +39,7 @@ export class CustomersController {
     UserRole.MANAGER,
     UserRole.WAITER,
   )
+  @RequiresLimit('maxCustomers')
   @ApiOperation({ summary: 'Create new customer' })
   create(@Body() createCustomerDto: CreateCustomerDto) {
     return this.customersService.create(createCustomerDto);

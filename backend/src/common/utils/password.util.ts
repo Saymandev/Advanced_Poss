@@ -8,6 +8,9 @@ export class PasswordUtil {
   }
 
   static async compare(password: string, hashedPassword: string): Promise<boolean> {
+    if (!password || !hashedPassword) {
+      throw new Error('Password and hashed password are required for comparison');
+    }
     return bcrypt.compare(password, hashedPassword);
   }
 

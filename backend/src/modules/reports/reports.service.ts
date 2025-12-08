@@ -5,6 +5,7 @@ import { CustomersService } from '../customers/customers.service';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
+import { WastageService } from '../wastage/wastage.service';
 
 @Injectable()
 export class ReportsService {
@@ -14,6 +15,7 @@ export class ReportsService {
     private customersService: CustomersService,
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
+    private wastageService: WastageService,
   ) {}
 
   async getSalesSummary(
@@ -489,38 +491,123 @@ export class ReportsService {
     };
   }
 
-  async getSalesAnalytics(period: string = 'week', branchId?: string): Promise<any> {
+  async getSalesAnalytics(period: string = 'week', branchId?: string, customStartDate?: Date, customEndDate?: Date): Promise<any> {
     const now = new Date();
     let startDate: Date;
     let endDate = new Date(now);
 
-    switch (period) {
-      case 'day':
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-      case 'week':
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      default:
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 7);
+    // Use custom dates if provided, otherwise calculate from period
+    if (customStartDate && customEndDate) {
+      // Parse dates - extract UTC date components to preserve the intended date
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      
+      // Use UTC date components from the ISO string to get the correct date
+      // This ensures that if frontend sends "2025-12-08T00:00:00.000Z", we get "2025-12-08"
+      const startDateStr = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}-${String(start.getUTCDate()).padStart(2, '0')}`;
+      const endDateStr = `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, '0')}-${String(end.getUTCDate()).padStart(2, '0')}`;
+      
+      // Create dates in UTC - start at 00:00:00, end at 23:59:59.999
+      startDate = new Date(startDateStr + 'T00:00:00.000Z');
+      endDate = new Date(endDateStr + 'T23:59:59.999Z');
+      
+      console.log('📅 Using custom dates:', {
+        originalStart: customStartDate,
+        originalEnd: customEndDate,
+        startDateStr,
+        endDateStr,
+        parsedStart: startDate.toISOString(),
+        parsedEnd: endDate.toISOString(),
+      });
+    } else {
+      switch (period) {
+        case 'day':
+          startDate = new Date(now);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'week':
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'year':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        default:
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+      }
     }
 
+    // Include orders that are paid OR have a paymentId (indicating payment was processed)
     const filter: any = {
-      status: 'paid',
+      $or: [
+        { status: 'paid' },
+        { paymentId: { $exists: true, $ne: null } }, // Orders with payment processed
+      ],
       createdAt: { $gte: startDate, $lte: endDate },
     };
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
 
+    // Debug logging
+    console.log('🔍 Reports Filter:', {
+      period,
+      branchId,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      filter,
+    });
+
     const orders = await this.posOrderModel.find(filter);
+    
+    // Debug logging
+    console.log('📊 Orders Found:', {
+      count: orders.length,
+      sampleOrder: orders.length > 0 ? {
+        orderNumber: orders[0].orderNumber,
+        status: orders[0].status,
+        totalAmount: orders[0].totalAmount,
+        createdAt: (orders[0] as any).createdAt,
+        branchId: orders[0].branchId,
+      } : null,
+    });
+
+    // Also check total orders without status filter for debugging
+    const allOrdersCount = await this.posOrderModel.countDocuments({
+      branchId: branchId ? new Types.ObjectId(branchId) : undefined,
+      createdAt: { $gte: startDate, $lte: endDate },
+    });
+    console.log('📊 All Orders (any status) in date range:', allOrdersCount);
+    
+    // Check orders by status
+    const ordersByStatus = await this.posOrderModel.aggregate([
+      {
+        $match: {
+          ...(branchId ? { branchId: new Types.ObjectId(branchId) } : {}),
+          createdAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    console.log('📊 Orders by Status:', ordersByStatus);
 
     // Group by date
     const dailyData = {};
@@ -537,10 +624,21 @@ export class ReportsService {
     }
 
     orders.forEach((order: any) => {
-      const dateKey = (order.createdAt || new Date()).toISOString().split('T')[0];
+      const orderDate = order.createdAt || new Date();
+      // Use UTC date to match the dateKey format (YYYY-MM-DD)
+      const dateKey = new Date(orderDate).toISOString().split('T')[0];
       if (dailyData[dateKey]) {
         dailyData[dateKey].revenue += (order.totalAmount || 0);
         dailyData[dateKey].orders += 1;
+      } else {
+        // Log if date key doesn't match (helps debug timezone issues)
+        console.log('⚠️ Order date not in dailyData range:', {
+          orderNumber: order.orderNumber,
+          orderDate: orderDate,
+          dateKey,
+          orderTotal: order.totalAmount,
+          availableDateKeys: Object.keys(dailyData).slice(0, 10),
+        });
       }
     });
 
@@ -549,13 +647,25 @@ export class ReportsService {
       day.averageOrderValue = day.orders > 0 ? day.revenue / day.orders : 0;
     });
 
+    const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalOrders = orders.length;
+    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    
+    console.log('📊 Summary Calculation:', {
+      totalRevenue,
+      totalOrders,
+      averageOrderValue,
+      dailyDataEntries: Object.keys(dailyData).length,
+      dailyDataWithOrders: Object.values(dailyData).filter((d: any) => d.orders > 0).length,
+    });
+
     return {
       period,
       data: Object.values(dailyData),
       summary: {
-        totalRevenue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
-        totalOrders: orders.length,
-        averageOrderValue: orders.length > 0 ? orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0) / orders.length : 0,
+        totalRevenue,
+        totalOrders,
+        averageOrderValue,
       },
     };
   }
@@ -619,39 +729,155 @@ export class ReportsService {
     }));
   }
 
-  async getRevenueByCategory(branchId?: string): Promise<any> {
+  async getRevenueByCategory(branchId?: string, customStartDate?: Date, customEndDate?: Date): Promise<any> {
     const now = new Date();
-    const startDate = new Date(now);
-    startDate.setDate(now.getDate() - 30); // Last 30 days
+    let startDate: Date;
+    let endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
 
+    // Use custom dates if provided, otherwise default to last 30 days
+    if (customStartDate && customEndDate) {
+      // Parse dates - extract UTC date components to preserve the intended date
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      
+      // Use UTC date components to get the correct date from the ISO string
+      const startDateStr = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}-${String(start.getUTCDate()).padStart(2, '0')}`;
+      const endDateStr = `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, '0')}-${String(end.getUTCDate()).padStart(2, '0')}`;
+      
+      // Create dates in UTC - start at 00:00:00, end at 23:59:59.999
+      startDate = new Date(startDateStr + 'T00:00:00.000Z');
+      endDate = new Date(endDateStr + 'T23:59:59.999Z');
+    } else {
+      // Default to last 30 days
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 30);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    // Include orders that are paid OR have a paymentId (indicating payment was processed)
     const filter: any = {
-      status: 'paid',
-      createdAt: { $gte: startDate },
+      $or: [
+        { status: 'paid' },
+        { paymentId: { $exists: true, $ne: null } }, // Orders with payment processed
+      ],
+      createdAt: { $gte: startDate, $lte: endDate },
     };
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
 
-    const orders = await this.posOrderModel
-      .find(filter)
-      .populate({
-        path: 'items.menuItemId',
-        select: 'name categoryId',
-        populate: {
-          path: 'categoryId',
-          select: 'name',
+    console.log('📊 getRevenueByCategory - Filter:', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      branchId,
+      filter,
+    });
+
+    // Use aggregation to properly populate nested categoryId
+    const orders = await this.posOrderModel.aggregate([
+      { $match: filter },
+      { $unwind: '$items' },
+      {
+        $lookup: {
+          from: 'menuitems',
+          localField: 'items.menuItemId',
+          foreignField: '_id',
+          as: 'menuItem',
         },
-      });
+      },
+      { $unwind: { path: '$menuItem', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'menuItem.categoryId',
+          foreignField: '_id',
+          as: 'category',
+        },
+      },
+      { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: '$_id',
+          orderNumber: { $first: '$orderNumber' },
+          items: {
+            $push: {
+              menuItemId: '$items.menuItemId',
+              name: '$items.name',
+              quantity: '$items.quantity',
+              price: '$items.price',
+              categoryId: '$category._id',
+              categoryName: '$category.name',
+            },
+          },
+        },
+      },
+    ]);
+
+    // Transform back to order-like structure for compatibility
+    const transformedOrders = orders.map((order: any) => ({
+      _id: order._id,
+      orderNumber: order.orderNumber,
+      items: order.items.map((item: any) => ({
+        menuItemId: {
+          _id: item.menuItemId,
+          name: item.name,
+          categoryId: item.categoryId ? {
+            _id: item.categoryId,
+            name: item.categoryName,
+          } : null,
+        },
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    }));
+
+    console.log('📊 getRevenueByCategory - Orders Found:', {
+      count: transformedOrders.length,
+      sampleOrder: transformedOrders[0] ? {
+        orderNumber: transformedOrders[0].orderNumber,
+        itemsCount: transformedOrders[0].items?.length,
+        firstItem: transformedOrders[0].items?.[0] ? {
+          menuItemId: transformedOrders[0].items[0].menuItemId?._id,
+          categoryId: transformedOrders[0].items[0].menuItemId?.categoryId?._id,
+          categoryName: transformedOrders[0].items[0].menuItemId?.categoryId?.name,
+        } : null,
+      } : null,
+    });
 
     const categoryStats = {};
+    let itemsWithoutCategory = 0;
+    let itemsWithCategory = 0;
 
-    orders.forEach((order) => {
+    transformedOrders.forEach((order) => {
       if (order.items && Array.isArray(order.items)) {
         order.items.forEach((item: any) => {
-          const categoryId = item.menuItemId?.categoryId?._id?.toString() || item.menuItemId?.categoryId?.toString();
-          const categoryName = item.menuItemId?.categoryId?.name || 'Uncategorized';
+          // Try multiple ways to get categoryId
+          let categoryId: string | null = null;
+          let categoryName = 'Uncategorized';
           
-          if (!categoryId) return;
+          // Check if menuItemId is populated
+          if (item.menuItemId) {
+            // Try different paths for categoryId
+            if (item.menuItemId.categoryId) {
+              if (typeof item.menuItemId.categoryId === 'object') {
+                // Populated category object
+                categoryId = item.menuItemId.categoryId._id?.toString() || item.menuItemId.categoryId.toString();
+                categoryName = item.menuItemId.categoryId.name || 'Uncategorized';
+              } else {
+                // Just an ObjectId reference
+                categoryId = item.menuItemId.categoryId.toString();
+              }
+            }
+          }
+          
+          // If still no categoryId, use 'Uncategorized' as a fallback
+          if (!categoryId) {
+            categoryId = 'uncategorized';
+            itemsWithoutCategory++;
+          } else {
+            itemsWithCategory++;
+          }
 
           if (!categoryStats[categoryId]) {
             categoryStats[categoryId] = {
@@ -672,6 +898,17 @@ export class ReportsService {
       }
     });
 
+    console.log('📊 getRevenueByCategory - Category Stats:', {
+      itemsWithCategory,
+      itemsWithoutCategory,
+      categoryCount: Object.keys(categoryStats).length,
+      categories: Object.keys(categoryStats).map(key => ({
+        categoryId: categoryStats[key].categoryId,
+        category: categoryStats[key].category,
+        revenue: categoryStats[key].revenue,
+      })),
+    });
+
     // Convert Set to count and calculate percentages
     const result = Object.values(categoryStats).map((stat: any) => ({
       ...stat,
@@ -680,7 +917,7 @@ export class ReportsService {
 
     const totalRevenue = result.reduce((sum: number, stat: any) => sum + stat.revenue, 0);
 
-    return result
+    const finalResult = result
       .map((stat: any) => ({
         categoryId: stat.categoryId,
         category: stat.category,
@@ -689,6 +926,66 @@ export class ReportsService {
         percentage: totalRevenue > 0 ? (stat.revenue / totalRevenue) * 100 : 0,
       }))
       .sort((a: any, b: any) => b.revenue - a.revenue);
+
+    console.log('📊 getRevenueByCategory - Final Result:', {
+      totalRevenue,
+      categoryCount: finalResult.length,
+      categories: finalResult.map((cat: any) => ({
+        category: cat.category,
+        revenue: cat.revenue,
+        percentage: cat.percentage,
+      })),
+    });
+
+    return finalResult;
+  }
+
+  async getWastageReport(
+    branchId?: string,
+    companyId?: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<any> {
+    const stats = await this.wastageService.getWastageStats(
+      branchId,
+      companyId,
+      startDate,
+      endDate,
+    );
+
+    const totalCost = stats.summary.totalCost || 0;
+
+    return {
+      summary: {
+        totalWastageCount: stats.summary.totalWastageCount || 0,
+        totalQuantity: stats.summary.totalQuantity || 0,
+        totalCost,
+        avgWastageCost: stats.summary.avgWastageCost || 0,
+        wastageRate: stats.summary.wastageRate || 0,
+      },
+      byReason: (stats.byReason || []).map((item: any) => ({
+        reason: item._id,
+        count: item.count,
+        totalQuantity: item.totalQuantity,
+        totalCost: item.totalCost,
+        percentage: totalCost > 0 ? (item.totalCost / totalCost) * 100 : 0,
+      })),
+      byIngredient: (stats.byIngredient || []).map((item: any) => ({
+        ingredientId: item.ingredientId,
+        ingredientName: item.ingredientName || 'Unknown',
+        ingredientUnit: item.ingredientUnit || '',
+        count: item.count,
+        totalQuantity: item.totalQuantity,
+        totalCost: item.totalCost,
+        percentage: totalCost > 0 ? (item.totalCost / totalCost) * 100 : 0,
+      })),
+      dailyTrend: (stats.dailyTrend || []).map((item: any) => ({
+        date: item._id,
+        count: item.count,
+        totalQuantity: item.totalQuantity,
+        totalCost: item.totalCost,
+      })),
+    };
   }
 
   async getLowStockItems(companyId?: string): Promise<any> {

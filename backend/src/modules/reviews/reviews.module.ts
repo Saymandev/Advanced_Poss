@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CustomersModule } from '../customers/customers.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
 import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
 import { Review, ReviewSchema } from './schemas/review.schema';
@@ -15,6 +16,7 @@ import { ReviewsService } from './reviews.service';
     ]),
     CustomersModule,
     WebsocketsModule,
+    SubscriptionsModule, // For subscription limit validation
   ],
   controllers: [ReviewsController],
   providers: [ReviewsService],

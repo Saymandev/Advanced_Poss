@@ -611,19 +611,28 @@ export class POSService {
       query.createdAt = {};
       if (filters.startDate) {
         try {
-          const startDate = new Date(filters.startDate);
+          // Ensure startDate includes time (00:00:00) for proper day start
+          // If it's just a date string (YYYY-MM-DD), append time in UTC
+          const startDateStr = filters.startDate.includes('T') 
+            ? filters.startDate
+            : filters.startDate + 'T00:00:00.000Z';
+          const startDate = new Date(startDateStr);
+          
           if (isNaN(startDate.getTime())) {
             throw new BadRequestException(`Invalid startDate format: ${filters.startDate}`);
           }
           query.createdAt.$gte = startDate;
         } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
           throw new BadRequestException(`Invalid startDate: ${filters.startDate}`);
         }
       }
       if (filters.endDate) {
         try {
-          // Check if endDate is already a full ISO string (contains 'T')
-          // If it is, use it directly; otherwise append time
+          // Ensure endDate includes time (23:59:59.999) for proper day end
+          // If it's just a date string (YYYY-MM-DD), append time in UTC
           const endDateStr = filters.endDate.includes('T') 
             ? filters.endDate
             : filters.endDate + 'T23:59:59.999Z';
@@ -660,6 +669,7 @@ export class POSService {
         .find(query)
         .populate('tableId', 'tableNumber capacity')
         .populate('userId', 'firstName lastName email')
+        .populate('paymentId', 'method amount status transactionId') // Populate payment to get method
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)

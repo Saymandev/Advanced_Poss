@@ -18,6 +18,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { AddCustomDomainDto } from './dto/add-custom-domain.dto';
+import { VerifyCustomDomainDto } from './dto/verify-custom-domain.dto';
 
 @ApiTags('Companies')
 @ApiBearerAuth()
@@ -95,6 +97,34 @@ export class CompaniesController {
   @ApiOperation({ summary: 'Deactivate company' })
   deactivate(@Param('id') id: string) {
     return this.companiesService.deactivate(id);
+  }
+
+  @Post(':id/custom-domain')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Add custom domain to company' })
+  addCustomDomain(@Param('id') id: string, @Body() addDomainDto: AddCustomDomainDto) {
+    return this.companiesService.addCustomDomain(id, addDomainDto);
+  }
+
+  @Post(':id/custom-domain/verify')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Verify custom domain ownership' })
+  verifyCustomDomain(@Param('id') id: string, @Body() verifyDto: VerifyCustomDomainDto) {
+    return this.companiesService.verifyCustomDomain(id, verifyDto);
+  }
+
+  @Get(':id/custom-domain')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Get custom domain information and DNS instructions' })
+  getCustomDomainInfo(@Param('id') id: string) {
+    return this.companiesService.getCustomDomainInfo(id);
+  }
+
+  @Delete(':id/custom-domain')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Remove custom domain from company' })
+  removeCustomDomain(@Param('id') id: string) {
+    return this.companiesService.removeCustomDomain(id);
   }
 }
 

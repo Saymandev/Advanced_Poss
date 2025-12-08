@@ -166,6 +166,7 @@ export function getFeaturesByCategory() {
       { key: FEATURES.INVENTORY, name: 'Inventory Management' },
       { key: FEATURES.SUPPLIERS, name: 'Suppliers' },
       { key: FEATURES.PURCHASE_ORDERS, name: 'Purchase Orders' },
+    { key: FEATURES.WASTAGE_MANAGEMENT, name: 'Wastage Management' },
     ],
     Financial: [
       { key: FEATURES.EXPENSES, name: 'Expense Management' },

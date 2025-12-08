@@ -18,13 +18,15 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 
 @ApiTags('Branches')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.BRANCHES)
 @Controller('branches')
 export class BranchesController {
@@ -32,6 +34,7 @@ export class BranchesController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  @RequiresLimit('maxBranches')
   @ApiOperation({ summary: 'Create new branch' })
   create(@Body() createBranchDto: CreateBranchDto) {
     return this.branchesService.create(createBranchDto);

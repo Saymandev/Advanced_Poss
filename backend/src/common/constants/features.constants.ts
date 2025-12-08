@@ -51,6 +51,7 @@ export const FEATURES = {
   INVENTORY: 'inventory',
   SUPPLIERS: 'suppliers',
   PURCHASE_ORDERS: 'purchase-orders',
+  WASTAGE_MANAGEMENT: 'wastage-management',
 
   // Financial Management
   EXPENSES: 'expenses',
@@ -87,7 +88,7 @@ export const FEATURE_CATEGORIES = {
   ],
   CUSTOMERS: ['customer-management', 'loyalty-program', 'marketing'],
   AI_FEATURES: ['ai-menu-optimization', 'ai-customer-loyalty'],
-  INVENTORY: ['inventory', 'suppliers', 'purchase-orders'],
+  INVENTORY: ['inventory', 'suppliers', 'purchase-orders', 'wastage-management'],
   FINANCIAL: ['expenses', 'accounting', 'work-periods'],
   SYSTEM: ['settings', 'branches', 'notifications'],
 } as const;
@@ -121,6 +122,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.INVENTORY,
     FEATURES.SUPPLIERS,
     FEATURES.PURCHASE_ORDERS,
+    FEATURES.WASTAGE_MANAGEMENT,
     FEATURES.EXPENSES,
     FEATURES.ACCOUNTING,
     FEATURES.WORK_PERIODS,
@@ -147,6 +149,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.AI_MENU_OPTIMIZATION,
     FEATURES.INVENTORY,
     FEATURES.SUPPLIERS,
+    FEATURES.WASTAGE_MANAGEMENT,
     FEATURES.EXPENSES,
     FEATURES.WORK_PERIODS,
     FEATURES.NOTIFICATIONS,
@@ -158,6 +161,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.KITCHEN_DISPLAY,
     FEATURES.INVENTORY,
     FEATURES.PURCHASE_ORDERS,
+    FEATURES.WASTAGE_MANAGEMENT,
     FEATURES.NOTIFICATIONS,
   ],
   waiter: [

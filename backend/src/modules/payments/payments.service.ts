@@ -27,6 +27,16 @@ export class PaymentsService {
     });
   }
 
+  private resolveStripePriceId(planName: string, fallback?: string) {
+    const map: Record<string, string | undefined> = {
+      free: process.env.STRIPE_PRICE_FREE_MONTHLY,
+      basic: process.env.STRIPE_PRICE_BASIC_MONTHLY,
+      premium: process.env.STRIPE_PRICE_PREMIUM_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
+    };
+    return map[planName] || fallback;
+  }
+
   async createPaymentIntent(companyId: string, planName: string) {
     // Get company details
     const company = await this.companyModel.findById(companyId);
@@ -340,7 +350,7 @@ export class PaymentsService {
       subscription.isActive = true; // CRITICAL: Ensure isActive is true for active subscriptions
       subscription.stripeCustomerId = customerId;
       subscription.stripeSubscriptionId = subscriptionId;
-      subscription.stripePriceId = plan.stripePriceId || undefined;
+      subscription.stripePriceId = this.resolveStripePriceId(plan.name, plan.stripePriceId) || undefined;
       
       // CRITICAL: Populate enabledFeatures from plan's enabledFeatureKeys
       if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
@@ -372,6 +382,13 @@ export class PaymentsService {
         customDomainEnabled: plan.limits?.customDomainEnabled ?? false,
         prioritySupportEnabled: plan.limits?.prioritySupportEnabled ?? plan.features?.aiInsights ?? false,
         storageGB: plan.limits?.storageGB ?? 0,
+        // Public ordering system
+        publicOrderingEnabled: plan.limits?.publicOrderingEnabled ?? false,
+        maxPublicBranches: plan.limits?.maxPublicBranches ?? -1, // Default to unlimited
+        // Review system
+        reviewsEnabled: plan.limits?.reviewsEnabled ?? false,
+        reviewModerationRequired: plan.limits?.reviewModerationRequired ?? false,
+        maxReviewsPerMonth: plan.limits?.maxReviewsPerMonth ?? -1, // Default to unlimited
       } as any;
       
       await subscription.save();
@@ -395,7 +412,7 @@ export class PaymentsService {
         stripeSubscriptionId: typeof session.subscription === 'string'
           ? (session.subscription || undefined)
           : (session.subscription as any)?.id || undefined,
-        stripePriceId: plan.stripePriceId || undefined,
+        stripePriceId: this.resolveStripePriceId(plan.name, plan.stripePriceId) || undefined,
         // CRITICAL: Populate enabledFeatures from plan's enabledFeatureKeys
         enabledFeatures: plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0
           ? plan.enabledFeatureKeys

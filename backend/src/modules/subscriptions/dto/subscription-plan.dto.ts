@@ -71,6 +71,10 @@ export class CreateSubscriptionPlanDto {
       storageGB: 25,
       maxTables: 50,
       maxMenuItems: 500,
+      publicOrderingEnabled: true,
+      maxPublicBranches: 3,
+      reviewsEnabled: true,
+      reviewModerationRequired: false,
     },
   })
   @IsOptional()
@@ -86,6 +90,13 @@ export class CreateSubscriptionPlanDto {
     whitelabelEnabled?: boolean;
     customDomainEnabled?: boolean;
     prioritySupportEnabled?: boolean;
+    // Public ordering system
+    publicOrderingEnabled?: boolean;
+    maxPublicBranches?: number;
+    // Review system
+    reviewsEnabled?: boolean;
+    reviewModerationRequired?: boolean;
+    maxReviewsPerMonth?: number;
   };
 
   @ApiPropertyOptional({ example: 1 })
@@ -185,6 +196,10 @@ export class UpdateSubscriptionPlanDto {
       maxBranches: 10,
       maxUsers: 50,
       storageGB: 50,
+      publicOrderingEnabled: true,
+      maxPublicBranches: 5,
+      reviewsEnabled: true,
+      reviewModerationRequired: true,
     },
   })
   @IsOptional()
@@ -200,6 +215,13 @@ export class UpdateSubscriptionPlanDto {
     whitelabelEnabled?: boolean;
     customDomainEnabled?: boolean;
     prioritySupportEnabled?: boolean;
+    // Public ordering system
+    publicOrderingEnabled?: boolean;
+    maxPublicBranches?: number;
+    // Review system
+    reviewsEnabled?: boolean;
+    reviewModerationRequired?: boolean;
+    maxReviewsPerMonth?: number;
   };
 
   @ApiPropertyOptional({ example: 1 })

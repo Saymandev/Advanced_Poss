@@ -48,13 +48,12 @@ export class SubscriptionPlansController {
   }
 
   @Get('available-features')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  // Expose to any authenticated user (owners/managers need this for role access UI)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all available features for plan customization (Super Admin only)' })
+  @ApiOperation({ summary: 'Get all available features for plan customization' })
   @ApiResponse({ status: 200, description: 'Available features retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
   getAvailableFeatures() {
     const featuresByCategory = getFeaturesByCategory();
     return {

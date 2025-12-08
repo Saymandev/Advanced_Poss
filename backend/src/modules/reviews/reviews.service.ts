@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CustomersService } from '../customers/customers.service';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { Review, ReviewDocument } from './schemas/review.schema';
@@ -14,6 +15,7 @@ export class ReviewsService {
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
     private customersService: CustomersService,
     private websocketsGateway: WebsocketsGateway,
+    private subscriptionsService: SubscriptionsService,
   ) {}
 
   /**
@@ -83,6 +85,40 @@ export class ReviewsService {
    * Internal create method - requires branchId and companyId to be provided
    */
   async create(createReviewDto: CreateReviewDto, branchId: string, companyId: string): Promise<Review> {
+    // Check subscription limits for reviews
+    // Convert to MongooseSchema.Types.ObjectId (same pattern as controller)
+    const companyObjectId = new Types.ObjectId(companyId) as unknown as any;
+    const subscription = await this.subscriptionsService.findByCompany(companyObjectId);
+    
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found. Reviews are not available.');
+    }
+
+    const limits = subscription.limits as any;
+    
+    // Check if reviews are enabled
+    if (limits.reviewsEnabled === false) {
+      throw new ForbiddenException('Reviews are not enabled for your subscription plan. Please upgrade to enable this feature.');
+    }
+
+    // Check maxReviewsPerMonth limit
+    if (limits.maxReviewsPerMonth !== undefined && limits.maxReviewsPerMonth !== -1) {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      // Count reviews for this company in current month
+      const reviewsThisMonth = await this.reviewModel.countDocuments({
+        companyId: companyObjectId,
+        createdAt: { $gte: startOfMonth },
+      });
+      
+      if (reviewsThisMonth >= limits.maxReviewsPerMonth) {
+        throw new ForbiddenException(
+          `You have reached the maximum reviews limit (${limits.maxReviewsPerMonth} per month) for your subscription plan. Please upgrade to allow more reviews.`
+        );
+      }
+    }
+
     // Verify order exists and belongs to branch - populate userId to get waiter info
     const order = await this.posOrderModel
       .findById(createReviewDto.orderId)
@@ -172,6 +208,10 @@ export class ReviewsService {
       };
     }).filter((item): item is NonNullable<typeof item> => item !== null) || [];
 
+    // Determine if review should be published immediately or require moderation
+    const requiresModeration = limits.reviewModerationRequired === true;
+    const isPublished = !requiresModeration; // Auto-publish if moderation not required
+
     const review = new this.reviewModel({
       companyId: new Types.ObjectId(companyId),
       branchId: new Types.ObjectId(branchId),
@@ -186,7 +226,7 @@ export class ReviewsService {
       overallRating: createReviewDto.overallRating,
       comment: createReviewDto.comment,
       itemReviews: itemReviews.length > 0 ? itemReviews : undefined,
-      isPublished: true,
+      isPublished, // Set based on moderation requirement
     });
 
     const savedReview = await review.save();

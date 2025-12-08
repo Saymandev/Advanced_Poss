@@ -11,8 +11,8 @@ import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
 import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
-import { Table, TableDocument } from '../tables/schemas/table.schema';
 import { SuperAdminNotificationsService } from '../super-admin-notifications/super-admin-notifications.service';
+import { Table, TableDocument } from '../tables/schemas/table.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
@@ -71,10 +71,29 @@ export class SubscriptionsService {
     if (id instanceof Types.ObjectId) {
       return id;
     }
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid identifier supplied');
+    
+    // Handle case where id might be an object that was stringified
+    if (typeof id === 'object' && id !== null) {
+      // Try to extract the actual ID from the object
+      const extractedId = (id as any).id || (id as any)._id || (id as any).toString();
+      if (extractedId && extractedId !== '[object Object]' && Types.ObjectId.isValid(extractedId)) {
+        return new Types.ObjectId(extractedId);
+      }
+      throw new BadRequestException('Invalid identifier supplied: object cannot be converted to ObjectId');
     }
-    return new Types.ObjectId(id);
+    
+    // Convert to string if it's not already
+    const idString = String(id);
+    
+    // Check if it's the stringified object case
+    if (idString === '[object Object]') {
+      throw new BadRequestException('Invalid identifier supplied: received object instead of string ID');
+    }
+    
+    if (!Types.ObjectId.isValid(idString)) {
+      throw new BadRequestException(`Invalid identifier supplied: "${idString}" is not a valid ObjectId`);
+    }
+    return new Types.ObjectId(idString);
   }
 
   private sanitizePlanPayload(plan: any) {
@@ -142,7 +161,24 @@ export class SubscriptionsService {
         plan.features?.aiInsights ??
         false,
       storageGB: plan.limits?.storageGB ?? 0,
+      // Public ordering system
+      publicOrderingEnabled: plan.limits?.publicOrderingEnabled ?? false,
+      maxPublicBranches: plan.limits?.maxPublicBranches ?? -1, // Default to unlimited
+      // Review system
+      reviewsEnabled: plan.limits?.reviewsEnabled ?? false,
+      reviewModerationRequired: plan.limits?.reviewModerationRequired ?? false,
+      maxReviewsPerMonth: plan.limits?.maxReviewsPerMonth ?? -1, // Default to unlimited
     } as SubscriptionLimits & { storageGB?: number };
+  }
+
+  private resolveStripePriceId(planName: string, fallback?: string) {
+    const map: Record<string, string | undefined> = {
+      free: process.env.STRIPE_PRICE_FREE_MONTHLY,
+      basic: process.env.STRIPE_PRICE_BASIC_MONTHLY,
+      premium: process.env.STRIPE_PRICE_PREMIUM_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
+    };
+    return map[planName] || fallback;
   }
 
   private async applyPlanChange(
@@ -163,26 +199,24 @@ export class SubscriptionsService {
       await this.stripeService.updateSubscription(
         subscription.stripeSubscriptionId,
         {
-          priceId: plan.stripePriceId,
+          priceId: this.resolveStripePriceId(plan.name, plan.stripePriceId),
           prorationBehavior: 'create_prorations',
         },
       );
     }
 
+    const now = new Date();
     const planKey = this.resolvePlanKey(plan.name);
+    const nextPeriodEnd = this.calculatePeriodEnd(now, resolvedBillingCycle);
+
     subscription.plan = planKey;
     subscription.price = newPrice;
     subscription.limits = this.buildLimitsFromPlan(plan) as SubscriptionLimits;
     subscription.billingCycle = resolvedBillingCycle;
-
-    // Update next billing date based on current period end
-    if (subscription.currentPeriodEnd) {
-      subscription.nextBillingDate = subscription.currentPeriodEnd;
-    } else {
-      // Calculate next billing date if not set
-      const periodStart = subscription.currentPeriodStart || new Date();
-      subscription.nextBillingDate = this.calculatePeriodEnd(periodStart, resolvedBillingCycle);
-    }
+    subscription.stripePriceId = this.resolveStripePriceId(plan.name, plan.stripePriceId);
+    subscription.currentPeriodStart = now;
+    subscription.currentPeriodEnd = nextPeriodEnd;
+    subscription.nextBillingDate = nextPeriodEnd;
 
     // CRITICAL: Update company record to reflect plan change
     // Use plan.name (e.g., 'premium', 'basic') not planKey enum value
@@ -843,24 +877,31 @@ export class SubscriptionsService {
 
   async getUsageStats(companyId: string) {
     const companyObjectId = this.toObjectId(companyId);
+    const companyIdFilter = {
+      $or: [
+        { companyId: companyObjectId },
+        { companyId: companyId as any },
+      ],
+    };
+
     const subscription = await this.subscriptionModel
       .findOne({
-        companyId: companyObjectId,
+        ...companyIdFilter,
         isActive: true,
       })
       .lean();
 
     const branchDocs = await this.branchModel
-      .find({ companyId: companyObjectId })
+      .find(companyIdFilter)
       .select('_id')
       .lean();
     const branchIds = branchDocs.map((doc) => doc._id);
 
     const [userCount, menuItemCount, customerCount, tableCount] =
       await Promise.all([
-        this.userModel.countDocuments({ companyId: companyObjectId }),
-        this.menuItemModel.countDocuments({ companyId: companyObjectId }),
-        this.customerModel.countDocuments({ companyId: companyObjectId }),
+        this.userModel.countDocuments(companyIdFilter),
+        this.menuItemModel.countDocuments(companyIdFilter),
+        this.customerModel.countDocuments(companyIdFilter),
         branchIds.length
           ? this.tableModel.countDocuments({ branchId: { $in: branchIds } })
           : Promise.resolve(0),

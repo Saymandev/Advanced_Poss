@@ -161,8 +161,10 @@ export class ReportsController {
   getSalesAnalytics(
     @Query('period') period: string = 'week',
     @Query('branchId') branchId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.reportsService.getSalesAnalytics(period, branchId);
+    return this.reportsService.getSalesAnalytics(period, branchId, startDate ? new Date(startDate) : undefined, endDate ? new Date(endDate) : undefined);
   }
 
 
@@ -180,8 +182,16 @@ export class ReportsController {
   @Get('revenue-by-category')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get revenue by category' })
-  getRevenueByCategorySimple(@Query('branchId') branchId?: string) {
-    return this.reportsService.getRevenueByCategory(branchId);
+  getRevenueByCategorySimple(
+    @Query('branchId') branchId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getRevenueByCategory(
+      branchId,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
   }
 
 
@@ -202,5 +212,21 @@ export class ReportsController {
     return this.reportsService.getDueSettlements(branchId, companyId);
   }
 
+  @Get('wastage')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get wastage report' })
+  getWastageReport(
+    @Query('branchId') branchId?: string,
+    @Query('companyId') companyId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getWastageReport(
+      branchId,
+      companyId,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
+  }
 }
 
