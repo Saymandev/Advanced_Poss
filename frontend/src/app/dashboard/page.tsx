@@ -255,23 +255,50 @@ export default function DashboardPage() {
     const ordersArray = (ordersData as any)?.orders || [];
     
     // Transform orders to ensure all required fields are present
-    const transformed = ordersArray.map((order: any) => ({
-      id: order._id || order.id,
-      orderNumber: order.orderNumber || order.order_number || 'N/A',
-      orderType: order.orderType || order.order_type || 'unknown',
-      status: order.status || 'pending',
-      paymentMethod: order.paymentMethod || order.payment_method || 'unknown',
-      totalAmount: order.totalAmount || order.total_amount || order.total || 0,
-      createdAt: order.createdAt || order.created_at || order.date || new Date().toISOString(),
-      items: order.items || [],
-      customerInfo: order.customerInfo || order.customer_info,
-    }));
+    const transformed = ordersArray.map((order: any) => {
+      // Payment method can be in multiple places:
+      // 1. order.paymentMethod (direct field)
+      // 2. order.payment_method (snake_case)
+      // 3. order.paymentId?.method (from populated POSPayment)
+      // 4. order.payment?.method (alternative structure)
+      let paymentMethod = order.paymentMethod || order.payment_method;
+      if (!paymentMethod && order.paymentId) {
+        // If paymentId is populated, get method from it
+        if (typeof order.paymentId === 'object' && order.paymentId.method) {
+          paymentMethod = order.paymentId.method;
+        } else if (typeof order.paymentId === 'string') {
+          // If it's just an ID, we can't get the method without another query
+          // But we'll try to get it from payment object if available
+          paymentMethod = order.payment?.method;
+        }
+      }
+      if (!paymentMethod && order.payment) {
+        paymentMethod = order.payment.method || order.payment.method;
+      }
+      
+      return {
+        id: order._id || order.id,
+        orderNumber: order.orderNumber || order.order_number || 'N/A',
+        orderType: order.orderType || order.order_type || 'unknown',
+        status: order.status || 'pending',
+        paymentMethod: paymentMethod || 'unknown',
+        totalAmount: order.totalAmount || order.total_amount || order.total || 0,
+        createdAt: order.createdAt || order.created_at || order.date || new Date().toISOString(),
+        items: order.items || [],
+        customerInfo: order.customerInfo || order.customer_info,
+      };
+    });
     
     console.log('Processing orders:', {
       total: transformed.length,
       statuses: transformed.reduce((acc: any, o: any) => {
         const status = o.status || 'unknown';
         acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {}),
+      paymentMethods: transformed.reduce((acc: any, o: any) => {
+        const method = o.paymentMethod || 'unknown';
+        acc[method] = (acc[method] || 0) + 1;
         return acc;
       }, {}),
       dateRange: validDateRange,

@@ -10,47 +10,23 @@ import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetBranchesQuery } from '@/lib/api/endpoints/branchesApi';
 import { useGetRolePermissionsQuery, useUpdateRolePermissionMutation } from '@/lib/api/endpoints/rolePermissionsApi';
 import { Staff, useDeactivateStaffMutation, useDeleteStaffMutation, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
+import { useGetAvailableFeaturesQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { useActivateUserMutation, useAdminUpdatePasswordMutation, useAdminUpdatePinMutation } from '@/lib/api/endpoints/usersApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import {
-  BellIcon,
-  BuildingStorefrontIcon,
-  CalculatorIcon,
-  ChartBarIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  CogIcon,
-  ComputerDesktopIcon,
-  CurrencyDollarIcon,
   ExclamationTriangleIcon,
   EyeIcon,
-  GiftIcon,
   KeyIcon,
   LockClosedIcon,
   MapPinIcon,
   PencilIcon,
-  PrinterIcon,
-  ReceiptPercentIcon,
-  ShieldCheckIcon,
-  ShoppingBagIcon,
-  TableCellsIcon,
   TrashIcon,
-  TruckIcon,
-  UserGroupIcon,
   UsersIcon,
-  XMarkIcon
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
-interface Feature {
-  id: string;
-  name: string;
-  description: string;
-  icon: any;
-  category: string;
-}
 
 interface RoleAccess {
   role: UserRole;
@@ -60,123 +36,16 @@ interface RoleAccess {
   color: string;
 }
 
-const features: Feature[] = [
-  // Dashboard & Overview
-  { id: 'dashboard', name: 'Dashboard', description: 'View dashboard and analytics', icon: ChartBarIcon, category: 'Overview' },
-  { id: 'reports', name: 'Reports', description: 'Access reports and analytics', icon: ClipboardDocumentListIcon, category: 'Overview' },
-
-  // User & Staff Management
-  { id: 'staff-management', name: 'Staff Management', description: 'Manage staff members', icon: UsersIcon, category: 'Staff' },
-  { id: 'role-management', name: 'Role Management', description: 'Manage user roles and permissions', icon: ShieldCheckIcon, category: 'Staff' },
-  { id: 'attendance', name: 'Attendance', description: 'Track staff attendance', icon: ClockIcon, category: 'Staff' },
-
-  // Menu & Products
-  { id: 'menu-management', name: 'Menu Management', description: 'Manage menu items and categories', icon: ShoppingBagIcon, category: 'Menu' },
-  { id: 'categories', name: 'Categories', description: 'Manage menu categories', icon: ClipboardDocumentListIcon, category: 'Menu' },
-  { id: 'qr-menus', name: 'QR Menus', description: 'Create and manage QR code menus', icon: TableCellsIcon, category: 'Menu' },
-
-  // Orders & Tables
-  { id: 'order-management', name: 'Order Management', description: 'Manage orders and transactions', icon: ClipboardDocumentListIcon, category: 'Orders' },
-  { id: 'delivery-management', name: 'Delivery Management', description: 'Manage delivery orders and drivers', icon: TruckIcon, category: 'Orders' },
-  { id: 'table-management', name: 'Table Management', description: 'Manage restaurant tables', icon: TableCellsIcon, category: 'Orders' },
-  { id: 'kitchen-display', name: 'Kitchen Display', description: 'Access kitchen display system', icon: BuildingStorefrontIcon, category: 'Orders' },
-  { id: 'customer-display', name: 'Customer Display', description: 'Access customer display system', icon: ComputerDesktopIcon, category: 'Orders' },
-  { id: 'pos-settings', name: 'POS Settings', description: 'Configure POS system settings', icon: CogIcon, category: 'Orders' },
-  { id: 'printer-management', name: 'Printer Management', description: 'Manage receipt and kitchen printers', icon: PrinterIcon, category: 'Orders' },
-  { id: 'digital-receipts', name: 'Digital Receipts', description: 'Generate and manage digital receipts', icon: ReceiptPercentIcon, category: 'Orders' },
-
-  // Customer Management
-  { id: 'customer-management', name: 'Customer Management', description: 'Manage customer data', icon: UserGroupIcon, category: 'Customers' },
-  { id: 'loyalty-program', name: 'Loyalty Program', description: 'Manage loyalty programs', icon: ReceiptPercentIcon, category: 'Customers' },
-  { id: 'marketing', name: 'Marketing', description: 'Access marketing and promotions', icon: GiftIcon, category: 'Customers' },
-
-  // AI Features
-  { id: 'ai-menu-optimization', name: 'AI Menu Optimization', description: 'AI-powered menu recommendations', icon: ChartBarIcon, category: 'AI Features' },
-  { id: 'ai-customer-loyalty', name: 'Customer Loyalty AI', description: 'AI-powered customer loyalty insights', icon: UserGroupIcon, category: 'AI Features' },
-
-  // Inventory & Suppliers
-  { id: 'inventory', name: 'Inventory Management', description: 'Manage inventory and stock', icon: ClipboardDocumentListIcon, category: 'Inventory' },
-  { id: 'suppliers', name: 'Supplier Management', description: 'Manage suppliers', icon: TruckIcon, category: 'Inventory' },
-  { id: 'purchase-orders', name: 'Purchase Orders', description: 'Create and manage purchase orders', icon: ClipboardDocumentListIcon, category: 'Inventory' },
-
-  // Financial Management
-  { id: 'expenses', name: 'Expense Management', description: 'Track and manage expenses', icon: CurrencyDollarIcon, category: 'Financial' },
-  { id: 'accounting', name: 'Accounting', description: 'Access accounting features', icon: CalculatorIcon, category: 'Financial' },
-  { id: 'work-periods', name: 'Work Periods', description: 'Manage work periods and cash flow', icon: ClockIcon, category: 'Financial' },
-
-  // System & Settings
-  { id: 'settings', name: 'Settings', description: 'Access system settings', icon: CogIcon, category: 'System' },
-  { id: 'branches', name: 'Branch Management', description: 'Manage multiple branches', icon: BuildingStorefrontIcon, category: 'System' },
-  { id: 'notifications', name: 'Notifications', description: 'Manage system notifications', icon: BellIcon, category: 'System' },
-];
-
-// Base role access definitions (includes all roles for reference)
-const allRoleAccess: RoleAccess[] = [
-  {
-    role: UserRole.SUPER_ADMIN,
-    name: 'Super Admin',
-    description: 'Full system access with all features',
-    color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-    features: features.map(f => f.id),
-  },
-  {
-    role: UserRole.OWNER,
-    name: 'Owner',
-    description: 'Full business management access',
-    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    features: [
-      'dashboard', 'reports', 'staff-management', 'role-management', 'attendance',
-      'menu-management', 'categories', 'order-management', 'table-management', 'kitchen-display',
-      'customer-management', 'loyalty-program', 'inventory', 'suppliers', 'purchase-orders',
-      'expenses', 'accounting', 'work-periods', 'settings', 'branches', 'notifications'
-    ],
-  },
-  {
-    role: UserRole.MANAGER,
-    name: 'Manager',
-    description: 'Operational management access',
-    color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    features: [
-      'dashboard', 'reports', 'staff-management', 'attendance', 'menu-management',
-      'categories', 'order-management', 'table-management', 'kitchen-display',
-      'customer-management', 'loyalty-program', 'inventory', 'suppliers',
-      'expenses', 'work-periods', 'notifications'
-    ],
-  },
-  {
-    role: UserRole.CHEF,
-    name: 'Chef',
-    description: 'Kitchen operations access',
-    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-    features: [
-      'dashboard', 'menu-management', 'categories', 'kitchen-display',
-      'inventory', 'purchase-orders', 'notifications'
-    ],
-  },
-  {
-    role: UserRole.WAITER,
-    name: 'Waiter',
-    description: 'Order taking and customer service',
-    color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-    features: [
-      'dashboard', 'order-management', 'delivery-management', 'table-management',
-      'customer-management', 'notifications'
-    ],
-  },
-  {
-    role: UserRole.CASHIER,
-    name: 'Cashier',
-    description: 'Payment processing and order completion',
-    color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
-    features: [
-      'dashboard', 'order-management', 'customer-management', 'expenses',
-      'work-periods', 'notifications'
-    ],
-  },
-];
-
-// Company-level roles only (exclude SUPER_ADMIN for company dashboards)
-const companyRoleAccess = allRoleAccess.filter(role => role.role !== UserRole.SUPER_ADMIN);
+// Categories allowed per role (drives dynamic feature assignment)
+const ROLE_CATEGORY_MAP: Partial<Record<UserRole, string[] | 'all'>> = {
+  [UserRole.SUPER_ADMIN]: 'all',
+  [UserRole.OWNER]: 'all',
+  [UserRole.MANAGER]: ['Overview', 'Staff', 'Menu', 'Orders', 'Customers', 'Inventory', 'Financial'],
+  [UserRole.CHEF]: ['Overview', 'Menu', 'Orders', 'Inventory'],
+  [UserRole.WAITER]: ['Overview', 'Orders', 'Customers'],
+  [UserRole.CASHIER]: ['Overview', 'Orders', 'Customers', 'Financial'],
+  // Fallback roles map to no categories unless defined
+};
 
 export default function RoleAccessPage() {
   const { user } = useAppSelector((state) => state.auth);
@@ -204,6 +73,92 @@ export default function RoleAccessPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
+  // Dynamic features (single source of truth) - hooks must be unconditional
+  const { data: availableFeaturesData } = useGetAvailableFeaturesQuery();
+
+  // Normalize available features whether the API returns { success, data } or raw object
+  const features = useMemo(() => {
+    const data = availableFeaturesData && typeof availableFeaturesData === 'object'
+      ? ('data' in availableFeaturesData ? (availableFeaturesData as any).data : availableFeaturesData)
+      : undefined;
+
+    const categories = (data as any)?.featuresByCategory || {};
+    const flattened: { id: string; name: string; category: string }[] = [];
+    Object.entries(categories).forEach(([category, feats]) => {
+      (feats as any[]).forEach((f) => flattened.push({ id: f.key, name: f.name, category }));
+    });
+    return flattened;
+  }, [availableFeaturesData]);
+
+  const allFeatureKeys = useMemo(() => features.map((f) => f.id), [features]);
+
+  const featureCategoryMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    features.forEach((f) => {
+      map[f.id] = f.category;
+    });
+    return map;
+  }, [features]);
+
+  const allRoleAccess: RoleAccess[] = useMemo(() => {
+    const buildFeaturesForRole = (role: UserRole) => {
+      const allowed = ROLE_CATEGORY_MAP[role];
+      if (!allowed) return [];
+      if (allowed === 'all') return allFeatureKeys;
+      return allFeatureKeys.filter((key) => allowed.includes(featureCategoryMap[key]));
+    };
+
+    return [
+      {
+        role: UserRole.SUPER_ADMIN,
+        name: 'Super Admin',
+        description: 'Full system access with all features',
+        color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+        features: allFeatureKeys,
+      },
+      {
+        role: UserRole.OWNER,
+        name: 'Owner',
+        description: 'Full business management access',
+        color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+        features: buildFeaturesForRole(UserRole.OWNER),
+      },
+      {
+        role: UserRole.MANAGER,
+        name: 'Manager',
+        description: 'Operational management access',
+        color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+        features: buildFeaturesForRole(UserRole.MANAGER),
+      },
+      {
+        role: UserRole.CHEF,
+        name: 'Chef',
+        description: 'Kitchen operations access',
+        color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+        features: buildFeaturesForRole(UserRole.CHEF),
+      },
+      {
+        role: UserRole.WAITER,
+        name: 'Waiter',
+        description: 'Order taking and customer service',
+        color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+        features: buildFeaturesForRole(UserRole.WAITER),
+      },
+      {
+        role: UserRole.CASHIER,
+        name: 'Cashier',
+        description: 'Payment processing and order completion',
+        color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+        features: buildFeaturesForRole(UserRole.CASHIER),
+      },
+    ];
+  }, [allFeatureKeys, featureCategoryMap]);
+
+  const companyRoleAccess = useMemo(
+    () => allRoleAccess.filter((role) => role.role !== UserRole.SUPER_ADMIN),
+    [allRoleAccess],
+  );
+
   const [deleteStaff] = useDeleteStaffMutation();
   const [deactivateStaff] = useDeactivateStaffMutation();
   const [activateUser] = useActivateUserMutation();
@@ -214,7 +169,7 @@ export default function RoleAccessPage() {
   const [updateStaff] = useUpdateStaffMutation();
   
   // Get role permissions from backend
-  const { data: rolePermissionsData, isLoading: isLoadingPermissions, refetch: refetchPermissions } = useGetRolePermissionsQuery(
+  const { data: rolePermissionsData, refetch: refetchPermissions } = useGetRolePermissionsQuery(
     undefined,
     { skip: !companyId }
   );
@@ -274,7 +229,7 @@ export default function RoleAccessPage() {
     }
     
     return baseRoles;
-  }, [rolePermissionsData]);
+  }, [rolePermissionsData, companyRoleAccess]);
 
   // Filter staff by selected role
   const filteredStaff = useMemo(() => {
@@ -831,13 +786,12 @@ export default function RoleAccessPage() {
                       <tr key={feature.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <feature.icon className="w-5 h-5 text-gray-400" />
                             <div>
                               <p className="font-medium text-gray-900 dark:text-white">
                                 {feature.name}
                               </p>
                               <p className="text-sm text-gray-600 dark:text-gray-400">
-                                {feature.description}
+                                {feature.category}
                               </p>
                             </div>
                           </div>
@@ -1388,13 +1342,12 @@ export default function RoleAccessPage() {
                           />
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <feature.icon className="w-4 h-4 text-gray-400" />
                               <span className="font-medium text-gray-900 dark:text-white text-sm">
                                 {feature.name}
                               </span>
                             </div>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                              {feature.description}
+                              {feature.category}
                             </p>
                           </div>
                         </label>

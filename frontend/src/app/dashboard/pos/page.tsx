@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Calculator } from '@/components/ui/Calculator';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -264,6 +265,7 @@ export default function POSPage() {
     return [];
   });
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [customerInfo, setCustomerInfo] = useState(() => {
     if (typeof window !== 'undefined') {
       // Use encrypted storage with 24-hour TTL for customer PII
@@ -2686,19 +2688,28 @@ export default function POSPage() {
                 <FunnelIcon className="h-4 w-4" />
                 Reset Filters
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setIsCalculatorOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80"
+                title="Calculator (F5)"
+              >
+                <CurrencyDollarIcon className="h-4 w-4" />
+                Calculator
+              </Button>
             </div>
-            <div className="flex flex-wrap items-center gap-2 justify-between sm:justify-end">
+            <div className="flex flex-wrap items-center gap-2 justify-between sm:justify-end relative">
               <Button
                 variant="secondary"
                 onClick={() => setIsCartModalOpen(true)}
-                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 relative z-10"
               >
                 <ShoppingCartIcon className="h-4 w-4" />
                 Open Order Cart
               </Button>
               
               {/* Payment Mode Toggle - In the middle */}
-              <div className="flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 relative group" style={{ zIndex: 1 }}>
+              <div className="flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 relative overflow-visible">
                 <span className="text-xs font-medium text-gray-600 dark:text-slate-400 whitespace-nowrap">
                   {paymentMode === 'pay-first' ? 'Pay First' : 'Pay Later'}
                 </span>
@@ -2713,14 +2724,18 @@ export default function POSPage() {
                     }`}
                   />
                 </button>
-                <div className="relative" style={{ zIndex: 10000 }}>
+                <div className="relative group" style={{ zIndex: 99999 }}>
                   <InformationCircleIcon className="h-4 w-4 text-gray-400 dark:text-slate-500 cursor-help" />
-                  <div className="absolute right-0 top-6 w-64 p-3 bg-slate-900 dark:bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-slate-700 pointer-events-none group-hover:pointer-events-auto" style={{ zIndex: 10001 }}>
+                  <div className="absolute right-0 top-6 w-72 p-3 bg-slate-900 dark:bg-slate-800 text-white text-xs rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-slate-700 pointer-events-none group-hover:pointer-events-auto whitespace-normal" style={{ zIndex: 999999 }}>
                     <div className="space-y-2">
                       <p className="font-semibold text-sky-300">Payment Mode Info:</p>
-                      <div className="space-y-1">
-                        <p><strong className="text-emerald-300">Pay First:</strong> Customer pays before sitting. Tables with paid orders remain occupied until customer leaves.</p>
-                        <p><strong className="text-amber-300">Pay Later:</strong> Customer orders first, pays after. Only pending orders keep tables occupied.</p>
+                      <div className="space-y-1.5">
+                        <p className="leading-relaxed">
+                          <strong className="text-emerald-300">Pay First:</strong> Customer pays before sitting. Tables with paid orders remain occupied until customer leaves.
+                        </p>
+                        <p className="leading-relaxed">
+                          <strong className="text-amber-300">Pay Later:</strong> Customer orders first, pays after. Only pending orders keep tables occupied.
+                        </p>
                       </div>
                     </div>
                     <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 dark:bg-slate-800 border-l border-t border-slate-700 transform rotate-45"></div>
@@ -3156,10 +3171,15 @@ export default function POSPage() {
           event.preventDefault();
           setShowKeyboardShortcuts(!showKeyboardShortcuts);
           break;
+        case 'F5':
+          event.preventDefault();
+          setIsCalculatorOpen(true);
+          break;
         case 'Escape':
           event.preventDefault();
           setIsPaymentModalOpen(false);
           setShowKeyboardShortcuts(false);
+          setIsCalculatorOpen(false);
           setIsQueueCollapsed(true);
           break;
         case 'Enter':
@@ -3178,7 +3198,7 @@ export default function POSPage() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [cart.length, selectedTable, showKeyboardShortcuts, handleCreateOrder, requiresTable, checkoutBlocked, paymentMode, setIsPaymentModalOpen]);
+  }, [cart.length, selectedTable, showKeyboardShortcuts, handleCreateOrder, requiresTable, checkoutBlocked, paymentMode, setIsPaymentModalOpen, clearCart]);
 
 
   return (
@@ -4024,6 +4044,15 @@ export default function POSPage() {
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsCalculatorOpen(true)}
+                  className="flex items-center gap-2 bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80"
+                  title="Calculator (F5)"
+                >
+                  <CurrencyDollarIcon className="h-4 w-4" />
+                  Calculator
+                </Button>
                 {paymentMode === 'pay-later' && (
                   <Button 
                     variant="secondary" 
@@ -4356,7 +4385,7 @@ export default function POSPage() {
                           <option value="">No methods available</option>
                         )}
                       </select>
-            <Input
+                      <Input
                         type="number"
                         min="0"
                         step="0.01"
@@ -4433,18 +4462,29 @@ export default function POSPage() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>
-              Cancel
-            </Button>
+          <div className="flex justify-between gap-2">
             <Button
-              onClick={handlePayment}
-              className="bg-emerald-600 hover:bg-emerald-500"
-              disabled={checkoutBlocked || cart.length === 0}
+              variant="secondary"
+              onClick={() => setIsCalculatorOpen(true)}
+              className="flex items-center gap-2 bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80"
+              title="Calculator (F5)"
             >
-              <CheckIcon className="h-4 w-4 mr-2" />
-              Complete Payment
+              <CurrencyDollarIcon className="h-4 w-4" />
+              Calculator
             </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePayment}
+                className="bg-emerald-600 hover:bg-emerald-500"
+                disabled={checkoutBlocked || cart.length === 0}
+              >
+                <CheckIcon className="h-4 w-4 mr-2" />
+                Complete Payment
+              </Button>
+            </div>
           </div>
         </div>
       </Modal>
@@ -5381,6 +5421,12 @@ export default function POSPage() {
           </div>
         )}
       </Modal>
+
+      {/* Calculator Modal */}
+      <Calculator
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+      />
     </div>
     )
   );

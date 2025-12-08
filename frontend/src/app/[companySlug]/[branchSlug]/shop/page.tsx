@@ -32,7 +32,8 @@ export default function BranchShopPage() {
   const { 
     data: company, 
     isLoading: companyLoading,
-    isError: companyError 
+    isError: companyError,
+    error: companyErrorData
   } = useGetCompanyBySlugQuery(companySlug, {
     skip: !companySlug,
   });
@@ -184,6 +185,34 @@ export default function BranchShopPage() {
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  // Get company name from menu data if company query fails
+  const companyName = company?.name || (menuData?.branch as any)?.companyId?.name || 'Restaurant';
+
+  // Update page title when company data is available
+  useEffect(() => {
+    if (company?.name) {
+      document.title = `${company.name} - Order Online`;
+    }
+  }, [company?.name]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Shop Page Debug:', {
+      companySlug,
+      branchSlug,
+      companyLoading,
+      companyError,
+      company: company ? { id: company.id, name: company.name, slug: company.slug } : null,
+      menuLoading,
+      menuError,
+      hasMenuData: !!menuData,
+      companyErrorData: companyErrorData ? {
+        status: (companyErrorData as any)?.status,
+        message: (companyErrorData as any)?.data?.message || (companyErrorData as any)?.message,
+      } : null,
+    });
+  }, [companySlug, branchSlug, companyLoading, companyError, company, menuLoading, menuError, menuData, companyErrorData]);
+
   if (companyLoading || menuLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -195,38 +224,33 @@ export default function BranchShopPage() {
     );
   }
 
-  if (companyError || !company) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="p-8 text-center">
-            <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Company Not Found</h1>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              The restaurant you're looking for doesn't exist.
-            </p>
-            <Button onClick={() => router.push('/')}>
-              Go to Homepage
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (menuError) {
+  // Only show error if menu query fails (menu is required)
+  // Company query failure is not critical - we can use menu data for company name
+  if (menuError || (!menuData && !menuLoading)) {
+    const errorMessage = (menuErrorData as any)?.data?.message || 
+                        (menuErrorData as any)?.message || 
+                        'Menu not available';
+    
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
         <Card className="max-w-md w-full">
           <CardContent className="p-8 text-center">
             <ExclamationTriangleIcon className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Menu Not Available</h1>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              {errorMessage}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
               Unable to load the menu. Please try again later.
             </p>
-            <Button onClick={() => window.location.reload()}>
-              Retry
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => window.location.reload()}>
+                Retry
+              </Button>
+              <Button variant="secondary" onClick={() => router.push('/')}>
+                Go to Homepage
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -241,7 +265,7 @@ export default function BranchShopPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">
-                {company?.name}
+                {companyName}
               </h1>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 Select items from our menu
@@ -309,12 +333,12 @@ export default function BranchShopPage() {
               >
                 All
               </button>
-              {categories.map((category: any) => (
+              {categories.map((category: any, index: number) => (
                 <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
+                  key={category.id || category._id || `category-${index}`}
+                  onClick={() => setSelectedCategory(category.id || category._id)}
                   className={`px-3 md:px-4 py-2 rounded-full whitespace-nowrap text-sm md:text-base transition-colors ${
-                    selectedCategory === category.id
+                    selectedCategory === (category.id || category._id)
                       ? 'bg-gray-900 dark:bg-gray-700 text-white'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}

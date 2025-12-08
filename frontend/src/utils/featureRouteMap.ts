@@ -47,6 +47,7 @@ export const FEATURE_ROUTE_MAP: Record<string, string | string[] | null> = {
   '/dashboard/ingredients': 'inventory',
   '/dashboard/suppliers': 'suppliers',
   '/dashboard/purchase-orders': 'purchase-orders',
+  '/dashboard/wastage': 'wastage-management',
   
   // Financial
   '/dashboard/expenses': 'expenses',

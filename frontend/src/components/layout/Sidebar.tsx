@@ -16,6 +16,7 @@ import {
     ComputerDesktopIcon,
     CurrencyDollarIcon,
     DocumentTextIcon,
+    ExclamationTriangleIcon,
     GiftIcon,
     HomeIcon,
     PhotoIcon,
@@ -154,7 +155,7 @@ const navigation: NavigationItem[] = [
     name: 'Inventory',
     href: '/dashboard/ingredients',
     icon: ClipboardDocumentListIcon,
-    requiredFeature: ['inventory', 'suppliers', 'purchase-orders'], // Show if user has ANY
+    requiredFeature: ['inventory', 'suppliers', 'purchase-orders', 'wastage-management'], // Show if user has ANY
     children: [
       {
         name: 'Ingredients',
@@ -179,6 +180,12 @@ const navigation: NavigationItem[] = [
         href: '/dashboard/purchase-orders',
         icon: ShoppingBagIcon,
         requiredFeature: 'purchase-orders',
+      },
+      {
+        name: 'Wastage Management',
+        href: '/dashboard/wastage',
+        icon: ExclamationTriangleIcon,
+        requiredFeature: 'wastage-management',
       },
     ],
   },

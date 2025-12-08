@@ -8,7 +8,15 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetBranchesQuery, useUpdateBranchPublicUrlMutation } from '@/lib/api/endpoints/branchesApi';
-import { useGetCompaniesQuery, useGetCompanyByIdQuery, useUploadCompanyLogoMutation } from '@/lib/api/endpoints/companiesApi';
+import {
+  useAddCustomDomainMutation,
+  useGetCompaniesQuery,
+  useGetCompanyByIdQuery,
+  useGetCustomDomainInfoQuery,
+  useRemoveCustomDomainMutation,
+  useUploadCompanyLogoMutation,
+  useVerifyCustomDomainMutation,
+} from '@/lib/api/endpoints/companiesApi';
 import {
   useCreatePaymentMethodMutation,
   useDeletePaymentMethodMutation,
@@ -31,6 +39,7 @@ import {
   useUpdateTaxSettingMutation,
   type InvoiceSettings,
 } from '@/lib/api/endpoints/settingsApi';
+import { useGetSubscriptionByCompanyQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { useAppSelector } from '@/lib/store';
 import {
   ClipboardDocumentIcon,
@@ -103,7 +112,7 @@ export default function SettingsPage() {
       setSelectedCompanyId('');
     }
   }, [isSuperAdmin, companyContext, selectedCompanyId]);
-  const [activeTab, setActiveTab] = useState<'general' | 'taxes' | 'service-charges' | 'invoice' | 'payment-methods'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'taxes' | 'service-charges' | 'invoice' | 'payment-methods' | 'custom-domain'>('general');
   const [invoiceForm, setInvoiceForm] = useState<Partial<InvoiceSettings>>({});
   const [editingBranchUrl, setEditingBranchUrl] = useState<{ branchId: string; url: string } | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -122,6 +131,15 @@ export default function SettingsPage() {
   const { data: company, refetch: refetchCompany } = useGetCompanyByIdQuery(companyId, {
     skip: !companyId,
   });
+
+  // Get subscription to check for customDomainEnabled feature
+  const { data: subscription } = useGetSubscriptionByCompanyQuery(
+    { companyId },
+    { skip: !companyId }
+  );
+
+  // Check if custom domain feature is enabled
+  const isCustomDomainEnabled = (subscription?.plan?.limits as any)?.customDomainEnabled ?? false;
 
   // Get branches for the company
   const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(
@@ -166,8 +184,18 @@ export default function SettingsPage() {
   // Update branch public URL mutation
   const [updateBranchPublicUrl] = useUpdateBranchPublicUrlMutation();
 
-  // Helper function to generate public URL from slugs
+  // Helper function to generate public URL from slugs or custom domain
   const generatePublicUrl = (companySlug?: string, branchSlug?: string): string | null => {
+    // If custom domain is verified, use it instead of slug-based URLs
+    if (company?.customDomain && company?.domainVerified) {
+      const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https://' : 'https://';
+      if (branchSlug) {
+        return `${protocol}${company.customDomain}/${branchSlug}`;
+      }
+      return `${protocol}${company.customDomain}`;
+    }
+    
+    // Fallback to slug-based URLs
     if (!companySlug) return null;
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     if (branchSlug) {
@@ -463,6 +491,8 @@ export default function SettingsPage() {
     { id: 'service-charges', label: 'Service Charges', icon: CurrencyDollarIcon },
     { id: 'invoice', label: 'Invoice Settings', icon: DocumentIcon },
     { id: 'payment-methods', label: 'Payment Methods', icon: CreditCardIcon },
+    // Only show custom domain tab if feature is enabled in subscription
+    ...(isCustomDomainEnabled ? [{ id: 'custom-domain' as const, label: 'Custom Domain', icon: GlobeAltIcon }] : []),
   ];
 
   const normalizedTaxSettings = Array.isArray(taxSettings)
@@ -863,8 +893,8 @@ export default function SettingsPage() {
             </Card>
           )}
 
-          {/* All Branches Public URLs (Super Admin Only) */}
-          {isSuperAdmin && branches.length > 0 && (
+                {/* All Branches Public URLs (Super Admin Only) */}
+                {isSuperAdmin && branches.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -967,10 +997,10 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+                )}
 
-          {/* Company-level URL (Fallback) */}
-          {!currentBranch && companyPublicUrl && (
+                {/* Company-level URL (Fallback) */}
+                {!currentBranch && companyPublicUrl && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1020,10 +1050,10 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+                )}
 
-          {/* Company Logo Upload */}
-          <Card>
+                {/* Company Logo Upload */}
+                <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <PhotoIcon className="w-5 h-5" />
@@ -2052,6 +2082,222 @@ export default function SettingsPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Custom Domain Tab */}
+      {activeTab === 'custom-domain' && (
+        <CustomDomainSection companyId={companyId} />
+      )}
+    </div>
+  );
+}
+
+// Custom Domain Component - defined after main component
+function CustomDomainSection({ companyId }: { companyId: string }) {
+  const { data: domainInfo, refetch: refetchDomainInfo } = useGetCustomDomainInfoQuery(companyId, {
+    skip: !companyId,
+  });
+  const [addDomain, { isLoading: isAdding }] = useAddCustomDomainMutation();
+  const [verifyDomain, { isLoading: isVerifying }] = useVerifyCustomDomainMutation();
+  const [removeDomain, { isLoading: isRemoving }] = useRemoveCustomDomainMutation();
+  const [domainInput, setDomainInput] = useState('');
+  const [verificationToken, setVerificationToken] = useState('');
+
+  const handleAddDomain = async () => {
+    if (!domainInput.trim()) {
+      toast.error('Please enter a domain');
+      return;
+    }
+
+    try {
+      await addDomain({ companyId, domain: domainInput.trim() }).unwrap();
+      toast.success('Domain added! Please verify it by adding the DNS record.');
+      setDomainInput('');
+      refetchDomainInfo();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to add domain');
+    }
+  };
+
+  const handleVerifyDomain = async () => {
+    if (!verificationToken.trim()) {
+      toast.error('Please enter the verification token');
+      return;
+    }
+
+    try {
+      await verifyDomain({ companyId, token: verificationToken.trim() }).unwrap();
+      toast.success('Domain verified successfully!');
+      setVerificationToken('');
+      refetchDomainInfo();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to verify domain');
+    }
+  };
+
+  const handleRemoveDomain = async () => {
+    if (!confirm('Are you sure you want to remove this custom domain?')) {
+      return;
+    }
+
+    try {
+      await removeDomain(companyId).unwrap();
+      toast.success('Custom domain removed');
+      refetchDomainInfo();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to remove domain');
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard!');
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GlobeAltIcon className="w-5 h-5" />
+            Custom Domain
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>What is a custom domain?</strong>
+            </p>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
+              A custom domain allows you to use your own domain name (e.g., app.yourrestaurant.com) instead of the default subdomain. 
+              This feature requires a premium or enterprise subscription plan.
+            </p>
+          </div>
+
+          {domainInfo?.domain ? (
+            <div className="space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Domain</span>
+                  {domainInfo.verified ? (
+                    <Badge className="bg-green-500 text-white">Verified</Badge>
+                  ) : (
+                    <Badge className="bg-yellow-500 text-white">Pending Verification</Badge>
+                  )}
+                </div>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">{domainInfo.domain}</p>
+                {domainInfo.verifiedAt && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Verified on {new Date(domainInfo.verifiedAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+
+              {!domainInfo.verified && domainInfo.dnsInstructions && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-3">
+                    DNS Verification Required
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-4">
+                    To verify ownership of your domain, add the following TXT record to your DNS settings:
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded p-3 border border-yellow-200 dark:border-yellow-700">
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Record Type</p>
+                        <p className="text-sm font-mono text-gray-900 dark:text-white">{domainInfo.dnsInstructions.recordType}</p>
+                      </div>
+                      <div className="flex-1 mx-4">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Record Name</p>
+                        <p className="text-sm font-mono text-gray-900 dark:text-white">{domainInfo.dnsInstructions.recordName}</p>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Record Value</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-mono text-gray-900 dark:text-white break-all">{domainInfo.dnsInstructions.recordValue}</p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copyToClipboard(domainInfo.dnsInstructions!.recordValue)}
+                            className="flex-shrink-0"
+                          >
+                            <ClipboardDocumentIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-4">
+                    After adding the DNS record, wait a few minutes for DNS propagation, then click "Verify Domain" below.
+                  </p>
+                </div>
+              )}
+
+              {!domainInfo.verified && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Verification Token
+                    </label>
+                    <Input
+                      type="text"
+                      value={verificationToken}
+                      onChange={(e) => setVerificationToken(e.target.value)}
+                      placeholder="Enter verification token from DNS TXT record"
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Copy the token from the DNS TXT record you added
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleVerifyDomain}
+                    isLoading={isVerifying}
+                    className="w-full"
+                  >
+                    Verify Domain
+                  </Button>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="secondary"
+                  onClick={handleRemoveDomain}
+                  isLoading={isRemoving}
+                  className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  Remove Custom Domain
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Domain Name
+                </label>
+                <Input
+                  type="text"
+                  value={domainInput}
+                  onChange={(e) => setDomainInput(e.target.value)}
+                  placeholder="app.yourrestaurant.com"
+                  className="font-mono"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Enter your custom domain (e.g., app.example.com)
+                </p>
+              </div>
+              <Button
+                onClick={handleAddDomain}
+                isLoading={isAdding}
+                className="w-full"
+              >
+                Add Custom Domain
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

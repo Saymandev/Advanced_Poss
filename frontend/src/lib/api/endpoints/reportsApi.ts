@@ -134,7 +134,9 @@ export const reportsApi = apiSlice.injectEndpoints({
         const queryParams: any = {};
         if (params.period) queryParams.period = params.period;
         if (params.branchId) queryParams.branchId = params.branchId;
-        // Note: startDate and endDate are calculated on backend based on period
+        // Send startDate and endDate if provided (frontend calculates them)
+        if (params.startDate) queryParams.startDate = params.startDate;
+        if (params.endDate) queryParams.endDate = params.endDate;
         return {
           url: '/reports/sales-analytics',
           params: queryParams,
@@ -142,14 +144,112 @@ export const reportsApi = apiSlice.injectEndpoints({
       },
       providesTags: ['Report'],
       transformResponse: (response: any) => {
-        const data = response.data || response;
+        // RTK Query's transformResponse receives result.data from baseQueryWithReauth
+        // After decryptIfNeeded, result.data is the HTTP response body
+        // TransformInterceptor wraps as: { success: true, data: <actual response>, timestamp: ... }
+        // The actual response from backend is: { period, data: [...], summary: { totalRevenue, totalOrders, averageOrderValue } }
+        
+        // Debug: Log the raw response structure
+        console.log('📊 Frontend Transform - Raw Response:', {
+          isArray: Array.isArray(response),
+          type: typeof response,
+          keys: response && typeof response === 'object' && !Array.isArray(response) 
+            ? Object.keys(response).slice(0, 10) 
+            : [],
+          hasSuccess: response?.success,
+          hasData: !!response?.data,
+          hasPeriod: !!response?.period,
+          hasSummary: !!response?.summary,
+        });
+        
+        // If response is an array, something went wrong
+        if (Array.isArray(response)) {
+          console.error('❌ Response is an array, expected object');
+          return {
+            period: 'week',
+            totalSales: 0,
+            totalOrders: 0,
+            averageOrderValue: 0,
+            salesByDay: [],
+            salesByCategory: [],
+            salesByHour: [],
+          };
+        }
+        
+        // Extract the actual data from TransformInterceptor wrapper
+        let actualData = response;
+        
+        // IMPORTANT: Check for period/summary FIRST to avoid extracting the array
+        // If response already has period/summary, it's already the data object
+        if (response && typeof response === 'object' && !Array.isArray(response) && 
+            ('period' in response || 'summary' in response)) {
+          // Already the actual data object: { period, data: [...], summary: {...} }
+          actualData = response;
+          console.log('📊 Response is already the data object (has period/summary)');
+        }
+        // Check if response has TransformInterceptor structure: { success: true, data: {...}, timestamp: ... }
+        else if (response && typeof response === 'object' && !Array.isArray(response) && 
+                 'success' in response && 'data' in response) {
+          // TransformInterceptor format: extract the inner data
+          actualData = response.data;
+          console.log('📊 Extracted from TransformInterceptor wrapper');
+        }
+        // Check if response has a data property but no success and no period/summary
+        else if (response && typeof response === 'object' && !Array.isArray(response) && 
+                 'data' in response && !('period' in response) && !('summary' in response)) {
+          // Might be partially unwrapped, but only extract if it's not already the data object
+          const extracted = response.data;
+          // Only use extracted if it has period/summary (is the actual data object)
+          if (extracted && typeof extracted === 'object' && !Array.isArray(extracted) &&
+              ('period' in extracted || 'summary' in extracted)) {
+            actualData = extracted;
+            console.log('📊 Extracted from data property (has period/summary)');
+          } else {
+            // Keep original response if extracted doesn't have the structure we need
+            actualData = response;
+            console.log('📊 Kept original response (extracted data is not the right structure)');
+          }
+        }
+        
+        // Debug logging
+        console.log('📊 Frontend Transform - Extracted Data:', {
+          actualDataType: typeof actualData,
+          isArray: Array.isArray(actualData),
+          actualDataKeys: actualData && typeof actualData === 'object' && !Array.isArray(actualData) 
+            ? Object.keys(actualData) 
+            : [],
+          hasSummary: !!actualData?.summary,
+          period: actualData?.period,
+          summary: actualData?.summary,
+          dataIsArray: Array.isArray(actualData?.data),
+          dataLength: actualData?.data?.length,
+        });
+        
+        // Validate structure
+        if (Array.isArray(actualData) || !actualData || typeof actualData !== 'object') {
+          console.error('❌ Invalid response structure after extraction:', {
+            isArray: Array.isArray(actualData),
+            type: typeof actualData,
+            value: actualData,
+          });
+          return {
+            period: 'week',
+            totalSales: 0,
+            totalOrders: 0,
+            averageOrderValue: 0,
+            salesByDay: [],
+            salesByCategory: [],
+            salesByHour: [],
+          };
+        }
+        
         // Backend returns: { period, data: [...], summary: { totalRevenue, totalOrders, averageOrderValue } }
-        return {
-          period: data.period || 'week',
-          totalSales: data.summary?.totalRevenue || 0,
-          totalOrders: data.summary?.totalOrders || 0,
-          averageOrderValue: data.summary?.averageOrderValue || 0,
-          salesByDay: (data.data || []).map((item: any) => ({
+        const transformed = {
+          period: actualData.period || 'week',
+          totalSales: actualData.summary?.totalRevenue ?? 0,
+          totalOrders: actualData.summary?.totalOrders ?? 0,
+          averageOrderValue: actualData.summary?.averageOrderValue ?? 0,
+          salesByDay: (actualData.data || []).map((item: any) => ({
             day: item.date || item.day || '',
             sales: item.revenue || item.sales || 0,
             orders: item.orders || 0,
@@ -157,25 +257,80 @@ export const reportsApi = apiSlice.injectEndpoints({
           salesByCategory: [], // Will be fetched separately
           salesByHour: [], // Will be fetched separately
         };
+        
+        console.log('📊 Frontend Transform - Final Result:', {
+          totalSales: transformed.totalSales,
+          totalOrders: transformed.totalOrders,
+          averageOrderValue: transformed.averageOrderValue,
+          salesByDayLength: transformed.salesByDay.length,
+          period: transformed.period,
+        });
+        
+        return transformed;
       },
     }),
     getRevenueByCategory: builder.query<Array<{
       category: string;
       sales: number;
       percentage: number;
-    }>, { branchId?: string }>({
-      query: (params) => ({
-        url: '/reports/revenue-by-category',
-        params,
-      }),
+    }>, { branchId?: string; startDate?: string; endDate?: string }>({
+      query: (params) => {
+        const queryParams: any = {};
+        if (params.branchId) queryParams.branchId = params.branchId;
+        if (params.startDate) queryParams.startDate = params.startDate;
+        if (params.endDate) queryParams.endDate = params.endDate;
+        return {
+          url: '/reports/revenue-by-category',
+          params: queryParams,
+        };
+      },
       providesTags: ['Report'],
       transformResponse: (response: any) => {
-        const data = response.data || response;
-        return (Array.isArray(data) ? data : []).map((item: any) => ({
-          category: item.categoryId || item.category || 'Unknown',
-          sales: item.revenue || item.sales || 0,
-          percentage: item.percentage || 0,
-        }));
+        // Handle TransformInterceptor wrapper: { success: true, data: [...], timestamp: ... }
+        let data = response;
+        
+        if (response && typeof response === 'object' && !Array.isArray(response)) {
+          if ('success' in response && 'data' in response) {
+            // TransformInterceptor format
+            data = response.data;
+          } else if ('data' in response && Array.isArray(response.data)) {
+            // Might just have data property
+            data = response.data;
+          }
+        }
+        
+        // Ensure data is an array
+        if (!Array.isArray(data)) {
+          console.warn('⚠️ getRevenueByCategory: Expected array, got:', typeof data, data);
+          return [];
+        }
+        
+        console.log('📊 getRevenueByCategory - Transformed:', {
+          count: data.length,
+          categories: data.map((item: any) => ({
+            category: item.categoryId || item.category || 'Unknown',
+            sales: item.revenue || item.sales || 0,
+          })),
+        });
+        
+        const transformed = data.map((item: any) => {
+          // Backend returns: { categoryId, category, sales, revenue, percentage }
+          const result = {
+            category: item.category || item.categoryId || 'Unknown',
+            categoryId: item.categoryId,
+            sales: item.sales || item.revenue || 0,
+            revenue: item.revenue || item.sales || 0,
+            percentage: item.percentage || 0,
+          };
+          return result;
+        });
+        
+        console.log('📊 getRevenueByCategory - Final Transformed:', {
+          count: transformed.length,
+          items: transformed,
+        });
+        
+        return transformed;
       },
     }),
     getPeakHours: builder.query<{
@@ -296,6 +451,31 @@ export const reportsApi = apiSlice.injectEndpoints({
         return response.data || response;
       },
     }),
+    getWastageReport: builder.query<any, { branchId?: string; companyId?: string; startDate?: string; endDate?: string }>({
+      query: ({ branchId, companyId, startDate, endDate }) => {
+        const params = new URLSearchParams();
+        if (branchId) params.append('branchId', branchId);
+        if (companyId) params.append('companyId', companyId);
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        return {
+          url: `/reports/wastage?${params.toString()}`,
+          method: 'GET',
+        };
+      },
+      providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        let data = response;
+        if (response && typeof response === 'object' && !Array.isArray(response)) {
+          if ('success' in response && 'data' in response) {
+            data = response.data;
+          } else if ('data' in response && typeof response.data === 'object') {
+            data = response.data;
+          }
+        }
+        return data;
+      },
+    }),
   }),
 });
 
@@ -309,5 +489,6 @@ export const {
   useGetRevenueByCategoryQuery,
   useGetPeakHoursQuery,
   useGetDueSettlementsQuery,
+  useGetWastageReportQuery,
   useExportReportMutation,
 } = reportsApi;

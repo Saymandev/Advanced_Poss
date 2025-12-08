@@ -56,6 +56,7 @@ export interface PublicStats {
   totalUsers: number;
   averageRating: number;
   totalFeedback: number;
+  totalCustomers: number;
 }
 
 export const systemFeedbackApi = apiSlice.injectEndpoints({

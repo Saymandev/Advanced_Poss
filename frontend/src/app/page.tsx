@@ -204,10 +204,12 @@ export default function LandingPage() {
                 <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">
                   {isLoadingStats ? (
                     <span className="inline-block w-16 h-10 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></span>
-                  ) : statsData?.totalCompanies ? (
-                    `${(statsData.totalCompanies / 1000).toFixed(1)}K+`
+                  ) : statsData?.activeCompanies ? (
+                    statsData.activeCompanies >= 1000
+                      ? `${(statsData.activeCompanies / 1000).toFixed(1)}K+`
+                      : `${statsData.activeCompanies}+`
                   ) : (
-                    '10K+'
+                    '0+'
                   )}
                 </div>
                 <div className="text-gray-600 dark:text-gray-300">Active Restaurants</div>
@@ -228,10 +230,12 @@ export default function LandingPage() {
                 <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">
                   {isLoadingStats ? (
                     <span className="inline-block w-16 h-10 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></span>
-                  ) : statsData?.totalFeedback ? (
-                    `${(statsData.totalFeedback / 1000).toFixed(1)}K+`
+                  ) : statsData?.totalCustomers ? (
+                    statsData.totalCustomers >= 1000
+                      ? `${(statsData.totalCustomers / 1000).toFixed(1)}K+`
+                      : `${statsData.totalCustomers}+`
                   ) : (
-                    '5K+'
+                    '0+'
                   )}
                 </div>
                 <div className="text-gray-600 dark:text-gray-300">Happy Customers</div>
@@ -303,31 +307,11 @@ export default function LandingPage() {
               {activePlans.map((plan: any, index: number) => {
                 const isPopular = plan.isPopular || index === 1;
                 
-                // Use admin-managed featureList if available, otherwise generate from features
-                let featureList: string[] = [];
-                
-                if (plan.featureList && plan.featureList.length > 0) {
-                  // Use backend-managed feature list
-                  featureList = plan.featureList;
-                } else {
-                  // Fallback: Generate from plan.features (for backward compatibility)
-                  if (plan.features?.pos) featureList.push('Unlimited orders & access accounts');
-                  if (plan.features?.accounting) featureList.push('Realtime restaurant sales status');
-                  if (plan.features?.inventory) featureList.push('Stock, Inventory & Accounting');
-                  if (plan.features?.crm) featureList.push('Customer Loyalty & Discount');
-                  featureList.push('Daily SMS & Email sales report');
-                  if (plan.features?.multiBranch) featureList.push('Kitchen & Customer Display System');
-                  featureList.push('Mobile, Tablet and any OS friendly');
-                  featureList.push('Cloud data backup & security');
-                  if (plan.features?.aiInsights) featureList.push('AI Insight and analytics');
-                  if (index === 1 && plan.features?.multiBranch) {
-                    featureList.push('Online Ordering');
-                    featureList.push('Table Touch QR Ordering');
-                    featureList.push('Customer Feedback System');
-                    featureList.push('Target SMS marketing');
-                    featureList.push('Priority 24/7 Call & Agent Support');
-                  }
-                }
+                // Use admin-managed featureList from backend (fully dynamic - no hardcoding)
+                // Super admin can manage this via subscription plan management
+                const featureList: string[] = plan.featureList && plan.featureList.length > 0 
+                  ? plan.featureList 
+                  : []; // Empty array if no features configured (super admin should configure via backend)
                 
                 return (
                   <div

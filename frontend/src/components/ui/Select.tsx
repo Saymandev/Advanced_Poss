@@ -9,7 +9,7 @@ interface SelectOption {
 }
 
 interface SelectProps {
-  options: SelectOption[];
+  options?: SelectOption[];
   value?: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -30,6 +30,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     disabled,
     className 
   }, ref) => {
+    const safeOptions = options || [];
     return (
       <div className="w-full">
         {label && (
@@ -58,7 +59,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 {placeholder}
               </option>
             )}
-            {options.map((option) => (
+            {safeOptions.map((option) => (
               <option
                 key={option.value}
                 value={option.value}
@@ -81,8 +82,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 Select.displayName = 'Select';
 
 interface MultiSelectProps {
-  options: SelectOption[];
-  values: string[];
+  options?: SelectOption[];
+  values?: string[];
   onChange: (values: string[]) => void;
   placeholder?: string;
   label?: string;
@@ -101,11 +102,13 @@ export function MultiSelect({
   disabled,
   className
 }: MultiSelectProps) {
+  const safeOptions = options || [];
+  const safeValues = values || [];
   const handleToggle = (value: string) => {
-    if (values.includes(value)) {
-      onChange(values.filter(v => v !== value));
+    if (safeValues.includes(value)) {
+      onChange(safeValues.filter(v => v !== value));
     } else {
-      onChange([...values, value]);
+      onChange([...safeValues, value]);
     }
   };
 
@@ -122,12 +125,12 @@ export function MultiSelect({
         disabled && 'opacity-50 cursor-not-allowed',
         className
       )}>
-        {values.length === 0 && placeholder && (
+        {safeValues.length === 0 && placeholder && (
           <p className="text-gray-500 dark:text-gray-400 text-sm">{placeholder}</p>
         )}
         <div className="flex flex-wrap gap-2">
-          {values.map((value) => {
-            const option = options.find(opt => opt.value === value);
+          {safeValues.map((value) => {
+            const option = safeOptions.find(opt => opt.value === value);
             return (
               <span
                 key={value}
@@ -146,14 +149,14 @@ export function MultiSelect({
           })}
         </div>
         <div className="mt-2 space-y-1">
-          {options.map((option) => (
+          {safeOptions.map((option) => (
             <label
               key={option.value}
               className="flex items-center space-x-2 text-sm"
             >
               <input
                 type="checkbox"
-                checked={values.includes(option.value)}
+                checked={safeValues.includes(option.value)}
                 onChange={() => handleToggle(option.value)}
                 disabled={disabled || option.disabled}
                 className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"

@@ -355,6 +355,12 @@ export default function OrdersPage() {
 
   const getOrderReviewURL = (order: Order): string => {
     // Link to customer review page using order ID
+    // Check if company has custom domain
+    const company = (companyContext as any)?.company;
+    if (company?.customDomain && company?.domainVerified) {
+      return `https://${company.customDomain}/display/customerreview/${order.id}`;
+    }
+    // Fallback to base URL
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     return `${baseUrl}/display/customerreview/${order.id}`;
   };
@@ -380,6 +386,15 @@ export default function OrdersPage() {
               font-size: 12px;
               margin: 0;
               padding: 10px;
+              max-width: 80mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+            }
+            .container {
+              width: 100%;
               max-width: 80mm;
             }
             .header {
@@ -452,6 +467,7 @@ export default function OrdersPage() {
           </style>
         </head>
         <body>
+          <div class="container">
           <div class="header">
             <h1>KITCHEN ORDER TICKET</h1>
             <h2>Token #${order.orderNumber.split('-').pop() || order.orderNumber}</h2>
@@ -500,18 +516,34 @@ export default function OrdersPage() {
           </div>
 
           <div class="total">
-            <div class="total-row">
-              <span>Subtotal:</span>
-              <span>${formatCurrency(order.total - order.tax - (order.total * 0.05))}</span>
-            </div>
-            <div class="total-row">
-              <span>SC (5%):</span>
-              <span>${formatCurrency((order.total - order.tax) * 0.05)}</span>
-            </div>
-            <div class="total-row">
-              <span>Tax:</span>
-              <span>${formatCurrency(order.tax)}</span>
-            </div>
+            ${(() => {
+              // Calculate subtotal from items
+              const subtotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+              // Calculate service charge backwards: Total = Subtotal + ServiceCharge + Tax
+              // So: ServiceCharge = Total - Subtotal - Tax
+              const serviceCharge = Math.max(0, order.total - subtotal - (order.tax || 0));
+              // Calculate service charge rate for display
+              const serviceChargeRate = subtotal > 0 ? Math.round((serviceCharge / subtotal) * 100) : 0;
+              // Tax is already provided in order.tax
+              return `
+                <div class="total-row">
+                  <span>Subtotal:</span>
+                  <span>${formatCurrency(subtotal)}</span>
+                </div>
+                ${serviceCharge > 0 ? `
+                <div class="total-row">
+                  <span>SC (${serviceChargeRate}%):</span>
+                  <span>${formatCurrency(serviceCharge)}</span>
+                </div>
+                ` : ''}
+                ${(order.tax || 0) > 0 ? `
+                <div class="total-row">
+                  <span>Tax:</span>
+                  <span>${formatCurrency(order.tax)}</span>
+                </div>
+                ` : ''}
+              `;
+            })()}
             ${order.tip ? `
             <div class="total-row">
               <span>Tip:</span>
@@ -533,6 +565,7 @@ export default function OrdersPage() {
           <div class="footer">
             <div>${new Date(order.createdAt).toLocaleString()}</div>
             <div style="margin-top: 5px;">Thank you!</div>
+          </div>
           </div>
         </body>
       </html>
@@ -1087,15 +1120,22 @@ export default function OrdersPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(selectedOrder.total - selectedOrder.tax - (selectedOrder.total * 0.05))}
+                      {formatCurrency(selectedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0))}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">SC 5%:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency((selectedOrder.total - selectedOrder.tax) * 0.05)}
-                    </span>
-                  </div>
+                  {(() => {
+                    const subtotal = selectedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    const serviceCharge = Math.max(0, selectedOrder.total - subtotal - (selectedOrder.tax || 0));
+                    const serviceChargeRate = subtotal > 0 ? Math.round((serviceCharge / subtotal) * 100) : 0;
+                    return serviceCharge > 0 ? (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">SC ({serviceChargeRate}%):</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(serviceCharge)}
+                        </span>
+                      </div>
+                    ) : null;
+                  })()}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">VAT 5%:</span>
                     <span className="font-medium text-gray-900 dark:text-white">

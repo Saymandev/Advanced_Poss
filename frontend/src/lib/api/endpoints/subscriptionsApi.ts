@@ -27,6 +27,19 @@ export interface SubscriptionPlan {
     storageGB: number;
     maxTables?: number;
     maxMenuItems?: number;
+    maxOrders?: number;
+    maxCustomers?: number;
+    // Public ordering system
+    publicOrderingEnabled?: boolean;
+    maxPublicBranches?: number;
+    // Review system
+    reviewsEnabled?: boolean;
+    reviewModerationRequired?: boolean;
+    maxReviewsPerMonth?: number;
+    // Custom domain and whitelabel
+    whitelabelEnabled?: boolean;
+    customDomainEnabled?: boolean;
+    prioritySupportEnabled?: boolean;
   };
   isActive: boolean;
   isPopular?: boolean;
@@ -265,7 +278,8 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: ['Subscription'],
+      // Invalidate both subscription and company so UI refreshes plan immediately
+      invalidatesTags: ['Subscription', 'Company'],
     }),
     cancelSubscription: builder.mutation<Subscription, { 
       id: string; 

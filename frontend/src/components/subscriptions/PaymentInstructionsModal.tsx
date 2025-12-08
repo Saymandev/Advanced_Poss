@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { CopyIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ClipboardDocumentIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -112,7 +112,7 @@ export function PaymentInstructionsModal({
                   </>
                 ) : (
                   <>
-                    <CopyIcon className="w-4 h-4" />
+                    <ClipboardDocumentIcon className="w-4 h-4" />
                     Copy
                   </>
                 )}
@@ -154,7 +154,7 @@ export function PaymentInstructionsModal({
                   </>
                 ) : (
                   <>
-                    <CopyIcon className="w-4 h-4" />
+                    <ClipboardDocumentIcon className="w-4 h-4" />
                     Copy
                   </>
                 )}

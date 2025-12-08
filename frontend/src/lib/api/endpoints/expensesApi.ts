@@ -254,11 +254,19 @@ export const expensesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Expense'],
     }),
-    approveExpense: builder.mutation<Expense, { id: string; approved: boolean; notes?: string }>({
-      query: ({ id, ...data }) => ({
+    approveExpense: builder.mutation<Expense, { id: string; approverId?: string }>({
+      query: ({ id, approverId }) => ({
         url: `/expenses/${id}/approve`,
-        method: 'PATCH',
-        body: data,
+        method: 'POST',
+        body: approverId ? { approverId } : {},
+      }),
+      invalidatesTags: ['Expense'],
+    }),
+    rejectExpense: builder.mutation<Expense, { id: string; approverId?: string; reason?: string }>({
+      query: ({ id, approverId, reason }) => ({
+        url: `/expenses/${id}/reject`,
+        method: 'POST',
+        body: { ...(approverId && { approverId }), ...(reason && { reason }) },
       }),
       invalidatesTags: ['Expense'],
     }),
@@ -295,6 +303,7 @@ export const {
   useUpdateExpenseMutation,
   useDeleteExpenseMutation,
   useApproveExpenseMutation,
+  useRejectExpenseMutation,
   useGetExpenseSummaryQuery,
   useUploadReceiptMutation,
 } = expensesApi;

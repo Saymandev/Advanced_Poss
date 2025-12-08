@@ -10,6 +10,7 @@ import {
   useGetCompanyRolePermissionsQuery,
   useUpdateCompanyRolePermissionMutation,
 } from '@/lib/api/endpoints/rolePermissionsApi';
+import { useGetAvailableFeaturesQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import {
@@ -19,46 +20,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
-// Import features list - must match role-access page
-const features = [
-  { id: 'dashboard', name: 'Dashboard', category: 'Overview' },
-  { id: 'reports', name: 'Reports', category: 'Overview' },
-  { id: 'staff-management', name: 'Staff Management', category: 'Staff' },
-  { id: 'role-management', name: 'Role Management', category: 'Staff' },
-  { id: 'attendance', name: 'Attendance', category: 'Staff' },
-  { id: 'menu-management', name: 'Menu Management', category: 'Menu' },
-  { id: 'categories', name: 'Categories', category: 'Menu' },
-  { id: 'qr-menus', name: 'QR Menus', category: 'Menu' },
-  // Orders & Tables
-  { id: 'order-management', name: 'Order Management', category: 'Orders' },
-  { id: 'delivery-management', name: 'Delivery Management', category: 'Orders' },
-  { id: 'table-management', name: 'Table Management', category: 'Orders' },
-  { id: 'kitchen-display', name: 'Kitchen Display', category: 'Orders' },
-  { id: 'customer-display', name: 'Customer Display', category: 'Orders' },
-  { id: 'pos-settings', name: 'POS Settings', category: 'Orders' },
-  { id: 'printer-management', name: 'Printer Management', category: 'Orders' },
-  { id: 'digital-receipts', name: 'Digital Receipts', category: 'Orders' },
-  // Customers
-  { id: 'customer-management', name: 'Customer Management', category: 'Customers' },
-  { id: 'loyalty-program', name: 'Loyalty Program', category: 'Customers' },
-  { id: 'marketing', name: 'Marketing', category: 'Customers' },
-  // AI Features
-  { id: 'ai-menu-optimization', name: 'AI Menu Optimization', category: 'AI Features' },
-  { id: 'ai-customer-loyalty', name: 'Customer Loyalty AI', category: 'AI Features' },
-  // Inventory
-  { id: 'inventory', name: 'Inventory Management', category: 'Inventory' },
-  { id: 'suppliers', name: 'Supplier Management', category: 'Inventory' },
-  { id: 'purchase-orders', name: 'Purchase Orders', category: 'Inventory' },
-  // Financial
-  { id: 'expenses', name: 'Expense Management', category: 'Financial' },
-  { id: 'accounting', name: 'Accounting', category: 'Financial' },
-  { id: 'work-periods', name: 'Work Periods', category: 'Financial' },
-  // System
-  { id: 'settings', name: 'Settings', category: 'System' },
-  { id: 'branches', name: 'Branch Management', category: 'System' },
-  { id: 'notifications', name: 'Notifications', category: 'System' },
-];
 
 type CompanyRole = 'owner' | 'manager' | 'chef' | 'waiter' | 'cashier';
 
@@ -83,6 +44,20 @@ export default function CompanyFeaturesPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<CompanyRole>('owner');
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
+
+  // Dynamic features from backend (single source of truth)
+  const { data: availableFeaturesData, isLoading: isLoadingFeatures } = useGetAvailableFeaturesQuery(undefined, {
+    skip: !user || user.role !== UserRole.SUPER_ADMIN,
+  });
+
+  const features = useMemo(() => {
+    const categories = availableFeaturesData?.data?.featuresByCategory || {};
+    const flattened: { id: string; name: string; category: string }[] = [];
+    Object.entries(categories).forEach(([category, feats]) => {
+      (feats as any[]).forEach((f) => flattened.push({ id: f.key, name: f.name, category }));
+    });
+    return flattened;
+  }, [availableFeaturesData]);
 
   const { data: companiesData } = useGetCompaniesQuery({});
   const companies = useMemo(() => {
@@ -142,20 +117,25 @@ export default function CompanyFeaturesPage() {
   };
 
   const featuresByCategory = useMemo(() => {
-    const grouped: Record<string, typeof features> = {};
-    features.forEach((feature) => {
-      if (!grouped[feature.category]) {
-        grouped[feature.category] = [];
-      }
-      grouped[feature.category].push(feature);
-    });
-    return grouped;
-  }, []);
+    return features.reduce((acc: Record<string, typeof features>, feature) => {
+      if (!acc[feature.category]) acc[feature.category] = [];
+      acc[feature.category].push(feature);
+      return acc;
+    }, {});
+  }, [features]);
 
   // const currentRolePermission = useMemo(() => {
   //   if (!rolePermissionsData || rolePermissionsData.length === 0) return null;
   //   return rolePermissionsData.find((p: RolePermission) => p.role === selectedRole) || null;
   // }, [rolePermissionsData, selectedRole]);
+
+  if (isLoadingFeatures) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600 dark:text-gray-400">Loading features...</p>
+      </div>
+    );
+  }
 
   if (!user || user.role !== UserRole.SUPER_ADMIN) {
     return (

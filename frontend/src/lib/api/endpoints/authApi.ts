@@ -173,7 +173,7 @@ export const authApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Auth', 'User'],
     }),
-    disable2FA: builder.mutation<{ message: string }, { password: string }>({
+    disable2FA: builder.mutation<{ message: string }, { password?: string; pin?: string }>({
       query: (data) => ({
         url: '/auth/2fa/disable',
         method: 'POST',

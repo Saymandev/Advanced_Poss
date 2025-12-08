@@ -3,46 +3,47 @@
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-    useExportReportMutation,
-    useGetDashboardQuery,
-    useGetDueSettlementsQuery,
-    useGetPeakHoursQuery,
-    useGetRevenueByCategoryQuery,
-    useGetSalesAnalyticsQuery,
-    useGetTopSellingItemsQuery
+  useExportReportMutation,
+  useGetDashboardQuery,
+  useGetDueSettlementsQuery,
+  useGetPeakHoursQuery,
+  useGetRevenueByCategoryQuery,
+  useGetSalesAnalyticsQuery,
+  useGetTopSellingItemsQuery,
+  useGetWastageReportQuery,
 } from '@/lib/api/endpoints/reportsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-    ArrowPathIcon,
-    ArrowTrendingDownIcon,
-    ArrowTrendingUpIcon,
-    CakeIcon,
-    ChartBarIcon,
-    ClockIcon,
-    CurrencyDollarIcon,
-    ExclamationTriangleIcon,
-    ShoppingCartIcon,
-    TrashIcon,
-    UsersIcon,
+  ArrowPathIcon,
+  ArrowTrendingDownIcon,
+  ArrowTrendingUpIcon,
+  CakeIcon,
+  ChartBarIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  ExclamationTriangleIcon,
+  ShoppingCartIcon,
+  TrashIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Line,
-    LineChart,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
 } from 'recharts';
 
 const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
@@ -77,28 +78,57 @@ export default function ReportsPage() {
   // Calculate date ranges based on period
   const { startDate, endDate } = useMemo(() => {
     const now = new Date();
-    const end = new Date(now);
+    let end = new Date(now);
     let start = new Date(now);
 
     switch (selectedPeriod) {
       case 'day':
+        // For 'day', only show today's data (use local date, not UTC)
+        // Create date in local timezone to avoid timezone conversion issues
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        start = new Date(today);
         start.setHours(0, 0, 0, 0);
+        end = new Date(today);
         end.setHours(23, 59, 59, 999);
         break;
       case 'week':
         start.setDate(now.getDate() - 7);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
         break;
       case 'month':
         start = new Date(now.getFullYear(), now.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
         break;
       case 'year':
         start = new Date(now.getFullYear(), 0, 1);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
         break;
     }
 
+    // Format dates to ensure the date part is correct regardless of timezone
+    // Use UTC date components to create the date string, so the date part matches the user's local date
+    const formatDateForAPI = (date: Date) => {
+      // Get the local date components (what the user sees)
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const day = date.getDate();
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const seconds = date.getSeconds();
+      const ms = date.getMilliseconds();
+      
+      // Create a new Date using UTC components but with the same date values
+      // This ensures the date part (YYYY-MM-DD) in the ISO string matches the local date
+      const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds, ms));
+      return utcDate.toISOString();
+    };
+
     return {
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
+      startDate: formatDateForAPI(start),
+      endDate: formatDateForAPI(end),
     };
   }, [selectedPeriod]);
 
@@ -130,6 +160,21 @@ export default function ReportsPage() {
     refetchOnMountOrArgChange: true,
   });
 
+  // Debug logging for sales analytics
+  useEffect(() => {
+    if (salesAnalytics) {
+      console.log('📊 Frontend - Sales Analytics Data:', {
+        totalSales: salesAnalytics.totalSales,
+        totalOrders: salesAnalytics.totalOrders,
+        averageOrderValue: salesAnalytics.averageOrderValue,
+        salesByDayLength: salesAnalytics.salesByDay?.length,
+        period: salesAnalytics.period,
+        selectedPeriod,
+      });
+    }
+  }, [salesAnalytics, selectedPeriod]);
+
+
   const { 
     data: topSellingItems, 
     isLoading: isLoadingTopItems,
@@ -150,10 +195,25 @@ export default function ReportsPage() {
     refetch: refetchCategory
   } = useGetRevenueByCategoryQuery({
     branchId: branchId || undefined,
+    startDate,
+    endDate,
   }, { 
     skip: !branchId && !companyId,
     refetchOnMountOrArgChange: true,
   });
+
+  // Debug logging for category data
+  useEffect(() => {
+    console.log('📊 Frontend - Revenue By Category Query:', {
+      revenueByCategory,
+      isLoadingCategory,
+      categoryError,
+      branchId,
+      startDate,
+      endDate,
+      selectedPeriod,
+    });
+  }, [revenueByCategory, isLoadingCategory, categoryError, branchId, startDate, endDate, selectedPeriod]);
 
   const { 
     data: peakHoursData, 
@@ -166,6 +226,21 @@ export default function ReportsPage() {
     endDate,
   }, { 
     skip: !branchId || !startDate || !endDate,
+    refetchOnMountOrArgChange: true,
+  });
+
+  const { 
+    data: wastageReport, 
+    isLoading: isLoadingWastage,
+    error: wastageError,
+    refetch: refetchWastage
+  } = useGetWastageReportQuery({
+    branchId: branchId || undefined,
+    companyId: companyId || undefined,
+    startDate,
+    endDate,
+  }, { 
+    skip: (!companyId && !branchId) || activeReport !== 'wastage',
     refetchOnMountOrArgChange: true,
   });
 
@@ -186,12 +261,58 @@ export default function ReportsPage() {
 
   // Transform real API data for charts (memoized to prevent re-renders)
   const salesData = useMemo(() => {
-    return salesAnalytics?.salesByDay?.map((item: any) => ({
-      name: new Date(item.day || item.date).toLocaleDateString('en-US', { weekday: 'short' }) || 'N/A',
-      sales: item.sales || 0,
-      orders: item.orders || 0,
-    })) || [];
-  }, [salesAnalytics?.salesByDay]);
+    if (!salesAnalytics?.salesByDay || !Array.isArray(salesAnalytics.salesByDay) || salesAnalytics.salesByDay.length === 0) {
+      return [];
+    }
+    
+    // Filter out days with no sales for better chart display (especially for year period)
+    const filtered = salesAnalytics.salesByDay.filter((item: any) => {
+      const sales = Number(item.sales) || 0;
+      const orders = Number(item.orders) || 0;
+      return sales > 0 || orders > 0;
+    });
+    
+    // If filtering removed all data, show all data anyway (for debugging)
+    const dataToUse = filtered.length > 0 ? filtered : salesAnalytics.salesByDay;
+    
+    return dataToUse.map((item: any) => {
+      // Handle different date formats
+      const dateStr = item.day || item.date || '';
+      let date: Date;
+      
+      if (dateStr) {
+        try {
+          date = new Date(dateStr);
+          if (isNaN(date.getTime())) {
+            // Try parsing as ISO string or other formats
+            date = new Date(dateStr.replace(/-/g, '/'));
+          }
+        } catch {
+          date = new Date();
+        }
+      } else {
+        date = new Date();
+      }
+      
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayNumber = date.getDate();
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      
+      // For year period, show month and day
+      const displayName = selectedPeriod === 'year' 
+        ? `${month} ${dayNumber}`
+        : selectedPeriod === 'day' 
+        ? `${dayName} ${dayNumber}` 
+        : dayName;
+      
+      return {
+        name: displayName,
+        fullDate: `${dayNumber} ${month}`,
+        sales: Number(item.sales) || 0,
+        orders: Number(item.orders) || 0,
+      };
+    });
+  }, [salesAnalytics?.salesByDay, selectedPeriod]);
 
   const topItems = useMemo(() => {
     return topSellingItems?.map((item, index) => ({
@@ -215,43 +336,111 @@ export default function ReportsPage() {
 
     const currentRevenue = salesAnalytics.totalSales || 0;
     const currentOrders = salesAnalytics.totalOrders || 0;
-    const currentAvgOrderValue = salesAnalytics.averageOrderValue || 0;
+    // Calculate current avg order value
+    const currentAvgOrderValue = currentOrders > 0 
+      ? (salesAnalytics.averageOrderValue || (currentRevenue / currentOrders))
+      : 0;
 
     // Compare with previous period based on selected period
+    // Use dashboard data which has period-specific comparisons
     let prevRevenue = 0;
     let prevOrders = 0;
     
     if (selectedPeriod === 'day') {
-      // Compare with yesterday (use week data as approximation)
-      prevRevenue = dashboardData.week?.revenue ? dashboardData.week.revenue / 7 : 0;
-      prevOrders = dashboardData.week?.orders ? Math.round(dashboardData.week.orders / 7) : 0;
+      // For today, compare with yesterday (use dashboard today data if available, otherwise 0)
+      // If we have week data, we can estimate yesterday as (week - today) / 6
+      const todayRevenue = dashboardData.today?.revenue || 0;
+      const todayOrders = dashboardData.today?.completed || 0;
+      const weekRevenue = dashboardData.week?.revenue || 0;
+      const weekOrders = dashboardData.week?.orders || 0;
+      
+      // Estimate previous day as average of other days in week
+      if (weekRevenue > todayRevenue && weekOrders > todayOrders) {
+        prevRevenue = (weekRevenue - todayRevenue) / Math.max(1, weekOrders - todayOrders) * (weekOrders - todayOrders) / 6;
+        prevOrders = (weekOrders - todayOrders) / 6;
+      }
     } else if (selectedPeriod === 'week') {
-      // Compare with previous week (use month data as approximation)
-      prevRevenue = dashboardData.month?.revenue ? dashboardData.month.revenue / 4 : 0;
-      prevOrders = dashboardData.month?.orders ? Math.round(dashboardData.month.orders / 4) : 0;
+      // For week, compare with previous week
+      // Use month data to estimate previous week
+      const monthRevenue = dashboardData.month?.revenue || 0;
+      const monthOrders = dashboardData.month?.orders || 0;
+      // Estimate previous week as (month - current week) / 3 (assuming 4 weeks in month)
+      if (monthRevenue > currentRevenue && monthOrders > currentOrders) {
+        prevRevenue = (monthRevenue - currentRevenue) / 3;
+        prevOrders = Math.round((monthOrders - currentOrders) / 3);
+      }
     } else if (selectedPeriod === 'month') {
-      // Compare with previous month (use current month as baseline)
-      prevRevenue = dashboardData.month?.revenue || 0;
-      prevOrders = dashboardData.month?.orders || 0;
+      // For month, we'd need previous month data - for now use 0 or current as baseline
+      // This would ideally come from a separate API call for previous month
+      prevRevenue = 0;
+      prevOrders = 0;
     }
 
     const prevAvgOrderValue = prevOrders > 0 ? prevRevenue / prevOrders : 0;
 
+    // Only calculate change if we have valid previous period data
+    const revenueChange = prevRevenue > 0 
+      ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 
+      : (currentRevenue > 0 ? 0 : -100); // If current > 0 but no previous, show 0% (new data)
+    
+    const ordersChange = prevOrders > 0 
+      ? ((currentOrders - prevOrders) / prevOrders) * 100 
+      : (currentOrders > 0 ? 0 : -100);
+    
+    const avgOrderValueChange = prevAvgOrderValue > 0 && currentAvgOrderValue > 0
+      ? ((currentAvgOrderValue - prevAvgOrderValue) / prevAvgOrderValue) * 100
+      : 0;
+
     return {
-      revenueChange: prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 : 0,
-      ordersChange: prevOrders > 0 ? ((currentOrders - prevOrders) / prevOrders) * 100 : 0,
-      avgOrderValueChange: prevAvgOrderValue > 0 ? ((currentAvgOrderValue - prevAvgOrderValue) / prevAvgOrderValue) * 100 : 0,
+      revenueChange,
+      ordersChange,
+      avgOrderValueChange,
     };
   }, [salesAnalytics, dashboardData, selectedPeriod]);
 
   const categoryData = useMemo(() => {
-    if (!revenueByCategory || !Array.isArray(revenueByCategory)) return [];
-    return revenueByCategory.map((item: any, index: number) => ({
-      name: item.category || item.categoryId || 'Unknown',
+    console.log('📊 Frontend - categoryData useMemo:', {
+      revenueByCategory,
+      isArray: Array.isArray(revenueByCategory),
+      length: revenueByCategory?.length,
+      sample: revenueByCategory?.[0],
+    });
+    
+    if (!revenueByCategory || !Array.isArray(revenueByCategory) || revenueByCategory.length === 0) {
+      console.log('⚠️ categoryData: No revenueByCategory data');
+      return [];
+    }
+    
+    const filtered = revenueByCategory.filter((item: any) => {
+      const sales = item.sales || item.revenue || 0;
+      const hasSales = sales > 0;
+      if (!hasSales) {
+        console.log('⚠️ Filtered out category with 0 sales:', item);
+      }
+      return item && hasSales;
+    });
+    
+    console.log('📊 categoryData - After filtering:', {
+      originalCount: revenueByCategory.length,
+      filteredCount: filtered.length,
+      filtered: filtered.map((item: any) => ({
+        category: item.category,
+        categoryId: item.categoryId,
+        sales: item.sales || item.revenue,
+        percentage: item.percentage,
+      })),
+    });
+    
+    const mapped = filtered.map((item: any, index: number) => ({
+      name: item.category || item.categoryId?.name || item.categoryId || 'Unknown',
       value: item.percentage || 0,
       sales: item.sales || item.revenue || 0,
       color: COLORS[index % COLORS.length],
     }));
+    
+    console.log('📊 categoryData - Final mapped:', mapped);
+    
+    return mapped;
   }, [revenueByCategory]);
 
   const hourlyData = useMemo(() => {
@@ -272,18 +461,29 @@ export default function ReportsPage() {
   // Calculate peak hours
   const peakHours = useMemo(() => {
     if (!peakHoursData?.peakHours || peakHoursData.peakHours.length === 0) {
-      return { text: 'N/A', orders: 0 };
+      return { text: 'N/A', orders: 0, isAverage: false };
     }
     const peak = peakHoursData.peakHours[0];
     const hour = peak.hour;
-    const hourText = hour >= 12 ? `${hour > 12 ? hour - 12 : hour} PM` : `${hour} AM`;
+    const hourText = hour >= 12 
+      ? `${hour > 12 ? hour - 12 : hour} PM` 
+      : `${hour === 0 ? 12 : hour} AM`;
     const nextHour = hour + 1;
-    const nextHourText = nextHour >= 12 ? `${nextHour > 12 ? nextHour - 12 : nextHour} PM` : `${nextHour} AM`;
+    const nextHourText = nextHour >= 12 
+      ? `${nextHour > 12 ? nextHour - 12 : nextHour} PM` 
+      : `${nextHour === 0 ? 12 : nextHour} AM`;
+    
+    // Calculate average if period is more than 1 day
+    const daysInPeriod = selectedPeriod === 'day' ? 1 : selectedPeriod === 'week' ? 7 : selectedPeriod === 'month' ? 30 : 365;
+    const totalOrders = peak.orders || 0;
+    const avgOrders = daysInPeriod > 1 ? totalOrders / daysInPeriod : totalOrders;
+    
     return {
       text: `${hourText}-${nextHourText}`,
-      orders: Math.round(peak.orders || 0),
+      orders: daysInPeriod > 1 ? Math.round(avgOrders * 10) / 10 : Math.round(totalOrders),
+      isAverage: daysInPeriod > 1,
     };
-  }, [peakHoursData]);
+  }, [peakHoursData, selectedPeriod]);
 
   // Find best performing day
   const bestDay = useMemo(() => {
@@ -577,7 +777,7 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                 <p className="text-3xl font-bold text-green-600">
-                  {formatCurrency(salesAnalytics?.totalSales || dashboardData?.today?.revenue || 0)}
+                  {formatCurrency(salesAnalytics?.totalSales ?? 0)}
                 </p>
                 <div className="mt-2">
                   <TrendIndicator value={trends.revenueChange} />
@@ -595,13 +795,17 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Completed Orders</p>
                 <p className="text-3xl font-bold text-blue-600">
-                  {salesAnalytics?.totalOrders || dashboardData?.today?.completed || 0}
+                  {salesAnalytics?.totalOrders ?? 0}
                 </p>
                 <div className="mt-2">
                   <TrendIndicator value={trends.ordersChange} />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {dashboardData?.today?.orders ? `${dashboardData.today.orders} total today` : ''}
+                  {selectedPeriod === 'day' && salesAnalytics?.totalOrders 
+                    ? `${salesAnalytics.totalOrders} orders in selected period` 
+                    : salesAnalytics?.totalOrders 
+                    ? `${salesAnalytics.totalOrders} total orders` 
+                    : ''}
                 </p>
               </div>
               <ShoppingCartIcon className="w-8 h-8 text-blue-600" />
@@ -615,7 +819,15 @@ export default function ReportsPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                 <p className="text-3xl font-bold text-purple-600">
-                  {formatCurrency(salesAnalytics?.averageOrderValue || 0)}
+                  {formatCurrency((() => {
+                    const totalSales = salesAnalytics?.totalSales || 0;
+                    const totalOrders = salesAnalytics?.totalOrders || 0;
+                    // Calculate if averageOrderValue is 0 or not provided
+                    if (salesAnalytics?.averageOrderValue && salesAnalytics.averageOrderValue > 0) {
+                      return salesAnalytics.averageOrderValue;
+                    }
+                    return totalOrders > 0 ? totalSales / totalOrders : 0;
+                  })())}
                 </p>
                 <div className="mt-2">
                   <TrendIndicator value={trends.avgOrderValueChange} />
@@ -634,7 +846,9 @@ export default function ReportsPage() {
                 <p className="text-3xl font-bold text-orange-600">{peakHours.text}</p>
                 <div className="flex items-center gap-1 mt-2">
                   <ClockIcon className="w-4 h-4 text-orange-600" />
-                  <span className="text-sm text-gray-500">{peakHours.orders} orders avg</span>
+                  <span className="text-sm text-gray-500">
+                    {peakHours.orders} {peakHours.isAverage ? 'orders avg' : 'orders'}
+                  </span>
                 </div>
               </div>
               <ClockIcon className="w-8 h-8 text-orange-600" />
@@ -905,46 +1119,205 @@ export default function ReportsPage() {
       )}
 
       {activeReport === 'wastage' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Wastage Report</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-12">
-              <TrashIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Wastage Report</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Track inventory losses, expired items, and waste management
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                <Card>
-                  <CardContent className="p-6">
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total Wastage</p>
-                    <p className="text-3xl font-bold text-red-600">0</p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {isLoadingWastage ? '...' : wastageReport?.summary?.totalWastageCount || 0}
+                    </p>
                     <p className="text-xs text-gray-500 mt-1">Items wasted</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-6">
+                  </div>
+                  <TrashIcon className="w-12 h-12 text-red-200 dark:text-red-900" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Quantity</p>
+                    <p className="text-3xl font-bold text-orange-600">
+                      {isLoadingWastage ? '...' : wastageReport?.summary?.totalQuantity?.toFixed(2) || '0.00'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Units wasted</p>
+                  </div>
+                  <ExclamationTriangleIcon className="w-12 h-12 text-orange-200 dark:text-orange-900" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Wastage Value</p>
-                    <p className="text-3xl font-bold text-orange-600">{formatCurrency(0)}</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {isLoadingWastage ? '...' : formatCurrency(wastageReport?.summary?.totalCost || 0)}
+                    </p>
                     <p className="text-xs text-gray-500 mt-1">Total loss</p>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <CurrencyDollarIcon className="w-12 h-12 text-purple-200 dark:text-purple-900" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Avg Wastage Cost</p>
+                    <p className="text-3xl font-bold text-blue-600">
+                      {isLoadingWastage ? '...' : formatCurrency(wastageReport?.summary?.avgWastageCost || 0)}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Per incident</p>
+                  </div>
+                  <ChartBarIcon className="w-12 h-12 text-blue-200 dark:text-blue-900" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {isLoadingWastage ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">Loading wastage data...</p>
+              </CardContent>
+            </Card>
+          ) : wastageError ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <ExclamationTriangleIcon className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                <p className="text-red-600 dark:text-red-400">Error loading wastage data</p>
+                <Button onClick={() => refetchWastage()} className="mt-4">Retry</Button>
+              </CardContent>
+            </Card>
+          ) : !wastageReport || wastageReport.summary.totalWastageCount === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <TrashIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Wastage Data</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  No wastage records found for the selected period. Start tracking wastage to see reports here.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Wastage by Reason */}
+              {wastageReport.byReason && wastageReport.byReason.length > 0 && (
                 <Card>
-                  <CardContent className="p-6">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Wastage Rate</p>
-                    <p className="text-3xl font-bold text-purple-600">0%</p>
-                    <p className="text-xs text-gray-500 mt-1">Of inventory</p>
+                  <CardHeader>
+                    <CardTitle>Wastage by Reason</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={wastageReport.byReason}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="reason" 
+                          tick={{ fontSize: 12 }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value: any) => formatCurrency(value)}
+                          contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}
+                        />
+                        <Bar dataKey="totalCost" fill="#ef4444" radius={[8, 8, 0, 0]}>
+                          {wastageReport.byReason.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length] || '#ef4444'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="mt-4 space-y-2">
+                      {wastageReport.byReason.map((item: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-4 h-4 rounded" 
+                              style={{ backgroundColor: COLORS[index % COLORS.length] || '#ef4444' }}
+                            />
+                            <span className="font-medium capitalize">{item.reason.replace('_', ' ')}</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{formatCurrency(item.totalCost)}</p>
+                            <p className="text-xs text-gray-500">{item.totalQuantity.toFixed(2)} units ({item.count} incidents)</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-6">
-                Wastage tracking will be available once inventory wastage data is recorded.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              )}
+
+              {/* Top Wasted Ingredients */}
+              {wastageReport.byIngredient && wastageReport.byIngredient.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top Wasted Ingredients</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {wastageReport.byIngredient.slice(0, 10).map((item: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                              <span className="text-red-600 dark:text-red-400 font-bold">{index + 1}</span>
+                            </div>
+                            <div>
+                              <p className="font-semibold">{item.ingredientName || 'Unknown'}</p>
+                              <p className="text-sm text-gray-500">{item.totalQuantity.toFixed(2)} {item.ingredientUnit || 'units'}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-red-600">{formatCurrency(item.totalCost)}</p>
+                            <p className="text-xs text-gray-500">{item.count} incidents</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Daily Wastage Trend */}
+              {wastageReport.dailyTrend && wastageReport.dailyTrend.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Daily Wastage Trend</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={wastageReport.dailyTrend}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value: any) => formatCurrency(value)}
+                          contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="totalCost" 
+                          stroke="#ef4444" 
+                          strokeWidth={2}
+                          dot={{ fill: '#ef4444', r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {activeReport === 'food' && (

@@ -51,6 +51,10 @@ export interface Company {
   subscriptionPlan?: 'basic' | 'premium' | 'enterprise';
   trialEndDate?: string;
   subscriptionEndDate?: string;
+  customDomain?: string;
+  domainVerified?: boolean;
+  domainVerificationToken?: string;
+  domainVerifiedAt?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -103,6 +107,27 @@ export interface SystemStats {
   expiredCompanies: number;
   totalUsers: number;
   companiesByPlan: Record<string, number>;
+}
+
+export interface CustomDomainInfo {
+  domain: string | null;
+  verified: boolean;
+  verificationToken: string | null;
+  verifiedAt: string | null;
+  dnsInstructions: {
+    recordType: string;
+    recordName: string;
+    recordValue: string;
+    instructions: string;
+  } | null;
+}
+
+export interface AddCustomDomainRequest {
+  domain: string;
+}
+
+export interface VerifyCustomDomainRequest {
+  token: string;
 }
 
 export const companiesApi = apiSlice.injectEndpoints({
@@ -212,6 +237,33 @@ export const companiesApi = apiSlice.injectEndpoints({
       },
       invalidatesTags: ['Company'],
     }),
+    getCustomDomainInfo: builder.query<CustomDomainInfo, string>({
+      query: (companyId) => `/companies/${companyId}/custom-domain`,
+      providesTags: ['Company'],
+    }),
+    addCustomDomain: builder.mutation<Company, { companyId: string; domain: string }>({
+      query: ({ companyId, domain }) => ({
+        url: `/companies/${companyId}/custom-domain`,
+        method: 'POST',
+        body: { domain },
+      }),
+      invalidatesTags: ['Company'],
+    }),
+    verifyCustomDomain: builder.mutation<Company, { companyId: string; token: string }>({
+      query: ({ companyId, token }) => ({
+        url: `/companies/${companyId}/custom-domain/verify`,
+        method: 'POST',
+        body: { token },
+      }),
+      invalidatesTags: ['Company'],
+    }),
+    removeCustomDomain: builder.mutation<Company, string>({
+      query: (companyId) => ({
+        url: `/companies/${companyId}/custom-domain`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Company'],
+    }),
   }),
 });
 
@@ -227,4 +279,8 @@ export const {
   useDeactivateCompanyMutation,
   useDeleteCompanyMutation,
   useUploadCompanyLogoMutation,
+  useGetCustomDomainInfoQuery,
+  useAddCustomDomainMutation,
+  useVerifyCustomDomainMutation,
+  useRemoveCustomDomainMutation,
 } = companiesApi;

@@ -7,11 +7,12 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { CreateExpenseRequest, Expense, useCreateExpenseMutation, useDeleteExpenseMutation, useGetExpensesQuery, useUpdateExpenseMutation } from '@/lib/api/endpoints/expensesApi';
+import { CreateExpenseRequest, Expense, useApproveExpenseMutation, useCreateExpenseMutation, useDeleteExpenseMutation, useGetExpensesQuery, useRejectExpenseMutation, useUpdateExpenseMutation } from '@/lib/api/endpoints/expensesApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
   CalendarIcon,
+  CheckCircleIcon,
   ClockIcon,
   CurrencyDollarIcon,
   EyeIcon,
@@ -20,6 +21,7 @@ import {
   ReceiptRefundIcon,
   TrashIcon,
   UserIcon,
+  XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -104,7 +106,9 @@ export default function ExpensesPage() {
   });
 
   const [createExpense] = useCreateExpenseMutation();
-  const [updateExpense] = useUpdateExpenseMutation();
+  const [updateExpense, { isLoading: isUpdating }] = useUpdateExpenseMutation();
+  const [approveExpense, { isLoading: isApproving }] = useApproveExpenseMutation();
+  const [rejectExpense, { isLoading: isRejecting }] = useRejectExpenseMutation();
   const [deleteExpense] = useDeleteExpenseMutation();
 
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -298,6 +302,34 @@ export default function ExpensesPage() {
     }
   };
 
+  const handleApprove = async (expense: Expense) => {
+    try {
+      await approveExpense({
+        id: expense.id,
+      }).unwrap();
+      toast.success('Expense approved successfully');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to approve expense');
+    }
+  };
+
+  const handleReject = async (expense: Expense) => {
+    if (!confirm('Are you sure you want to reject this expense?')) {
+      return;
+    }
+
+    try {
+      await rejectExpense({
+        id: expense.id,
+      }).unwrap();
+      toast.success('Expense rejected');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to reject expense');
+    }
+  };
+
   const openEditModal = (expense: Expense) => {
     setSelectedExpense(expense);
     setFormData({
@@ -451,10 +483,35 @@ export default function ExpensesPage() {
       title: 'Actions',
       render: (value: any, row: Expense) => (
         <div className="flex items-center gap-2">
+          {row.status === 'pending' && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleApprove(row)}
+                disabled={isApproving || isRejecting}
+                title="Approve"
+                className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+              >
+                <CheckCircleIcon className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleReject(row)}
+                disabled={isApproving || isRejecting}
+                title="Reject"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <XCircleIcon className="w-4 h-4" />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => openViewModal(row)}
+            title="View"
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
@@ -462,6 +519,7 @@ export default function ExpensesPage() {
             variant="ghost"
             size="sm"
             onClick={() => openEditModal(row)}
+            title="Edit"
           >
             <PencilIcon className="w-4 h-4" />
           </Button>
@@ -470,6 +528,7 @@ export default function ExpensesPage() {
             size="sm"
             onClick={() => handleDelete(row)}
             className="text-red-600 hover:text-red-700"
+            title="Delete"
           >
             <TrashIcon className="w-4 h-4" />
           </Button>

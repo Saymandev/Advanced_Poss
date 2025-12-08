@@ -117,44 +117,6 @@ export default function SubscriptionsPage() {
     },
   );
 
-  // Auto-refresh subscription data when returning from checkout or when URL has checkout parameter
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
-    const checkoutSuccess = urlParams.get('checkout') === 'success';
-    
-    if (sessionId || checkoutSuccess) {
-      console.log('🔄 Refreshing subscription data after checkout...');
-      
-      // CRITICAL: Refetch company data first (source of truth after webhook)
-      refetchCompany();
-      
-      // Then refetch subscription data
-      refetchCurrentSubscription();
-      refetchSubscriptionByCompany();
-      
-      // Clear the URL parameters after refetching
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
-      
-      // Show success message
-      if (checkoutSuccess) {
-        toast.success('Subscription updated successfully! Refreshing data...');
-      }
-      
-      // Force another refetch after a short delay to ensure webhook has processed
-      setTimeout(() => {
-        console.log('🔄 Second refresh to ensure webhook data is loaded...');
-        refetchCompany();
-        refetchCurrentSubscription();
-        refetchSubscriptionByCompany();
-      }, 2000);
-    }
-  }, [refetchCurrentSubscription, refetchSubscriptionByCompany, refetchCompany]);
-
-
   // Extract subscription data - handle both wrapped { data: {...} } and direct {...} formats
   const unwrappedCurrentSubscription = (currentSubscription as any)?.data || currentSubscription;
   const unwrappedSubscriptionByCompany = (subscriptionByCompany as any)?.data || subscriptionByCompany;
@@ -408,7 +370,7 @@ export default function SubscriptionsPage() {
   );
   
   const [createSubscription, { isLoading: isCreatingFeatureSubscription }] = useCreateSubscriptionMutation();
-  const [_updateSubscription] = useUpdateSubscriptionMutation();
+  const [updateSubscription] = useUpdateSubscriptionMutation();
   const [cancelSubscription, { isLoading: isCancelling }] = useCancelSubscriptionMutation();
   const [reactivateSubscription, { isLoading: isReactivating }] = useReactivateSubscriptionMutation();
   const [_createCheckoutSession, { isLoading: isUpdating }] = useCreateCheckoutSessionMutation();
@@ -423,6 +385,76 @@ export default function SubscriptionsPage() {
   const [_selectedPaymentMethod, setSelectedPaymentMethod] = useState<SubscriptionPaymentMethod | null>(null);
   const [initializePayment, { isLoading: isInitializingPayment }] = useInitializeSubscriptionPaymentMutation();
   const [manualActivate, { isLoading: isActivating }] = useManualActivateSubscriptionMutation();
+
+  // Auto-refresh + finalize plan when returning from checkout (Stripe)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    const checkoutSuccess = urlParams.get('checkout') === 'success';
+    const genericSuccess = urlParams.get('success') === 'true';
+    const hasSuccess = sessionId || checkoutSuccess || genericSuccess;
+    
+    if (!hasSuccess) return;
+
+    const finalizePendingPlan = async (subscriptionId?: string) => {
+      try {
+        const raw = window.localStorage.getItem('pendingPlanChange');
+        if (!raw) return;
+        const pending = JSON.parse(raw);
+        if (!pending?.planId) return;
+
+        const subId = subscriptionId || pending.subscriptionId;
+        if (!subId) return;
+
+        toast.loading('Applying plan change...', { id: 'pending-plan' });
+        await updateSubscription({
+          id: subId,
+          planId: pending.planId,
+        }).unwrap();
+        toast.dismiss('pending-plan');
+        toast.success('Plan updated successfully');
+        window.localStorage.removeItem('pendingPlanChange');
+        refetchCompany();
+        refetchCurrentSubscription();
+        refetchSubscriptionByCompany();
+      } catch (err: any) {
+        toast.dismiss('pending-plan');
+        console.error('Failed to apply pending plan change', err);
+        toast.error(err?.data?.message || 'Failed to apply plan change after checkout');
+      }
+    };
+
+    console.log('🔄 Refreshing subscription data after checkout/success...');
+    refetchCompany();
+    refetchCurrentSubscription();
+    refetchSubscriptionByCompany();
+
+    // Clear the URL parameters after refetching
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+
+    // Show success message
+    toast.success('Payment successful. Finalizing your plan change...');
+
+    // Apply pending plan after a short delay to ensure data is available
+    setTimeout(() => {
+      finalizePendingPlan(effectiveSubscription?.id);
+      // Safety refetch after finalize
+      setTimeout(() => {
+        refetchCompany();
+        refetchCurrentSubscription();
+        refetchSubscriptionByCompany();
+      }, 1500);
+    }, 400);
+  }, [
+    effectiveSubscription?.id,
+    refetchCompany,
+    refetchCurrentSubscription,
+    refetchSubscriptionByCompany,
+    updateSubscription,
+  ]);
   
   // View mode: 'plans' or 'features'
   const [viewMode, setViewMode] = useState<'plans' | 'features'>('plans');
@@ -546,6 +578,20 @@ export default function SubscriptionsPage() {
       if (paymentResponse.url) {
         // Redirect to payment URL (Stripe, PayPal, Google Pay, etc.)
         console.log('🔵 Redirecting to payment URL:', paymentResponse.url);
+        // Persist pending plan change so we can finalize after returning from checkout
+        try {
+          window.localStorage.setItem(
+            'pendingPlanChange',
+            JSON.stringify({
+              planId: selectedPlan.id,
+              planName: selectedPlan.name,
+              companyId,
+              subscriptionId: effectiveSubscription?.id || null,
+            }),
+          );
+        } catch (e) {
+          console.warn('Failed to persist pendingPlanChange', e);
+        }
         window.location.href = paymentResponse.url;
       } else if (paymentResponse.requiresManualVerification && paymentResponse.instructions) {
         // For mobile wallets (bKash, Nagad) with manual verification, show instructions modal
@@ -786,7 +832,7 @@ export default function SubscriptionsPage() {
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'basic' | 'features'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'features' | 'limits'>('basic');
 
   const [createPlan, { isLoading: isCreatingPlan }] = useCreateSubscriptionPlanMutation();
   const [updatePlan, { isLoading: isUpdatingPlan }] = useUpdateSubscriptionPlanMutation();
@@ -1183,6 +1229,52 @@ export default function SubscriptionsPage() {
         payload.enabledFeatureKeys = selectedFeatures;
       }
 
+      // Collect limits data from form
+      const limits: any = {};
+      const limitFields = [
+        'maxBranches',
+        'maxUsers',
+        'maxTables',
+        'maxMenuItems',
+        'maxOrders',
+        'maxCustomers',
+        'storageGB',
+        'maxPublicBranches',
+        'maxReviewsPerMonth',
+      ];
+      const limitBooleanFields = [
+        'publicOrderingEnabled',
+        'reviewsEnabled',
+        'reviewModerationRequired',
+        'whitelabelEnabled',
+        'customDomainEnabled',
+        'prioritySupportEnabled',
+      ];
+
+      // Process numeric limit fields
+      for (const field of limitFields) {
+        const value = formData.get(`limits.${field}`) as string;
+        if (value !== null && value !== undefined && value.trim() !== '') {
+          const numValue = Number(value);
+          if (!isNaN(numValue)) {
+            limits[field] = numValue;
+          }
+        }
+      }
+
+      // Process boolean limit fields
+      for (const field of limitBooleanFields) {
+        const checkbox = formData.get(`limits.${field}`);
+        if (checkbox !== null) {
+          limits[field] = checkbox === 'on';
+        }
+      }
+
+      // Only include limits if at least one field was set
+      if (Object.keys(limits).length > 0) {
+        payload.limits = limits;
+      }
+
       try {
         if (isUpdate) {
           await updatePlan({ id: editingPlan.id, data: payload }).unwrap();
@@ -1322,6 +1414,17 @@ export default function SubscriptionsPage() {
               >
                 Features ({selectedFeatures.length})
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('limits')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'limits'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Limits
+              </button>
             </nav>
           </div>
 
@@ -1433,6 +1536,268 @@ export default function SubscriptionsPage() {
               </div>
             )}
 
+            {activeTab === 'limits' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Resource Limits
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Branches
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (-1 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.maxBranches"
+                        type="number"
+                        min={-1}
+                        defaultValue={editingPlan?.limits?.maxBranches ?? ''}
+                        placeholder="-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Users
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (-1 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.maxUsers"
+                        type="number"
+                        min={-1}
+                        defaultValue={editingPlan?.limits?.maxUsers ?? ''}
+                        placeholder="-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Tables
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (-1 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.maxTables"
+                        type="number"
+                        min={-1}
+                        defaultValue={editingPlan?.limits?.maxTables ?? ''}
+                        placeholder="-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Menu Items
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (-1 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.maxMenuItems"
+                        type="number"
+                        min={-1}
+                        defaultValue={editingPlan?.limits?.maxMenuItems ?? ''}
+                        placeholder="-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Orders
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (-1 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.maxOrders"
+                        type="number"
+                        min={-1}
+                        defaultValue={editingPlan?.limits?.maxOrders ?? ''}
+                        placeholder="-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Customers
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (-1 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.maxCustomers"
+                        type="number"
+                        min={-1}
+                        defaultValue={editingPlan?.limits?.maxCustomers ?? ''}
+                        placeholder="-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Storage (GB)
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (0 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.storageGB"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        defaultValue={editingPlan?.limits?.storageGB ?? ''}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Public Ordering Limits
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="limits.publicOrderingEnabled"
+                        name="limits.publicOrderingEnabled"
+                        type="checkbox"
+                        defaultChecked={editingPlan?.limits?.publicOrderingEnabled ?? false}
+                        className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="limits.publicOrderingEnabled"
+                        className="text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        Enable Public Ordering
+                      </label>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Public Branches
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (-1 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.maxPublicBranches"
+                        type="number"
+                        min={-1}
+                        defaultValue={editingPlan?.limits?.maxPublicBranches ?? ''}
+                        placeholder="-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Review System Limits
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="limits.reviewsEnabled"
+                        name="limits.reviewsEnabled"
+                        type="checkbox"
+                        defaultChecked={editingPlan?.limits?.reviewsEnabled ?? false}
+                        className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="limits.reviewsEnabled"
+                        className="text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        Enable Reviews
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="limits.reviewModerationRequired"
+                        name="limits.reviewModerationRequired"
+                        type="checkbox"
+                        defaultChecked={editingPlan?.limits?.reviewModerationRequired ?? false}
+                        className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="limits.reviewModerationRequired"
+                        className="text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        Require Review Moderation
+                      </label>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Reviews Per Month
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          (-1 for unlimited)
+                        </span>
+                      </label>
+                      <Input
+                        name="limits.maxReviewsPerMonth"
+                        type="number"
+                        min={-1}
+                        defaultValue={editingPlan?.limits?.maxReviewsPerMonth ?? ''}
+                        placeholder="-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Additional Features
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="limits.whitelabelEnabled"
+                        name="limits.whitelabelEnabled"
+                        type="checkbox"
+                        defaultChecked={editingPlan?.limits?.whitelabelEnabled ?? false}
+                        className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="limits.whitelabelEnabled"
+                        className="text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        Whitelabel Enabled
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="limits.customDomainEnabled"
+                        name="limits.customDomainEnabled"
+                        type="checkbox"
+                        defaultChecked={editingPlan?.limits?.customDomainEnabled ?? false}
+                        className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="limits.customDomainEnabled"
+                        className="text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        Custom Domain Enabled
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="limits.prioritySupportEnabled"
+                        name="limits.prioritySupportEnabled"
+                        type="checkbox"
+                        defaultChecked={editingPlan?.limits?.prioritySupportEnabled ?? false}
+                        className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="limits.prioritySupportEnabled"
+                        className="text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        Priority Support Enabled
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 type="button"
@@ -1446,7 +1811,7 @@ export default function SubscriptionsPage() {
               >
                 Cancel
               </Button>
-              {activeTab === 'features' && (
+              {(activeTab === 'features' || activeTab === 'limits') && (
                 <Button
                   type="button"
                   variant="secondary"

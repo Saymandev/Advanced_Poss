@@ -66,7 +66,12 @@ export const publicApi = apiSlice.injectEndpoints({
     getCompanyBySlug: builder.query<PublicCompany, string>({
       query: (slug) => `/public/companies/${slug}`,
       transformResponse: (response: any) => {
-        return response.data || response;
+        const data = response.data || response;
+        // Normalize MongoDB _id to id
+        if (data && data._id && !data.id) {
+          data.id = data._id.toString();
+        }
+        return data;
       },
     }),
     
