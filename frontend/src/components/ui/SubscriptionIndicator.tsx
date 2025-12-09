@@ -32,14 +32,10 @@ export function SubscriptionIndicator() {
 
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null);
   const [isExpired, setIsExpired] = useState(false);
-  
-  // Early return for super admins AFTER hooks are called
-  if (isSuperAdmin) {
-    return null;
-  }
 
   useEffect(() => {
-    if (!companyData) return;
+    // Early return for super admins - don't process subscription data
+    if (isSuperAdmin || !companyData) return;
 
     const company = companyData as any;
     const status = company.subscriptionStatus || company.subscription?.status;
@@ -106,7 +102,12 @@ export function SubscriptionIndicator() {
     const interval = setInterval(calculateRemaining, 60000); // Update every minute
 
     return () => clearInterval(interval);
-  }, [companyData]);
+  }, [companyData, isSuperAdmin]);
+
+  // Early return for super admins AFTER all hooks are called
+  if (isSuperAdmin) {
+    return null;
+  }
 
   // If loading or no company data, don't show anything
   if (isLoading || !companyData) {
