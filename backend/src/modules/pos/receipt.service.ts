@@ -116,11 +116,15 @@ export class ReceiptService {
                 }
               } else if (company?.slug) {
                 // Fallback to slug-based URL
-                const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-                publicUrl = `${baseUrl}/${company.slug}`;
+                // Prefer FRONTEND_URL, then APP_URL, then localhost as last resort
+                const baseUrl =
+                  process.env.APP_URL ||
+                  process.env.APP_URL ||
+                  'http://localhost:3000';
+                publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
                 // If branch has slug, use it too
                 if (branch.slug) {
-                  publicUrl = `${baseUrl}/${company.slug}/${branch.slug}`;
+                  publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}/${branch.slug}`;
                 }
               }
             }
@@ -272,7 +276,7 @@ export class ReceiptService {
         }
         
         // Fallback to base URL
-        const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+        const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
         return `${baseUrl}/display/customerreview/${orderId}`;
       })(),
     };

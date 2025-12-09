@@ -4,8 +4,8 @@ import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
-import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import { CustomersService } from '../customers/customers.service';
+import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
 import { GalleryService } from '../gallery/gallery.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
@@ -195,7 +195,7 @@ export class PublicService {
       // Get company and branch slugs for URL generation
       const companySlug = orderData.companySlug;
       const branchSlug = orderData.branchSlug;
-      const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+      const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
       const orderId = savedOrder._id.toString();
       
       // Generate tracking URL
@@ -340,7 +340,7 @@ export class PublicService {
       
       let trackingUrl = null;
       if (companySlug && branchSlug && orderId) {
-        const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+        const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
         trackingUrl = `${baseUrl}/${companySlug}/${branchSlug}/track/${orderId}`;
       }
 

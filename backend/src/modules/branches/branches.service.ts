@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -187,7 +187,7 @@ export class BranchesService {
           const company = branch.companyId as any;
           let publicUrl = branch.publicUrl;
           if (company?.slug && !publicUrl) {
-            const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+            const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
             publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
           }
           
@@ -251,7 +251,7 @@ export class BranchesService {
       // Also update publicUrl if company has slug
       const company = branch.companyId as any;
       if (company?.slug) {
-        const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+        const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
         branch.publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
       }
       
