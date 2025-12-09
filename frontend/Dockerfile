@@ -12,6 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Ensure public folder exists (build can be empty, but copy must succeed)
+RUN mkdir -p public
+
 # Set build-time environment variables (if needed)
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
