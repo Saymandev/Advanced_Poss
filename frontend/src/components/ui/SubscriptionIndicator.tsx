@@ -18,14 +18,12 @@ export function SubscriptionIndicator() {
   
   // Super Admins don't need subscription indicators - they manage system-wide subscriptions
   const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'super_admin';
-  if (isSuperAdmin) {
-    return null;
-  }
   
   const companyId = user?.companyId;
   
-  const { data: companyData, isLoading, refetch } = useGetCompanyByIdQuery(companyId || '', {
-    skip: !companyId,
+  // All hooks must be called unconditionally at the top level
+  const { data: companyData, isLoading } = useGetCompanyByIdQuery(companyId || '', {
+    skip: !companyId || isSuperAdmin, // Skip if no companyId or super admin
     refetchOnMountOrArgChange: true,
     // Refetch more aggressively to catch payment status changes
     refetchOnFocus: true,
@@ -34,6 +32,11 @@ export function SubscriptionIndicator() {
 
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  
+  // Early return for super admins AFTER hooks are called
+  if (isSuperAdmin) {
+    return null;
+  }
 
   useEffect(() => {
     if (!companyData) return;
