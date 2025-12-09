@@ -142,7 +142,7 @@ export default function OrderConfirmationPage() {
               </p>
               {/* Use tracking URL from sessionStorage if available, otherwise build from slugs */}
               <Link href={trackingUrl || `/${companySlug}/${branchSlug}/track/${orderId}`}>
-                <Button variant="outline" className="w-full">
+                <Button variant="secondary" className="w-full">
                   Track Your Order
                 </Button>
               </Link>
@@ -179,7 +179,7 @@ export default function OrderConfirmationPage() {
               Order Again
             </Button>
             <Link href={`/${companySlug}`} className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full sm:w-auto">
+              <Button variant="secondary" className="w-full sm:w-auto">
                 <HomeIcon className="w-5 h-5 mr-2" />
                 Back to Home
               </Button>
