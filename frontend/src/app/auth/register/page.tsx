@@ -165,6 +165,10 @@ export default function RegisterPage() {
       } as any).unwrap();
 
       // Tokens are now in httpOnly cookies, response only contains user data
+      if (!response.data?.user) {
+        throw new Error('Registration failed: User data not received');
+      }
+
       dispatch(
         setCredentials({
           user: response.data.user,
