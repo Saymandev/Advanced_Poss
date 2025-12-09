@@ -78,7 +78,7 @@ export const backupsApi = apiSlice.injectEndpoints({
       query: (id) => ({
         url: `/backups/${id}/download`,
         method: 'GET',
-        responseHandler: (response) => response.blob(),
+        responseHandler: (response: any) => response.blob(),
       }),
       invalidatesTags: ['Backup'],
     }),
@@ -102,7 +102,7 @@ export const backupsApi = apiSlice.injectEndpoints({
         url: '/backups/export',
         method: 'POST',
         body: data,
-        responseHandler: (response) => response.blob(),
+        responseHandler: (response: any) => response.blob(),
       }),
       invalidatesTags: ['Backup'],
     }),

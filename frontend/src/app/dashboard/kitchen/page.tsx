@@ -1,47 +1,47 @@
 'use client';
 
+import ElapsedTime from '@/components/kitchen/ElapsedTime';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-    KitchenOrder,
-    useCancelKitchenOrderMutation,
-    useCompleteKitchenOrderItemMutation,
-    useCompleteKitchenOrderMutation,
-    useGetKitchenDelayedOrdersQuery,
-    useGetKitchenPendingOrdersQuery,
-    useGetKitchenPreparingOrdersQuery,
-    useGetKitchenReadyOrdersQuery,
-    useGetKitchenUrgentOrdersQuery,
-    useMarkKitchenOrderUrgentMutation,
-    useStartKitchenOrderItemMutation,
-    useStartKitchenOrderMutation,
-    useUpdateKitchenItemPriorityMutation
+  KitchenOrder,
+  useCancelKitchenOrderMutation,
+  useCompleteKitchenOrderItemMutation,
+  useCompleteKitchenOrderMutation,
+  useGetKitchenDelayedOrdersQuery,
+  useGetKitchenPendingOrdersQuery,
+  useGetKitchenPreparingOrdersQuery,
+  useGetKitchenReadyOrdersQuery,
+  useGetKitchenUrgentOrdersQuery,
+  useMarkKitchenOrderUrgentMutation,
+  useStartKitchenOrderItemMutation,
+  useStartKitchenOrderMutation,
+  useUpdateKitchenItemPriorityMutation
 } from '@/lib/api/endpoints/kitchenApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-    ArrowPathIcon,
-    ArrowsPointingInIcon,
-    ArrowsPointingOutIcon,
-    ArrowsUpDownIcon,
-    CheckCircleIcon,
-    ClockIcon,
-    FireIcon,
-    MagnifyingGlassIcon,
-    SpeakerWaveIcon,
-    SpeakerXMarkIcon,
-    UserIcon,
-    XCircleIcon
+  ArrowPathIcon,
+  ArrowsPointingInIcon,
+  ArrowsPointingOutIcon,
+  ArrowsUpDownIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  FireIcon,
+  MagnifyingGlassIcon,
+  SpeakerWaveIcon,
+  SpeakerXMarkIcon,
+  UserIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import ElapsedTime from '@/components/kitchen/ElapsedTime';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function KitchenPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
@@ -369,7 +369,7 @@ export default function KitchenPage() {
   const handleItemStatusChange = async (orderId: string, itemId: string, newStatus: 'pending' | 'preparing' | 'ready', chefId?: string) => {
     try {
       if (newStatus === 'preparing') {
-        const chef = chefId || (user as any)?._id || (user as any)?.id;
+        const chef = chefId || (user as any)?.id;
         if (!chef) {
           toast.error('Please select a chef');
           return;
@@ -391,7 +391,7 @@ export default function KitchenPage() {
     try {
       // Find the order to get its items
       const allOrders = [...pendingOrders, ...preparingOrders, ...readyOrders];
-      const order = allOrders.find(o => (o.id || o._id) === orderId);
+      const order = allOrders.find(o => o.id === orderId);
       
       if (!order) {
         toast.error('Order not found');
@@ -408,7 +408,7 @@ export default function KitchenPage() {
 
       // Complete all preparing items
       for (const item of itemsToComplete) {
-        const itemId = item.itemId || item.id || item._id;
+        const itemId = item.id;
         if (!itemId) {
           console.warn('Item missing ID:', item);
           continue;
@@ -426,7 +426,7 @@ export default function KitchenPage() {
   const handleOrderStatusChange = async (orderId: string, newStatus: 'pending' | 'preparing' | 'ready' | 'completed', chefId?: string) => {
     try {
       if (newStatus === 'preparing') {
-        const chef = chefId || (user as any)?._id || (user as any)?.id;
+        const chef = chefId || (user as any)?.id;
         if (!chef) {
           toast.error('Please select a chef');
           return;
@@ -681,7 +681,7 @@ export default function KitchenPage() {
                 const isDelayed = order.isDelayed || elapsedMinutes > 30;
                 return (
                   <div 
-                    key={order.id || order._id} 
+                    key={order.id} 
                     className={`border rounded-lg p-4 ${
                       isUrgent || isDelayed
                         ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
@@ -721,7 +721,7 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id || item._id || item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                    <div key={item.id} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
@@ -772,13 +772,13 @@ export default function KitchenPage() {
                               {chefs.length > 0 && (
                                 <Select
                                   options={chefs.map((chef) => ({
-                                    value: chef.id || chef._id,
+                                    value: chef.id,
                                     label: `${chef.firstName} ${chef.lastName}`,
                                   }))}
                                   value=""
                                   onChange={(chefId) => {
                                     if (chefId) {
-                                      handleItemStatusChange(order.id || order._id, item.id || item._id || item.itemId, 'preparing', chefId);
+                                      handleItemStatusChange(order.id, item.id, 'preparing', chefId);
                                     }
                                   }}
                                   placeholder={chefs.length > 0 ? "Assign Chef/Cook" : "Assign"}
@@ -788,7 +788,7 @@ export default function KitchenPage() {
                           {!chefs.length && (
                             <Button
                               size="sm"
-                              onClick={() => handleItemStatusChange(order.id || order._id, item.id || item._id || item.itemId, 'preparing')}
+                              onClick={() => handleItemStatusChange(order.id, item.id, 'preparing')}
                             >
                               Start
                             </Button>
@@ -812,13 +812,13 @@ export default function KitchenPage() {
                     {chefs.length > 0 ? (
                       <Select
                         options={chefs.map((chef) => ({
-                          value: chef.id || chef._id,
+                          value: chef.id,
                           label: `${chef.firstName} ${chef.lastName}`,
                         }))}
                         value=""
                         onChange={(chefId) => {
                           if (chefId) {
-                            handleOrderStatusChange(order.id || order._id, 'preparing', chefId);
+                            handleOrderStatusChange(order.id, 'preparing', chefId);
                           }
                         }}
                         placeholder="Assign Chef/Cook & Start"
@@ -826,7 +826,7 @@ export default function KitchenPage() {
                       />
                     ) : (
                       <Button
-                        onClick={() => handleOrderStatusChange(order.id || order._id, 'preparing')}
+                        onClick={() => handleOrderStatusChange(order.id, 'preparing')}
                         className="flex-1"
                       >
                         Start Preparing
@@ -836,7 +836,7 @@ export default function KitchenPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => handleMarkUrgent(order.id || order._id, true)}
+                        onClick={() => handleMarkUrgent(order.id, true)}
                         title="Mark as Urgent"
                       >
                         <FireIcon className="w-4 h-4" />
@@ -846,7 +846,7 @@ export default function KitchenPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => handleMarkUrgent(order.id || order._id, false)}
+                        onClick={() => handleMarkUrgent(order.id, false)}
                         title="Remove Urgent Status"
                         className="bg-red-600 hover:bg-red-700"
                       >
@@ -856,7 +856,7 @@ export default function KitchenPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleCancelOrder(order.id || order._id)}
+                      onClick={() => handleCancelOrder(order.id)}
                       className="text-red-600"
                       title="Cancel Order"
                     >
@@ -899,7 +899,7 @@ export default function KitchenPage() {
                 const isUrgent = order.isUrgent || order.priority === 'urgent';
                 return (
                   <div 
-                    key={order.id || order._id} 
+                    key={order.id} 
                     className={`border rounded-lg p-4 ${
                       isUrgent
                         ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
@@ -940,7 +940,7 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id || item._id || item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                    <div key={item.id} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
@@ -991,7 +991,7 @@ export default function KitchenPage() {
                               ]}
                               value={item.priority?.toString() || '1'}
                               onChange={(priority) => {
-                                handleUpdateItemPriority(order.id || order._id, item.id || item._id || item.itemId, parseInt(priority));
+                                handleUpdateItemPriority(order.id, item.id, parseInt(priority));
                               }}
                               className="w-24"
                             />
@@ -1003,7 +1003,7 @@ export default function KitchenPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleItemStatusChange(order.id || order._id, item.id || item._id || item.itemId, 'ready')}
+                              onClick={() => handleItemStatusChange(order.id, item.id, 'ready')}
                             >
                               <CheckCircleIcon className="w-4 h-4" />
                             </Button>
@@ -1019,7 +1019,7 @@ export default function KitchenPage() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => handleOrderStatusChange(order.id || order._id, 'ready')}
+                      onClick={() => handleOrderStatusChange(order.id, 'ready')}
                       className="flex-1"
                     >
                       Mark Ready
@@ -1028,7 +1028,7 @@ export default function KitchenPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => handleMarkUrgent(order.id || order._id, true)}
+                        onClick={() => handleMarkUrgent(order.id, true)}
                         title="Mark as Urgent"
                       >
                         <FireIcon className="w-4 h-4" />
@@ -1038,7 +1038,7 @@ export default function KitchenPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => handleMarkUrgent(order.id || order._id, false)}
+                        onClick={() => handleMarkUrgent(order.id, false)}
                         title="Remove Urgent Status"
                         className="bg-red-600 hover:bg-red-700"
                       >
@@ -1078,7 +1078,7 @@ export default function KitchenPage() {
             ) : (
               filteredReadyOrders.map((order: any) => {
                 return (
-                  <div key={order.id || order._id} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
+                  <div key={order.id} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -1099,7 +1099,7 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id || item._id || item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                    <div key={item.id} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
@@ -1149,7 +1149,7 @@ export default function KitchenPage() {
 
                 {canUpdateOrders && (
                   <Button
-                    onClick={() => handleOrderStatusChange(order.id || order._id, 'completed')}
+                    onClick={() => handleOrderStatusChange(order.id, 'completed')}
                     className="w-full"
                   >
                     Mark as Served

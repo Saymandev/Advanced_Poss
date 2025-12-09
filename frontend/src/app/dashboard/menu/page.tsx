@@ -45,11 +45,12 @@ export default function MenuPage() {
 
   const categories = ['all', 'appetizers', 'main course', 'desserts', 'beverages', 'sides'];
 
-  const filteredItems = data?.items?.filter((item: any) => {
+  const items = (data && 'menuItems' in data ? data.menuItems : data && 'items' in data ? data.items : []) || [];
+  const filteredItems = items.filter((item: any) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
-  }) || [];
+  });
 
   const handleOpenModal = (item?: any) => {
     if (item) {
@@ -154,9 +155,9 @@ export default function MenuPage() {
   }
 
   const stats = {
-    total: data?.items?.length || 0,
-    available: data?.items?.filter((i: any) => i.isAvailable).length || 0,
-    unavailable: data?.items?.filter((i: any) => !i.isAvailable).length || 0,
+    total: items.length || 0,
+    available: items.filter((i: any) => i.isAvailable).length || 0,
+    unavailable: items.filter((i: any) => !i.isAvailable).length || 0,
   };
 
   return (

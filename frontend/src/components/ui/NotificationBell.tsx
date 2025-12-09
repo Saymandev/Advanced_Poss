@@ -158,7 +158,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
               </div>
             ) : (
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                {notifications.map((notification) => (
+                {notifications.map((notification: any) => (
                   <div
                     key={notification.id}
                     className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors ${

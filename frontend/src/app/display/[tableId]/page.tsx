@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { useCreateReviewMutation, useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useGetOrdersQuery } from '@/lib/api/endpoints/ordersApi';
+import { useCreateReviewMutation, useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useGetTableByIdQuery } from '@/lib/api/endpoints/tablesApi';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { CheckCircleIcon, ClockIcon, FireIcon, ShoppingBagIcon, StarIcon } from '@heroicons/react/24/outline';
@@ -24,7 +24,7 @@ export default function CustomerDisplayPage() {
   });
 
   const currentOrder = ordersData?.orders?.[0];
-  const orderId = currentOrder?.id || currentOrder?._id;
+  const orderId = currentOrder?.id;
 
   // Check if review already exists
   const { data: existingReview } = useGetReviewByOrderQuery(orderId || '', {
@@ -93,7 +93,7 @@ export default function CustomerDisplayPage() {
 
     try {
       const itemReviews = currentOrder.items?.map((item: any) => {
-        const itemId = item.menuItemId?._id?.toString() || item.menuItemId?.toString() || item.menuItemId || item.id;
+        const itemId = item.menuItemId?.toString() || item.menuItemId || item.id;
         const itemRating = reviewForm.itemRatings[itemId] || { rating: 0, comment: '' };
         return {
           menuItemId: itemId,
@@ -452,13 +452,13 @@ export default function CustomerDisplayPage() {
           </div>
 
           {/* Waiter Rating */}
-          {currentOrder?.waiterName && (
+          {(currentOrder as any)?.waiterName && (
             <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Waiter Service</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {currentOrder.waiterName}
+                    {(currentOrder as any).waiterName}
                   </p>
                 </div>
                 <StarRating
@@ -491,7 +491,7 @@ export default function CustomerDisplayPage() {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Rate Your Items</h3>
               <div className="space-y-3">
                 {currentOrder.items.map((item: any, idx: number) => {
-                  const itemId = item.menuItemId?._id?.toString() || item.menuItemId?.toString() || item.menuItemId || item.id || idx.toString();
+                  const itemId = item.menuItemId?.toString() || item.menuItemId || item.id || idx.toString();
                   const itemRating = reviewForm.itemRatings[itemId] || { rating: 0, comment: '' };
                   
                   return (

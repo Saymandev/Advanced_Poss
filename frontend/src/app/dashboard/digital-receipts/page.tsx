@@ -146,13 +146,11 @@ export default function DigitalReceiptsPage() {
       const selectedOrder = completedOrders?.orders?.find(
         (o: any) => 
           (o.id === generateForm.orderId) || 
-          (o._id === generateForm.orderId) || 
-          (o.id?.toString() === generateForm.orderId) || 
-          (o._id?.toString() === generateForm.orderId)
+          (o.id?.toString() === generateForm.orderId)
       );
 
       const orderId = selectedOrder 
-        ? (selectedOrder.id || selectedOrder._id || generateForm.orderId).toString()
+        ? (selectedOrder.id || generateForm.orderId).toString()
         : generateForm.orderId.trim();
 
       await generateReceipt({
@@ -267,7 +265,7 @@ export default function DigitalReceiptsPage() {
         // Safely extract orderId as string
         const orderIdStr = typeof row.orderId === 'string' 
           ? row.orderId 
-          : (row.orderId as any)?._id?.toString() || (row.orderId as any)?.toString() || String(row.orderId || '');
+          : (row.orderId as any)?.toString() || String(row.orderId || '');
         const orderIdDisplay = orderIdStr.length >= 8 ? orderIdStr.slice(-8) : orderIdStr;
         
         return (
@@ -869,14 +867,14 @@ export default function DigitalReceiptsPage() {
                 }));
               }
               
-              // Find the selected order - handle both id and _id
+              // Find the selected order
               const selectedOrder = completedOrders?.orders?.find(
-                (o: any) => (o.id === value) || (o._id === value) || (o.id?.toString() === value) || (o._id?.toString() === value)
+                (o: any) => (o.id === value) || (o.id?.toString() === value)
               );
               
               if (selectedOrder && value) {
-                // Extract the proper ID (could be id or _id)
-                const orderId = selectedOrder.id || selectedOrder._id || value;
+                // Extract the proper ID
+                const orderId = selectedOrder.id || value;
                 setGenerateForm({ 
                   ...generateForm, 
                   orderId: orderId.toString(),
@@ -893,7 +891,7 @@ export default function DigitalReceiptsPage() {
                 : completedOrders?.orders?.length
                 ? completedOrders.orders.map((order: any) => {
                     // Extract proper ID
-                    const orderId = order.id || order._id || '';
+                    const orderId = order.id || '';
                     // Build customer info string
                     const customerInfo = order.customerInfo 
                       ? (order.customerInfo.name 

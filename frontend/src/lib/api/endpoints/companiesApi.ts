@@ -67,6 +67,7 @@ export interface CreateCompanyRequest {
   phoneNumber?: string;
   website?: string;
   description?: string;
+  slug?: string;
   address: {
     street: string;
     city: string;

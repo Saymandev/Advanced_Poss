@@ -10,6 +10,7 @@ export interface User {
   branchId: string | null;
   isSuperAdmin?: boolean;
   phoneNumber?: string;
+  avatar?: string;
 }
 
 export interface AuthState {

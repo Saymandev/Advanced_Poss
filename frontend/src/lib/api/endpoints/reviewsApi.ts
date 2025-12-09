@@ -155,7 +155,6 @@ export const {
   useCreateReviewMutation,
   useGetReviewByOrderQuery,
   useGetReviewsQuery,
-  useGetReviewByIdQuery,
   useGetMenuItemRatingQuery,
   useGetMenuItemsRatingsMutation,
 } = reviewsApi;

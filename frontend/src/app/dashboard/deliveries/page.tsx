@@ -8,11 +8,11 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-    useCreateDeliveryZoneMutation,
-    useDeleteDeliveryZoneMutation,
-    useGetDeliveryZonesByBranchQuery,
-    useUpdateDeliveryZoneMutation,
-    type DeliveryZone,
+  useCreateDeliveryZoneMutation,
+  useDeleteDeliveryZoneMutation,
+  useGetDeliveryZonesByBranchQuery,
+  useUpdateDeliveryZoneMutation,
+  type DeliveryZone,
 } from '@/lib/api/endpoints/deliveryZonesApi';
 import { DeliveryOrder, DeliveryStatus, useAssignDeliveryDriverMutation, useGetDeliveryOrdersQuery, useUpdateDeliveryStatusMutation } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
@@ -271,7 +271,7 @@ export default function DeliveriesPage() {
               className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs px-2 py-1"
               value={deliveryStatus}
               onChange={(e) => {
-                const orderId = record.id || record._id;
+                const orderId = record.id;
                 if (orderId) {
                   handleStatusChange(orderId, e.target.value as DeliveryStatus);
                 } else {
@@ -302,7 +302,7 @@ export default function DeliveriesPage() {
               className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs px-2 py-1"
               value={assignedId || ''}
               onChange={(e) => {
-                const orderId = record.id || record._id;
+                const orderId = record.id;
                 if (orderId) {
                   handleAssignDriver(orderId, e.target.value);
                 } else {

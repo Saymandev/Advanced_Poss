@@ -7,34 +7,31 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { 
-  Company, 
-  useGetCompaniesQuery, 
-  useCreateCompanyMutation, 
-  useUpdateCompanyMutation, 
-  useDeleteCompanyMutation,
-  useDeactivateCompanyMutation,
-  useGetCompanyStatsQuery,
+import {
+  Company,
   CreateCompanyRequest,
+  useCreateCompanyMutation,
+  useDeactivateCompanyMutation,
+  useDeleteCompanyMutation,
+  useGetCompaniesQuery,
+  useGetCompanyStatsQuery,
+  useUpdateCompanyMutation,
 } from '@/lib/api/endpoints/companiesApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
   BuildingOffice2Icon,
-  EnvelopeIcon,
+  ChartBarIcon,
+  CheckCircleIcon,
+  CurrencyDollarIcon,
   EyeIcon,
   PencilIcon,
-  PhoneIcon,
   PlusIcon,
-  TrashIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  GlobeAltIcon,
-  ChartBarIcon,
-  UsersIcon,
   ShoppingBagIcon,
-  CurrencyDollarIcon,
+  TrashIcon,
+  UsersIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -474,8 +471,8 @@ export default function CompaniesPage() {
             />
             <Select
               value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
+              onChange={(value) => {
+                setStatusFilter(value);
                 setCurrentPage(1);
               }}
               options={[
@@ -486,8 +483,8 @@ export default function CompaniesPage() {
             />
             <Select
               value={subscriptionFilter}
-              onChange={(e) => {
-                setSubscriptionFilter(e.target.value);
+              onChange={(value) => {
+                setSubscriptionFilter(value);
                 setCurrentPage(1);
               }}
               options={[
