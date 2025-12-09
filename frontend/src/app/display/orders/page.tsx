@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import ElapsedTime from '@/components/kitchen/ElapsedTime';
 import { KitchenOrder, useGetKitchenPendingOrdersQuery, useGetKitchenPreparingOrdersQuery, useGetKitchenReadyOrdersQuery } from '@/lib/api/endpoints/kitchenApi';
 import { useGetMenuItemsQuery } from '@/lib/api/endpoints/menuItemsApi';
@@ -8,9 +10,9 @@ import { useAppSelector } from '@/lib/store';
 import { ClockIcon, FireIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-export default function CustomerOrderDisplayPage() {
+function CustomerOrderDisplayContent() {
   const searchParams = useSearchParams();
   const branchId = searchParams.get('branchId') || '';
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -790,3 +792,21 @@ export default function CustomerOrderDisplayPage() {
     </div>
   );
 }
+
+export default function CustomerOrderDisplayPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-xl">Loading order display...</p>
+          </div>
+        </div>
+      }
+    >
+      <CustomerOrderDisplayContent />
+    </Suspense>
+  );
+}
+

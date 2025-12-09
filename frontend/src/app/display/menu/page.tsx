@@ -1,18 +1,20 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { Card, CardContent } from '@/components/ui/Card';
 import { useGetBranchMenuByIdQuery } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
-import { 
-  ShoppingBagIcon, 
-  QrCodeIcon,
-  TableCellsIcon,
+import {
   FireIcon,
-  SparklesIcon
+  QrCodeIcon,
+  ShoppingBagIcon,
+  SparklesIcon,
+  TableCellsIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 
 const MENU_TYPE_LABELS: Record<string, string> = {
   full: 'Full Menu',
@@ -21,29 +23,19 @@ const MENU_TYPE_LABELS: Record<string, string> = {
   desserts: 'Desserts Menu',
 };
 
-export default function DisplayMenuPage() {
+function DisplayMenuContent() {
   const searchParams = useSearchParams();
   const branchId = searchParams.get('branchId');
   const tableNumber = searchParams.get('table');
   const menuType = searchParams.get('type') || 'full';
 
+  // All hooks must be called unconditionally at the top level
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const { data: menuData, isLoading, error } = useGetBranchMenuByIdQuery(
     { branchId: branchId || '', menuType },
     { skip: !branchId }
   );
-
-  const categories = useMemo(() => {
-    if (!menuData?.categories) return [];
-    return menuData.categories.filter((cat: any) => {
-      if (selectedCategory) {
-        const catId = (cat as any).id || (cat as any)._id?.toString();
-        return catId === selectedCategory;
-      }
-      return true;
-    });
-  }, [menuData?.categories, selectedCategory]);
 
   const menuItems = useMemo(() => {
     if (!menuData?.menuItems) return [];
@@ -62,6 +54,25 @@ export default function DisplayMenuPage() {
     
     return items;
   }, [menuData?.menuItems, selectedCategory]);
+
+  // During build/SSR, return a simple fallback (after all hooks are called)
+  if (typeof window === 'undefined' && !branchId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-600 flex items-center justify-center p-6">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <QrCodeIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Menu Display
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Please scan a QR code to view the menu.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!branchId) {
     return (
@@ -269,3 +280,21 @@ export default function DisplayMenuPage() {
   );
 }
 
+export default function DisplayMenuPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-600 flex items-center justify-center p-6">
+          <Card className="max-w-md w-full">
+            <CardContent className="p-8 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400">Loading menu...</p>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <DisplayMenuContent />
+    </Suspense>
+  );
+}
