@@ -2,8 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { Button } from '@/components/ui/Button';
 import { TwoFactorVerificationModal } from '@/components/auth/TwoFactorVerificationModal';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { usePinLoginMutation } from '@/lib/api/endpoints/authApi';
 import { clearCompanyContext, restoreCompanyContext, setCompanyContext, setCredentials } from '@/lib/slices/authSlice';
@@ -14,8 +14,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-const getAvatarUrl = (email: string) => {
-  const hash = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+const getAvatarUrl = (user: any) => {
+  // Use user's actual avatar if available
+  if (user?.avatar) {
+    return user.avatar;
+  }
+  // Fallback to placeholder avatar based on email
+  const email = user?.email || '';
+  const hash = email.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
   return `https://i.pravatar.cc/150?img=${hash % 70}`;
 };
 
@@ -168,16 +174,14 @@ export default function PinLoginPage() {
 
       // Tokens are now in httpOnly cookies, response only contains user data
       // Handle response structure: { success, data: { user, sessionId } } or direct: { user, sessionId }
-      let loggedInUser, sessionId;
+      let loggedInUser;
       
       if (response.data) {
         // TransformInterceptor wrapped response
         loggedInUser = response.data.user || response.data;
-        sessionId = response.data.sessionId;
       } else {
         // Direct response from service
         loggedInUser = response.user;
-        sessionId = response.sessionId;
       }
 
       if (!loggedInUser) {
@@ -412,11 +416,23 @@ export default function PinLoginPage() {
                               : 'border-gray-700 group-hover:border-primary-400'
                           }`}
                         >
-                          <img
-                            src={getAvatarUrl(user.email)}
-                            alt={user.firstName}
-                            className="w-full h-full rounded-full object-cover"
-                          />
+                          {user.avatar ? (
+                            <img
+                              src={user.avatar}
+                              alt={`${user.firstName} ${user.lastName}`}
+                              className="w-full h-full rounded-full object-cover"
+                              onError={(e) => {
+                                // Fallback to placeholder if image fails
+                                (e.target as HTMLImageElement).src = getAvatarUrl(user);
+                              }}
+                            />
+                          ) : (
+                            <img
+                              src={getAvatarUrl(user)}
+                              alt={`${user.firstName} ${user.lastName}`}
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          )}
                           {selectedUser?.id === user.id && (
                             <div className="absolute -top-2 -right-2 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
                               <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">

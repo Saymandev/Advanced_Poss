@@ -16,6 +16,7 @@ import {
     ComputerDesktopIcon,
     CurrencyDollarIcon,
     DocumentTextIcon,
+    EnvelopeIcon,
     ExclamationTriangleIcon,
     GiftIcon,
     HomeIcon,
@@ -297,6 +298,12 @@ const navigation: NavigationItem[] = [
         icon: PhotoIcon,
         requiredFeature: 'settings',
       },
+      {
+        name: 'Contact Forms',
+        href: '/dashboard/contact-forms',
+        icon: EnvelopeIcon,
+        requiredFeature: 'settings',
+      },
     ],
   },
 ];
@@ -355,6 +362,12 @@ const superAdminNavigation: NavigationItem[] = [
     name: 'Payment Methods',
     href: '/dashboard/subscription-payment-methods',
     icon: CurrencyDollarIcon,
+    roles: ['super_admin'],
+  },
+  {
+    name: 'Contact Forms',
+    href: '/dashboard/contact-forms',
+    icon: EnvelopeIcon,
     roles: ['super_admin'],
   },
 ];

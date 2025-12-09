@@ -105,9 +105,33 @@ export function Topbar() {
                 variant="ghost"
                 className="flex items-center gap-2 p-2"
               >
-                <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
-                  <UserCircleIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-                </div>
+                {user?.avatar ? (
+                  <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary-200 dark:border-primary-700">
+                    <img
+                      src={user.avatar}
+                      alt={`${user?.firstName} ${user?.lastName}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to icon if image fails to load
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const parent = (e.target as HTMLImageElement).parentElement;
+                        if (parent) {
+                          parent.innerHTML = '<div class="w-full h-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center"><svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>';
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                    {user?.firstName || user?.lastName ? (
+                      <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">
+                        {user.firstName?.charAt(0) || ''}{user.lastName?.charAt(0) || ''}
+                      </span>
+                    ) : (
+                      <UserCircleIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                    )}
+                  </div>
+                )}
                 <div className="hidden md:block text-left">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {user?.firstName} {user?.lastName}

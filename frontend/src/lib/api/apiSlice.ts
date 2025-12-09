@@ -344,6 +344,7 @@ export const apiSlice = createApi({
     'SuperAdminNotifications',
     'ContentPages',
     'SystemFeedback',
+    'ContactForm',
   ],
   endpoints: () => ({}),
 });
