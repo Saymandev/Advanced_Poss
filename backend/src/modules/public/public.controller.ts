@@ -1,11 +1,11 @@
 import {
-    Body,
-    Controller,
-    Get,
-    NotFoundException,
-    Param,
-    Post,
-    Query
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Query
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
@@ -32,15 +32,37 @@ export class PublicController {
   @Get('companies/:slug')
   @ApiOperation({ summary: 'Get company by slug (public)' })
   async getCompanyBySlug(@Param('slug') slug: string) {
-    try {
-      const company = await this.companiesService.findBySlug(slug);
-      return {
-        success: true,
-        data: company,
-      };
-    } catch (error) {
-      throw new NotFoundException('Company not found');
+    // Log the request for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[PublicController] getCompanyBySlug called with slug: "${slug}"`);
     }
+
+    // Validate slug is not empty or just whitespace
+    if (!slug || !slug.trim()) {
+      throw new NotFoundException('Invalid company slug');
+    }
+
+    // Exclude common static file requests (favicon, robots.txt, etc.)
+    const staticFilePatterns = [
+      'favicon.ico',
+      'robots.txt',
+      'sitemap.xml',
+      '.well-known',
+      'apple-touch-icon',
+      'manifest.json',
+    ];
+    
+    const normalizedSlug = slug.toLowerCase().trim();
+    if (staticFilePatterns.some(pattern => normalizedSlug.includes(pattern))) {
+      throw new NotFoundException('Not found');
+    }
+
+    // findBySlug already throws NotFoundException if company not found
+    const company = await this.companiesService.findBySlug(slug);
+    return {
+      success: true,
+      data: company,
+    };
   }
 
   @Public()

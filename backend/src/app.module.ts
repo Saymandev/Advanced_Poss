@@ -21,6 +21,7 @@ import { CmsModule } from './modules/cms/cms.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { Company, CompanySchema } from './modules/companies/schemas/company.schema';
 import { CompanyModule } from './modules/company/company.module';
+import { ContactFormsModule } from './modules/contact-forms/contact-forms.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { DeliveryZonesModule } from './modules/delivery-zones/delivery-zones.module';
 import { DigitalReceiptsModule } from './modules/digital-receipts/digital-receipts.module';
@@ -135,6 +136,7 @@ import { SubscriptionLockMiddleware } from './common/middleware/subscription-loc
     UsersModule,
     CompaniesModule,
     CompanyModule,
+    ContactFormsModule,
     BranchesModule,
     CategoriesModule,
     CmsModule,

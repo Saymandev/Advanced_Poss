@@ -1,9 +1,10 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import * as crypto from 'crypto';
 import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
@@ -11,12 +12,11 @@ import { Customer, CustomerDocument } from '../customers/schemas/customer.schema
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { AddCustomDomainDto } from './dto/add-custom-domain.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { AddCustomDomainDto } from './dto/add-custom-domain.dto';
 import { VerifyCustomDomainDto } from './dto/verify-custom-domain.dto';
 import { Company, CompanyDocument } from './schemas/company.schema';
-import * as crypto from 'crypto';
 
 @Injectable()
 export class CompaniesService {
@@ -115,13 +115,25 @@ export class CompaniesService {
   }
 
   async findBySlug(slug: string): Promise<Company> {
+    // Validate input
+    if (!slug || typeof slug !== 'string') {
+      throw new BadRequestException('Invalid slug provided');
+    }
+
+    // Normalize slug: lowercase and trim to match schema behavior
+    const normalizedSlug = slug.toLowerCase().trim();
+    
+    if (!normalizedSlug) {
+      throw new BadRequestException('Slug cannot be empty');
+    }
+
     const company = await this.companyModel
-      .findOne({ slug })
+      .findOne({ slug: normalizedSlug })
       .populate('ownerId', 'firstName lastName email')
       .lean();
 
     if (!company) {
-      throw new NotFoundException('Company not found');
+      throw new NotFoundException(`Company with slug "${normalizedSlug}" not found`);
     }
 
     return company as any;

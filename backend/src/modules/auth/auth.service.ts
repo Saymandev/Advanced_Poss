@@ -988,7 +988,8 @@ export class AuthService {
             id: (user as any)._id.toString(),
             firstName: user.firstName,
             lastName: user.lastName,
-            email: user.email
+            email: user.email,
+            avatar: user.avatar // Include avatar for display during role selection
           });
         });
 
@@ -1355,7 +1356,8 @@ export class AuthService {
             lastName: userWithPin.lastName,
             role: userWithPin.role,
             companyId: userWithPin.companyId,
-            branchId: userWithPin.branchId
+            branchId: userWithPin.branchId,
+            avatar: userWithPin.avatar
           },
           sessionId
         },
@@ -1373,7 +1375,8 @@ export class AuthService {
           lastName: userWithPin.lastName,
           role: userWithPin.role,
           companyId: userWithPin.companyId,
-          branchId: userWithPin.branchId
+          branchId: userWithPin.branchId,
+          avatar: userWithPin.avatar
         },
         accessToken,
         refreshToken,

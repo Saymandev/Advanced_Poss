@@ -55,6 +55,7 @@ export class ReceiptService {
     // Get branch and company to find public URL and logo
     let publicUrl: string | undefined;
     let companyLogo: string | undefined;
+    let company: any = null; // Store company for later use
     try {
       const branch = await this.branchesService.findOne(order.branchId.toString());
       // Use branch's publicUrl if available, otherwise fallback to company slug
@@ -87,7 +88,7 @@ export class ReceiptService {
         // Validate ObjectId format before calling findOne
         if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
           try {
-            const company = await this.companiesService.findOne(companyIdStr);
+            company = await this.companiesService.findOne(companyIdStr);
             // Get company logo
             if (company?.logo) {
               companyLogo = company.logo;
@@ -264,26 +265,7 @@ export class ReceiptService {
         const orderId = (order as any)._id?.toString() || (order as any).id?.toString();
         if (!orderId) return null;
         
-        // Get company to check for custom domain
-        let company: any = null;
-        try {
-          const branch = await this.branchesService.findOne(order.branchId.toString());
-          if (branch?.companyId) {
-            let companyIdStr: string;
-            if (typeof branch.companyId === 'object' && branch.companyId !== null) {
-              companyIdStr = (branch.companyId as any)._id?.toString() || (branch.companyId as any).id?.toString() || branch.companyId.toString();
-            } else {
-              companyIdStr = branch.companyId.toString();
-            }
-            
-            if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
-              company = await this.companiesService.findOne(companyIdStr);
-            }
-          }
-        } catch (error) {
-          console.warn('Could not fetch company for review URL:', error);
-        }
-        
+        // Use the company we already fetched earlier
         // Use custom domain if available and verified
         if (company?.customDomain && company?.domainVerified) {
           return `https://${company.customDomain}/display/customerreview/${orderId}`;
