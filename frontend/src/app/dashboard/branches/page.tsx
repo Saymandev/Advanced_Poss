@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { Branch, useCreateBranchMutation, useDeleteBranchMutation, useGetBranchByIdQuery, useGetBranchesQuery, useGetBranchStatsQuery, useToggleBranchStatusMutation, useUpdateBranchMutation } from '@/lib/api/endpoints/branchesApi';
 import { Staff, useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
@@ -26,7 +27,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function BranchesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
@@ -348,7 +348,6 @@ export default function BranchesPage() {
       phone: branch.phoneNumber || (branch as any).phone || '',
       email: branch.email || '',
       managerId: branch.managerId || '',
-      slug: (branch as any).slug || '',
       openingHours: (branch as any).openingHours || [
         { day: 'monday', open: '09:00', close: '21:00', isClosed: false },
         { day: 'tuesday', open: '09:00', close: '21:00', isClosed: false },
