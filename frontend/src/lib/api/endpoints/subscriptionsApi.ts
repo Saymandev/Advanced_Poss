@@ -123,6 +123,15 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         console.log('getSubscriptionPlans transformResponse - Response type:', typeof response);
         console.log('getSubscriptionPlans transformResponse - Is array?', Array.isArray(response));
         
+        // If response is still encrypted (decryption failed), bail out safely
+        if (response && typeof response === 'object') {
+          const payload = (response as any).data || response;
+          if (payload && typeof payload === 'object' && payload.encrypted) {
+            console.warn('Subscription plans response is still encrypted; returning empty list to avoid UI crash.');
+            return [];
+          }
+        }
+
         const normalize = (plans: any) => {
           if (!Array.isArray(plans)) {
             console.warn('Expected plans array but received:', plans);
