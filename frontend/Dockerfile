@@ -15,6 +15,9 @@ COPY . .
 # Ensure public folder exists (build can be empty, but copy must succeed)
 RUN mkdir -p public
 
+# Remove local env so build uses provided build args/env (Coolify)
+RUN rm -f .env.local
+
 # Set build-time environment variables (if needed)
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL

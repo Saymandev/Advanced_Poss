@@ -26,7 +26,13 @@ const decryptIfNeeded = async (response: any) => {
       body = body.data;
     }
 
-    if (!body || typeof body !== 'object' || !body.encrypted) {
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      !body.encrypted ||
+      !body.iv ||
+      !body.data
+    ) {
       return response;
     }
 
@@ -59,35 +65,40 @@ const decryptIfNeeded = async (response: any) => {
       ['decrypt'],
     );
 
-    const iv = Uint8Array.from(
-      atob(body.iv || ''),
-      (c) => c.charCodeAt(0),
-    );
-
-    const cipherBytes = Uint8Array.from(
-      atob(body.data || ''),
-      (c) => c.charCodeAt(0),
-    );
-
-    const decryptedBuffer = await window.crypto.subtle.decrypt(
-      { name: 'AES-CBC', iv },
-      key,
-      cipherBytes,
-    );
-
-    const decoded = new TextDecoder().decode(decryptedBuffer);
-
-    // Parse JSON if possible, otherwise keep as string
-    let parsed: any;
     try {
-      parsed = JSON.parse(decoded);
-    } catch {
-      parsed = decoded;
-    }
+      const iv = Uint8Array.from(
+        atob(body.iv || ''),
+        (c) => c.charCodeAt(0),
+      );
 
-    // Replace entire body with decrypted payload so callers see the ORIGINAL
-    // response shape from the service (e.g. { success, data: {...} }).
-    response.data = parsed;
+      const cipherBytes = Uint8Array.from(
+        atob(body.data || ''),
+        (c) => c.charCodeAt(0),
+      );
+
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: 'AES-CBC', iv },
+        key,
+        cipherBytes,
+      );
+
+      const decoded = new TextDecoder().decode(decryptedBuffer);
+
+      // Parse JSON if possible, otherwise keep as string
+      let parsed: any;
+      try {
+        parsed = JSON.parse(decoded);
+      } catch {
+        parsed = decoded;
+      }
+
+      // Replace entire body with decrypted payload so callers see the ORIGINAL
+      // response shape from the service (e.g. { success, data: {...} }).
+      response.data = parsed;
+    } catch (decryptError) {
+      console.error('Failed to decrypt API response, returning original:', decryptError);
+      return response;
+    }
 
     return response;
   } catch (error) {

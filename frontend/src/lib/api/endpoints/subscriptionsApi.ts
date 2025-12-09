@@ -123,7 +123,11 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         console.log('getSubscriptionPlans transformResponse - Response type:', typeof response);
         console.log('getSubscriptionPlans transformResponse - Is array?', Array.isArray(response));
         
-        const normalize = (plans: SubscriptionPlan[]) => {
+        const normalize = (plans: any) => {
+          if (!Array.isArray(plans)) {
+            console.warn('Expected plans array but received:', plans);
+            return [];
+          }
           console.log(`Normalizing ${plans.length} plans`);
           return plans.map((plan) => ({
             ...plan,
@@ -159,6 +163,18 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
             console.log(`Returning ${normalized.plans.length} normalized plans from success.data.plans`);
             return normalized;
           }
+          // If data is an object with items property (fallback)
+          if (data && typeof data === 'object' && 'items' in data) {
+            const normalized = {
+              ...data,
+              items: normalize((data as any).items || []),
+            };
+            console.log(`Returning ${normalized.items.length} normalized plans from success.data.items`);
+            return normalized;
+          }
+          // Unknown shape, return empty array to avoid runtime errors
+          console.warn('Success response data shape not recognized for subscription plans:', data);
+          return [];
         }
 
         // Handle direct array format
