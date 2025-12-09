@@ -37,6 +37,7 @@ export interface PublicMenuItem {
   images?: string[];
   category?: any;
   isAvailable: boolean;
+  preparationTime?: number;
 }
 
 export interface PublicCategory {
