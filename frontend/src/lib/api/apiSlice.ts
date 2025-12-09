@@ -40,7 +40,7 @@ const decryptIfNeeded = async (response: any) => {
     // NOTE: For real security you should derive this key per-session or
     //       use TLS only. A hard-coded key only adds light obfuscation.
     const secret =
-      process.env.NEXT_PUBLIC_RESPONSE_ENCRYPTION_KEY || 'default-weak-key-change-me';
+      'ykg44s8k80wsok80s880w0gw';
 
     const enc = new TextEncoder();
     const keyMaterial = await window.crypto.subtle.importKey(
