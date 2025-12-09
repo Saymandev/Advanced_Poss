@@ -17,6 +17,33 @@ const nextConfig = {
       process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
   },
   async headers() {
+    // Get API URL from environment variable
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+    // Extract the base URL (remove /api/v1 if present)
+    const apiBaseUrl = apiUrl.replace(/\/api\/v1\/?$/, '');
+    // Extract protocol and hostname for CSP
+    let connectSrc = "'self' https: wss: ws:";
+    
+    // Add API URL to connect-src if it's not already covered
+    if (apiBaseUrl) {
+      try {
+        const url = new URL(apiBaseUrl);
+        // If API is HTTP (not HTTPS), add it explicitly
+        if (url.protocol === 'http:') {
+          connectSrc += ` ${url.protocol}//${url.hostname}${url.port ? ':' + url.port : ''}`;
+        }
+        // If API is HTTPS, it's already covered by 'https:'
+      } catch (e) {
+        // If URL parsing fails, allow localhost in development
+        if (process.env.NODE_ENV === 'development') {
+          connectSrc += ' http://localhost:*';
+        }
+      }
+    } else if (process.env.NODE_ENV === 'development') {
+      // Fallback for development
+      connectSrc += ' http://localhost:*';
+    }
+
     return [
       {
         // Apply security headers to all routes
@@ -30,10 +57,8 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
-              // Allow connections to same origin, HTTPS, WebSockets, and localhost API in development
-              process.env.NODE_ENV === 'development' 
-                ? "connect-src 'self' https: wss: ws: http://localhost:*"
-                : "connect-src 'self' https: wss: ws:",
+              // Allow connections to same origin, HTTPS, WebSockets, and API URL
+              `connect-src ${connectSrc}`,
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
