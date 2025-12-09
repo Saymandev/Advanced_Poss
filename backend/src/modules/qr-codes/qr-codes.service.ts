@@ -50,7 +50,10 @@ export class QRCodesService {
     branchSlug = branch?.slug;
     
     // Generate URL - prioritize custom domain, then slug-based, then fallback to branchId
-    const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
+    const baseUrl =
+      process.env.FRONTEND_URL ||
+      process.env.APP_URL ||
+      'http://localhost:3000';
     let url: string;
     
     if (customDomain) {
@@ -202,7 +205,10 @@ export class QRCodesService {
       branchSlug = branch?.slug;
       
       // Generate URL - prioritize custom domain, then slug-based, then fallback to branchId
-      const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
+        const baseUrl =
+          process.env.FRONTEND_URL ||
+          process.env.APP_URL ||
+          'http://localhost:3000';
       let newUrl: string;
       
       if (customDomain) {

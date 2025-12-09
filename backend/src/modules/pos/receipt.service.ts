@@ -118,7 +118,7 @@ export class ReceiptService {
                 // Fallback to slug-based URL
                 // Prefer FRONTEND_URL, then APP_URL, then localhost as last resort
                 const baseUrl =
-                  process.env.APP_URL ||
+                  process.env.FRONTEND_URL ||
                   process.env.APP_URL ||
                   'http://localhost:3000';
                 publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
@@ -276,7 +276,10 @@ export class ReceiptService {
         }
         
         // Fallback to base URL
-        const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
+        const baseUrl =
+          process.env.FRONTEND_URL ||
+          process.env.APP_URL ||
+          'http://localhost:3000';
         return `${baseUrl}/display/customerreview/${orderId}`;
       })(),
     };

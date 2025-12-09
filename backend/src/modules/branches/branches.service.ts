@@ -1,7 +1,7 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -92,7 +92,10 @@ export class BranchesService {
     // Use the slug from the company object (which may have been updated above)
     const companySlug = (company as any).slug || company.slug;
     if (!publicUrl && companySlug && slug) {
-      const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+      const baseUrl =
+        process.env.FRONTEND_URL ||
+        process.env.APP_URL ||
+        'http://localhost:3000';
       publicUrl = `${baseUrl}/${companySlug}/${slug}`;
     } else if (!publicUrl) {
       // Log warning if publicUrl couldn't be generated
@@ -186,9 +189,16 @@ export class BranchesService {
           
           const company = branch.companyId as any;
           let publicUrl = branch.publicUrl;
-          if (company?.slug && !publicUrl) {
-            const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
-            publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
+          const baseUrl =
+            process.env.FRONTEND_URL ||
+            process.env.APP_URL ||
+            'http://localhost:3000';
+          const needsRegenerate =
+            !publicUrl ||
+            publicUrl.startsWith('http://localhost:3000') ||
+            publicUrl.includes('://localhost:3000/');
+          if (company?.slug && needsRegenerate) {
+            publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}/${autoSlug}`;
           }
           
           branchesToUpdate.push({
@@ -211,6 +221,24 @@ export class BranchesService {
           this.branchModel.findByIdAndUpdate(id, { slug, ...(publicUrl && { publicUrl }) }, { new: false })
         )
       );
+    }
+
+    // Ensure publicUrl in response uses current base domain (even if DB still has localhost)
+    const baseUrlForResponse =
+      process.env.FRONTEND_URL ||
+      process.env.APP_URL ||
+      'http://localhost:3000';
+    for (const branch of branches as any[]) {
+      const companySlug = (branch.companyId as any)?.slug;
+      if (companySlug && branch.slug) {
+        const needsRegenerate =
+          !branch.publicUrl ||
+          branch.publicUrl.startsWith('http://localhost:3000') ||
+          branch.publicUrl.includes('://localhost:3000/');
+        if (needsRegenerate) {
+          branch.publicUrl = `${baseUrlForResponse.replace(/\/$/, '')}/${companySlug}/${branch.slug}`;
+        }
+      }
     }
 
     return {
@@ -251,7 +279,10 @@ export class BranchesService {
       // Also update publicUrl if company has slug
       const company = branch.companyId as any;
       if (company?.slug) {
-        const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
+        const baseUrl =
+          process.env.FRONTEND_URL ||
+          process.env.APP_URL ||
+          'http://localhost:3000';
         branch.publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
       }
       
@@ -339,7 +370,10 @@ export class BranchesService {
         // Update publicUrl if slug changed
         const company = await this.companiesService.findOne(companyId);
         if (company?.slug) {
-          const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+          const baseUrl =
+            process.env.FRONTEND_URL ||
+            process.env.APP_URL ||
+            'http://localhost:3000';
           (updateBranchDto as any).publicUrl = `${baseUrl}/${company.slug}/${newSlug}`;
         }
       } else {
@@ -356,7 +390,10 @@ export class BranchesService {
         // Update publicUrl
         const company = await this.companiesService.findOne(companyId);
         if (company?.slug) {
-          const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+          const baseUrl =
+            process.env.FRONTEND_URL ||
+            process.env.APP_URL ||
+            'http://localhost:3000';
           (updateBranchDto as any).publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
         }
       }
@@ -373,7 +410,10 @@ export class BranchesService {
       // Update publicUrl
       const company = await this.companiesService.findOne(companyId);
       if (company?.slug) {
-        const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+        const baseUrl =
+          process.env.FRONTEND_URL ||
+          process.env.APP_URL ||
+          'http://localhost:3000';
         (updateBranchDto as any).publicUrl = `${baseUrl}/${company.slug}/${autoSlug}`;
       }
     }

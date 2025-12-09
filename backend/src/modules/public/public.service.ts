@@ -195,7 +195,10 @@ export class PublicService {
       // Get company and branch slugs for URL generation
       const companySlug = orderData.companySlug;
       const branchSlug = orderData.branchSlug;
-      const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
+      const baseUrl =
+        process.env.FRONTEND_URL ||
+        process.env.APP_URL ||
+        'http://localhost:3000';
       const orderId = savedOrder._id.toString();
       
       // Generate tracking URL
@@ -340,7 +343,10 @@ export class PublicService {
       
       let trackingUrl = null;
       if (companySlug && branchSlug && orderId) {
-        const baseUrl = process.env.APP_URL || process.env.APP_URL || 'http://localhost:3000';
+        const baseUrl =
+          process.env.FRONTEND_URL ||
+          process.env.APP_URL ||
+          'http://localhost:3000';
         trackingUrl = `${baseUrl}/${companySlug}/${branchSlug}/track/${orderId}`;
       }
 

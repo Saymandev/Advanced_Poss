@@ -161,7 +161,11 @@ export class CompanyService {
       throw new NotFoundException('Company not found');
     }
 
-    const onlineUrl = `${process.env.APP_URL || 'http://localhost:3000'}/order/${companyId}`;
+    const baseUrl =
+      process.env.FRONTEND_URL ||
+      process.env.APP_URL ||
+      'http://localhost:3000';
+    const onlineUrl = `${baseUrl.replace(/\/$/, '')}/order/${companyId}`;
     
     try {
       const qrCodeUrl = await QRCode.toDataURL(onlineUrl, {
