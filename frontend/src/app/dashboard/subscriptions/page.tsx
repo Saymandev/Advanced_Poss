@@ -509,8 +509,18 @@ export default function SubscriptionsPage() {
   const handleUpgrade = () => {
     console.log('🔵 handleUpgrade called', { selectedPlan, effectiveSubscription });
     
-    if (!selectedPlan || !effectiveSubscription) {
+    if (!selectedPlan) {
       toast.error('Please select a plan');
+      return;
+    }
+
+    // For new companies without subscription, allow them to proceed
+    if (!effectiveSubscription) {
+      console.log('🔵 New company - no subscription, proceeding to payment method selection');
+      setIsUpgradeModalOpen(false);
+      setTimeout(() => {
+        setIsPaymentMethodModalOpen(true);
+      }, 100);
       return;
     }
 
@@ -2769,7 +2779,7 @@ export default function SubscriptionsPage() {
           setIsUpgradeModalOpen(false);
           setSelectedPlan(null);
         }}
-        title={isSuperAdmin ? "Activate Subscription" : "Confirm Plan Change"}
+        title={isSuperAdmin ? "Activate Subscription" : (effectiveSubscription ? "Confirm Plan Change" : "Create Subscription")}
         size="lg"
       >
         {(() => {
@@ -2796,11 +2806,40 @@ export default function SubscriptionsPage() {
             );
           }
           
-          // If no subscription data at all (not even from company), show error
+          // For new companies without subscription, show create subscription UI
           if (!effectiveSubscription) {
             return (
-              <div className="py-8 text-center">
-                <p className="text-gray-600 dark:text-gray-400">Unable to load subscription information. Please refresh the page.</p>
+              <div className="space-y-6">
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400 mb-2">
+                    You're about to create a new subscription with the <strong>{selectedPlan.displayName || selectedPlan.name}</strong> plan.
+                  </p>
+                </div>
+
+                {/* Selected Plan Details */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Selected Plan</h4>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                    {selectedPlan.displayName || selectedPlan.name}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {selectedPlan.price === 0 ? 'Free' : `${selectedPlan.currency} ${selectedPlan.price.toLocaleString()}/${selectedPlan.billingCycle || 'month'}`}
+                  </p>
+                  {selectedPlan.trialPeriod && selectedPlan.trialPeriod > 0 && (
+                    <p className="text-sm text-primary-600 dark:text-primary-400 mt-2">
+                      ✓ {selectedPlan.trialPeriod === 168 ? '7 Days' : `${Math.round(selectedPlan.trialPeriod / 24)} Days`} Free Trial
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t">
+                  <Button variant="secondary" onClick={() => setIsUpgradeModalOpen(false)} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpgrade} className="flex-1">
+                    Continue to Payment
+                  </Button>
+                </div>
               </div>
             );
           }
