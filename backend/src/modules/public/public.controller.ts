@@ -197,13 +197,71 @@ export class PublicController {
     @Param('branchSlug') branchSlug: string,
     @Query('type') menuType?: string,
   ) {
+    // Step 1: Find company by unique slug (company slug is always unique)
     const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException(`Company with slug "${companySlug}" not found`);
+    }
     const companyId = (company as any)._id?.toString() || (company as any).id;
+    
+    // Step 2: Find branch by companyId + branchSlug (ensures branch belongs to this company)
+    // findBySlug filters by companyId first, with fallback to slug-only for historical data
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
-    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    if (!branch) {
+      throw new NotFoundException(`Branch with slug "${branchSlug}" not found for company "${companySlug}"`);
+    }
+    
+    // Step 3: Verify branch actually belongs to the company (handle ObjectId/string formats)
+    // Extract branch companyId - handle both populated ObjectId and string formats
+    let branchCompanyId: string | undefined;
+    const branchCompanyIdRaw = (branch as any).companyId;
+    
+    if (branchCompanyIdRaw) {
+      if (typeof branchCompanyIdRaw === 'object' && branchCompanyIdRaw._id) {
+        branchCompanyId = branchCompanyIdRaw._id.toString();
+      } else if (typeof branchCompanyIdRaw === 'object' && branchCompanyIdRaw.id) {
+        branchCompanyId = branchCompanyIdRaw.id.toString();
+      } else {
+        branchCompanyId = branchCompanyIdRaw.toString();
+      }
+    }
+    
+    // Normalize both IDs to strings for comparison
+    const normalizedBranchCompanyId = branchCompanyId?.toString();
+    const normalizedCompanyId = companyId?.toString();
+    
+    let branchId = (branch as any)._id?.toString() || (branch as any).id;
+    let actualBranch = branch;
+    
+    // Step 4: If branch companyId doesn't match, find the correct branch for this company
+    if (normalizedBranchCompanyId && normalizedCompanyId && normalizedBranchCompanyId !== normalizedCompanyId) {
+      console.warn(`[Public API] ⚠️ Branch "${branchSlug}" belongs to different company (${normalizedBranchCompanyId})`);
+      console.warn(`[Public API] ⚠️ Company "${companySlug}" has ID: ${normalizedCompanyId}`);
+      console.warn(`[Public API] ⚠️ Finding correct branch for company "${companySlug}"...`);
+      
+      // Find branches that actually belong to this company
+      const companyBranches = await this.branchesService.findByCompany(companyId);
+      const correctBranch = companyBranches.find((b: any) => {
+        const bSlug = (b as any).slug;
+        return bSlug === branchSlug || bSlug === 'main-branch' || bSlug === 'main';
+      }) || companyBranches[0]; // Use first branch if exact match not found
+      
+      if (correctBranch) {
+        actualBranch = correctBranch;
+        branchId = (correctBranch as any)._id?.toString() || (correctBranch as any).id;
+        console.warn(`[Public API] ⚠️ Using branch "${(correctBranch as any).slug}" (ID: ${branchId}) for company "${companySlug}"`);
+      } else {
+        console.error(`[Public API] ❌ No branches found for company "${companySlug}"`);
+        // Continue with original branch, but menu items query will return 0 items
+      }
+    }
+    
     const categories = await this.categoriesService.findAll({ branchId } as any);
+    
+    // Step 5: Query menu items with companyId + branchId
     const menuItemsResult = await this.menuItemsService.findAll({
-      branchId,
+      companyId, // CRITICAL: Use companyId from company slug (unique identifier)
+      branchId, // Use branch ID (corrected if needed)
       isAvailable: true,
     } as any);
 
@@ -259,8 +317,8 @@ export class PublicController {
       data: {
         branch: {
           id: branchId,
-          name: (branch as any).name,
-          address: (branch as any).address,
+          name: (actualBranch as any).name,
+          address: (actualBranch as any).address,
         },
         categories: Array.isArray(categories) ? categories : [],
         menuItems,
