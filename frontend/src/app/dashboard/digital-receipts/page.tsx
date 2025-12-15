@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -578,8 +579,8 @@ export default function DigitalReceiptsPage() {
             }}
             exportable={true}
             exportFilename="digital-receipts"
-            onExport={(format, items) => {
-              console.log(`Exporting ${items.length} digital receipts as ${format}`);
+            onExport={(_format, _items) => {
+              // Export is handled automatically by ExportButton component
             }}
             emptyMessage="No digital receipts found."
           />
@@ -859,6 +860,11 @@ export default function DigitalReceiptsPage() {
             label="Select Order *"
             value={generateForm.orderId}
             onChange={(value) => {
+              // Don't process empty values or loading/error states
+              if (!value || value === '' || isLoadingOrders) {
+                return;
+              }
+              
               // Clear error when value changes
               if (formErrors.generate?.orderId) {
                 setFormErrors(prev => ({
@@ -867,48 +873,67 @@ export default function DigitalReceiptsPage() {
                 }));
               }
               
-              // Find the selected order
+              // Find the selected order - try multiple ID formats
               const selectedOrder = completedOrders?.orders?.find(
-                (o: any) => (o.id === value) || (o.id?.toString() === value)
+                (o: any) => {
+                  const oId = o.id?.toString() || o._id?.toString() || '';
+                  const vId = value?.toString() || '';
+                  return oId === vId || o.id === value || o._id === value || o._id?.toString() === value;
+                }
               );
               
-              if (selectedOrder && value) {
-                // Extract the proper ID
-                const orderId = selectedOrder.id || value;
+              if (selectedOrder) {
+                // Extract the proper ID - try multiple formats
+                const orderId = selectedOrder.id || selectedOrder._id || value;
                 setGenerateForm({ 
                   ...generateForm, 
-                  orderId: orderId.toString(),
+                  orderId: orderId?.toString() || value,
                   customerEmail: selectedOrder.customerInfo?.email || generateForm.customerEmail,
                 });
-              } else if (value) {
-                // If value exists but order not found, still set it
+              } else {
+                // If order not found, still set the value (might be a valid ID)
                 setGenerateForm({ ...generateForm, orderId: value });
               }
             }}
             options={
               isLoadingOrders
-                ? [{ value: '', label: 'Loading orders...' }]
+                ? []
                 : completedOrders?.orders?.length
-                ? completedOrders.orders.map((order: any) => {
-                    // Extract proper ID
-                    const orderId = order.id || '';
-                    // Build customer info string
-                    const customerInfo = order.customerInfo 
-                      ? (order.customerInfo.name 
-                          ? `${order.customerInfo.name}${order.customerInfo.email ? ` (${order.customerInfo.email})` : ''}`
-                          : order.customerInfo.email || '')
-                      : 'Walk-in Customer';
-                    
-                    return {
-                      value: orderId.toString(),
-                      label: `Order #${order.orderNumber} - ${formatCurrency(order.totalAmount)} - ${customerInfo} - ${new Date(order.createdAt).toLocaleDateString()}`,
-                    };
-                  })
-                : [{ value: '', label: 'No completed orders available' }]
+                ? completedOrders.orders
+                    .filter((order: any) => {
+                      // Filter out orders without valid IDs
+                      const orderId = order.id || order._id;
+                      return orderId !== undefined && orderId !== null && orderId !== '';
+                    })
+                    .map((order: any) => {
+                      // Extract proper ID - try multiple formats
+                      const orderId = order.id || order._id || '';
+                      if (!orderId) return null;
+                      
+                      // Build customer info string
+                      const customerInfo = order.customerInfo 
+                        ? (order.customerInfo.name 
+                            ? `${order.customerInfo.name}${order.customerInfo.email ? ` (${order.customerInfo.email})` : ''}`
+                            : order.customerInfo.email || '')
+                        : 'Walk-in Customer';
+                      
+                      return {
+                        value: orderId.toString(),
+                        label: `Order #${order.orderNumber || order.orderNumber || 'N/A'} - ${formatCurrency(order.totalAmount || 0)} - ${customerInfo} - ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`,
+                      };
+                    })
+                    .filter((opt: any) => opt !== null) // Remove null entries
+                : []
             }
             error={formErrors.generate?.orderId}
-            disabled={isLoadingOrders}
-            placeholder="Select an order..."
+            disabled={isLoadingOrders || !completedOrders?.orders?.length}
+            placeholder={
+              isLoadingOrders 
+                ? 'Loading orders...' 
+                : !completedOrders?.orders?.length 
+                ? 'No completed orders available' 
+                : 'Select an order...'
+            }
           />
 
           <Input

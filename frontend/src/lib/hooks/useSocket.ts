@@ -63,16 +63,13 @@ const playLoudNotificationSound = () => {
 };
 
 // Get socket URL from environment or default to API URL
-const getSocketUrl = () => {
-  if (typeof window === 'undefined') return 'http://localhost:5000';
-  
+const getBaseUrls = () => {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-  // Extract base URL (remove /api/v1 if present)
   const baseUrl = apiUrl.replace(/\/api\/v1$/, '');
-  return baseUrl;
+  return { apiUrl, baseUrl };
 };
 
-const SOCKET_URL = getSocketUrl();
+const { apiUrl: API_URL, baseUrl: SOCKET_URL } = getBaseUrls();
 
 interface UseSocketReturn {
   socket: Socket | null;
@@ -87,7 +84,7 @@ interface UseSocketReturn {
 
 export const useSocket = (): UseSocketReturn => {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  const { addNotification } = useNotifications();
+  const { addNotification, hydrateNotifications } = useNotifications();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const branchIdRef = useRef<string | null>(null);
@@ -102,6 +99,9 @@ export const useSocket = (): UseSocketReturn => {
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
+  const companyId = (user as any)?.companyId || (companyContext as any)?.companyId || (companyContext as any)?._id || (companyContext as any)?.id;
+  const userId = (user as any)?.id || (user as any)?._id;
+  const features = ((user as any)?.enabledFeatures || (companyContext as any)?.enabledFeatures || []) as string[];
 
   // Initialize socket connection
   useEffect(() => {
@@ -113,13 +113,20 @@ export const useSocket = (): UseSocketReturn => {
 
     const newSocket = io(`${SOCKET_URL}/ws`, {
       transports: ['websocket', 'polling'],
-      auth: token ? { token } : undefined,
+      auth: {
+        ...(token ? { token } : {}),
+        userId,
+        branchId,
+        companyId,
+        role: userRole,
+        features: Array.isArray(features) ? features : [],
+      },
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
     });
 
-    newSocket.on('connect', () => {
+    newSocket.on('connect', async () => {
       console.log('✅ Socket.IO connected:', newSocket.id);
       setIsConnected(true);
       
@@ -135,13 +142,37 @@ export const useSocket = (): UseSocketReturn => {
       }
 
       // Auto-join user room for personal notifications
-      const userId = (user as any)?.id || (user as any)?._id;
       if (userId) {
         const userIdStr = typeof userId === 'string' ? userId : userId.toString();
         newSocket.emit('join-user', { userId: userIdStr });
         console.log(`✅ Joined user room: ${userIdStr}`);
       } else {
         console.warn('⚠️ No user ID found for joining user room');
+      }
+
+      // Hydrate notifications from server on connect
+      try {
+        if (token) {
+          const params = new URLSearchParams();
+          if (companyId) params.append('companyId', companyId);
+          if (branchId) params.append('branchId', branchId);
+          if (userRole) params.append('role', userRole);
+          if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
+          if (features && features.length > 0) params.append('features', features.join(','));
+
+          const res = await fetch(`${API_URL}/notifications?${params.toString()}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const body = await res.json();
+          const items = body?.data?.items || body?.items || body || [];
+          if (Array.isArray(items)) {
+            hydrateNotifications(items);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to hydrate notifications from server:', err);
       }
     });
 
@@ -188,6 +219,16 @@ export const useSocket = (): UseSocketReturn => {
           data: data.data || {},
         });
       }
+    });
+
+    // Scoped notifications (company/branch/role/user/features)
+    newSocket.on('notification', (data: any) => {
+      addNotification({
+        type: (data?.type as any) || 'system',
+        title: data?.title || 'Notification',
+        message: data?.message || '',
+        data: data?.metadata || data?.data || {},
+      });
     });
 
     newSocket.on('order:updated', (data: any) => {

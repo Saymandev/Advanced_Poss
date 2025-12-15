@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -378,10 +379,107 @@ export default function PurchaseOrdersPage() {
             Manage purchase orders and supplier deliveries
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Create Order
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  if (!companyId) {
+                    toast.error('Company context is missing. Please refresh the page.');
+                    return;
+                  }
+
+                  // Parse items from CSV (format: "Ingredient Name:Quantity:Price" separated by semicolons)
+                  const items: any[] = [];
+                  if (item.items || item.Items) {
+                    const itemsStr = item.items || item.Items;
+                    const itemList = itemsStr.split(';').map((i: string) => i.trim()).filter(Boolean);
+                    
+                    for (const itemStr of itemList) {
+                      const parts = itemStr.split(':');
+                      if (parts.length >= 2) {
+                        // Find ingredient by name
+                        const ingredientName = parts[0].trim();
+                        const ingredientList = (ingredients as any)?.data || (ingredients as any) || [];
+                        const ingredient = ingredientList.find((ing: any) => 
+                          ing.name.toLowerCase() === ingredientName.toLowerCase()
+                        );
+                        
+                        if (ingredient) {
+                          items.push({
+                            ingredientId: ingredient.id || ingredient._id,
+                            quantity: parseFloat(parts[1] || 0),
+                            unitPrice: parseFloat(parts[2] || 0) || ingredient.unitCost || 0,
+                            notes: parts[3] || undefined,
+                          });
+                        }
+                      }
+                    }
+                  }
+
+                  if (items.length === 0) {
+                    errorCount++;
+                    continue;
+                  }
+
+                  // Find supplier by name
+                  let supplierId = item.supplierId || item['Supplier ID'];
+                  if (!supplierId && (item.supplier || item.Supplier)) {
+                    const supplierName = item.supplier || item.Supplier;
+                    const supplierList = (suppliers as any)?.data || (suppliers as any) || [];
+                    const supplier = supplierList.find((s: any) => 
+                      s.name.toLowerCase() === supplierName.toLowerCase()
+                    );
+                    supplierId = supplier?.id || supplier?._id;
+                  }
+
+                  if (!supplierId) {
+                    errorCount++;
+                    continue;
+                  }
+
+                  const payload: CreatePurchaseOrderRequest = {
+                    companyId,
+                    branchId: branchId || undefined,
+                    supplierId,
+                    expectedDeliveryDate: item.expectedDeliveryDate || item['Expected Delivery Date'] || '',
+                    notes: item.notes || item.Notes || undefined,
+                    items,
+                  };
+
+                  await createOrder(payload).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import purchase order:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} purchase orders`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} purchase orders`);
+              }
+            }}
+            columns={[
+              { key: 'supplier', label: 'Supplier Name', required: true, type: 'string' },
+              { key: 'items', label: 'Items (Format: Name:Qty:Price;Name:Qty:Price)', required: true, type: 'string' },
+              { key: 'expectedDeliveryDate', label: 'Expected Delivery Date', type: 'date' },
+              { key: 'notes', label: 'Notes', type: 'string' },
+            ]}
+            filename="purchase-orders-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Create Order
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

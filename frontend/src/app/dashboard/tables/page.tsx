@@ -4,26 +4,27 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { Table, useCreateTableMutation, useDeleteTableMutation, useGetTablesQuery, useUpdateTableMutation, useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import {
-  CheckCircleIcon,
-  ClockIcon,
-  EyeIcon,
-  PencilIcon,
-  PlusIcon,
-  TableCellsIcon,
-  TrashIcon,
-  UserGroupIcon,
-  XCircleIcon
+    CheckCircleIcon,
+    ClockIcon,
+    EyeIcon,
+    PencilIcon,
+    PlusIcon,
+    TableCellsIcon,
+    TrashIcon,
+    UserGroupIcon,
+    XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function TablesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
@@ -496,17 +497,62 @@ export default function TablesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Table Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage your restaurant tables and seating arrangements
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Table
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  if (!branchId) {
+                    toast.error('Branch ID is required. Please ensure you are logged in with a valid branch.');
+                    return;
+                  }
+
+                  const payload = {
+                    branchId: branchId.toString(),
+                    tableNumber: (item.tableNumber || item['Table Number'] || item.number || item.Number || '').toString(),
+                    capacity: parseInt(item.capacity || item.Capacity || 4),
+                    location: item.location || item.Location || undefined,
+                  };
+                  
+                  await createTable(payload as any).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import table:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} tables`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} tables`);
+              }
+            }}
+            columns={[
+              { key: 'tableNumber', label: 'Table Number', required: true, type: 'string' },
+              { key: 'capacity', label: 'Capacity', required: true, type: 'number' },
+              { key: 'location', label: 'Location', type: 'string' },
+            ]}
+            filename="tables-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Table
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -692,8 +738,8 @@ export default function TablesPage() {
         }}
         exportable={true}
         exportFilename="tables"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} tables as ${format}`);
+        onExport={(_format, _items) => {
+          // Export is handled automatically by ExportButton component
         }}
         emptyMessage="No tables found. Add your first table to get started."
       />

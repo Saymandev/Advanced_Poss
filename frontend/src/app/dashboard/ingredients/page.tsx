@@ -3,30 +3,32 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Combobox } from '@/components/ui/Combobox';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import {
-  InventoryItem,
-  useAddStockMutation,
-  useCreateInventoryItemMutation,
-  useDeleteInventoryItemMutation,
-  useGetInventoryItemsQuery,
-  useRemoveStockMutation,
-  useUpdateInventoryItemMutation,
+    InventoryItem,
+    useAddStockMutation,
+    useCreateInventoryItemMutation,
+    useDeleteInventoryItemMutation,
+    useGetInventoryItemsQuery,
+    useRemoveStockMutation,
+    useUpdateInventoryItemMutation,
 } from '@/lib/api/endpoints/inventoryApi';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
-import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
-  ArchiveBoxIcon,
-  BeakerIcon,
-  ExclamationTriangleIcon,
-  EyeIcon,
-  PencilIcon,
-  PlusIcon,
-  TrashIcon,
+    ArchiveBoxIcon,
+    BeakerIcon,
+    ExclamationTriangleIcon,
+    EyeIcon,
+    PencilIcon,
+    PlusIcon,
+    TrashIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -98,6 +100,43 @@ export default function IngredientsPage() {
     if (!ingredientsResponse) return [];
     return ingredientsResponse.items || [];
   }, [ingredientsResponse]);
+
+  // Get unique ingredient categories from existing ingredients for suggestions
+  const existingIngredientCategories = useMemo(() => {
+    const categories = new Set<string>();
+    ingredients.forEach((ing: any) => {
+      if (ing.category) {
+        categories.add(ing.category);
+      }
+    });
+    return Array.from(categories).map((cat) => ({
+      value: cat,
+      label: cat.charAt(0).toUpperCase() + cat.slice(1).replace(/-/g, ' '),
+    }));
+  }, [ingredients]);
+
+  // Combine predefined categories with existing categories from database
+  const ingredientCategoryOptions = useMemo(() => {
+    const predefined = [
+      { value: 'food', label: 'Food' },
+      { value: 'beverage', label: 'Beverage' },
+      { value: 'packaging', label: 'Packaging' },
+      { value: 'cleaning', label: 'Cleaning' },
+      { value: 'other', label: 'Other' },
+    ];
+    
+    const predefinedMap = new Map(predefined.map(opt => [opt.value, opt]));
+    const combined = [...predefined];
+    
+    // Add existing categories that aren't in predefined list
+    existingIngredientCategories.forEach((cat) => {
+      if (!predefinedMap.has(cat.value)) {
+        combined.push(cat);
+      }
+    });
+    
+    return combined;
+  }, [existingIngredientCategories]);
 
   const totalIngredients = useMemo(() => {
     return ingredientsResponse?.total || 0;
@@ -520,17 +559,80 @@ export default function IngredientsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Inventory Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage your restaurant ingredients and stock levels
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Ingredient
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  const payload: any = {
+                    companyId: companyId?.toString(),
+                    name: item.name || item.Name,
+                    description: item.description || item.Description || '',
+                    category: item.category || item.Category || 'food',
+                    unit: item.unit || item.Unit || 'pcs',
+                    currentStock: parseFloat(item.currentStock || item['Current Stock'] || 0),
+                    minimumStock: parseFloat(item.minimumStock || item['Minimum Stock'] || 10),
+                    maximumStock: parseFloat(item.maximumStock || item['Maximum Stock'] || 100),
+                    unitCost: parseFloat(item.unitCost || item['Unit Cost'] || item.price || item.Price || 0),
+                    preferredSupplierId: item.preferredSupplierId || item['Preferred Supplier'] || undefined,
+                    storageLocation: item.storageLocation || item['Storage Location'] || undefined,
+                    storageTemperature: item.storageTemperature || item['Storage Temperature'] || undefined,
+                    shelfLife: item.shelfLife || item['Shelf Life'] || undefined,
+                    sku: item.sku || item.SKU || undefined,
+                    barcode: item.barcode || item.Barcode || undefined,
+                    notes: item.notes || item.Notes || undefined,
+                  };
+
+                  if (branchId) {
+                    payload.branchId = branchId.toString();
+                  }
+
+                  await createIngredient(payload as any).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import ingredient:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} ingredients`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} ingredients`);
+              }
+            }}
+            columns={[
+              { key: 'name', label: 'Name', required: true, type: 'string' },
+              { key: 'category', label: 'Category', required: true, type: 'string' },
+              { key: 'unit', label: 'Unit', required: true, type: 'string' },
+              { key: 'unitCost', label: 'Unit Cost', required: true, type: 'number' },
+              { key: 'currentStock', label: 'Current Stock', type: 'number' },
+              { key: 'minimumStock', label: 'Minimum Stock', type: 'number' },
+              { key: 'maximumStock', label: 'Maximum Stock', type: 'number' },
+              { key: 'description', label: 'Description', type: 'string' },
+              { key: 'storageLocation', label: 'Storage Location', type: 'string' },
+              { key: 'sku', label: 'SKU', type: 'string' },
+            ]}
+            filename="ingredients-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Ingredient
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -611,11 +713,7 @@ export default function IngredientsPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Categories' },
-                  { value: 'food', label: 'Food' },
-                  { value: 'beverage', label: 'Beverage' },
-                  { value: 'packaging', label: 'Packaging' },
-                  { value: 'cleaning', label: 'Cleaning' },
-                  { value: 'other', label: 'Other' },
+                  ...ingredientCategoryOptions,
                 ]}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
@@ -664,9 +762,8 @@ export default function IngredientsPage() {
           }}
           exportable={true}
           exportFilename="ingredients"
-          onExport={(format, items) => {
-            console.log(`Exporting ${items.length} ingredients as ${format}`);
-            toast.success(`Exporting ${items.length} ingredients as ${format.toUpperCase()}`);
+          onExport={(_format, _items) => {
+            // Export is handled automatically by ExportButton component
           }}
           emptyMessage="No ingredients found. Add your first ingredient to get started."
         />
@@ -690,18 +787,18 @@ export default function IngredientsPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
-            <Select
-              label="Category"
-              options={[
-                { value: 'food', label: 'Food' },
-                { value: 'beverage', label: 'Beverage' },
-                { value: 'packaging', label: 'Packaging' },
-                { value: 'cleaning', label: 'Cleaning' },
-                { value: 'other', label: 'Other' },
-              ]}
-              value={formData.category}
-              onChange={(value) => setFormData({ ...formData, category: value })}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Category *
+              </label>
+              <Combobox
+                value={formData.category || 'food'}
+                onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
+                options={ingredientCategoryOptions}
+                placeholder="Select a category or enter custom category..."
+                allowCustom={true}
+              />
+            </div>
           </div>
 
           <div>
@@ -846,18 +943,18 @@ export default function IngredientsPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
-            <Select
-              label="Category"
-              options={[
-                { value: 'food', label: 'Food' },
-                { value: 'beverage', label: 'Beverage' },
-                { value: 'packaging', label: 'Packaging' },
-                { value: 'cleaning', label: 'Cleaning' },
-                { value: 'other', label: 'Other' },
-              ]}
-              value={formData.category}
-              onChange={(value) => setFormData({ ...formData, category: value })}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Category *
+              </label>
+              <Combobox
+                value={formData.category || 'food'}
+                onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
+                options={ingredientCategoryOptions}
+                placeholder="Select a category or enter custom category..."
+                allowCustom={true}
+              />
+            </div>
           </div>
 
           <div>

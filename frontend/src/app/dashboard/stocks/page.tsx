@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -69,6 +70,43 @@ export default function StocksPage() {
   const totalIngredients = useMemo(() => {
     return ingredientsResponse?.total || 0;
   }, [ingredientsResponse]);
+
+  // Get unique ingredient categories from existing ingredients for suggestions
+  const existingIngredientCategories = useMemo(() => {
+    const categories = new Set<string>();
+    ingredients.forEach((ing: any) => {
+      if (ing.category) {
+        categories.add(ing.category);
+      }
+    });
+    return Array.from(categories).map((cat) => ({
+      value: cat,
+      label: cat.charAt(0).toUpperCase() + cat.slice(1).replace(/-/g, ' '),
+    }));
+  }, [ingredients]);
+
+  // Combine predefined categories with existing categories from database
+  const ingredientCategoryOptions = useMemo(() => {
+    const predefined = [
+      { value: 'food', label: 'Food' },
+      { value: 'beverage', label: 'Beverage' },
+      { value: 'packaging', label: 'Packaging' },
+      { value: 'cleaning', label: 'Cleaning' },
+      { value: 'other', label: 'Other' },
+    ];
+    
+    const predefinedMap = new Map(predefined.map(opt => [opt.value, opt]));
+    const combined = [...predefined];
+    
+    // Add existing categories that aren't in predefined list
+    existingIngredientCategories.forEach((cat) => {
+      if (!predefinedMap.has(cat.value)) {
+        combined.push(cat);
+      }
+    });
+    
+    return combined;
+  }, [existingIngredientCategories]);
 
   const lowStockItems = useMemo(() => {
     return lowStockData || [];
@@ -284,13 +322,80 @@ export default function StocksPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Stock Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Monitor inventory levels and stock alerts
           </p>
         </div>
+        <ImportButton
+          onImport={async (data, _result) => {
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const item of data) {
+              try {
+                // Find ingredient by name
+                const ingredientName = item.ingredient || item.Ingredient || item.name || item.Name;
+                const ingredient = ingredients.find((ing: any) => 
+                  ing.name.toLowerCase() === ingredientName.toLowerCase()
+                );
+
+                if (!ingredient) {
+                  errorCount++;
+                  continue;
+                }
+
+                const quantity = parseFloat(item.quantity || item.Quantity || 0);
+                const type = (item.type || item.Type || 'add').toLowerCase();
+
+                if (quantity <= 0) {
+                  errorCount++;
+                  continue;
+                }
+
+                if (type === 'add' || type === 'increase') {
+                  await addStock({ 
+                    id: ingredient.id, 
+                    quantity 
+                  }).unwrap();
+                  successCount++;
+                } else if (type === 'remove' || type === 'decrease' || type === 'subtract') {
+                  if (quantity > (ingredient.currentStock || 0)) {
+                    errorCount++;
+                    continue;
+                  }
+                  await removeStock({ 
+                    id: ingredient.id, 
+                    quantity 
+                  }).unwrap();
+                  successCount++;
+                } else {
+                  errorCount++;
+                }
+              } catch (error: any) {
+                console.error('Failed to import stock adjustment:', item, error);
+                errorCount++;
+              }
+            }
+
+            if (successCount > 0) {
+              toast.success(`Successfully imported ${successCount} stock adjustments`);
+              await refetch();
+            }
+            if (errorCount > 0) {
+              toast.error(`Failed to import ${errorCount} stock adjustments`);
+            }
+          }}
+          columns={[
+            { key: 'ingredient', label: 'Ingredient Name', required: true, type: 'string' },
+            { key: 'quantity', label: 'Quantity', required: true, type: 'number' },
+            { key: 'type', label: 'Type (add/remove)', required: true, type: 'string' },
+          ]}
+          filename="stock-adjustments-import-template"
+          variant="secondary"
+        />
       </div>
 
       {/* Low Stock Alert Banner */}
@@ -400,11 +505,7 @@ export default function StocksPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Categories' },
-                  { value: 'food', label: 'Food' },
-                  { value: 'beverage', label: 'Beverage' },
-                  { value: 'packaging', label: 'Packaging' },
-                  { value: 'cleaning', label: 'Cleaning' },
-                  { value: 'other', label: 'Other' },
+                  ...ingredientCategoryOptions,
                 ]}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
@@ -453,8 +554,8 @@ export default function StocksPage() {
           }}
           exportable={true}
           exportFilename="stock-levels"
-          onExport={(format, items) => {
-            toast.success(`Exporting ${items.length} stock items as ${format.toUpperCase()}`);
+          onExport={(_format, _items) => {
+            // Export is handled automatically by ExportButton component
           }}
           emptyMessage="No stock items found."
         />

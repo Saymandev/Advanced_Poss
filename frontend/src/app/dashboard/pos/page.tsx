@@ -703,10 +703,12 @@ export default function POSPage() {
   const branchId = (user as any)?.branchId || 
                    (user as any)?.branch?.id || 
                    (user as any)?.branch?._id;
+  const companyId = (user as any)?.companyId || (companyContext as any)?.companyId;
 
   const { data: staffData, isLoading: staffLoading, error: staffError } = useGetStaffQuery(
     { 
-      branchId,
+      companyId: companyId || undefined,
+      branchId: branchId || undefined,
       limit: 200, 
       isActive: true 
     },
@@ -2381,7 +2383,7 @@ export default function POSPage() {
   const renderPreOrderView = () => {
     if (orderType === 'dine-in') {
       return (
-        <div className="flex-1 overflow-y-auto px-6 py-10">
+        <div className="flex-1 overflow-y-auto px-6 py-10 min-h-0">
           <div className="mx-auto max-w-5xl space-y-8">
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Select a table to start a dine-in order</h2>
@@ -2645,10 +2647,10 @@ export default function POSPage() {
   };
 
   const renderOrderingWorkspace = () => (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="bg-gray-50 dark:bg-slate-900/80 backdrop-blur border-b border-gray-200 dark:border-slate-800 px-6 py-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex-1">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <div className="bg-gray-50 dark:bg-slate-900/80 backdrop-blur border-b border-gray-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+        <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex-1 min-w-0">
             <label className="text-xs font-semibold uppercase text-slate-400 tracking-[0.2em] block mb-2">
               Search menu items
             </label>
@@ -2658,12 +2660,12 @@ export default function POSPage() {
                 placeholder='Try "salmon", "latte", or scan a barcode'
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-11 h-11 bg-white dark:bg-slate-950/90 border border-gray-300 dark:border-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:border-sky-600 focus:ring-sky-600/40"
+                className="pl-11 h-10 sm:h-11 bg-white dark:bg-slate-950/90 border border-gray-300 dark:border-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:border-sky-600 focus:ring-sky-600/40 text-sm sm:text-base"
               />
             </div>
           </div>
-          <div className="flex flex-col gap-3 items-stretch lg:items-end">
-            <div className="flex flex-wrap items-center gap-3 justify-between sm:justify-end">
+          <div className="flex flex-col gap-2 sm:gap-3 items-stretch lg:items-end">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-between sm:justify-end">
               <div className="flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-4 py-2">
                 <UserGroupIcon className="h-4 w-4 text-gray-500 dark:text-slate-400" />
                 <select
@@ -2698,20 +2700,24 @@ export default function POSPage() {
                 Calculator
               </Button>
             </div>
-            <div className="flex flex-wrap items-center gap-2 justify-between sm:justify-end relative">
+            <div className="flex flex-wrap items-center gap-2 justify-between sm:justify-end relative w-full sm:w-auto">
               <Button
                 variant="secondary"
                 onClick={() => setIsCartModalOpen(true)}
-                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 relative z-10"
+                className="flex items-center gap-1 sm:gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 relative z-10 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
               >
                 <ShoppingCartIcon className="h-4 w-4" />
-                Open Order Cart
+                <span className="hidden sm:inline">Open Order Cart</span>
+                <span className="sm:hidden">Cart</span>
               </Button>
               
               {/* Payment Mode Toggle - In the middle */}
-              <div className="flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 relative overflow-visible">
-                <span className="text-xs font-medium text-gray-600 dark:text-slate-400 whitespace-nowrap">
+              <div className="flex items-center gap-1 sm:gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-2 sm:px-3 py-1.5 sm:py-2 relative overflow-visible">
+                <span className="text-xs font-medium text-gray-600 dark:text-slate-400 whitespace-nowrap hidden sm:inline">
                   {paymentMode === 'pay-first' ? 'Pay First' : 'Pay Later'}
+                </span>
+                <span className="text-xs font-medium text-gray-600 dark:text-slate-400 whitespace-nowrap sm:hidden">
+                  {paymentMode === 'pay-first' ? 'Pay 1st' : 'Pay Later'}
                 </span>
                 <button
                   onClick={() => setPaymentMode(prev => prev === 'pay-first' ? 'pay-later' : 'pay-first')}
@@ -2747,19 +2753,19 @@ export default function POSPage() {
                 variant="primary"
                 onClick={() => setIsPaymentModalOpen(true)}
                 disabled={cart.length === 0 || checkoutBlocked}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40"
+                className="flex items-center gap-1 sm:gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 flex-1 sm:flex-initial"
               >
                 <CreditCardIcon className="h-4 w-4" />
-                Checkout
+                <span>Checkout</span>
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 min-h-0">
         {menuItemsLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
             {[...Array(8)].map((_, i) => (
               <Card key={i} className="animate-pulse bg-gray-100 dark:bg-slate-900/40 border border-gray-200 dark:border-slate-800">
                 <CardContent className="p-4">
@@ -2771,7 +2777,7 @@ export default function POSPage() {
             ))}
           </div>
         ) : filteredMenuItems.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
             {filteredMenuItems.map((item) => (
               <Card
                 key={item.id}
@@ -2874,16 +2880,28 @@ export default function POSPage() {
   const renderQueuePanel = () => {
     if (isQueueCollapsed) {
       return (
-        <aside className="hidden md:flex md:w-16 md:flex-col md:items-center md:justify-center border-l border-gray-200 dark:border-slate-900/50 bg-white dark:bg-slate-950/60">
-          <Button
-            variant="ghost"
+        <>
+          {/* Mobile: Floating button to open queue */}
+          <button
             onClick={() => setIsQueueCollapsed(false)}
-            className="flex flex-col items-center gap-2 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white"
+            className="fixed bottom-4 right-4 z-50 md:hidden flex items-center justify-center w-14 h-14 rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/50 transition-all"
+            aria-label="Open Orders Queue"
           >
-            <ChevronLeftIcon className="h-5 w-5" />
-            <span className="text-xs font-medium">Queue</span>
-          </Button>
-        </aside>
+            <ClipboardDocumentListIcon className="h-6 w-6" />
+          </button>
+          
+          {/* Desktop: Side collapsed panel */}
+          <aside className="hidden md:flex md:w-16 md:flex-col md:items-center md:justify-center border-l border-gray-200 dark:border-slate-900/50 bg-white dark:bg-slate-950/60">
+            <Button
+              variant="ghost"
+              onClick={() => setIsQueueCollapsed(false)}
+              className="flex flex-col items-center gap-2 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white"
+            >
+              <ChevronLeftIcon className="h-5 w-5" />
+              <span className="text-xs font-medium">Queue</span>
+            </Button>
+          </aside>
+        </>
       );
     }
 
@@ -2891,9 +2909,13 @@ export default function POSPage() {
       <>
         <div
           className="fixed inset-0 z-30 bg-black/50 dark:bg-slate-950/70 backdrop-blur-sm md:hidden"
-          onClick={() => setIsQueueCollapsed(true)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsQueueCollapsed(true);
+          }}
         />
-        <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-md flex-col border-l border-gray-200 dark:border-slate-900 bg-white dark:bg-slate-950/95 shadow-xl md:static md:z-auto md:max-w-xs md:bg-white md:dark:bg-slate-950/80">
+        <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-md flex-col border-l border-gray-200 dark:border-slate-900 bg-white dark:bg-slate-950/95 shadow-xl md:static md:z-auto md:max-w-xs md:bg-white md:dark:bg-slate-950/80 min-h-0">
           <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900/70 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Orders</p>
@@ -2915,9 +2937,14 @@ export default function POSPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setIsQueueCollapsed(true)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsQueueCollapsed(true);
+                }}
                 className="h-9 w-9 rounded-full border border-slate-800 bg-slate-900/80 text-slate-200 hover:bg-slate-800/80"
                 title="Collapse queue"
+                type="button"
               >
                 <ChevronRightIcon className="h-4 w-4" />
               </Button>
@@ -3274,24 +3301,24 @@ export default function POSPage() {
                 <ActiveOrderIcon className="h-4 w-4 text-sky-600 dark:text-sky-300" />
                 <span className="font-medium tracking-wide text-gray-900 dark:text-slate-100">{orderTypeLabel} mode</span>
           </div>
-              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/70 px-3 py-1.5">
-                <ClipboardDocumentListIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
-                <span className="text-gray-900 dark:text-slate-100">{orderSummary.itemCount} item{orderSummary.itemCount === 1 ? '' : 's'} in cart</span>
+              <div className="flex items-center gap-1 sm:gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/70 px-2 sm:px-3 py-1 sm:py-1.5">
+                <ClipboardDocumentListIcon className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-300 flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-gray-900 dark:text-slate-100 whitespace-nowrap">{orderSummary.itemCount} item{orderSummary.itemCount === 1 ? '' : 's'} in cart</span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/70 px-3 py-1.5">
-                <CurrencyDollarIcon className="h-4 w-4 text-amber-600 dark:text-amber-300" />
-                <span className="text-gray-900 dark:text-slate-100">Total {formatCurrency(orderSummary.total)}</span>
+              <div className="flex items-center gap-1 sm:gap-2 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/70 px-2 sm:px-3 py-1 sm:py-1.5">
+                <CurrencyDollarIcon className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-300 flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-gray-900 dark:text-slate-100 whitespace-nowrap">Total {formatCurrency(orderSummary.total)}</span>
               </div>
               {requiresDeliveryDetails && (
-                <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 border ${deliveryIsValid ? 'border-emerald-500/40 bg-emerald-500/10 dark:text-emerald-200 text-gray-900' : 'border-amber-500/40 bg-amber-500/10 dark:text-amber-100 text-gray-900'}`}>
-                  <TruckIcon className="h-4 w-4" />
-                  <span className="whitespace-nowrap">{deliveryIsValid ? 'Delivery details complete' : `Missing ${missingDeliveryFields.length} delivery field${missingDeliveryFields.length === 1 ? '' : 's'}`}</span>
+                <div className={`flex items-center gap-1 sm:gap-2 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 border text-xs sm:text-sm ${deliveryIsValid ? 'border-emerald-500/40 bg-emerald-500/10 dark:text-emerald-200 text-gray-900' : 'border-amber-500/40 bg-amber-500/10 dark:text-amber-100 text-gray-900'}`}>
+                  <TruckIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="whitespace-nowrap">{deliveryIsValid ? 'Delivery details complete' : `Missing ${missingDeliveryFields.length} field${missingDeliveryFields.length === 1 ? '' : 's'}`}</span>
                 </div>
               )}
               {requiresTakeawayDetails && (
-                <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 border ${takeawayIsValid ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/40 bg-amber-500/10 text-amber-100'}`}>
-                  <ShoppingBagIcon className="h-4 w-4" />
-                  <span className="whitespace-nowrap">{takeawayIsValid ? 'Takeaway details ready' : `Missing ${missingTakeawayFields.length} contact detail${missingTakeawayFields.length === 1 ? '' : 's'}`}</span>
+                <div className={`flex items-center gap-1 sm:gap-2 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 border text-xs sm:text-sm ${takeawayIsValid ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/40 bg-amber-500/10 text-amber-100'}`}>
+                  <ShoppingBagIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="whitespace-nowrap">{takeawayIsValid ? 'Takeaway ready' : `Missing ${missingTakeawayFields.length} detail${missingTakeawayFields.length === 1 ? '' : 's'}`}</span>
                 </div>
               )}
             </div>
@@ -3306,54 +3333,62 @@ export default function POSPage() {
                       size="sm"
                       variant={isActive ? 'primary' : 'secondary'}
                       onClick={() => handleOrderTypeChange(value)}
-                    className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition ${isActive ? 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25' : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'}`}
+                    className={`flex items-center gap-1 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm transition ${isActive ? 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25' : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'}`}
                     >
-                      <Icon className="h-4 w-4" />
-                      {label}
+                      <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">{label}</span>
                     </Button>
                   );
                 })}
               </div>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end w-full sm:w-auto">
               <Button
                 variant={isQueueCollapsed ? 'secondary' : 'primary'}
-                onClick={() => setIsQueueCollapsed((prev) => !prev)}
-                className={`flex items-center gap-2 rounded-xl ${
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsQueueCollapsed((prev) => !prev);
+                }}
+                className={`flex items-center gap-1 sm:gap-2 rounded-xl text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 ${
                   isQueueCollapsed
                     ? 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80'
                     : 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25'
                 }`}
+                type="button"
               >
-                <ClipboardDocumentListIcon className="h-4 w-4" />
-                Orders Queue (F1)
+                <ClipboardDocumentListIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Orders Queue (F1)</span>
+                <span className="sm:hidden">Queue</span>
               </Button>
               <Button
                 variant="secondary"
                 onClick={clearCart}
                 disabled={cart.length === 0}
-                className="flex items-center gap-2 rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
+                className="flex items-center gap-1 sm:gap-2 rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
               >
-                <TrashIcon className="h-4 w-4" />
-                Clear Cart (F3)
+                <TrashIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Clear Cart (F3)</span>
+                <span className="sm:hidden">Clear</span>
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => setShowKeyboardShortcuts(true)}
-                className="flex items-center gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+                className="flex items-center gap-1 sm:gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
               >
-                ⌨️ Shortcuts (F4)
+                <span className="hidden sm:inline">⌨️ Shortcuts (F4)</span>
+                <span className="sm:hidden">⌨️</span>
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row min-h-0">
+        <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
           {isOrderingActive ? renderOrderingWorkspace() : renderPreOrderView()}
-                </div>
+        </div>
         {renderQueuePanel()}
-              </div>
+      </div>
 
       {/* Order Cart Modal */}
       <Modal

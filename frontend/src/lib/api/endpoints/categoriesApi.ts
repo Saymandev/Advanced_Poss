@@ -6,6 +6,7 @@ export interface Category {
   description?: string;
   icon?: string;
   color?: string;
+  type?: string; // Category type - can be any custom value
   sortOrder?: number;
   isActive: boolean;
   companyId: string;
@@ -19,6 +20,7 @@ export interface CreateCategoryRequest {
   description?: string;
   icon?: string;
   color?: string;
+  type?: string; // Category type - can be any custom value
   sortOrder?: number;
 }
 
@@ -280,6 +282,18 @@ export const categoriesApi = apiSlice.injectEndpoints({
         'MenuItem', // Menu items might filter by active categories
       ],
     }),
+    getCategoryTypes: builder.query<{ types: Array<{ value: string; label: string }> }, void>({
+      query: () => '/categories/types',
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        if (data.types && Array.isArray(data.types)) {
+          return { types: data.types };
+        }
+        // Fallback if response structure is different
+        return { types: [] };
+      },
+      providesTags: ['CategoryTypes'],
+    }),
   }),
 });
 
@@ -293,5 +307,6 @@ export const {
   useUpdateCategorySortOrderMutation,
   useDeleteCategoryMutation,
   useToggleCategoryStatusMutation,
+  useGetCategoryTypesQuery,
 } = categoriesApi;
 

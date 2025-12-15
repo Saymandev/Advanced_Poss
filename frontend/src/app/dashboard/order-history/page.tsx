@@ -4,10 +4,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
+import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery } from '@/lib/api/endpoints/posApi';
 import { useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -24,6 +25,7 @@ import {
   UserIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
+import { useSearchParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -42,12 +44,16 @@ interface Order {
     name: string;
     quantity: number;
     price: number;
+    basePrice?: number;
     notes?: string;
   }>;
   total: number;
   tax: number;
+  serviceCharge?: number;
   tip?: number;
   discount?: number;
+  taxRate?: number;
+  serviceChargeRate?: number;
   paymentMethod?: 'cash' | 'card' | 'digital_wallet';
   paymentStatus: string;
   createdAt: string;
@@ -211,12 +217,15 @@ function OrderReview({ orderId }: { orderId: string }) {
 
 export default function OrdersPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  const searchParams = useSearchParams();
+  const urlSearch = searchParams.get('search') || '';
+  
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [committedSearch, setCommittedSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState(urlSearch);
+  const [committedSearch, setCommittedSearch] = useState(urlSearch);
   const [statusFilter, setStatusFilter] = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'dine-in' | 'takeaway' | 'delivery'>('all');
   const [activeQuickRange, setActiveQuickRange] = useState<QuickRange>('last7');
@@ -244,7 +253,20 @@ export default function OrdersPage() {
     skip: !selectedOrderId || !isViewModalOpen,
   });
   
+  // Get POS settings for tax rate and service charge
+  const { data: posSettings } = useGetPOSSettingsQuery({
+    branchId: branchId || undefined,
+  }, { skip: !branchId });
+  
   const [cancelPOSOrder, { isLoading: isCancelling }] = useCancelPOSOrderMutation();
+
+  // Update search when URL param changes
+  useEffect(() => {
+    if (urlSearch && urlSearch !== committedSearch) {
+      setSearchTerm(urlSearch);
+      setCommittedSearch(urlSearch);
+    }
+  }, [urlSearch, committedSearch]);
 
   const handleQuickRange = (range: QuickRange) => {
     setActiveQuickRange(range);
@@ -321,15 +343,19 @@ export default function OrdersPage() {
         items:
           order.items?.map((item: any) => ({
             id: item._id || item.id || item.menuItemId?._id || item.menuItemId,
-            name: item.menuItemId?.name || item.name,
+            name: item.menuItemId?.name || item.name || 'Unknown Item',
             quantity: item.quantity,
-            price: item.price,
+            price: item.price, // Actual price used in order (may include modifications)
+            basePrice: item.basePrice || item.menuItemId?.price || item.price, // Use stored basePrice, fallback to populated menuItem price, then item price
             notes: item.notes,
           })) || [],
         total: order.totalAmount ?? order.total ?? 0,
         tax: order.taxAmount ?? order.tax ?? 0,
+        serviceCharge: order.serviceChargeAmount ?? order.serviceCharge ?? 0,
         tip: order.tipAmount ?? order.tip,
-        discount: order.discountAmount ?? order.discount,
+        discount: order.loyaltyDiscount ?? order.discountAmount ?? order.discount ?? 0,
+        taxRate: order.taxRate ?? posSettings?.taxRate ?? 0,
+        serviceChargeRate: order.serviceChargeRate ?? posSettings?.serviceCharge ?? 0,
         paymentMethod: order.paymentMethod,
         paymentStatus: order.status === 'paid' ? 'paid' : 'pending',
         createdAt: order.createdAt || new Date().toISOString(),
@@ -344,7 +370,7 @@ export default function OrdersPage() {
           order.waiterName,
       };
     });
-  }, [ordersResponse]);
+  }, [ordersResponse, posSettings]);
   
   const totalOrders = useMemo(() => {
     if (typeof ordersResponse?.total === 'number') {
@@ -631,15 +657,19 @@ export default function OrdersPage() {
         items:
           orderData.items?.map((item: any) => ({
             id: item._id || item.id || item.menuItemId?._id || item.menuItemId,
-            name: item.menuItemId?.name || item.name,
+            name: item.menuItemId?.name || item.name || 'Unknown Item',
             quantity: item.quantity,
-            price: item.price,
+            price: item.price, // Actual price used in order (may include modifications)
+            basePrice: item.basePrice || item.menuItemId?.price || item.price, // Use stored basePrice, fallback to populated menuItem price, then item price
             notes: item.notes,
           })) || [],
         total: orderData.totalAmount ?? orderData.total ?? 0,
         tax: orderData.taxAmount ?? orderData.tax ?? 0,
+        serviceCharge: orderData.serviceChargeAmount ?? orderData.serviceCharge ?? 0,
         tip: orderData.tipAmount ?? orderData.tip,
-        discount: orderData.discountAmount ?? orderData.discount,
+        discount: orderData.loyaltyDiscount ?? orderData.discountAmount ?? orderData.discount ?? 0,
+        taxRate: orderData.taxRate ?? posSettings?.taxRate ?? 0,
+        serviceChargeRate: orderData.serviceChargeRate ?? posSettings?.serviceCharge ?? 0,
         paymentMethod: orderData.paymentMethod,
         paymentStatus: orderData.status === 'paid' ? 'paid' : 'pending',
         createdAt: orderData.createdAt || new Date().toISOString(),
@@ -654,7 +684,7 @@ export default function OrdersPage() {
           orderData.waiterName,
       });
     }
-  }, [selectedOrderData, selectedOrderId]);
+  }, [selectedOrderData, selectedOrderId, posSettings]);
 
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<string, 'warning' | 'info' | 'success' | 'secondary' | 'danger'> = {
@@ -812,7 +842,20 @@ export default function OrdersPage() {
             Manage restaurant orders and transactions
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              toast.info('Orders are typically created through the POS system. Import functionality is for reference only.');
+            }}
+            columns={[
+              { key: 'orderNumber', label: 'Order Number', type: 'string' },
+              { key: 'customerName', label: 'Customer Name', type: 'string' },
+              { key: 'total', label: 'Total Amount', type: 'number' },
+              { key: 'status', label: 'Status', type: 'string' },
+            ]}
+            filename="order-history-import-template"
+            variant="secondary"
+          />
           <Button onClick={() => window.open('/dashboard/pos', '_blank')}>
             <PlusIcon className="w-5 h-5 mr-2" />
             New Order
@@ -965,9 +1008,8 @@ export default function OrdersPage() {
           }}
           exportable={true}
           exportFilename="orders"
-          onExport={(format, items) => {
-            console.log(`Exporting ${items.length} orders as ${format}`);
-            toast.success(`Exporting ${items.length} orders as ${format.toUpperCase()}`);
+          onExport={(_format, _items) => {
+            // Export is handled automatically by ExportButton component
           }}
           emptyMessage="No orders found."
         />
@@ -1124,38 +1166,127 @@ export default function OrdersPage() {
                     </span>
                   </div>
                   {(() => {
+                    // Calculate subtotal from items
                     const subtotal = selectedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                    const serviceCharge = Math.max(0, selectedOrder.total - subtotal - (selectedOrder.tax || 0));
-                    const serviceChargeRate = subtotal > 0 ? Math.round((serviceCharge / subtotal) * 100) : 0;
-                    return serviceCharge > 0 ? (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600 dark:text-gray-400">SC ({serviceChargeRate}%):</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {formatCurrency(serviceCharge)}
-                        </span>
-                      </div>
-                    ) : null;
+                    
+                    // Get discount amount from order (loyaltyDiscount or discountAmount)
+                    const storedDiscount = selectedOrder.discount || 0;
+                    
+                    // Get tax rate and service charge rate from order or settings
+                    const taxRate = selectedOrder.taxRate ?? posSettings?.taxRate ?? 0;
+                    const serviceChargeRate = selectedOrder.serviceChargeRate ?? posSettings?.serviceCharge ?? 0;
+                    
+                    const actualTotal = selectedOrder.total;
+                    
+                    // Reverse-engineer the discount and tax/SC from the actual total
+                    // Based on POS payment screen logic (from pos/page.tsx line 877-879):
+                    // taxableSubtotal = Math.max(base.subtotal - totalDiscount, 0);
+                    // taxAmount = (taxableSubtotal * taxRate) / 100;
+                    // total = taxableSubtotal + taxAmount + deliveryFeeValue;
+                    //
+                    // So the formula is:
+                    // Total = (subtotal - discount) + (subtotal - discount) * taxRate/100
+                    // Total = (subtotal - discount) * (1 + taxRate/100)
+                    // (subtotal - discount) = Total / (1 + taxRate/100)
+                    // discount = subtotal - Total / (1 + taxRate/100)
+                    
+                    let discount = storedDiscount;
+                    let taxAmount = 0;
+                    let serviceChargeAmount = 0;
+                    
+                    // First, try with stored discount
+                    if (storedDiscount > 0 && storedDiscount <= subtotal) {
+                      discount = storedDiscount;
+                      const baseForTaxAndSC = subtotal - discount;
+                      taxAmount = Math.round(baseForTaxAndSC * (taxRate / 100) * 100) / 100;
+                      serviceChargeAmount = Math.round(baseForTaxAndSC * (serviceChargeRate / 100) * 100) / 100;
+                      
+                      // Verify calculation matches
+                      const calculatedTotal = baseForTaxAndSC + taxAmount + serviceChargeAmount;
+                      if (Math.abs(calculatedTotal - actualTotal) > 0.01) {
+                        // Stored discount doesn't match, need to recalculate
+                        discount = 0;
+                      }
+                    }
+                    
+                    // If no stored discount or it doesn't match, calculate it
+                    if (discount === 0) {
+                      const totalRate = taxRate + serviceChargeRate;
+                      
+                      if (totalRate > 0) {
+                        // Calculate what the discounted subtotal should be based on the actual total
+                        // Total = (subtotal - discount) * (1 + totalRate/100)
+                        // (subtotal - discount) = Total / (1 + totalRate/100)
+                        const discountedSubtotal = actualTotal / (1 + totalRate / 100);
+                        discount = Math.max(0, subtotal - discountedSubtotal);
+                        discount = Math.round(discount * 100) / 100;
+                        
+                        // Calculate tax and service charge on the discounted subtotal
+                        const baseForTaxAndSC = subtotal - discount;
+                        taxAmount = Math.round(baseForTaxAndSC * (taxRate / 100) * 100) / 100;
+                        serviceChargeAmount = Math.round(baseForTaxAndSC * (serviceChargeRate / 100) * 100) / 100;
+                        
+                        // Verify: (subtotal - discount) + tax + sc should equal actualTotal
+                        const calculatedTotal = baseForTaxAndSC + taxAmount + serviceChargeAmount;
+                        const difference = Math.abs(calculatedTotal - actualTotal);
+                        
+                        // If there's a rounding difference, adjust tax to match
+                        if (difference > 0.01 && difference < 1) {
+                          // Small rounding difference, adjust tax to make total match
+                          taxAmount = actualTotal - baseForTaxAndSC - serviceChargeAmount;
+                          taxAmount = Math.round(taxAmount * 100) / 100;
+                        }
+                      } else {
+                        // No tax or service charge, discount is just the difference
+                        discount = Math.max(0, subtotal - actualTotal);
+                        discount = Math.round(discount * 100) / 100;
+                      }
+                    }
+                    
+                    // Calculate discount percentage
+                    const discountPercentage = discount > 0 && subtotal > 0
+                      ? Math.round((discount / subtotal) * 100 * 100) / 100
+                      : 0;
+                    
+                    return (
+                      <>
+                        {discount > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Discount{discountPercentage > 0 ? ` (${discountPercentage}%)` : ''}:
+                            </span>
+                            <span className="font-medium text-red-600 dark:text-red-400">
+                              -{formatCurrency(discount)}
+                            </span>
+                          </div>
+                        )}
+                        {serviceChargeAmount > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600 dark:text-gray-400">SC ({serviceChargeRate}%):</span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {formatCurrency(serviceChargeAmount)}
+                            </span>
+                          </div>
+                        )}
+                        {taxAmount > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600 dark:text-gray-400">Tax ({taxRate}%):</span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {formatCurrency(taxAmount)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">Total:</span>
+                            <span className="text-xl font-bold text-gray-900 dark:text-white">
+                              {formatCurrency(selectedOrder.total)}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    );
                   })()}
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">VAT 5%:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(selectedOrder.tax)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">Discount:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {selectedOrder.discount ? formatCurrency(selectedOrder.discount) : formatCurrency(0)}
-                    </span>
-                  </div>
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">Total:</span>
-                      <span className="text-xl font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(selectedOrder.total + (selectedOrder.tip || 0) - (selectedOrder.discount || 0))}
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1196,10 +1327,18 @@ export default function OrdersPage() {
                           {getStatusBadge(selectedOrder.status)}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <span className="text-gray-900 dark:text-white">{formatCurrency(item.price)}</span>
+                          <span className="text-gray-900 dark:text-white">
+                            {formatCurrency(item.basePrice ?? item.price)}
+                          </span>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="text-gray-600 dark:text-gray-400">—</span>
+                          {item.price !== (item.basePrice ?? item.price) ? (
+                            <span className="text-xs text-gray-600 dark:text-gray-400">
+                              Modified
+                            </span>
+                          ) : (
+                            <span className="text-gray-600 dark:text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <span className="text-gray-900 dark:text-white">{formatCurrency(item.price)}</span>
@@ -1221,6 +1360,129 @@ export default function OrdersPage() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    {(() => {
+                      // Calculate subtotal from items
+                      const subtotal = selectedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                      
+                      // Get discount amount from order (loyaltyDiscount or discountAmount)
+                      const storedDiscount = selectedOrder.discount || 0;
+                      
+                      // Get tax rate and service charge rate from order or settings
+                      const taxRate = selectedOrder.taxRate ?? posSettings?.taxRate ?? 0;
+                      const serviceChargeRate = selectedOrder.serviceChargeRate ?? posSettings?.serviceCharge ?? 0;
+                      
+                      const actualTotal = selectedOrder.total;
+                      
+                      // Reverse-engineer the discount and tax/SC from the actual total
+                      let discount = storedDiscount;
+                      let taxAmount = 0;
+                      let serviceChargeAmount = 0;
+                      
+                      // First, try with stored discount
+                      if (storedDiscount > 0 && storedDiscount <= subtotal) {
+                        discount = storedDiscount;
+                        const baseForTaxAndSC = subtotal - discount;
+                        taxAmount = Math.round(baseForTaxAndSC * (taxRate / 100) * 100) / 100;
+                        serviceChargeAmount = Math.round(baseForTaxAndSC * (serviceChargeRate / 100) * 100) / 100;
+                        
+                        // Verify calculation matches
+                        const calculatedTotal = baseForTaxAndSC + taxAmount + serviceChargeAmount;
+                        if (Math.abs(calculatedTotal - actualTotal) > 0.01) {
+                          // Stored discount doesn't match, need to recalculate
+                          discount = 0;
+                        }
+                      }
+                      
+                      // If no stored discount or it doesn't match, calculate it
+                      if (discount === 0) {
+                        const totalRate = taxRate + serviceChargeRate;
+                        
+                        if (totalRate > 0) {
+                          // Calculate what the discounted subtotal should be based on the actual total
+                          const discountedSubtotal = actualTotal / (1 + totalRate / 100);
+                          discount = Math.max(0, subtotal - discountedSubtotal);
+                          discount = Math.round(discount * 100) / 100;
+                          
+                          // Calculate tax and service charge on the discounted subtotal
+                          const baseForTaxAndSC = subtotal - discount;
+                          taxAmount = Math.round(baseForTaxAndSC * (taxRate / 100) * 100) / 100;
+                          serviceChargeAmount = Math.round(baseForTaxAndSC * (serviceChargeRate / 100) * 100) / 100;
+                          
+                          // Verify: (subtotal - discount) + tax + sc should equal actualTotal
+                          const calculatedTotal = baseForTaxAndSC + taxAmount + serviceChargeAmount;
+                          const difference = Math.abs(calculatedTotal - actualTotal);
+                          
+                          // If there's a rounding difference, adjust tax to match
+                          if (difference > 0.01 && difference < 1) {
+                            // Small rounding difference, adjust tax to make total match
+                            taxAmount = actualTotal - baseForTaxAndSC - serviceChargeAmount;
+                            taxAmount = Math.round(taxAmount * 100) / 100;
+                          }
+                        } else {
+                          // No tax or service charge, discount is just the difference
+                          discount = Math.max(0, subtotal - actualTotal);
+                          discount = Math.round(discount * 100) / 100;
+                        }
+                      }
+                      
+                      return (
+                        <>
+                          <tr className="border-t-2 border-gray-300 dark:border-gray-600">
+                            <td colSpan={5} className="py-3 px-4 text-right font-medium text-gray-700 dark:text-gray-300">
+                              Subtotal:
+                            </td>
+                            <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                              {formatCurrency(subtotal)}
+                            </td>
+                            <td colSpan={3}></td>
+                          </tr>
+                          {discount > 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-2 px-4 text-right text-gray-600 dark:text-gray-400">
+                                Discount:
+                              </td>
+                              <td className="py-2 px-4 text-right font-medium text-red-600 dark:text-red-400">
+                                -{formatCurrency(discount)}
+                              </td>
+                              <td colSpan={3}></td>
+                            </tr>
+                          )}
+                          {serviceChargeAmount > 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-2 px-4 text-right text-gray-600 dark:text-gray-400">
+                                SC ({serviceChargeRate}%):
+                              </td>
+                              <td className="py-2 px-4 text-right font-medium text-gray-900 dark:text-white">
+                                {formatCurrency(serviceChargeAmount)}
+                              </td>
+                              <td colSpan={3}></td>
+                            </tr>
+                          )}
+                          {taxAmount > 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-2 px-4 text-right text-gray-600 dark:text-gray-400">
+                                Tax ({taxRate}%):
+                              </td>
+                              <td className="py-2 px-4 text-right font-medium text-gray-900 dark:text-white">
+                                {formatCurrency(taxAmount)}
+                              </td>
+                              <td colSpan={3}></td>
+                            </tr>
+                          )}
+                          <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50">
+                            <td colSpan={5} className="py-3 px-4 text-right text-lg font-bold text-gray-900 dark:text-white">
+                              TOTAL:
+                            </td>
+                            <td className="py-3 px-4 text-right text-lg font-bold text-gray-900 dark:text-white">
+                              {formatCurrency(selectedOrder.total)}
+                            </td>
+                            <td colSpan={3}></td>
+                          </tr>
+                        </>
+                      );
+                    })()}
+                  </tfoot>
                 </table>
               </div>
             </div>

@@ -3,30 +3,32 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Combobox } from '@/components/ui/Combobox';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-  Category,
-  CreateCategoryRequest,
-  useCreateCategoryMutation,
-  useDeleteCategoryMutation,
-  useGetCategoriesQuery,
-  useToggleCategoryStatusMutation,
-  useUpdateCategoryMutation
+    Category,
+    CreateCategoryRequest,
+    useCreateCategoryMutation,
+    useDeleteCategoryMutation,
+    useGetCategoriesQuery,
+    useToggleCategoryStatusMutation,
+    useUpdateCategoryMutation
 } from '@/lib/api/endpoints/categoriesApi';
+import { CATEGORY_TYPE_OPTIONS, DEFAULT_CATEGORY_TYPE } from '@/lib/constants/category-types.constant';
 import { useAppSelector } from '@/lib/store';
 import {
-  EyeIcon,
-  PencilIcon,
-  PlusIcon,
-  TagIcon,
-  TrashIcon
+    EyeIcon,
+    PencilIcon,
+    PlusIcon,
+    TagIcon,
+    TrashIcon
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function CategoriesPage() {
   const [mounted, setMounted] = useState(false);
@@ -49,7 +51,7 @@ export default function CategoriesPage() {
     description: '',
     color: '#3B82F6',
     icon: 'tag',
-    type: 'food',
+    type: DEFAULT_CATEGORY_TYPE,
     isActive: true,
     sortOrder: 0,
   });
@@ -116,12 +118,51 @@ export default function CategoriesPage() {
       id: cat.id || cat._id,
       isActive: cat.isActive !== undefined ? cat.isActive : true,
       sortOrder: cat.sortOrder || 0,
-      type: cat.type || 'food',
+      type: cat.type || DEFAULT_CATEGORY_TYPE,
       color: cat.color || '#3B82F6',
       icon: cat.icon || 'tag',
     }));
   }, [categoriesResponse]);
 
+
+  // Get unique category types from existing categories for suggestions
+  const existingCategoryTypes = useMemo(() => {
+    const types = new Set<string>();
+    categories.forEach((cat) => {
+      if (cat.type) {
+        types.add(cat.type);
+      }
+    });
+    return Array.from(types).map((type) => ({
+      value: type,
+      label: type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' '),
+    }));
+  }, [categories]);
+
+  // Combine predefined types with existing types from database
+  const categoryTypeOptions = useMemo(() => {
+    if (!CATEGORY_TYPE_OPTIONS || CATEGORY_TYPE_OPTIONS.length === 0) {
+      // Fallback if constants aren't loaded
+      return [
+        { value: 'food', label: 'Food' },
+        { value: 'beverage', label: 'Beverage' },
+        { value: 'dessert', label: 'Dessert' },
+        { value: 'special', label: 'Special' },
+      ];
+    }
+    
+    const predefinedMap = new Map(CATEGORY_TYPE_OPTIONS.map(opt => [opt.value, opt]));
+    const combined = [...CATEGORY_TYPE_OPTIONS];
+    
+    // Add existing types that aren't in predefined list
+    existingCategoryTypes.forEach((type) => {
+      if (!predefinedMap.has(type.value)) {
+        combined.push(type);
+      }
+    });
+    
+    return combined;
+  }, [existingCategoryTypes]);
 
   // Filter categories
   const filteredCategories = useMemo(() => {
@@ -157,6 +198,13 @@ export default function CategoriesPage() {
       errors.name = 'Category name must be at least 2 characters';
     } else if (formData.name.trim().length > 50) {
       errors.name = 'Category name must be less than 50 characters';
+    }
+
+    // Type validation - just check it's not empty (allow custom types)
+    if (!formData.type || !formData.type.trim()) {
+      errors.type = 'Category type is required';
+    } else if (formData.type.trim().length > 50) {
+      errors.type = 'Category type must be less than 50 characters';
     }
 
     // Description validation
@@ -197,7 +245,7 @@ export default function CategoriesPage() {
       const payload: any = {
         companyId: companyId.toString(),
         name: formData.name.trim(),
-        type: formData.type || 'food', // Required field, default to 'food'
+        type: formData.type, // Required field - validated in validateForm
       };
 
       // Optional fields
@@ -252,7 +300,7 @@ export default function CategoriesPage() {
       const payload: any = {
         id: selectedCategory.id,
         name: formData.name.trim(),
-        type: formData.type || 'food',
+        type: formData.type, // Required field - validated in validateForm
       };
 
       // Optional fields - only include if they have values
@@ -321,12 +369,16 @@ export default function CategoriesPage() {
 
   const openEditModal = (category: Category) => {
     setSelectedCategory(category);
+    // Use category's type or default
+    const categoryType = (category as any).type;
+    const type = categoryType && categoryType.trim() ? categoryType.trim() : DEFAULT_CATEGORY_TYPE;
+    
     setFormData({
       name: category.name,
       description: category.description || '',
       color: category.color || '#3B82F6',
       icon: category.icon || 'tag',
-      type: (category as any).type || 'food',
+      type: type,
       isActive: category.isActive,
       sortOrder: category.sortOrder || 0,
     });
@@ -345,7 +397,7 @@ export default function CategoriesPage() {
       description: '',
       color: '#3B82F6',
       icon: 'tag',
-      type: 'food',
+      type: DEFAULT_CATEGORY_TYPE,
       isActive: true,
       sortOrder: 0,
     });
@@ -501,7 +553,7 @@ export default function CategoriesPage() {
   return (
     <div className="space-y-6" suppressHydrationWarning>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Categories
@@ -510,10 +562,56 @@ export default function CategoriesPage() {
             Manage menu categories and organization
           </p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Category
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  const payload: any = {
+                    companyId: companyId?.toString(),
+                    name: item.name || item.Name,
+                    description: item.description || item.Description || '',
+                    type: item.type || item.Type || DEFAULT_CATEGORY_TYPE,
+                    isActive: item.isActive !== false && item.Status !== 'Inactive',
+                  };
+
+                  if (branchId) {
+                    payload.branchId = branchId.toString();
+                  }
+
+                  await createCategory(payload).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import category:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} categories`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} categories`);
+              }
+            }}
+            columns={[
+              { key: 'name', label: 'Name', required: true, type: 'string' },
+              { key: 'type', label: 'Type', required: true, type: 'string' },
+              { key: 'description', label: 'Description', type: 'string' },
+              { key: 'isActive', label: 'Status', type: 'boolean' },
+            ]}
+            filename="categories-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Category
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -714,15 +812,13 @@ export default function CategoriesPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Type *
             </label>
-            <Select
-              value={formData.type || 'food'}
-              onChange={(value: string) => setFormData({ ...formData, type: value })}
-              options={[
-                { value: 'food', label: 'Food' },
-                { value: 'beverage', label: 'Beverage' },
-                { value: 'dessert', label: 'Dessert' },
-                { value: 'special', label: 'Special' },
-              ]}
+            <Combobox
+              value={formData.type || DEFAULT_CATEGORY_TYPE}
+              onChange={(value: string) => setFormData({ ...formData, type: value.trim() })}
+              options={categoryTypeOptions}
+              placeholder="Select a type or enter custom type..."
+              allowCustom={true}
+              error={formErrors.type}
             />
           </div>
 
@@ -931,15 +1027,13 @@ export default function CategoriesPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Type *
             </label>
-            <Select
-              value={formData.type || 'food'}
-              onChange={(value: string) => setFormData({ ...formData, type: value })}
-              options={[
-                { value: 'food', label: 'Food' },
-                { value: 'beverage', label: 'Beverage' },
-                { value: 'dessert', label: 'Dessert' },
-                { value: 'special', label: 'Special' },
-              ]}
+            <Combobox
+              value={formData.type || DEFAULT_CATEGORY_TYPE}
+              onChange={(value: string) => setFormData({ ...formData, type: value.trim() })}
+              options={categoryTypeOptions}
+              placeholder="Select a type or enter custom type..."
+              allowCustom={true}
+              error={formErrors.type}
             />
           </div>
 

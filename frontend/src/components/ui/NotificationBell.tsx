@@ -25,16 +25,127 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const superAdmin = useSuperAdminNotifications();
   const fallbackNotifications = useNotifications();
   const [localOpen, setLocalOpen] = useState(false);
+  // Non-super-admin fetch state for panel hydration
+  const [isFetchingFallback, setIsFetchingFallback] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  const active = isSuperAdmin ? superAdmin : {
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1').replace(/\/$/, '');
+  const token = typeof window !== 'undefined'
+    ? (localStorage.getItem('token') || sessionStorage.getItem('token') || undefined)
+    : undefined;
+
+  const branchId = (user as any)?.branchId;
+  const companyId = (user as any)?.companyId;
+  const userId = (user as any)?.id || (user as any)?._id;
+  const userRole = (user as any)?.role?.toLowerCase();
+  const features = Array.isArray((user as any)?.enabledFeatures) ? (user as any)?.enabledFeatures : [];
+
+  // Super-admin endpoints for mark-read / mark-all
+  const markSuperAdminRead = async (id: string) => {
+    if (!token) return;
+    try {
+      await fetch(`${apiBase}/super-admin/notifications/${id}/read`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.warn('Failed to mark super-admin notification read on server:', err);
+    }
+  };
+
+  const markSuperAdminAllRead = async () => {
+    if (!token) return;
+    try {
+      await fetch(`${apiBase}/super-admin/notifications/read-all`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.warn('Failed to mark all super-admin notifications read on server:', err);
+    }
+  };
+
+  const fetchFallbackNotifications = async () => {
+    if (!token) return;
+    setIsFetchingFallback(true);
+    try {
+      const params = new URLSearchParams();
+      if (companyId) params.append('companyId', companyId);
+      if (branchId) params.append('branchId', branchId);
+      if (userRole) params.append('role', userRole);
+      if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
+      if (features.length > 0) params.append('features', features.join(','));
+
+      const res = await fetch(`${apiBase}/notifications?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json();
+      const items = body?.data?.items || body?.items || body || [];
+      if (Array.isArray(items)) {
+        fallbackNotifications.hydrateNotifications(items);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch notifications:', err);
+    } finally {
+      setIsFetchingFallback(false);
+      setHasLoaded(true);
+    }
+  };
+
+  const markReadServer = async (id: string) => {
+    if (!token) return;
+    try {
+      await fetch(`${apiBase}/notifications/${id}/read`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.warn('Failed to mark notification read on server:', err);
+    }
+  };
+
+  const markAllReadServer = async () => {
+    if (!token) return;
+    try {
+      const params = new URLSearchParams();
+      if (companyId) params.append('companyId', companyId);
+      if (branchId) params.append('branchId', branchId);
+      if (userRole) params.append('role', userRole);
+      if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
+      await fetch(`${apiBase}/notifications/read-all?${params.toString()}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.warn('Failed to mark all notifications read on server:', err);
+    }
+  };
+
+  const active = isSuperAdmin ? {
+    ...superAdmin,
+    markAsRead: async (id: string) => {
+      superAdmin.markAsRead(id);
+      await markSuperAdminRead(id);
+    },
+    markAllAsRead: async () => {
+      superAdmin.markAllAsRead();
+      await markSuperAdminAllRead();
+    },
+  } : {
     notifications: fallbackNotifications.notifications,
     unreadCount: fallbackNotifications.unreadCount,
-    markAsRead: fallbackNotifications.markAsRead,
-    markAllAsRead: fallbackNotifications.markAllAsRead,
+    markAsRead: async (id: string) => {
+      fallbackNotifications.markAsRead(id);
+      await markReadServer(id);
+    },
+    markAllAsRead: async () => {
+      fallbackNotifications.markAllAsRead();
+      await markAllReadServer();
+    },
     clearNotification: fallbackNotifications.clearNotification,
     clearAll: fallbackNotifications.clearAll,
-    refresh: () => {},
-    isFetching: false,
+    refresh: fetchFallbackNotifications,
+    isFetching: isFetchingFallback,
     isOpen: localOpen,
     setIsOpen: setLocalOpen,
   };
@@ -64,6 +175,14 @@ export function NotificationBell({ className }: NotificationBellProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Load notifications when panel first opens (non-super-admin path)
+  useEffect(() => {
+    if (!isSuperAdmin && active.isOpen && !hasLoaded) {
+      fetchFallbackNotifications();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active.isOpen, isSuperAdmin]);
 
   const getNotificationIcon = (type: string) => {
     const icons = {

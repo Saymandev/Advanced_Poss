@@ -20,6 +20,7 @@ export interface UseNotificationsReturn {
   markAllAsRead: () => void;
   clearNotification: (id: string) => void;
   clearAll: () => void;
+  hydrateNotifications: (serverNotifications: any[]) => void;
 }
 
 // Simple global store so all uses of this hook share the same notifications
@@ -121,6 +122,43 @@ export const useNotifications = (): UseNotificationsReturn => {
     notifyListeners();
   }, []);
 
+  const hydrateNotifications = useCallback((serverNotifications: any[]) => {
+    if (!Array.isArray(serverNotifications)) return;
+
+    const mapped = serverNotifications.map((n) => {
+      const id = n.id || n._id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      const timestampStr = n.createdAt || n.timestamp || n.created_at;
+      const readAt = n.readAt || n.read_at;
+      return {
+        id,
+        type: (n.type as Notification['type']) || 'system',
+        title: n.title || 'Notification',
+        message: n.message || '',
+        timestamp: timestampStr ? new Date(timestampStr) : new Date(),
+        read: Boolean(readAt),
+        data: n.metadata || n.data || {},
+      } as Notification;
+    });
+
+    // Merge by id (server wins)
+    const byId = new Map<string, Notification>();
+    [...mapped, ...globalNotifications].forEach((n) => {
+      if (!byId.has(n.id)) {
+        byId.set(n.id, n);
+      } else {
+        // server wins: prefer the mapped version if it came from server
+        const existing = byId.get(n.id)!;
+        const isServer = mapped.find((m) => m.id === n.id);
+        byId.set(n.id, isServer ? n : existing);
+      }
+    });
+
+    globalNotifications = Array.from(byId.values()).sort(
+      (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
+    );
+    notifyListeners();
+  }, []);
+
   const clearNotification = useCallback((id: string) => {
     globalNotifications = globalNotifications.filter((n) => n.id !== id);
     notifyListeners();
@@ -141,6 +179,7 @@ export const useNotifications = (): UseNotificationsReturn => {
     markAllAsRead,
     clearNotification,
     clearAll,
+    hydrateNotifications,
   };
 };
 

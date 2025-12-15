@@ -112,6 +112,36 @@ export interface CustomerReport {
   }>;
 }
 
+export interface FinancialSummary {
+  period: {
+    startDate: string | null;
+    endDate: string | null;
+  };
+  sales: {
+    total: number;
+    orders: number;
+    byPaymentMethod: Record<string, number>;
+  };
+  expenses: {
+    total: number;
+    paid: number;
+    unpaid: number;
+  };
+  purchases: {
+    total: number;
+    received: number;
+    pending: number;
+  };
+  net: number;
+  timeline: Array<{
+    date: string;
+    sales: number;
+    expenses: number;
+    purchases: number;
+    net: number;
+  }>;
+}
+
 export const reportsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getDashboard: builder.query<DashboardStats, { branchId?: string; companyId?: string; date?: string }>({
@@ -122,6 +152,27 @@ export const reportsApi = apiSlice.injectEndpoints({
       providesTags: ['Report'],
       transformResponse: (response: any) => {
         return response.data || response;
+      },
+    }),
+    getFinancialSummary: builder.query<FinancialSummary, { branchId?: string; companyId?: string; startDate?: string; endDate?: string }>({
+      query: (params) => ({
+        url: '/reports/financial-summary',
+        params,
+      }),
+      providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        const data = response?.data ?? response;
+        return {
+          period: {
+            startDate: data?.period?.startDate || data?.period?.start || null,
+            endDate: data?.period?.endDate || data?.period?.end || null,
+          },
+          sales: data?.sales || { total: 0, orders: 0, byPaymentMethod: {} },
+          expenses: data?.expenses || { total: 0, paid: 0, unpaid: 0 },
+          purchases: data?.purchases || { total: 0, received: 0, pending: 0 },
+          net: data?.net ?? 0,
+          timeline: Array.isArray(data?.timeline) ? data.timeline : [],
+        } as FinancialSummary;
       },
     }),
     getSalesAnalytics: builder.query<SalesAnalytics, { 
@@ -481,6 +532,7 @@ export const reportsApi = apiSlice.injectEndpoints({
 
 export const {
   useGetDashboardQuery,
+  useGetFinancialSummaryQuery,
   useGetSalesAnalyticsQuery,
   useGetTopSellingItemsQuery,
   useGetInventoryReportQuery,

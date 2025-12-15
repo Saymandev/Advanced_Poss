@@ -48,13 +48,28 @@ export const reviewsApi = apiSlice.injectEndpoints({
       }),
       transformResponse: (response: any) => {
         const review = response.data || response;
+        
+        // Properly extract waiterId - handle populated ObjectId objects
+        let waiterId: string | undefined = undefined;
+        if (review.waiterId) {
+          if (typeof review.waiterId === 'string') {
+            waiterId = review.waiterId;
+          } else if (review.waiterId._id) {
+            waiterId = review.waiterId._id.toString();
+          } else if (review.waiterId.id) {
+            waiterId = review.waiterId.id.toString();
+          } else if (typeof review.waiterId.toString === 'function' && review.waiterId.toString() !== '[object Object]') {
+            waiterId = review.waiterId.toString();
+          }
+        }
+        
         return {
           id: review._id || review.id,
           orderId: review.orderId?._id?.toString() || review.orderId?.toString() || review.orderId,
           customerId: review.customerId?._id?.toString() || review.customerId?.toString() || review.customerId,
           customerName: review.customerName,
           customerEmail: review.customerEmail,
-          waiterId: review.waiterId?._id?.toString() || review.waiterId?.toString() || review.waiterId,
+          waiterId: waiterId,
           waiterRating: review.waiterRating,
           foodRating: review.foodRating,
           ambianceRating: review.ambianceRating,
@@ -69,15 +84,45 @@ export const reviewsApi = apiSlice.injectEndpoints({
     getReviewByOrder: builder.query<Review | null, string>({
       query: (orderId) => `/reviews/order/${orderId}`,
       transformResponse: (response: any) => {
-        if (!response || !response.data) return null;
-        const review = response.data;
+        // Backend returns review directly or null, not wrapped in data
+        const review = response?.data || response;
+        if (!review || !review._id) return null;
+        
+        // Properly extract waiterId - handle populated ObjectId objects
+        // Backend populates waiterId with user data: { _id: ObjectId, firstName: string, lastName: string }
+        let waiterId: string | undefined = undefined;
+        if (review.waiterId) {
+          if (typeof review.waiterId === 'string') {
+            waiterId = review.waiterId;
+          } else if (review.waiterId._id) {
+            // Handle populated ObjectId - _id is an ObjectId object
+            waiterId = typeof review.waiterId._id === 'string' 
+              ? review.waiterId._id 
+              : review.waiterId._id.toString();
+          } else if (review.waiterId.id) {
+            waiterId = typeof review.waiterId.id === 'string'
+              ? review.waiterId.id
+              : review.waiterId.id.toString();
+          } else {
+            // Last resort: try to get string representation if it's an ObjectId
+            try {
+              const idStr = String(review.waiterId);
+              if (idStr && idStr !== '[object Object]' && idStr.length > 10) {
+                waiterId = idStr;
+              }
+            } catch (e) {
+              console.warn('Failed to extract waiterId from review:', review.waiterId, e);
+            }
+          }
+        }
+        
         return {
           id: review._id || review.id,
           orderId: review.orderId?._id?.toString() || review.orderId?.toString() || review.orderId,
           customerId: review.customerId?._id?.toString() || review.customerId?.toString() || review.customerId,
           customerName: review.customerName,
           customerEmail: review.customerEmail,
-          waiterId: review.waiterId?._id?.toString() || review.waiterId?.toString() || review.waiterId,
+          waiterId: waiterId,
           waiterRating: review.waiterRating,
           foodRating: review.foodRating,
           ambianceRating: review.ambianceRating,
@@ -98,21 +143,51 @@ export const reviewsApi = apiSlice.injectEndpoints({
       },
       transformResponse: (response: any) => {
         const reviews = response.data || response || [];
-        return reviews.map((review: any) => ({
-          id: review._id || review.id,
-          orderId: review.orderId?._id?.toString() || review.orderId?.toString() || review.orderId,
-          customerId: review.customerId?._id?.toString() || review.customerId?.toString() || review.customerId,
-          customerName: review.customerName,
-          customerEmail: review.customerEmail,
-          waiterId: review.waiterId?._id?.toString() || review.waiterId?.toString() || review.waiterId,
-          waiterRating: review.waiterRating,
-          foodRating: review.foodRating,
-          ambianceRating: review.ambianceRating,
-          overallRating: review.overallRating,
-          comment: review.comment,
-          itemReviews: review.itemReviews,
-          createdAt: review.createdAt,
-        }));
+        return reviews.map((review: any) => {
+          // Properly extract waiterId - handle populated ObjectId objects
+          // Backend populates waiterId with user data: { _id: ObjectId, firstName: string, lastName: string }
+          let waiterId: string | undefined = undefined;
+          if (review.waiterId) {
+            if (typeof review.waiterId === 'string') {
+              waiterId = review.waiterId;
+            } else if (review.waiterId._id) {
+              // Handle populated ObjectId - _id is an ObjectId object
+              waiterId = typeof review.waiterId._id === 'string' 
+                ? review.waiterId._id 
+                : review.waiterId._id.toString();
+            } else if (review.waiterId.id) {
+              waiterId = typeof review.waiterId.id === 'string'
+                ? review.waiterId.id
+                : review.waiterId.id.toString();
+            } else {
+              // Last resort: try to get string representation if it's an ObjectId
+              try {
+                const idStr = String(review.waiterId);
+                if (idStr && idStr !== '[object Object]' && idStr.length > 10) {
+                  waiterId = idStr;
+                }
+              } catch (e) {
+                console.warn('Failed to extract waiterId from review:', review.waiterId, e);
+              }
+            }
+          }
+          
+          return {
+            id: review._id || review.id,
+            orderId: review.orderId?._id?.toString() || review.orderId?.toString() || review.orderId,
+            customerId: review.customerId?._id?.toString() || review.customerId?.toString() || review.customerId,
+            customerName: review.customerName,
+            customerEmail: review.customerEmail,
+            waiterId: waiterId,
+            waiterRating: review.waiterRating,
+            foodRating: review.foodRating,
+            ambianceRating: review.ambianceRating,
+            overallRating: review.overallRating,
+            comment: review.comment,
+            itemReviews: review.itemReviews,
+            createdAt: review.createdAt,
+          };
+        });
       },
     }),
 

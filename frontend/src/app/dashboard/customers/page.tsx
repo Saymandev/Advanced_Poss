@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -586,7 +587,7 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Customer Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -598,10 +599,56 @@ export default function CustomersPage() {
             </p>
           )}
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Customer
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  const payload: any = {
+                    companyId: companyId?.toString(),
+                    firstName: item.firstName || item['First Name'] || item.name?.split(' ')[0] || '',
+                    lastName: item.lastName || item['Last Name'] || item.name?.split(' ').slice(1).join(' ') || '',
+                    email: item.email || item.Email || '',
+                    phone: item.phone || item.Phone || undefined,
+                  };
+
+                  if (branchId) {
+                    payload.branchId = branchId.toString();
+                  }
+
+                  await createCustomer(payload).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import customer:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} customers`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} customers`);
+              }
+            }}
+            columns={[
+              { key: 'firstName', label: 'First Name', required: true, type: 'string' },
+              { key: 'lastName', label: 'Last Name', required: true, type: 'string' },
+              { key: 'email', label: 'Email', required: true, type: 'email' },
+              { key: 'phone', label: 'Phone', type: 'string' },
+            ]}
+            filename="customers-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Customer
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -750,9 +797,8 @@ export default function CustomersPage() {
           }}
           exportable={true}
           exportFilename="customers"
-          onExport={(format, items) => {
-            console.log(`Exporting ${items.length} customers as ${format}`);
-            toast.success(`Exporting ${items.length} customers as ${format.toUpperCase()}`);
+          onExport={(_format, _items) => {
+            // Export is handled automatically by ExportButton component
           }}
           emptyMessage="No customers found. Add your first customer to get started."
         />

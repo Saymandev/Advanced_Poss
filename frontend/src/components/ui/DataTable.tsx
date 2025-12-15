@@ -2,6 +2,7 @@ import { ExportButton } from '@/components/ui/ExportButton';
 import { Pagination } from '@/components/ui/Pagination';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { cn } from '@/lib/utils';
+import { ExportOptions } from '@/lib/utils/export';
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -42,6 +43,7 @@ interface DataTableProps<T> {
   exportable?: boolean;
   exportFilename?: string;
   exportFormats?: ('excel' | 'csv' | 'pdf')[];
+  exportOptions?: ExportOptions;
   onExport?: (format: string, items: T[]) => void;
   emptyMessage?: string;
   className?: string;
@@ -65,6 +67,7 @@ export function DataTable<T extends Record<string, any>>({
   exportable = true,
   exportFilename = 'data',
   exportFormats = ['excel', 'csv'],
+  exportOptions,
   onExport,
   emptyMessage = 'No data available',
   className,
@@ -204,6 +207,7 @@ export function DataTable<T extends Record<string, any>>({
               data={selectedItems.length > 0 ? selectedItems : safeData}
               filename={exportFilename}
               formats={exportFormats}
+              exportOptions={exportOptions}
               onExport={(format) => onExport?.(format, selectedItems.length > 0 ? selectedItems : safeData)}
             />
           </div>

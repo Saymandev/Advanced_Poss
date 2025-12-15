@@ -214,15 +214,33 @@ export default function DashboardPage() {
   }, [ordersLoading, ordersData, ordersError, validDateRange, safeDateRange, branchId]);
 
   // Get reviews for waiter ratings
-  const { data: reviewsData } = useGetReviewsQuery(
+  const { data: reviewsData, error: reviewsError } = useGetReviewsQuery(
     { branchId: branchId || undefined, companyId: companyId || undefined },
     { skip: !branchId && !companyId }
   );
+  
+  // Debug: Log reviews data
+  useEffect(() => {
+    if (reviewsData) {
+      console.log('🔍 Dashboard Reviews Data:', reviewsData);
+      console.log('🔍 Reviews Count:', Array.isArray(reviewsData) ? reviewsData.length : 'Not an array');
+      if (Array.isArray(reviewsData) && reviewsData.length > 0) {
+        console.log('🔍 Sample Review:', reviewsData[0]);
+        console.log('🔍 Sample Review waiterId:', reviewsData[0]?.waiterId, 'Type:', typeof reviewsData[0]?.waiterId);
+        console.log('🔍 Reviews with waiterId:', reviewsData.filter((r: any) => r.waiterId).length);
+        console.log('🔍 Reviews with waiterRating:', reviewsData.filter((r: any) => r.waiterRating).length);
+      }
+    }
+    if (reviewsError) {
+      console.error('❌ Reviews Error:', reviewsError);
+    }
+  }, [reviewsData, reviewsError]);
 
-  // Get staff/waiter data
+  // Get staff/waiter data - filter by both company and branch
   const { data: staffData } = useGetStaffQuery(
     {
       companyId: companyId || undefined,
+      branchId: branchId || undefined,
       limit: 100,
     },
     { skip: !companyId }
@@ -457,7 +475,8 @@ export default function DashboardPage() {
     const staff = staffData?.staff || [];
     staff.forEach((member: any) => {
       if (member.role?.toLowerCase() === 'waiter') {
-        const waiterId = member.id || member._id?.toString();
+        // Normalize waiter ID to string for consistent matching
+        const waiterId = (member.id || member._id?.toString() || member._id || '').toString();
         if (waiterId) {
           waiters[waiterId] = {
             name: `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email || 'Unknown Waiter',
@@ -470,23 +489,69 @@ export default function DashboardPage() {
 
     // Count orders per waiter
     orders.forEach((order: any) => {
-      const waiterId = order.waiterId || order.userId;
-      if (waiterId && waiters[waiterId]) {
-        waiters[waiterId].totalOrders += 1;
+      // Normalize waiter ID from order
+      const orderWaiterId = (order.waiterId || order.userId || '').toString();
+      if (orderWaiterId && waiters[orderWaiterId]) {
+        waiters[orderWaiterId].totalOrders += 1;
       }
     });
 
     // Add ratings from reviews
-    if (reviewsData && Array.isArray(reviewsData)) {
-      reviewsData.forEach((review: any) => {
-        if (review.waiterId && review.waiterRating) {
-          const waiterId = review.waiterId.toString();
-          if (waiters[waiterId]) {
-            waiters[waiterId].ratings.push(review.waiterRating);
+    // Handle both array and object response formats
+    let reviews: any[] = [];
+    if (reviewsData) {
+      if (Array.isArray(reviewsData)) {
+        reviews = reviewsData;
+      } else if ((reviewsData as any).data && Array.isArray((reviewsData as any).data)) {
+        reviews = (reviewsData as any).data;
+      } else if ((reviewsData as any).reviews && Array.isArray((reviewsData as any).reviews)) {
+        reviews = (reviewsData as any).reviews;
+      }
+    }
+    
+    reviews.forEach((review: any) => {
+      if (review.waiterId && review.waiterRating) {
+        // waiterId should already be normalized to string by transformResponse
+        // But handle edge cases where it might still be an object
+        let waiterId: string = '';
+        if (typeof review.waiterId === 'string') {
+          waiterId = review.waiterId;
+        } else if (review.waiterId?._id) {
+          waiterId = typeof review.waiterId._id === 'string' 
+            ? review.waiterId._id 
+            : review.waiterId._id.toString();
+        } else if (review.waiterId?.id) {
+          waiterId = typeof review.waiterId.id === 'string'
+            ? review.waiterId.id
+            : review.waiterId.id.toString();
+        } else {
+          // Skip if waiterId is "[object Object]" or invalid
+          const idStr = String(review.waiterId);
+          if (idStr && idStr !== '[object Object]' && idStr.length > 10) {
+            waiterId = idStr;
+          } else {
+            console.warn('⚠️ Invalid waiterId in review:', review.waiterId, 'Review ID:', review.id);
+            return; // Skip this review
           }
         }
-      });
-    }
+        
+        // Match waiter ID (exact match)
+        if (waiterId && waiters[waiterId]) {
+          waiters[waiterId].ratings.push(review.waiterRating);
+        } else {
+          // Try to find waiter by matching normalized format
+          const normalizedWaiterId = waiterId.toLowerCase().trim();
+          const matchingWaiterKey = Object.keys(waiters).find(key => 
+            key.toLowerCase().trim() === normalizedWaiterId
+          );
+          if (matchingWaiterKey) {
+            waiters[matchingWaiterKey].ratings.push(review.waiterRating);
+          } else {
+            console.warn('⚠️ Waiter not found for review waiterId:', waiterId, 'Available waiters:', Object.keys(waiters));
+          }
+        }
+      }
+    });
 
     // Calculate average ratings and sort
     return Object.entries(waiters)

@@ -8,6 +8,7 @@ import {
   useExportReportMutation,
   useGetDashboardQuery,
   useGetDueSettlementsQuery,
+  useGetFinancialSummaryQuery,
   useGetPeakHoursQuery,
   useGetRevenueByCategoryQuery,
   useGetSalesAnalyticsQuery,
@@ -54,7 +55,7 @@ export default function ReportsPage() {
   // Redirect if user doesn't have reports feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('reports');
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('week');
-  const [activeReport, setActiveReport] = useState<'sales' | 'wastage' | 'food' | 'settlement'>('sales');
+  const [activeReport, setActiveReport] = useState<'financial' | 'sales' | 'wastage' | 'food' | 'settlement'>('financial');
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => {
@@ -142,6 +143,21 @@ export default function ReportsPage() {
     companyId: companyId || undefined
   }, { 
     skip: !companyId && !branchId,
+    refetchOnMountOrArgChange: true,
+  });
+
+  const {
+    data: financialSummary,
+    isLoading: isLoadingFinancialSummary,
+    error: financialSummaryError,
+    refetch: refetchFinancialSummary,
+  } = useGetFinancialSummaryQuery({
+    branchId: branchId || undefined,
+    companyId: companyId || undefined,
+    startDate,
+    endDate,
+  }, {
+    skip: (!companyId && !branchId) || activeReport !== 'financial',
     refetchOnMountOrArgChange: true,
   });
 
@@ -313,6 +329,47 @@ export default function ReportsPage() {
       };
     });
   }, [salesAnalytics?.salesByDay, selectedPeriod]);
+
+  const financialCards = useMemo(() => {
+    const net = financialSummary?.net ?? 0;
+    const sales = financialSummary?.sales?.total ?? 0;
+    const expenses = financialSummary?.expenses?.total ?? 0;
+    const purchases = financialSummary?.purchases?.total ?? 0;
+    return [
+      {
+        title: 'Net Profit / Loss',
+        value: formatCurrency(net),
+        color: net >= 0 ? 'text-green-600' : 'text-red-600',
+      },
+      {
+        title: 'Sales',
+        value: formatCurrency(sales),
+        color: 'text-gray-900 dark:text-white',
+      },
+      {
+        title: 'Expenses',
+        value: formatCurrency(expenses),
+        color: 'text-gray-900 dark:text-white',
+      },
+      {
+        title: 'Purchases',
+        value: formatCurrency(purchases),
+        color: 'text-gray-900 dark:text-white',
+      },
+    ];
+  }, [financialSummary]);
+
+  const financialChartData = useMemo(() => {
+    if (!financialSummary?.timeline) return [];
+    return financialSummary.timeline.map((item) => {
+      const date = new Date(item.date);
+      const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return {
+        ...item,
+        label,
+      };
+    });
+  }, [financialSummary]);
 
   const topItems = useMemo(() => {
     return topSellingItems?.map((item, index) => ({
@@ -504,12 +561,25 @@ export default function ReportsPage() {
     return topItems[0];
   }, [topItems]);
 
-  const isLoading = isLoadingDashboard || isLoadingAnalytics || isLoadingTopItems || isLoadingCategory || isLoadingPeakHours || isLoadingSettlements;
+  const isLoading = isLoadingDashboard
+    || isLoadingAnalytics
+    || isLoadingTopItems
+    || isLoadingCategory
+    || isLoadingPeakHours
+    || isLoadingSettlements
+    || (activeReport === 'financial' && isLoadingFinancialSummary);
   
-  const hasError = dashboardError || salesAnalyticsError || topItemsError || categoryError || peakHoursError || settlementsError;
+  const hasError = dashboardError
+    || salesAnalyticsError
+    || topItemsError
+    || categoryError
+    || peakHoursError
+    || settlementsError
+    || (activeReport === 'financial' && financialSummaryError);
 
   const handleRefresh = () => {
     refetchDashboard();
+    refetchFinancialSummary();
     refetchSalesAnalytics();
     refetchTopItems();
     refetchCategory();
@@ -679,7 +749,28 @@ export default function ReportsPage() {
       </div>
 
       {/* Report Type Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card 
+          className={`cursor-pointer transition-all ${activeReport === 'financial' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          onClick={() => setActiveReport('financial')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'financial' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <ChartBarIcon className={`w-6 h-6 ${activeReport === 'financial' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+              </div>
+              <div>
+                <h3 className={`font-semibold ${activeReport === 'financial' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+                  Financial Summary
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Net, sales, expenses
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card 
           className={`cursor-pointer transition-all ${activeReport === 'sales' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('sales')}
@@ -764,6 +855,48 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {activeReport === 'financial' && (
+        <>
+          {/* Financial Summary (Sales vs Expenses vs Purchases) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {financialCards.map((card) => (
+              <Card key={card.title} className="border border-gray-200 dark:border-gray-800">
+                <CardContent className="p-5">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{card.title}</p>
+                  <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="border border-gray-200 dark:border-gray-800">
+            <CardHeader>
+              <CardTitle>Net Profit / Loss vs Sales, Expenses, Purchases</CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
+              {isLoadingFinancialSummary ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={financialChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="label" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="sales" name="Sales" stroke="#10b981" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="purchases" name="Purchases" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="net" name="Net" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Report Content Based on Selection */}
       {/* Report Content Based on Selection */}

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -554,7 +555,7 @@ export default function StaffPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Staff Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -566,10 +567,68 @@ export default function StaffPage() {
             </p>
           )}
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Staff Member
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  if (!companyId || !branchId) {
+                    toast.error('Company or Branch ID is missing');
+                    return;
+                  }
+
+                  const payload: any = {
+                    firstName: item.firstName || item['First Name'] || item.name?.split(' ')[0] || '',
+                    lastName: item.lastName || item['Last Name'] || item.name?.split(' ').slice(1).join(' ') || '',
+                    email: item.email || item.Email || '',
+                    phoneNumber: item.phoneNumber || item['Phone Number'] || item.phone || item.Phone || '',
+                    role: item.role || item.Role || 'waiter',
+                    password: item.password || item.Password || 'TempPassword123!', // Generate temp password
+                    pin: item.pin || item.PIN || undefined,
+                    branchId,
+                    companyId,
+                  };
+
+                  if (item.salary || item.Salary) {
+                    payload.salary = parseFloat(item.salary || item.Salary);
+                  }
+
+                  await createStaff(payload).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import staff:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} staff members`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} staff members`);
+              }
+            }}
+            columns={[
+              { key: 'firstName', label: 'First Name', required: true, type: 'string' },
+              { key: 'lastName', label: 'Last Name', required: true, type: 'string' },
+              { key: 'email', label: 'Email', required: true, type: 'email' },
+              { key: 'phoneNumber', label: 'Phone Number', type: 'string' },
+              { key: 'role', label: 'Role', required: true, type: 'string' },
+              { key: 'password', label: 'Password', type: 'string' },
+              { key: 'salary', label: 'Salary', type: 'number' },
+            ]}
+            filename="staff-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Staff Member
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -718,9 +777,8 @@ export default function StaffPage() {
           }}
           exportable={true}
           exportFilename="staff"
-          onExport={(format, items) => {
-            console.log(`Exporting ${items.length} staff members as ${format}`);
-            toast.success(`Exporting ${items.length} staff members as ${format.toUpperCase()}`);
+          onExport={(_format, _items) => {
+            // Export is handled automatically by ExportButton component
           }}
           emptyMessage="No staff members found. Add your first staff member to get started."
         />

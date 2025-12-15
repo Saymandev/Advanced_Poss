@@ -85,7 +85,7 @@ export interface QRCodeMenu {
   id: string;
   branchId: string;
   tableNumber?: number;
-  menuType: 'full' | 'drinks' | 'food' | 'desserts';
+  menuType: 'full' | 'drinks' | 'food' | 'desserts' | string; // Allow any string for flexibility
   url: string;
   qrCodeImage: string;
   isActive: boolean;

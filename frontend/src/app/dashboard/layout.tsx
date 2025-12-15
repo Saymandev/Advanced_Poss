@@ -77,7 +77,9 @@ export default function DashboardLayout({
         {/* Fixed Topbar */}
         <div 
           className={`fixed top-0 right-0 z-40 transition-all duration-300 ${
-            sidebarCollapsed ? 'left-16' : 'left-64'
+            sidebarCollapsed 
+              ? 'left-0 lg:left-16' 
+              : 'left-0 lg:left-64'
           }`}
         >
           <Topbar />

@@ -4,28 +4,29 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { CreateExpenseRequest, Expense, useApproveExpenseMutation, useCreateExpenseMutation, useDeleteExpenseMutation, useGetExpensesQuery, useRejectExpenseMutation, useUpdateExpenseMutation } from '@/lib/api/endpoints/expensesApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  CalendarIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  EyeIcon,
-  PencilIcon,
-  PlusIcon,
-  ReceiptRefundIcon,
-  TrashIcon,
-  UserIcon,
-  XCircleIcon,
+    CalendarIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    CurrencyDollarIcon,
+    EyeIcon,
+    PencilIcon,
+    PlusIcon,
+    ReceiptRefundIcon,
+    TrashIcon,
+    UserIcon,
+    XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 const EXPENSE_CATEGORIES = [
   { value: 'ingredient', label: 'Ingredients' },
@@ -106,7 +107,7 @@ export default function ExpensesPage() {
   });
 
   const [createExpense] = useCreateExpenseMutation();
-  const [updateExpense, { isLoading: isUpdating }] = useUpdateExpenseMutation();
+  const [updateExpense] = useUpdateExpenseMutation();
   const [approveExpense, { isLoading: isApproving }] = useApproveExpenseMutation();
   const [rejectExpense, { isLoading: isRejecting }] = useRejectExpenseMutation();
   const [deleteExpense] = useDeleteExpenseMutation();
@@ -566,17 +567,77 @@ export default function ExpensesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Expense Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Track and manage business expenses
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Expense
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  if (!user?.branchId || !user?.companyId || !user?.id) {
+                    toast.error('User context is missing. Please refresh the page.');
+                    return;
+                  }
+
+                  const payload: CreateExpenseRequest = {
+                    companyId: user.companyId,
+                    branchId: user.branchId,
+                    createdBy: user.id,
+                    title: (item.title || item.Title || '').trim(),
+                    description: (item.description || item.Description || '').trim() || undefined,
+                    amount: parseFloat(item.amount || item.Amount || 0),
+                    category: item.category || item.Category || 'other',
+                    date: item.date || item.Date || new Date().toISOString().split('T')[0],
+                    paymentMethod: item.paymentMethod || item['Payment Method'] || 'cash',
+                    vendorName: (item.vendorName || item['Vendor Name'] || '').trim() || undefined,
+                    invoiceNumber: (item.invoiceNumber || item['Invoice Number'] || '').trim() || undefined,
+                    notes: (item.notes || item.Notes || '').trim() || undefined,
+                    isRecurring: item.isRecurring === true || item['Is Recurring'] === 'Yes' || false,
+                    recurringFrequency: item.recurringFrequency || item['Recurring Frequency'] || undefined,
+                  };
+
+                  await createExpense(payload).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import expense:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} expenses`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} expenses`);
+              }
+            }}
+            columns={[
+              { key: 'title', label: 'Title', required: true, type: 'string' },
+              { key: 'amount', label: 'Amount', required: true, type: 'number' },
+              { key: 'category', label: 'Category', required: true, type: 'string' },
+              { key: 'date', label: 'Date', required: true, type: 'date' },
+              { key: 'paymentMethod', label: 'Payment Method', required: true, type: 'string' },
+              { key: 'description', label: 'Description', type: 'string' },
+              { key: 'vendorName', label: 'Vendor Name', type: 'string' },
+              { key: 'invoiceNumber', label: 'Invoice Number', type: 'string' },
+            ]}
+            filename="expenses-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Expense
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -705,8 +766,8 @@ export default function ExpensesPage() {
         }}
         exportable={true}
         exportFilename="expenses"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} expenses as ${format}`);
+        onExport={(_format, _items) => {
+          // Export is handled automatically by ExportButton component
         }}
         emptyMessage="No expenses found."
       />

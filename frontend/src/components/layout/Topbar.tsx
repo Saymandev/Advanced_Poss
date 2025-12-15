@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { apiSlice } from '@/lib/api/apiSlice';
 import { logout } from '@/lib/slices/authSlice';
@@ -11,10 +12,12 @@ import {
   MagnifyingGlassIcon,
   MoonIcon,
   SunIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useTheme } from 'next-themes';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export function Topbar() {
@@ -22,12 +25,28 @@ export function Topbar() {
   const dispatch = useAppDispatch();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlSearch = searchParams.get('search') || '';
+  
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync search input with URL when on order-history page
+  useEffect(() => {
+    if (pathname === '/dashboard/order-history') {
+      setSearchQuery(urlSearch);
+    } else {
+      setSearchQuery('');
+    }
+  }, [pathname, urlSearch]);
 
   const handleLogout = async () => {
     try {
       // Call logout API to clear httpOnly cookies on server
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/auth/logout`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/auth/logout`, {
           method: 'POST',
           credentials: 'include', // Include cookies
           headers: {
@@ -59,26 +78,64 @@ export function Topbar() {
     router.push('/auth/login');
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    
+    // Navigate to order history page with search query
+    router.push(`/dashboard/order-history?search=${encodeURIComponent(searchQuery.trim())}`);
+    setIsSearchModalOpen(false);
+    // Don't clear searchQuery - let it sync from URL
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+  };
+
+  // Focus search input when modal opens
+  useEffect(() => {
+    if (isSearchModalOpen && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isSearchModalOpen]);
+
 
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 backdrop-blur-sm bg-white/95 dark:bg-gray-800/95">
-      <div className="px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          {/* Left side - Search and breadcrumbs could go here */}
-          <div className="flex items-center gap-4">
-            <div className="hidden md:block">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
+    <>
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 w-full">
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            {/* Left side - Search and breadcrumbs could go here */}
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              {/* Desktop Search */}
+              <form onSubmit={handleSearch} className="hidden md:block flex-1 max-w-md">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search orders, customers..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 py-1.5 pl-10 pr-3 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-inset focus:ring-primary-600 focus:border-primary-600 sm:text-sm sm:leading-6"
+                  />
                 </div>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="block w-64 rounded-md border-0 bg-gray-50 dark:bg-gray-800 py-1.5 pl-10 pr-3 text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                />
-              </div>
+              </form>
+
+              {/* Mobile Search Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSearchModalOpen(true)}
+                className="md:hidden p-2"
+                aria-label="Search"
+              >
+                <MagnifyingGlassIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              </Button>
             </div>
-          </div>
 
           {/* Right side - User menu and notifications */}
           <div className="flex items-center gap-4">
@@ -107,6 +164,7 @@ export function Topbar() {
               >
                 {user?.avatar ? (
                   <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary-200 dark:border-primary-700">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={user.avatar}
                       alt={`${user?.firstName} ${user?.lastName}`}
@@ -174,5 +232,67 @@ export function Topbar() {
         </div>
       </div>
     </header>
+
+    {/* Mobile Search Modal */}
+    <Modal
+      isOpen={isSearchModalOpen}
+      onClose={() => {
+        setIsSearchModalOpen(false);
+        setSearchQuery('');
+      }}
+      title="Search"
+      size="full"
+      className="z-[60]"
+    >
+      <form onSubmit={handleSearch} className="p-4">
+        <div className="relative mb-4">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+          </div>
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search orders, customers..."
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-10 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-inset focus:ring-primary-600 focus:border-primary-600 text-base"
+            autoFocus
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              aria-label="Clear search"
+            >
+              <XMarkIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" />
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            type="submit"
+            className="flex-1"
+            disabled={!searchQuery.trim()}
+          >
+            Search
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setIsSearchModalOpen(false);
+              setSearchQuery('');
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
+          Search for orders, customers, and more...
+        </p>
+      </form>
+    </Modal>
+    </>
   );
 }

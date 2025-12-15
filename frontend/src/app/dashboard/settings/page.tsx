@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetBranchesQuery, useUpdateBranchPublicUrlMutation } from '@/lib/api/endpoints/branchesApi';
+import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import {
   useAddCustomDomainMutation,
   useGetCompaniesQuery,
@@ -126,6 +127,49 @@ export default function SettingsPage() {
   );
   const [updateCompanySettings] = useUpdateCompanySettingsMutation();
   const [uploadCompanyLogo, { isLoading: isUploadingLogo }] = useUploadCompanyLogoMutation();
+
+  // Get categories for dynamic tax appliesTo options
+  const { data: categoriesData } = useGetCategoriesQuery(
+    { companyId, branchId },
+    { skip: !companyId }
+  );
+  const categories = useMemo(() => {
+    if (!categoriesData) return [];
+    return categoriesData.categories || [];
+  }, [categoriesData]);
+
+  // Get unique category types from categories for tax appliesTo options
+  const categoryTypeOptions = useMemo(() => {
+    const predefined = [
+      { value: 'all', label: 'All Items' },
+      { value: 'food', label: 'Food Only' },
+      { value: 'beverage', label: 'Beverages Only' },
+      { value: 'alcohol', label: 'Alcohol Only' },
+    ];
+    
+    // Get unique types from categories
+    const categoryTypes = new Set<string>();
+    categories.forEach((cat: any) => {
+      if (cat.type) {
+        categoryTypes.add(cat.type);
+      }
+    });
+    
+    // Add category types that aren't already in predefined list
+    const predefinedMap = new Map(predefined.map(opt => [opt.value, opt]));
+    const combined = [...predefined];
+    
+    categoryTypes.forEach((type) => {
+      if (!predefinedMap.has(type)) {
+        combined.push({
+          value: type,
+          label: type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' ') + ' Only',
+        });
+      }
+    });
+    
+    return combined;
+  }, [categories]);
 
   // Get company data to access slug
   const { data: company, refetch: refetchCompany } = useGetCompanyByIdQuery(companyId, {
@@ -1802,12 +1846,7 @@ export default function SettingsPage() {
               Applies To
             </label>
             <Select
-              options={[
-                { value: 'all', label: 'All Items' },
-                { value: 'food', label: 'Food Only' },
-                { value: 'beverage', label: 'Beverages Only' },
-                { value: 'alcohol', label: 'Alcohol Only' },
-              ]}
+              options={categoryTypeOptions}
               value={taxForm.appliesTo}
               onChange={(value) => setTaxForm({ ...taxForm, appliesTo: value as any })}
             />

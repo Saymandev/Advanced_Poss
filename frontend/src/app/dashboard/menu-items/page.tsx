@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -593,10 +594,24 @@ export default function MenuItemsPage() {
         price: formData.price,
         preparationTime: formData.preparationTime || undefined,
         isAvailable: formData.isAvailable !== false,
-        trackInventory: formData.trackInventory || false,
+        trackInventory: false, // Will be set based on ingredients below
         images: formData.images.filter(Boolean).length > 0 ? formData.images.filter(Boolean) : undefined,
         tags: formData.tags.length > 0 ? formData.tags : undefined,
       };
+
+      // Handle ingredients - backend expects array of {ingredientId, quantity, unit}
+      // Filter out ingredients without ingredientId
+      const validIngredients = formData.ingredients.filter(ing => ing.ingredientId && ing.quantity > 0);
+      if (validIngredients.length > 0) {
+        payload.ingredients = validIngredients;
+      } else {
+        // Empty ingredients array - clear existing ingredients
+        payload.ingredients = [];
+      }
+      
+      // Use the trackInventory value from form (user can enable/disable manually)
+      // If trackInventory is enabled but no ingredients, it will be ignored by backend
+      payload.trackInventory = formData.trackInventory && validIngredients.length > 0;
 
       // Add nutrition object if any nutritional info is provided
       if (formData.nutritionalInfo && (
@@ -617,16 +632,6 @@ export default function MenuItemsPage() {
         payload.nutrition = {
           allergens: formData.allergens,
         };
-      }
-
-      // Handle ingredients - backend expects array of {ingredientId, quantity, unit}
-      // Filter out ingredients without ingredientId
-      const validIngredients = formData.ingredients.filter(ing => ing.ingredientId && ing.quantity > 0);
-      if (validIngredients.length > 0) {
-        payload.ingredients = validIngredients;
-      } else {
-        // Empty ingredients array - clear existing ingredients
-        payload.ingredients = [];
       }
 
       // Add variants if provided
@@ -734,13 +739,14 @@ export default function MenuItemsPage() {
       const validIngredients = formData.ingredients.filter(ing => ing.ingredientId && ing.quantity > 0);
       if (validIngredients.length > 0) {
         payload.ingredients = validIngredients;
-        // Enable inventory tracking if ingredients are added
-        payload.trackInventory = true;
       } else {
         // Empty ingredients array - clear existing ingredients
         payload.ingredients = [];
-        payload.trackInventory = false;
       }
+      
+      // Use the trackInventory value from form (user can enable/disable manually)
+      // If trackInventory is enabled but no ingredients, it will be ignored by backend
+      payload.trackInventory = formData.trackInventory && validIngredients.length > 0;
 
       // Add variants if provided
       if (formData.variants.length > 0) {
@@ -1233,17 +1239,81 @@ export default function MenuItemsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Menu Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage your restaurant menu items and pricing
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Menu Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportButton
+            onImport={async (data, _result) => {
+              // Bulk create menu items
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  // Find category by name if categoryId is not provided
+                  let categoryId = item.categoryId;
+                  if (!categoryId && item.category) {
+                    const category = categories.find(
+                      (cat: any) => cat.name.toLowerCase() === item.category.toLowerCase()
+                    );
+                    categoryId = category?.id;
+                  }
+
+                  if (!categoryId && categories.length > 0) {
+                    categoryId = categories[0].id; // Fallback to first category
+                  }
+
+                  const payload: any = {
+                    companyId: companyId?.toString(),
+                    name: item.name || item['Menu Item'],
+                    description: item.description || '',
+                    price: parseFloat(item.price || item.Price || 0),
+                    categoryId: categoryId || categories[0]?.id,
+                    preparationTime: parseInt(item.preparationTime || item['Prep Time (min)'] || 0),
+                    isAvailable: item.isAvailable !== false && item.Status !== 'Unavailable',
+                  };
+
+                  if (branchId) {
+                    payload.branchId = branchId.toString();
+                  }
+
+                  await createMenuItem(payload).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import menu item:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} menu items`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} menu items`);
+              }
+            }}
+            columns={[
+              { key: 'name', label: 'Menu Item', required: true, type: 'string' },
+              { key: 'price', label: 'Price', required: true, type: 'number' },
+              { key: 'category', label: 'Category', required: true, type: 'string' },
+              { key: 'preparationTime', label: 'Prep Time (min)', type: 'number' },
+              { key: 'description', label: 'Description', type: 'string' },
+              { key: 'isAvailable', label: 'Status', type: 'boolean' },
+            ]}
+            filename="menu-items-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Menu Item
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -1392,9 +1462,28 @@ export default function MenuItemsPage() {
         }}
         exportable={true}
         exportFilename="menu-items"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} menu items as ${format}`);
-          toast.success(`Exporting ${items.length} menu items as ${format.toUpperCase()}`);
+        exportOptions={{
+          columns: [
+            { key: 'name', label: 'Menu Item' },
+            { key: 'price', label: 'Price', format: (value) => formatCurrency(value || 0) },
+            { key: 'preparationTime', label: 'Prep Time (min)' },
+            { key: 'category', label: 'Category', format: (value, row) => {
+              if (typeof value === 'object' && value?.name) return value.name;
+              if (typeof value === 'string') return value;
+              return row.categoryId || 'N/A';
+            }},
+            { key: 'isAvailable', label: 'Status', format: (value) => value ? 'Available' : 'Unavailable' },
+            { key: 'popularity', label: 'Rating', format: (value, row) => {
+              const rating = menuItemsRatings[row.id]?.averageRating || 0;
+              return rating > 0 ? rating.toFixed(1) : '0.0';
+            }},
+            { key: 'description', label: 'Description' },
+            { key: 'createdAt', label: 'Created At', format: (value) => value ? formatDateTime(value) : '' },
+          ],
+          excludeColumns: ['actions', 'imageUrl', 'images'],
+        }}
+        onExport={(_format, _items) => {
+          // Export is handled automatically by ExportButton component
         }}
         emptyMessage={isLoading ? 'Loading menu items...' : error ? 'Error loading menu items. Please try again.' : 'No menu items found.'}
       />
@@ -1777,6 +1866,20 @@ export default function MenuItemsPage() {
                 />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Available</span>
               </label>
+            </div>
+            <div className="flex items-center pt-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.trackInventory}
+                  onChange={(e) => setFormData({ ...formData, trackInventory: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Track Inventory</span>
+              </label>
+              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                (Enable to automatically decrease ingredient stock when orders are created)
+              </span>
             </div>
           </div>
 

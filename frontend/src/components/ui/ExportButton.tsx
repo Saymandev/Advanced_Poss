@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { exportData, ExportOptions } from '@/lib/utils/export';
 import { ArrowDownTrayIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -9,6 +10,7 @@ interface ExportButtonProps {
   filename?: string;
   formats?: ('excel' | 'csv' | 'pdf')[];
   onExport?: (format: string) => void;
+  exportOptions?: ExportOptions;
   className?: string;
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'ghost';
@@ -20,6 +22,7 @@ export function ExportButton({
   filename = 'export',
   formats = ['excel', 'csv'],
   onExport,
+  exportOptions,
   className,
   disabled = false,
   variant = 'secondary',
@@ -28,137 +31,32 @@ export function ExportButton({
   const [isExporting, setIsExporting] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const exportToCSV = () => {
-    if (data.length === 0) {
+  const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
+    if (disabled || data.length === 0) {
       toast.error('No data to export');
       return;
     }
-
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => 
-        headers.map(header => {
-          const value = row[header];
-          // Escape commas and quotes in CSV
-          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-            return `"${value.replace(/"/g, '""')}"`;
-          }
-          return value;
-        }).join(',')
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportToExcel = () => {
-    if (data.length === 0) {
-      toast.error('No data to export');
-      return;
-    }
-
-    // For Excel export, we'll use a simple CSV approach
-    // In a real app, you'd use a library like xlsx
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join('\t'),
-      ...data.map(row => 
-        headers.map(header => row[header]).join('\t')
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}.xls`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportToPDF = () => {
-    // For PDF export, we'll create a simple HTML table and print it
-    if (data.length === 0) {
-      toast.error('No data to export');
-      return;
-    }
-
-    const headers = Object.keys(data[0]);
-    const tableHtml = `
-      <html>
-        <head>
-          <title>${filename}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            @media print { body { margin: 0; } }
-          </style>
-        </head>
-        <body>
-          <h1>${filename}</h1>
-          <table>
-            <thead>
-              <tr>
-                ${headers.map(header => `<th>${header}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${data.map(row => 
-                `<tr>${headers.map(header => `<td>${row[header]}</td>`).join('')}</tr>`
-              ).join('')}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
-
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(tableHtml);
-      printWindow.document.close();
-      printWindow.print();
-    }
-  };
-
-  const handleExport = async (format: string) => {
-    if (disabled || data.length === 0) return;
 
     setIsExporting(true);
     try {
+      // Call the callback if provided
       onExport?.(format);
 
-      switch (format) {
-        case 'csv':
-          exportToCSV();
-          toast.success('CSV exported successfully');
-          break;
-        case 'excel':
-          exportToExcel();
-          toast.success('Excel file exported successfully');
-          break;
-        case 'pdf':
-          exportToPDF();
-          toast.success('PDF exported successfully');
-          break;
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error('Export failed. Please try again.');
+      // Use the shared export utility
+      const options: ExportOptions = {
+        filename,
+        ...exportOptions,
+      };
+
+      exportData(data, format, options);
+      
+      toast.success(`${format.toUpperCase()} exported successfully`);
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast.error(error?.message || 'Export failed. Please try again.');
     } finally {
       setIsExporting(false);
+      setIsDropdownOpen(false);
     }
   };
 

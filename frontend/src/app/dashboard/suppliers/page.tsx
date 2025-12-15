@@ -3,7 +3,9 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Combobox } from '@/components/ui/Combobox';
 import { DataTable } from '@/components/ui/DataTable';
+import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -11,18 +13,18 @@ import { Supplier, useActivateSupplierMutation, useCreateSupplierMutation, useDe
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-  BuildingOfficeIcon,
-  CheckBadgeIcon,
-  EnvelopeIcon,
-  EyeIcon,
-  MapPinIcon,
-  PencilIcon,
-  PhoneIcon,
-  PlusIcon,
-  PowerIcon,
-  StarIcon,
-  TrashIcon,
-  TruckIcon
+    BuildingOfficeIcon,
+    CheckBadgeIcon,
+    EnvelopeIcon,
+    EyeIcon,
+    MapPinIcon,
+    PencilIcon,
+    PhoneIcon,
+    PlusIcon,
+    PowerIcon,
+    StarIcon,
+    TrashIcon,
+    TruckIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
@@ -131,6 +133,44 @@ export default function SuppliersPage() {
     console.log('Total suppliers:', total);
     return total;
   }, [suppliersResponse]);
+
+  // Get unique supplier types from existing suppliers for suggestions
+  const existingSupplierTypes = useMemo(() => {
+    const types = new Set<string>();
+    suppliers.forEach((supplier: any) => {
+      if (supplier.type) {
+        types.add(supplier.type);
+      }
+    });
+    return Array.from(types).map((type) => ({
+      value: type,
+      label: type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' '),
+    }));
+  }, [suppliers]);
+
+  // Combine predefined types with existing types from database
+  const supplierTypeOptions = useMemo(() => {
+    const predefined = [
+      { value: 'food', label: 'Food' },
+      { value: 'beverage', label: 'Beverage' },
+      { value: 'equipment', label: 'Equipment' },
+      { value: 'packaging', label: 'Packaging' },
+      { value: 'service', label: 'Service' },
+      { value: 'other', label: 'Other' },
+    ];
+    
+    const predefinedMap = new Map(predefined.map(opt => [opt.value, opt]));
+    const combined = [...predefined];
+    
+    // Add existing types that aren't in predefined list
+    existingSupplierTypes.forEach((type) => {
+      if (!predefinedMap.has(type.value)) {
+        combined.push(type);
+      }
+    });
+    
+    return combined;
+  }, [existingSupplierTypes]);
 
   const [formData, setFormData] = useState<any>({
     name: '',
@@ -646,10 +686,73 @@ export default function SuppliersPage() {
             </p>
           )}
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Supplier
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <ImportButton
+            onImport={async (data, _result) => {
+              let successCount = 0;
+              let errorCount = 0;
+
+              for (const item of data) {
+                try {
+                  const payload: any = {
+                    companyId,
+                    name: item.name || item.Name,
+                    description: item.description || item.Description || undefined,
+                    type: item.type || item.Type || 'food',
+                    contactPerson: item.contactPerson || item['Contact Person'] || '',
+                    email: item.email || item.Email || '',
+                    phone: item.phone || item.Phone || '',
+                    alternatePhone: item.alternatePhone || item['Alternate Phone'] || undefined,
+                    website: item.website || item.Website || undefined,
+                    address: {
+                      street: item['Street'] || item.street || item.address?.street || '',
+                      city: item['City'] || item.city || item.address?.city || '',
+                      state: item['State'] || item.state || item.address?.state || '',
+                      zipCode: item['Zip Code'] || item.zipCode || item.address?.zipCode || '',
+                      country: item['Country'] || item.country || item.address?.country || 'USA',
+                    },
+                    taxId: item.taxId || item['Tax ID'] || undefined,
+                    registrationNumber: item.registrationNumber || item['Registration Number'] || undefined,
+                    paymentTerms: item.paymentTerms || item['Payment Terms'] || 'net-30',
+                    creditLimit: item.creditLimit || item['Credit Limit'] ? parseFloat(item.creditLimit || item['Credit Limit']) : undefined,
+                  };
+
+                  await createSupplier(payload).unwrap();
+                  successCount++;
+                } catch (error: any) {
+                  console.error('Failed to import supplier:', item, error);
+                  errorCount++;
+                }
+              }
+
+              if (successCount > 0) {
+                toast.success(`Successfully imported ${successCount} suppliers`);
+                await refetch();
+              }
+              if (errorCount > 0) {
+                toast.error(`Failed to import ${errorCount} suppliers`);
+              }
+            }}
+            columns={[
+              { key: 'name', label: 'Name', required: true, type: 'string' },
+              { key: 'type', label: 'Type', required: true, type: 'string' },
+              { key: 'email', label: 'Email', type: 'email' },
+              { key: 'phone', label: 'Phone', type: 'string' },
+              { key: 'contactPerson', label: 'Contact Person', type: 'string' },
+              { key: 'street', label: 'Street', type: 'string' },
+              { key: 'city', label: 'City', type: 'string' },
+              { key: 'state', label: 'State', type: 'string' },
+              { key: 'zipCode', label: 'Zip Code', type: 'string' },
+              { key: 'country', label: 'Country', type: 'string' },
+            ]}
+            filename="suppliers-import-template"
+            variant="secondary"
+          />
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Supplier
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -718,12 +821,7 @@ export default function SuppliersPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Types' },
-                  { value: 'food', label: 'Food' },
-                  { value: 'beverage', label: 'Beverage' },
-                  { value: 'equipment', label: 'Equipment' },
-                  { value: 'packaging', label: 'Packaging' },
-                  { value: 'service', label: 'Service' },
-                  { value: 'other', label: 'Other' },
+                  ...supplierTypeOptions,
                 ]}
                 value={typeFilter}
                 onChange={setTypeFilter}
@@ -785,8 +883,8 @@ export default function SuppliersPage() {
           }}
           exportable={true}
           exportFilename="suppliers"
-          onExport={(format, items) => {
-            toast.success(`Exporting ${items.length} suppliers as ${format.toUpperCase()}`);
+          onExport={(_format, _items) => {
+            // Export is handled automatically by ExportButton component
           }}
           emptyMessage="No suppliers found. Add your first supplier to get started."
         />
@@ -810,19 +908,18 @@ export default function SuppliersPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
-            <Select
-              label="Type"
-              options={[
-                { value: 'food', label: 'Food' },
-                { value: 'beverage', label: 'Beverage' },
-                { value: 'equipment', label: 'Equipment' },
-                { value: 'packaging', label: 'Packaging' },
-                { value: 'service', label: 'Service' },
-                { value: 'other', label: 'Other' },
-              ]}
-              value={formData.type}
-              onChange={(value) => setFormData({ ...formData, type: value })}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Type *
+              </label>
+              <Combobox
+                value={formData.type || 'food'}
+                onChange={(value: string) => setFormData({ ...formData, type: value.trim() })}
+                options={supplierTypeOptions}
+                placeholder="Select a type or enter custom type..."
+                allowCustom={true}
+              />
+            </div>
           </div>
 
           <div>
@@ -1126,19 +1223,18 @@ export default function SuppliersPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
-            <Select
-              label="Type"
-              options={[
-                { value: 'food', label: 'Food' },
-                { value: 'beverage', label: 'Beverage' },
-                { value: 'equipment', label: 'Equipment' },
-                { value: 'packaging', label: 'Packaging' },
-                { value: 'service', label: 'Service' },
-                { value: 'other', label: 'Other' },
-              ]}
-              value={formData.type}
-              onChange={(value) => setFormData({ ...formData, type: value })}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Type *
+              </label>
+              <Combobox
+                value={formData.type || 'food'}
+                onChange={(value: string) => setFormData({ ...formData, type: value.trim() })}
+                options={supplierTypeOptions}
+                placeholder="Select a type or enter custom type..."
+                allowCustom={true}
+              />
+            </div>
           </div>
 
           <div>
