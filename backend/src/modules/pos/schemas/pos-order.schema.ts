@@ -7,7 +7,8 @@ export interface POSOrderItem {
   menuItemId: Types.ObjectId;
   name?: string; // Store menu item name for easier access
   quantity: number;
-  price: number;
+  price: number; // Actual price used in order (may include modifications)
+  basePrice?: number; // Original menu item base price at time of order (for historical accuracy)
   notes?: string;
 }
 
@@ -27,6 +28,9 @@ export class POSOrder {
 
   @Prop({ type: Types.ObjectId, ref: 'Table' })
   tableId: Types.ObjectId;
+
+  @Prop({ type: String })
+  tableNumber?: string; // Store table number for historical records (even after tableId is cleared)
 
   @Prop({ type: Number, default: 0 })
   deliveryFee?: number;

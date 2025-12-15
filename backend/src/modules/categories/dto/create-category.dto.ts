@@ -1,11 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-    IsEnum,
     IsNotEmpty,
     IsNumber,
     IsOptional,
     IsString,
+    MinLength,
+    MaxLength,
 } from 'class-validator';
+import { DEFAULT_CATEGORY_TYPE } from '../constants/category-types.constant';
 
 export class CreateCategoryDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
@@ -43,8 +45,14 @@ export class CreateCategoryDto {
   @IsString()
   color?: string;
 
-  @ApiProperty({ enum: ['food', 'beverage', 'dessert', 'special'], example: 'food' })
-  @IsEnum(['food', 'beverage', 'dessert', 'special'])
+  @ApiProperty({ 
+    example: DEFAULT_CATEGORY_TYPE,
+    description: 'Category type - can be any custom value (e.g., "food", "beverage", "appetizer", "custom-type")'
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
+  @MaxLength(50)
   type: string;
 
   @ApiPropertyOptional({ example: 0 })

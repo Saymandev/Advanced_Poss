@@ -336,7 +336,7 @@ export class TablesService {
         }
         
         // Clear tableId from paid orders (don't cancel them, just remove table association)
-        // This allows the table to be released while keeping the order history intact
+        // IMPORTANT: Store tableNumber in orders BEFORE clearing tableId so it remains in history/receipts
         const paidOrders = await this.posOrderModel.find({
           tableId: new Types.ObjectId(id),
           createdAt: { $gte: today, $lt: tomorrow },
@@ -345,16 +345,22 @@ export class TablesService {
         }).exec();
         
         if (paidOrders.length > 0) {
+          // Get table number before clearing tableId
+          const table = await this.tableModel.findById(id).exec();
+          const tableNumber = (table as any)?.tableNumber || (table as any)?.number || '';
+          
+          // Store tableNumber in orders, then clear tableId
           await this.posOrderModel.updateMany(
             {
               _id: { $in: paidOrders.map(o => o._id) },
             },
             {
-              $unset: { tableId: '' },
+              $set: { tableNumber: tableNumber }, // Store table number for history/receipts
+              $unset: { tableId: '' }, // Clear tableId to release table
             }
           ).exec();
           
-          console.log(`✅ Cleared tableId from ${paidOrders.length} paid order(s) for table ${id} when releasing`);
+          console.log(`✅ Stored tableNumber "${tableNumber}" and cleared tableId from ${paidOrders.length} paid order(s) for table ${id} when releasing`);
         }
       } catch (orderCancelError) {
         // Log error but don't fail table release
@@ -510,4 +516,3 @@ export class TablesService {
     return tables;
   }
 }
-

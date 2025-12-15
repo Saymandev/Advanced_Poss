@@ -122,6 +122,17 @@ export class UsersService {
       delete query.includeSuperAdmins;
     }
 
+    // CRITICAL: Filter by companyId - only show employees from this company
+    if (query.companyId) {
+      try {
+        const companyIdObj = new Types.ObjectId(query.companyId);
+        query.companyId = companyIdObj;
+      } catch (error) {
+        // If companyId is not a valid ObjectId, use string format
+        query.companyId = query.companyId.toString();
+      }
+    }
+
     // CRITICAL: Filter by branchId - only show employees assigned to this specific branch
     // This ensures that when working at Branch X, you only see employees assigned to Branch X
     // Employees without a branchId assignment will be excluded

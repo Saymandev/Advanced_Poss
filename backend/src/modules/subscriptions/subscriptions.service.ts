@@ -38,6 +38,7 @@ import {
 } from './schemas/subscription.schema';
 import { StripeService } from './stripe.service';
 import { SubscriptionFeaturesService } from './subscription-features.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SubscriptionsService {
@@ -65,6 +66,7 @@ export class SubscriptionsService {
     private stripeService: StripeService,
     private featuresService: SubscriptionFeaturesService,
     private superAdminNotificationsService: SuperAdminNotificationsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   private toObjectId(id: string | Types.ObjectId): Types.ObjectId {
@@ -1503,6 +1505,13 @@ export class SubscriptionsService {
           );
         } catch (error) {
           // this.logger.error(`Failed to charge subscription ${subscription._id}`, error);
+          await this.sendSubscriptionNotification(
+            subscription.companyId,
+            'subscription.trial.charge_failed',
+            'Trial charge failed',
+            'We could not charge your payment method at trial end. Please update billing to continue service.',
+            { subscriptionId: subscription._id.toString() },
+          );
         }
       } else {
         // Mark subscription as expired
@@ -1533,6 +1542,14 @@ export class SubscriptionsService {
         ).exec();
         
         console.log(`[Subscriptions] ✅ Subscription ${subscription._id} expired and company ${subscription.companyId} synced`);
+
+        await this.sendSubscriptionNotification(
+          subscription.companyId,
+          'subscription.trial.expired',
+          'Subscription expired',
+          'Your trial has expired. Please update your plan to restore access.',
+          { subscriptionId: subscription._id.toString() },
+        );
       }
     }
 
@@ -1558,8 +1575,22 @@ export class SubscriptionsService {
             subscription._id.toString(),
             subscription.stripePaymentMethodId,
           );
+          await this.sendSubscriptionNotification(
+            subscription.companyId,
+            'subscription.billing.success',
+            'Subscription renewed',
+            'Your subscription has been renewed successfully.',
+            { subscriptionId: subscription._id.toString() },
+          );
         } catch (error) {
           // this.logger.error(`Failed to process recurring payment for subscription ${subscription._id}`, error);
+          await this.sendSubscriptionNotification(
+            subscription.companyId,
+            'subscription.billing.failed',
+            'Subscription billing failed',
+            'We could not process your subscription payment. Please update your billing method.',
+            { subscriptionId: subscription._id.toString() },
+          );
         }
       }
     }
@@ -1579,6 +1610,27 @@ export class SubscriptionsService {
       storageUsed: 0,
       lastUpdated: new Date(),
     };
+  }
+
+  private async sendSubscriptionNotification(
+    companyId: any,
+    type: string,
+    title: string,
+    message: string,
+    metadata: Record<string, any> = {},
+  ) {
+    try {
+      await this.notificationsService.create({
+        companyId: companyId?.toString?.() || companyId,
+        type,
+        title,
+        message,
+        metadata,
+        roles: ['owner', 'manager'],
+      });
+    } catch (err) {
+      console.warn(`Failed to send subscription notification (${type}):`, err);
+    }
   }
 
   private resolvePlanKey(planName?: string): SubscriptionPlan {

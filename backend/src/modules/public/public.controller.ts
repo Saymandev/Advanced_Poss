@@ -272,22 +272,47 @@ export class PublicController {
       : (menuItemsResult as any)?.menuItems || [];
 
     // Filter by menu type if provided
+    // Make this flexible by checking actual category types in the database
     if (menuType && menuType !== 'full') {
-      const categoryTypes: Record<string, string[]> = {
-        food: ['food', 'main', 'appetizer', 'entree'],
-        drinks: ['beverage', 'drink', 'beverages'],
-        desserts: ['dessert', 'sweets'],
-      };
+      // Get all unique category types from the database
+      const uniqueCategoryTypes = new Set(
+        (categories as any[]).map((cat: any) => (cat as any).type?.toLowerCase()).filter(Boolean)
+      );
       
-      const allowedTypes = categoryTypes[menuType] || [];
-      if (allowedTypes.length > 0) {
-        const filteredCategories = (categories as any[]).filter((cat: any) => {
-          const catType = (cat as any).type?.toLowerCase();
-          return allowedTypes.some(type => catType?.includes(type));
-        });
-        const categoryIds = filteredCategories.map((cat: any) => 
-          (cat as any)._id?.toString() || (cat as any).id
-        );
+      // Flexible mapping: check if category type matches menu type or contains it
+      // This allows custom types like "appetizer", "breakfast", etc. to work
+      const filteredCategories = (categories as any[]).filter((cat: any) => {
+        const catType = (cat as any).type?.toLowerCase();
+        if (!catType) return false;
+        
+        // Direct match
+        if (catType === menuType.toLowerCase()) return true;
+        
+        // Partial match (e.g., "beverage" matches "drinks", "dessert" matches "desserts")
+        if (catType.includes(menuType.toLowerCase()) || menuType.toLowerCase().includes(catType)) {
+          return true;
+        }
+        
+        // Common mappings for backward compatibility
+        const commonMappings: Record<string, string[]> = {
+          food: ['food', 'main', 'appetizer', 'entree', 'breakfast', 'lunch', 'dinner'],
+          drinks: ['beverage', 'drink', 'beverages', 'drinks'],
+          desserts: ['dessert', 'sweets', 'desserts'],
+        };
+        
+        const menuTypeLower = menuType.toLowerCase();
+        if (commonMappings[menuTypeLower]) {
+          return commonMappings[menuTypeLower].some(type => catType.includes(type) || type.includes(catType));
+        }
+        
+        return false;
+      });
+      
+      const categoryIds = filteredCategories.map((cat: any) => 
+        (cat as any)._id?.toString() || (cat as any).id
+      );
+      
+      if (categoryIds.length > 0) {
         rawMenuItems = rawMenuItems.filter((item: any) => {
           const itemCategoryId = (item as any).categoryId?._id?.toString() || 
                                 (item as any).categoryId?.id ||

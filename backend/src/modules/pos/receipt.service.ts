@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as qrcode from 'qrcode';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
 import { SettingsService } from '../settings/settings.service';
+import { Table, TableDocument } from '../tables/schemas/table.schema';
 import { PDFGeneratorService } from './pdf-generator.service';
 import { PrinterService, PrintJob } from './printer.service';
 import { POSOrder, POSOrderDocument } from './schemas/pos-order.schema';
@@ -15,6 +16,7 @@ export class ReceiptService {
   constructor(
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
+    @InjectModel(Table.name) private tableModel: Model<TableDocument>,
     private pdfGeneratorService: PDFGeneratorService,
     private printerService: PrinterService,
     private companiesService: CompaniesService,
@@ -39,7 +41,7 @@ export class ReceiptService {
   async generateReceiptData(orderId: string): Promise<any> {
     const order = await this.posOrderModel
       .findById(orderId)
-      .populate('tableId', 'number capacity')
+      .populate('tableId', 'tableNumber capacity')
       .populate('userId', 'name email')
       .populate('paymentId')
       .exec();
@@ -47,6 +49,18 @@ export class ReceiptService {
     if (!order) {
       throw new Error('Order not found');
     }
+
+    // Debug: Log tableId information
+    console.log('🔍 [Receipt] Order tableId debug:', {
+      orderId: orderId,
+      orderType: order.orderType,
+      hasTableId: !!order.tableId,
+      tableIdType: typeof order.tableId,
+      tableIdValue: order.tableId,
+      tableIdKeys: order.tableId && typeof order.tableId === 'object' ? Object.keys(order.tableId) : [],
+      tableNumber: (order.tableId as any)?.tableNumber,
+      number: (order.tableId as any)?.number,
+    });
 
     const settings = await this.posSettingsModel
       .findOne({ branchId: order.branchId })
@@ -180,22 +194,140 @@ export class ReceiptService {
       console.warn('Could not retrieve currency from company settings, using default:', error);
     }
 
+    // Extract table number - prioritize stored tableNumber (works even after table release)
+    // If tableNumber is stored in order, use it (this persists even after tableId is cleared)
+    let tableNumber = 'N/A';
+    
+    // First, check if tableNumber is directly stored in the order (for released tables)
+    if ((order as any).tableNumber) {
+      tableNumber = (order as any).tableNumber;
+      console.log(`✅ [Receipt] Using stored tableNumber from order: ${tableNumber}`);
+    } else if (order.tableId) {
+      // Fallback: Check if tableId is populated (object with tableNumber) or just an ObjectId
+      const tableIdValue = order.tableId as any;
+      
+      // If it's a populated object (has tableNumber property), use it directly
+      if (tableIdValue && typeof tableIdValue === 'object' && !(tableIdValue instanceof Types.ObjectId) && tableIdValue.tableNumber) {
+        tableNumber = tableIdValue.tableNumber || 'N/A';
+      } else {
+        // tableId is an ObjectId (not populated), fetch the table
+        try {
+          const tableIdStr = tableIdValue instanceof Types.ObjectId 
+            ? tableIdValue.toString() 
+            : String(tableIdValue);
+          const table = await this.tableModel.findById(tableIdStr).lean().exec();
+          if (table) {
+            tableNumber = (table as any).tableNumber || 'N/A';
+          }
+        } catch (error) {
+          console.warn('Could not fetch table for receipt:', error);
+        }
+      }
+    } else if (order.orderType === 'dine-in') {
+      // For dine-in orders without tableId or tableNumber, log a warning
+      console.warn(`⚠️ [Receipt] Dine-in order ${order.orderNumber} has no tableId or tableNumber`);
+    }
+
+    console.log('🔍 [Receipt] Final tableNumber:', tableNumber);
+
+    // Calculate discount amount
+    // The discount can be applied before tax (on subtotal) or after tax (on total)
+    // We need to reverse-engineer the discount from the actual total
+    const subtotal = this.calculateSubtotal(safeItems);
+    const actualTotal = Number(order.totalAmount || 0);
+    
+    // Try to find discount - it could be:
+    // 1. loyaltyDiscount field on the order
+    // 2. Calculated from the difference
+    let discountAmount = 0;
+    let discountPercentage = 0;
+    
+    if ((order as any).loyaltyDiscount && (order as any).loyaltyDiscount > 0) {
+      // Use loyalty discount if available
+      discountAmount = (order as any).loyaltyDiscount;
+    } else {
+      // Try to reverse-engineer the discount
+      // If discount is applied before tax: subtotal - discount, then tax on (subtotal - discount)
+      // If discount is applied after tax: (subtotal + tax) - discount
+      
+      // First, try discount on subtotal (before tax)
+      const taxRate = settings?.taxRate || 0;
+      const serviceChargeRate = settings?.serviceCharge || 0;
+      
+      // Calculate what the total would be with different discount scenarios
+      // Scenario 1: Discount on subtotal, then tax on discounted amount
+      // Let d = discount amount on subtotal
+      // (subtotal - d) * (1 + taxRate/100) * (1 + serviceChargeRate/100) = actualTotal
+      // Solving for d: d = subtotal - (actualTotal / ((1 + taxRate/100) * (1 + serviceChargeRate/100)))
+      
+      const taxMultiplier = 1 + (taxRate / 100);
+      const serviceChargeMultiplier = 1 + (serviceChargeRate / 100);
+      const totalMultiplier = taxMultiplier * serviceChargeMultiplier;
+      
+      const expectedSubtotalAfterDiscount = actualTotal / totalMultiplier;
+      const discountOnSubtotal = subtotal - expectedSubtotalAfterDiscount;
+      
+      // Scenario 2: Discount on total (after tax)
+      const subtotalWithTaxAndService = subtotal * totalMultiplier;
+      const discountOnTotal = subtotalWithTaxAndService - actualTotal;
+      
+      // Use the discount that makes more sense (positive and reasonable)
+      if (discountOnSubtotal > 0 && discountOnSubtotal <= subtotal) {
+        discountAmount = Math.round(discountOnSubtotal * 100) / 100;
+        discountPercentage = subtotal > 0 ? Math.round((discountAmount / subtotal) * 100 * 100) / 100 : 0;
+      } else if (discountOnTotal > 0 && discountOnTotal <= subtotalWithTaxAndService) {
+        discountAmount = Math.round(discountOnTotal * 100) / 100;
+        discountPercentage = subtotalWithTaxAndService > 0 ? Math.round((discountAmount / subtotalWithTaxAndService) * 100 * 100) / 100 : 0;
+      }
+    }
+    
+    // Recalculate tax and service charge based on discounted subtotal (if discount is on subtotal)
+    // For now, we'll calculate tax on the original subtotal and show discount separately
+    // This matches the payment screen behavior where discount is shown separately
+    const taxAmount = this.calculateTax(safeItems, settings?.taxRate || 0);
+    const serviceChargeAmount = this.calculateServiceCharge(
+      safeItems,
+      settings?.serviceCharge || 0,
+    );
+    
+    // If discount is on subtotal, recalculate tax on discounted amount
+    let finalTaxAmount = taxAmount;
+    let finalServiceChargeAmount = serviceChargeAmount;
+    
+    if (discountAmount > 0 && discountAmount <= subtotal) {
+      // Discount is likely on subtotal, recalculate tax on discounted amount
+      const discountedSubtotal = subtotal - discountAmount;
+      finalTaxAmount = Math.round(discountedSubtotal * (settings?.taxRate || 0) / 100 * 100) / 100;
+      finalServiceChargeAmount = Math.round(discountedSubtotal * (settings?.serviceCharge || 0) / 100 * 100) / 100;
+    }
+    
+    // Debug logging
+    console.log('🔍 [Receipt] Discount calculation:', {
+      subtotal,
+      discountAmount,
+      discountPercentage,
+      taxAmount: finalTaxAmount,
+      serviceChargeAmount: finalServiceChargeAmount,
+      calculatedTotal: subtotal - discountAmount + finalTaxAmount + finalServiceChargeAmount,
+      actualTotal,
+      loyaltyDiscount: (order as any).loyaltyDiscount,
+    });
+
     const receiptData = {
       orderNumber: order.orderNumber,
       orderId: order._id,
       branchId: order.branchId,
-      tableNumber: (order.tableId as any)?.number || 'N/A',
+      tableNumber: tableNumber,
       customerInfo: order.customerInfo || undefined,
       items: safeItems,
-      subtotal: this.calculateSubtotal(safeItems),
+      subtotal: subtotal,
       taxRate: settings?.taxRate || 0,
       serviceCharge: settings?.serviceCharge || 0,
-      taxAmount: this.calculateTax(safeItems, settings?.taxRate || 0),
-      serviceChargeAmount: this.calculateServiceCharge(
-        safeItems,
-        settings?.serviceCharge || 0,
-      ),
-      totalAmount: Number(order.totalAmount || 0),
+      taxAmount: finalTaxAmount,
+      serviceChargeAmount: finalServiceChargeAmount,
+      discountAmount: discountAmount,
+      discountPercentage: discountPercentage,
+      totalAmount: actualTotal,
       paymentMethod: order.paymentMethod,
       paymentDetails: order.paymentId || undefined,
       createdAt: (order as any)?.createdAt || new Date(),

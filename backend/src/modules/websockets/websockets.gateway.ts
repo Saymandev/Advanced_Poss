@@ -1,13 +1,13 @@
 import { Logger } from '@nestjs/common';
 import {
-  ConnectedSocket,
-  MessageBody,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  OnGatewayInit,
-  SubscribeMessage,
-  WebSocketGateway,
-  WebSocketServer,
+    ConnectedSocket,
+    MessageBody,
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnGatewayInit,
+    SubscribeMessage,
+    WebSocketGateway,
+    WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
@@ -30,6 +30,9 @@ export class WebsocketsGateway
   private roleRooms: Map<string, Set<string>> = new Map(); // role -> Set<socketId>
   private socketToUser: Map<string, string> = new Map(); // socketId -> userId
   private socketToRole: Map<string, string> = new Map(); // socketId -> role
+  private socketToBranch: Map<string, string> = new Map(); // socketId -> branchId
+  private socketToCompany: Map<string, string> = new Map(); // socketId -> companyId
+  private socketToFeatures: Map<string, Set<string>> = new Map(); // socketId -> features
 
   afterInit(server: Server) {
     this.logger.log('WebSocket Gateway initialized');
@@ -39,7 +42,18 @@ export class WebsocketsGateway
     this.logger.log(`Client connected: ${client.id}`);
     
     // Extract user ID from handshake auth if available
-    const userId = (client.handshake.auth as any)?.userId || (client.handshake.query as any)?.userId;
+    const auth = client.handshake.auth as any;
+    const query = client.handshake.query as any;
+    const userId = auth?.userId || query?.userId;
+    const branchId = auth?.branchId || query?.branchId;
+    const companyId = auth?.companyId || query?.companyId;
+    const role = (auth?.role || query?.role || '').toLowerCase();
+    const featuresRaw = auth?.features || query?.features;
+    const features = Array.isArray(featuresRaw)
+      ? featuresRaw.map((f: any) => String(f).toLowerCase())
+      : typeof featuresRaw === 'string'
+        ? featuresRaw.split(',').map((f: string) => f.trim().toLowerCase()).filter(Boolean)
+        : [];
     if (userId) {
       this.socketToUser.set(client.id, userId);
       if (!this.userRooms.has(userId)) {
@@ -48,6 +62,29 @@ export class WebsocketsGateway
       this.userRooms.get(userId).add(client.id);
       client.join(`user:${userId}`);
       this.logger.log(`Client ${client.id} associated with user ${userId}`);
+    }
+
+    if (branchId) {
+      this.socketToBranch.set(client.id, branchId);
+      client.join(`branch:${branchId}`);
+    }
+
+    if (companyId) {
+      this.socketToCompany.set(client.id, companyId);
+      client.join(`company:${companyId}`);
+    }
+
+    if (role) {
+      this.socketToRole.set(client.id, role);
+      if (!this.roleRooms.has(role)) {
+        this.roleRooms.set(role, new Set());
+      }
+      this.roleRooms.get(role).add(client.id);
+      client.join(`role:${role}`);
+    }
+
+    if (features.length > 0) {
+      this.socketToFeatures.set(client.id, new Set(features));
     }
   }
 
@@ -76,6 +113,20 @@ export class WebsocketsGateway
       client.leave(`user:${userId}`);
     }
 
+    const branchId = this.socketToBranch.get(client.id);
+    if (branchId) {
+      client.leave(`branch:${branchId}`);
+      this.socketToBranch.delete(client.id);
+    }
+
+    const companyId = this.socketToCompany.get(client.id);
+    if (companyId) {
+      client.leave(`company:${companyId}`);
+      this.socketToCompany.delete(client.id);
+    }
+
+    this.socketToFeatures.delete(client.id);
+
     // Remove from role room
     const role = this.socketToRole.get(client.id);
     if (role) {
@@ -97,6 +148,16 @@ export class WebsocketsGateway
     @ConnectedSocket() client: Socket,
   ) {
     const { branchId } = data;
+    const claimedBranch = this.socketToBranch.get(client.id);
+
+    // Enforce: client can only join the branch it declared at handshake
+    if (claimedBranch && claimedBranch !== branchId) {
+      return { success: false, message: 'Branch mismatch' };
+    }
+
+    if (!claimedBranch) {
+      this.socketToBranch.set(client.id, branchId);
+    }
 
     if (!this.rooms.has(branchId)) {
       this.rooms.set(branchId, new Set());
@@ -145,13 +206,22 @@ export class WebsocketsGateway
     }
 
     const normalizedRole = role.toLowerCase();
+    const claimedRole = this.socketToRole.get(client.id);
+
+    // Enforce: client can only join the role it declared at handshake
+    if (claimedRole && claimedRole !== normalizedRole) {
+      return { success: false, message: 'Role mismatch' };
+    }
+
+    if (!claimedRole) {
+      this.socketToRole.set(client.id, normalizedRole);
+    }
 
     if (!this.roleRooms.has(normalizedRole)) {
       this.roleRooms.set(normalizedRole, new Set());
     }
 
     this.roleRooms.get(normalizedRole).add(client.id);
-    this.socketToRole.set(client.id, normalizedRole);
     client.join(`role:${normalizedRole}`);
 
     this.logger.log(`Client ${client.id} joined role ${normalizedRole}`);
@@ -162,9 +232,78 @@ export class WebsocketsGateway
     };
   }
 
+  @SubscribeMessage('join-user')
+  handleJoinUser(
+    @MessageBody() data: { userId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { userId } = data;
+    if (!userId) {
+      return { success: false, message: 'User ID is required' };
+    }
+
+    const claimedUser = this.socketToUser.get(client.id);
+    if (claimedUser && claimedUser !== userId) {
+      return { success: false, message: 'User mismatch' };
+    }
+
+    if (!claimedUser) {
+      this.socketToUser.set(client.id, userId);
+    }
+
+    client.join(`user:${userId}`);
+    this.logger.log(`Client ${client.id} joined user ${userId}`);
+
+    return {
+      success: true,
+      message: `Joined user ${userId}`,
+    };
+  }
+
   broadcastToRole(role: string, event: string, payload: any) {
     const normalizedRole = role.toLowerCase();
     this.server.to(`role:${normalizedRole}`).emit(event, payload);
+  }
+
+  emitScopedNotification(params: {
+    companyId?: string;
+    branchId?: string;
+    roles?: string[];
+    features?: string[];
+    userIds?: string[];
+    payload: any;
+  }) {
+    const { companyId, branchId, roles = [], features = [], userIds = [], payload } = params;
+    const roleSet = new Set((roles || []).map((r) => r.toLowerCase()));
+    const featureSet = new Set((features || []).map((f) => f.toLowerCase()));
+    const userIdSet = new Set(userIds || []);
+
+    this.server.sockets.sockets.forEach((socket) => {
+      const sockUser = this.socketToUser.get(socket.id);
+      const sockBranch = this.socketToBranch.get(socket.id);
+      const sockCompany = this.socketToCompany.get(socket.id);
+      const sockRole = this.socketToRole.get(socket.id);
+      const sockFeatures = this.socketToFeatures.get(socket.id);
+
+      // Company / branch scoping
+      if (companyId && sockCompany !== companyId) return;
+      if (branchId && sockBranch !== branchId) return;
+
+      // Role scoping
+      if (roleSet.size > 0 && (!sockRole || !roleSet.has(sockRole))) return;
+
+      // User targeting
+      if (userIdSet.size > 0 && (!sockUser || !userIdSet.has(sockUser))) return;
+
+      // Feature scoping
+      if (featureSet.size > 0) {
+        if (!sockFeatures) return;
+        const hasFeature = [...featureSet].some((f) => sockFeatures.has(f));
+        if (!hasFeature) return;
+      }
+
+      socket.emit('notification', payload);
+    });
   }
 
   @SubscribeMessage('join-table')
@@ -196,29 +335,6 @@ export class WebsocketsGateway
     return {
       success: true,
       message: `Joined kitchen ${branchId}`,
-    };
-  }
-
-  @SubscribeMessage('join-user')
-  handleJoinUser(
-    @MessageBody() data: { userId: string },
-    @ConnectedSocket() client: Socket,
-  ) {
-    const { userId } = data;
-    client.join(`user:${userId}`);
-    
-    // Track user room
-    if (!this.userRooms.has(userId)) {
-      this.userRooms.set(userId, new Set());
-    }
-    this.userRooms.get(userId).add(client.id);
-    this.socketToUser.set(client.id, userId);
-
-    this.logger.log(`Client ${client.id} joined user room ${userId}`);
-
-    return {
-      success: true,
-      message: `Joined user room ${userId}`,
     };
   }
 

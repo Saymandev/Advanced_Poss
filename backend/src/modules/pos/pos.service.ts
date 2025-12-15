@@ -208,6 +208,9 @@ export class POSService {
           throw new NotFoundException(`Table with ID ${createOrderDto.tableId} not found`);
         }
         
+        // Store tableNumber in order for historical records (even if tableId is cleared later)
+        baseOrderData.tableNumber = (table as any).tableNumber || '';
+        
         // Get active orders for this table today
         // ALWAYS check both pending AND paid orders, regardless of payment mode setting
         // This handles scenarios where:
@@ -1910,4 +1913,3 @@ export class POSService {
     return updatedOrder;
   }
 }
-

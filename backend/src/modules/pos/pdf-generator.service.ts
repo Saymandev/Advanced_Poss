@@ -290,6 +290,12 @@ export class PDFGeneratorService {
             <span>Subtotal:</span>
             <span>${this.formatCurrency(orderData.subtotal, orderData.currency || 'BDT')}</span>
         </div>
+        ${orderData.discountAmount && orderData.discountAmount > 0 ? `
+            <div class="total-line" style="color: #dc2626;">
+                <span>Discount${orderData.discountPercentage && orderData.discountPercentage > 0 ? ` (${orderData.discountPercentage}%)` : ''}:</span>
+                <span>-${this.formatCurrency(orderData.discountAmount, orderData.currency || 'BDT')}</span>
+            </div>
+        ` : ''}
         ${orderData.taxRate > 0 ? `
             <div class="total-line">
                 <span>Tax (${orderData.taxRate}%):</span>

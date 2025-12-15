@@ -38,6 +38,18 @@ export class ReportsController {
     return this.reportsService.getDashboardStats(branchId, companyId);
   }
 
+  @Get('financial-summary')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get combined financial summary (sales, expenses, purchases, net)' })
+  getFinancialSummary(
+    @Query('branchId') branchId?: string,
+    @Query('companyId') companyId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getFinancialSummary(branchId, companyId, startDate, endDate);
+  }
+
   @Get('sales/summary/:branchId')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get sales summary report' })

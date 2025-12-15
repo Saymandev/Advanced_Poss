@@ -7,6 +7,7 @@ import { EmailService } from '../../common/services/email.service';
 import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { LoginActivityModule } from '../login-activity/login-activity.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schemas/subscription-plan.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
@@ -26,6 +27,7 @@ import { TwoFactorService } from './two-factor.service';
     forwardRef(() => SubscriptionPlansModule),
     forwardRef(() => LoginActivityModule),
     forwardRef(() => SuperAdminNotificationsModule),
+    forwardRef(() => NotificationsModule),
     SettingsModule,
     PassportModule,
     MongooseModule.forFeature([

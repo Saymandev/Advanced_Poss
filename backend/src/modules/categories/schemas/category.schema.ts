@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { DEFAULT_CATEGORY_TYPE } from '../constants/category-types.constant';
 
 export type CategoryDocument = Category & Document;
 
@@ -28,8 +29,9 @@ export class Category {
 
   @Prop({
     type: String,
-    enum: ['food', 'beverage', 'dessert', 'special'],
-    default: 'food',
+    required: true,
+    trim: true,
+    default: DEFAULT_CATEGORY_TYPE,
   })
   type: string;
 

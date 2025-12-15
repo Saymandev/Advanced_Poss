@@ -15,6 +15,7 @@ import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schem
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { SystemSettings, SystemSettingsSchema } from '../settings/schemas/system-settings.schema';
+import { Table, TableSchema } from '../tables/schemas/table.schema';
 import { TablesModule } from '../tables/tables.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { UsersModule } from '../users/users.module';
@@ -41,6 +42,7 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
       { name: User.name, schema: UserSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: SystemSettings.name, schema: SystemSettingsSchema },
+      { name: Table.name, schema: TableSchema },
     ]),
     MenuItemsModule,
     IngredientsModule,

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { Company, CompanySchema } from '../companies/schemas/company.schema';
@@ -11,6 +11,7 @@ import {
   MenuItemSchema,
 } from '../menu-items/schemas/menu-item.schema';
 import { SuperAdminNotificationsModule } from '../super-admin-notifications/super-admin-notifications.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { Table, TableSchema } from '../tables/schemas/table.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import {
@@ -48,6 +49,7 @@ import { SubscriptionsService } from './subscriptions.service';
       { name: Table.name, schema: TableSchema },
     ]),
     SuperAdminNotificationsModule,
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [
     SubscriptionsController,

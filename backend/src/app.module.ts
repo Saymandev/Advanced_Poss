@@ -32,6 +32,7 @@ import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { LoginActivityModule } from './modules/login-activity/login-activity.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
 import { MenuItemsModule } from './modules/menu-items/menu-items.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentMethodsModule } from './modules/payment-methods/payment-methods.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -172,6 +173,7 @@ import { SubscriptionLockMiddleware } from './common/middleware/subscription-loc
     WebsocketsModule,
     WorkPeriodsModule,
     SuperAdminNotificationsModule,
+    NotificationsModule,
     PurchaseOrdersModule,
     SystemFeedbackModule,
   ],

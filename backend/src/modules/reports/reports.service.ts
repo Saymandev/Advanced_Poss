@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { PurchaseOrderStatus } from '../../common/enums/purchase-order-status.enum';
 import { CustomersService } from '../customers/customers.service';
+import { Expense, ExpenseDocument } from '../expenses/schemas/expense.schema';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
+import { PurchaseOrder, PurchaseOrderDocument } from '../purchase-orders/schemas/purchase-order.schema';
 import { WastageService } from '../wastage/wastage.service';
 
 @Injectable()
@@ -12,11 +15,155 @@ export class ReportsService {
   constructor(
     @InjectModel(POSOrder.name)
     private posOrderModel: Model<POSOrderDocument>,
+    @InjectModel(Expense.name)
+    private expenseModel: Model<ExpenseDocument>,
+    @InjectModel(PurchaseOrder.name)
+    private purchaseOrderModel: Model<PurchaseOrderDocument>,
     private customersService: CustomersService,
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
     private wastageService: WastageService,
   ) {}
+
+  /**
+   * Financial summary that combines sales (POS orders), expenses, and purchase orders.
+   * Defaults to current month if no range is provided.
+   */
+  async getFinancialSummary(
+    branchId?: string,
+    companyId?: string,
+    startDateInput?: string,
+    endDateInput?: string,
+  ): Promise<any> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Parse date range with safe defaults
+    const startDate = startDateInput ? new Date(startDateInput) : startOfMonth;
+    const endDate = endDateInput ? new Date(endDateInput) : endOfMonth;
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new Error('Invalid date range');
+    }
+
+    // Build common filters
+    const salesFilter: any = {
+      createdAt: { $gte: startDate, $lte: endDate },
+      status: 'paid',
+    };
+    if (branchId) {
+      salesFilter.branchId = new Types.ObjectId(branchId);
+    }
+
+    const expenseFilter: any = {
+      date: { $gte: startDate, $lte: endDate },
+    };
+    if (branchId) expenseFilter.branchId = new Types.ObjectId(branchId);
+    if (companyId) expenseFilter.companyId = new Types.ObjectId(companyId);
+
+    const purchaseFilter: any = {
+      orderDate: { $gte: startDate, $lte: endDate },
+    };
+    if (branchId) purchaseFilter.branchId = new Types.ObjectId(branchId);
+    if (companyId) purchaseFilter.companyId = new Types.ObjectId(companyId);
+
+    // Run queries in parallel
+    const [salesOrders, expenses, purchases] = await Promise.all([
+      this.posOrderModel.find(salesFilter).lean().exec(),
+      this.expenseModel.find(expenseFilter).lean().exec(),
+      this.purchaseOrderModel.find(purchaseFilter).lean().exec(),
+    ]);
+
+    // Sales aggregates
+    const salesTotal = salesOrders.reduce((sum, o: any) => sum + (o.totalAmount || 0), 0);
+    const salesByPayment = salesOrders.reduce((acc: any, o: any) => {
+      const method = o.paymentMethod || 'unknown';
+      acc[method] = (acc[method] || 0) + (o.totalAmount || 0);
+      return acc;
+    }, {});
+    const salesDaily = salesOrders.reduce((acc: any, o: any) => {
+      const key = (o.createdAt ? new Date(o.createdAt) : new Date()).toISOString().split('T')[0];
+      acc[key] = (acc[key] || 0) + (o.totalAmount || 0);
+      return acc;
+    }, {});
+
+    // Expense aggregates (paid vs unpaid)
+    const expenseTotals = expenses.reduce(
+      (acc: any, e: any) => {
+        const amount = e.amount || 0;
+        if (e.status === 'paid') {
+          acc.paid += amount;
+        } else {
+          acc.unpaid += amount;
+        }
+        acc.total += amount;
+        return acc;
+      },
+      { total: 0, paid: 0, unpaid: 0 },
+    );
+    const expenseDaily = expenses.reduce((acc: any, e: any) => {
+      const key = (e.date ? new Date(e.date) : new Date()).toISOString().split('T')[0];
+      acc[key] = (acc[key] || 0) + (e.amount || 0);
+      return acc;
+    }, {});
+
+    // Purchase aggregates (received as paid)
+    const purchaseTotals = purchases.reduce(
+      (acc: any, p: any) => {
+        const amount = p.totalAmount || 0;
+        if (p.status === PurchaseOrderStatus.RECEIVED) {
+          acc.received += amount;
+        } else if (p.status !== PurchaseOrderStatus.CANCELLED) {
+          acc.pending += amount;
+        }
+        if (p.status !== PurchaseOrderStatus.CANCELLED) {
+          acc.total += amount;
+        }
+        return acc;
+      },
+      { total: 0, received: 0, pending: 0 },
+    );
+    const purchaseDaily = purchases.reduce((acc: any, p: any) => {
+      const key = (p.orderDate ? new Date(p.orderDate) : new Date()).toISOString().split('T')[0];
+      acc[key] = (acc[key] || 0) + (p.totalAmount || 0);
+      return acc;
+    }, {});
+
+    // Build merged daily series (sales vs expenses vs purchases)
+    const allDates = new Set<string>([
+      ...Object.keys(salesDaily),
+      ...Object.keys(expenseDaily),
+      ...Object.keys(purchaseDaily),
+    ]);
+    const timeline = Array.from(allDates)
+      .sort()
+      .map((date) => ({
+        date,
+        sales: salesDaily[date] || 0,
+        expenses: expenseDaily[date] || 0,
+        purchases: purchaseDaily[date] || 0,
+        net: (salesDaily[date] || 0) - (expenseDaily[date] || 0) - (purchaseDaily[date] || 0),
+      }));
+
+    const netProfit = salesTotal - expenseTotals.paid - purchaseTotals.received;
+
+    return {
+      period: {
+        startDate,
+        endDate,
+      },
+      sales: {
+        total: salesTotal,
+        orders: salesOrders.length,
+        byPaymentMethod: salesByPayment,
+      },
+      expenses: expenseTotals,
+      purchases: purchaseTotals,
+      net: netProfit,
+      timeline,
+    };
+  }
 
   async getSalesSummary(
     branchId: string,

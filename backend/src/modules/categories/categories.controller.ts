@@ -20,6 +20,7 @@ import { SubscriptionFeatureGuard } from '../../common/guards/subscription-featu
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { CATEGORY_TYPES, CATEGORY_TYPE_LABELS } from './constants/category-types.constant';
 
 @ApiTags('Menu')
 @ApiBearerAuth()
@@ -28,6 +29,17 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
+
+  @Get('types')
+  @ApiOperation({ summary: 'Get available category types' })
+  getCategoryTypes() {
+    return {
+      types: CATEGORY_TYPES.map((type) => ({
+        value: type,
+        label: CATEGORY_TYPE_LABELS[type as keyof typeof CATEGORY_TYPE_LABELS],
+      })),
+    };
+  }
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
