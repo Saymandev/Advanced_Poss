@@ -12,15 +12,15 @@ import { useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPerio
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  ArrowDownTrayIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  EyeIcon,
-  PaperAirplaneIcon,
-  PlayIcon,
-  PrinterIcon,
-  StopIcon,
-  UserIcon,
+    ArrowDownTrayIcon,
+    ClockIcon,
+    CurrencyDollarIcon,
+    EyeIcon,
+    PaperAirplaneIcon,
+    PlayIcon,
+    PrinterIcon,
+    StopIcon,
+    UserIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -406,12 +406,12 @@ export default function WorkPeriodsPage() {
               for (const item of data) {
                 try {
                   // Import historical work periods (started and closed)
-                  const openingBalance = parseFloat(item.openingBalance || item['Opening Balance'] || 0);
-                  const startTime = item.startTime || item['Start Time'] || new Date().toISOString();
-                  
                   // Note: Work periods are typically started/ended through the UI
                   // This import is for historical data entry
-                  toast.info('Work periods are typically managed through the UI. Import functionality is for reference only.');
+                  const _openingBalance = parseFloat(item.openingBalance || item['Opening Balance'] || 0);
+                  const _startTime = item.startTime || item['Start Time'] || new Date().toISOString();
+                  
+                  toast.success('Work periods are typically managed through the UI. Import functionality is for reference only.');
                   successCount++;
                 } catch (error: any) {
                   console.error('Failed to import work period:', item, error);

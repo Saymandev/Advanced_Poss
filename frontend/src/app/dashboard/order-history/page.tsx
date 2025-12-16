@@ -844,8 +844,8 @@ export default function OrdersPage() {
         </div>
         <div className="flex items-center gap-2">
           <ImportButton
-            onImport={async (data, _result) => {
-              toast.info('Orders are typically created through the POS system. Import functionality is for reference only.');
+            onImport={async (_data, _result) => {
+              toast.success('Orders are typically created through the POS system. Import functionality is for reference only.');
             }}
             columns={[
               { key: 'orderNumber', label: 'Order Number', type: 'string' },

@@ -292,7 +292,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
         // Fallback if response structure is different
         return { types: [] };
       },
-      providesTags: ['CategoryTypes'],
+      providesTags: ['Category'],
     }),
   }),
 });

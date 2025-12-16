@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
-import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -35,10 +34,7 @@ export default function DigitalReceiptsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
-  // Extract companyId and branchId
-  const companyId = (user as any)?.companyId || 
-                   (companyContext as any)?.companyId;
-  
+  // Extract branchId
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
@@ -884,7 +880,7 @@ export default function DigitalReceiptsPage() {
               
               if (selectedOrder) {
                 // Extract the proper ID - try multiple formats
-                const orderId = selectedOrder.id || selectedOrder._id || value;
+                const orderId = selectedOrder.id || (selectedOrder as any)._id || value;
                 setGenerateForm({ 
                   ...generateForm, 
                   orderId: orderId?.toString() || value,
@@ -902,12 +898,12 @@ export default function DigitalReceiptsPage() {
                 ? completedOrders.orders
                     .filter((order: any) => {
                       // Filter out orders without valid IDs
-                      const orderId = order.id || order._id;
+                      const orderId = order.id || (order as any)._id;
                       return orderId !== undefined && orderId !== null && orderId !== '';
                     })
                     .map((order: any) => {
                       // Extract proper ID - try multiple formats
-                      const orderId = order.id || order._id || '';
+                      const orderId = order.id || (order as any)._id || '';
                       if (!orderId) return null;
                       
                       // Build customer info string
@@ -922,7 +918,7 @@ export default function DigitalReceiptsPage() {
                         label: `Order #${order.orderNumber || order.orderNumber || 'N/A'} - ${formatCurrency(order.totalAmount || 0)} - ${customerInfo} - ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`,
                       };
                     })
-                    .filter((opt: any) => opt !== null) // Remove null entries
+                    .filter((opt: any): opt is { value: string; label: string } => opt !== null) // Remove null entries
                 : []
             }
             error={formErrors.generate?.orderId}

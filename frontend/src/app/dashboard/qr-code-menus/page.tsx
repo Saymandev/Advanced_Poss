@@ -253,14 +253,14 @@ export default function QRCodesPage() {
   };
 
   const getMenuTypeBadge = (type: QRCodeMenu['menuType']) => {
-    const configs = {
+    const configs: Record<string, { variant: 'info' | 'success' | 'warning' | 'danger'; label: string }> = {
       full: { variant: 'info' as const, label: 'Full Menu' },
       food: { variant: 'success' as const, label: 'Food Menu' },
       drinks: { variant: 'info' as const, label: 'Drinks Menu' },
       desserts: { variant: 'warning' as const, label: 'Desserts Menu' },
     };
 
-    const config = configs[type];
+    const config = configs[type] || { variant: 'info' as const, label: 'Menu' };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
