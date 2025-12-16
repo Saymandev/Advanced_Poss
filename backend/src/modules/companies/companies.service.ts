@@ -268,6 +268,22 @@ export class CompaniesService {
     }
   }
 
+  async activate(id: string): Promise<void> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid company ID');
+    }
+
+    const company = await this.companyModel.findByIdAndUpdate(
+      id,
+      { isActive: true },
+      { new: true },
+    );
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+  }
+
   async remove(id: string): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid company ID');

@@ -1,13 +1,13 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -16,9 +16,9 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CompaniesService } from './companies.service';
+import { AddCustomDomainDto } from './dto/add-custom-domain.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { AddCustomDomainDto } from './dto/add-custom-domain.dto';
 import { VerifyCustomDomainDto } from './dto/verify-custom-domain.dto';
 
 @ApiTags('Companies')
@@ -97,6 +97,13 @@ export class CompaniesController {
   @ApiOperation({ summary: 'Deactivate company' })
   deactivate(@Param('id') id: string) {
     return this.companiesService.deactivate(id);
+  }
+
+  @Patch(':id/activate')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Activate company (Super Admin only)' })
+  activate(@Param('id') id: string) {
+    return this.companiesService.activate(id);
   }
 
   @Post(':id/custom-domain')
