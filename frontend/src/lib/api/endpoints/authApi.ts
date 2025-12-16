@@ -54,6 +54,27 @@ export interface LoginResponse {
     accessToken?: string;
     refreshToken?: string;
     sessionId?: string;
+    requiresPayment?: boolean;
+    subscriptionPlan?: {
+      name: string;
+      displayName?: string;
+      price?: number;
+      currency?: string;
+      stripePriceId?: string;
+      trialPeriod?: number;
+    };
+    company?: {
+      id: string;
+      name: string;
+      email: string;
+      slug?: string;
+    };
+    branch?: {
+      id: string;
+      name: string;
+      address?: string;
+      slug?: string;
+    };
   };
   // Direct response (if not wrapped)
   user?: {
@@ -72,6 +93,15 @@ export interface LoginResponse {
   };
   accessToken?: string;
   refreshToken?: string;
+  requiresPayment?: boolean;
+  subscriptionPlan?: {
+    name: string;
+    displayName?: string;
+    price?: number;
+    currency?: string;
+    stripePriceId?: string;
+    trialPeriod?: number;
+  };
 }
 
 export interface Verify2FALoginRequest {

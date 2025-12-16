@@ -182,7 +182,7 @@ export default function RegisterPage() {
       toast.success('Registration successful! Welcome to Advanced POS.');
 
       // Check if payment is required (Premium/Enterprise plans)
-      const responseData = response?.data || response;
+      const responseData = (response?.data || response) as any;
       if (responseData?.requiresPayment) {
         // Redirect to payment page after registration for Premium/Enterprise plans
         // User can complete payment immediately or start trial first
