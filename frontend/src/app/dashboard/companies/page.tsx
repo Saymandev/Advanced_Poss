@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import {
   Company,
   CreateCompanyRequest,
+  useActivateCompanyMutation,
   useCreateCompanyMutation,
   useDeactivateCompanyMutation,
   useDeleteCompanyMutation,
@@ -70,6 +71,7 @@ export default function CompaniesPage() {
   const [updateCompany, { isLoading: isUpdating }] = useUpdateCompanyMutation();
   const [deleteCompany, { isLoading: isDeleting }] = useDeleteCompanyMutation();
   const [deactivateCompany] = useDeactivateCompanyMutation();
+  const [activateCompany] = useActivateCompanyMutation();
 
   const companies = useMemo(() => {
     if (!companiesData) return [];
@@ -251,7 +253,11 @@ export default function CompaniesPage() {
     }
 
     try {
-      await deactivateCompany(company.id).unwrap();
+      if (company.isActive) {
+        await deactivateCompany(company.id).unwrap();
+      } else {
+        await activateCompany(company.id).unwrap();
+      }
       toast.success(`Company ${action}d successfully`);
       refetch();
     } catch (error: any) {

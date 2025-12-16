@@ -219,6 +219,13 @@ export const companiesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Company'],
     }),
+    activateCompany: builder.mutation<Company, string>({
+      query: (id) => ({
+        url: `/companies/${id}/activate`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Company'],
+    }),
     deleteCompany: builder.mutation<void, string>({
       query: (id) => ({
         url: `/companies/${id}`,
@@ -278,6 +285,7 @@ export const {
   useUpdateCompanyMutation,
   useUpdateCompanySettingsMutation,
   useDeactivateCompanyMutation,
+  useActivateCompanyMutation,
   useDeleteCompanyMutation,
   useUploadCompanyLogoMutation,
   useGetCustomDomainInfoQuery,

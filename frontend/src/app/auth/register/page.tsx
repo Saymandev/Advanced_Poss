@@ -164,22 +164,26 @@ export default function RegisterPage() {
         pin: formData.pin,
       } as any).unwrap();
 
-      // Tokens are now in httpOnly cookies, response only contains user data
-      if (!response.data?.user) {
-        throw new Error('Registration failed: User data not received');
+      // Handle different response structures
+      // Response might be: { success: true, data: { user, ... } } or { data: { user, ... } } or { user, ... }
+      const userData = response?.data?.user || response?.user || (response as any)?.data?.user;
+      
+      if (!userData) {
+        console.error('Registration response structure:', response);
+        throw new Error('Registration failed: User data not received in response');
       }
 
       dispatch(
         setCredentials({
-          user: response.data.user,
+          user: userData,
         })
       );
 
       toast.success('Registration successful! Welcome to Advanced POS.');
 
       // Check if payment is required (Premium/Enterprise plans)
-      const responseData = response.data as any;
-      if (responseData.requiresPayment) {
+      const responseData = response?.data || response;
+      if (responseData?.requiresPayment) {
         // Redirect to payment page after registration for Premium/Enterprise plans
         // User can complete payment immediately or start trial first
         const planName = responseData.subscriptionPlan?.name || 'premium';
@@ -189,7 +193,10 @@ export default function RegisterPage() {
         router.push('/dashboard');
       }
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Registration failed. Please try again.');
+      console.error('Registration error:', error);
+      // Check if it's a validation error or already exists error
+      const errorMessage = error?.data?.message || error?.message || 'Registration failed. Please try again.';
+      toast.error(errorMessage);
     }
   };
 

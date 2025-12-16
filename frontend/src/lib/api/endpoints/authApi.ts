@@ -136,6 +136,43 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      transformResponse: (response: any) => {
+        // Handle different response structures
+        // Backend returns: { success: true, data: { user, company, branch, ... } }
+        // Or direct: { user, company, branch, ... }
+        const data = response?.data || response;
+        
+        // If response already has success and data structure
+        if (response?.success && response?.data) {
+          return {
+            success: true,
+            data: {
+              user: data.user,
+              company: data.company,
+              branch: data.branch,
+              requiresPayment: data.requiresPayment,
+              subscriptionPlan: data.subscriptionPlan,
+            },
+          };
+        }
+        
+        // If response is direct (shouldn't happen with TransformInterceptor, but handle it)
+        if (data?.user) {
+          return {
+            success: true,
+            data: {
+              user: data.user,
+              company: data.company,
+              branch: data.branch,
+              requiresPayment: data.requiresPayment,
+              subscriptionPlan: data.subscriptionPlan,
+            },
+          };
+        }
+        
+        // Fallback - return as is
+        return response;
+      },
     }),
     logout: builder.mutation<void, void>({
       query: () => ({
