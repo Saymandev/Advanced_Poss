@@ -6,7 +6,9 @@ import { Calculator } from '@/components/ui/Calculator';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { useFeatureAccess } from '@/hooks/useFeatureRedirect';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
+import { Booking, useCreateBookingMutation, useGetBookingsQuery } from '@/lib/api/endpoints/bookingsApi';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useGetCustomerByIdQuery, useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import { useGetDeliveryZonesByBranchQuery } from '@/lib/api/endpoints/deliveryZonesApi';
@@ -30,6 +32,7 @@ import {
   useProcessPaymentMutation,
   useUpdatePOSOrderMutation
 } from '@/lib/api/endpoints/posApi';
+import { useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
@@ -39,6 +42,7 @@ import { cn, formatDateTime } from '@/lib/utils';
 import { getEncryptedItemWithTTL, removeEncryptedItem, setEncryptedItemWithTTL } from '@/lib/utils/storage-encryption';
 import {
   ArrowPathIcon,
+  BuildingOfficeIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -110,18 +114,28 @@ interface OrderSummary {
   discount: number;
 }
 
-type OrderType = 'dine-in' | 'delivery' | 'takeaway';
+type OrderType = 'dine-in' | 'delivery' | 'takeaway' | 'room-booking' | 'room-service';
 
-const ORDER_TYPE_OPTIONS = [
+// Order type options - room booking will be conditionally added based on feature access
+const BASE_ORDER_TYPE_OPTIONS = [
   { value: 'dine-in', label: 'Dine-In', icon: HomeModernIcon },
   { value: 'delivery', label: 'Delivery', icon: TruckIcon },
   { value: 'takeaway', label: 'Takeaway', icon: ShoppingBagIcon },
 ] as const;
 
-const ORDER_TYPE_LABELS: Record<OrderType, string> = {
-  'dine-in': 'Dine-In',
-  delivery: 'Delivery',
-  takeaway: 'Takeaway',
+const ROOM_BOOKING_OPTION = { value: 'room-booking', label: 'Room Booking', icon: BuildingOfficeIcon } as const;
+const ROOM_SERVICE_OPTION = { value: 'room-service', label: 'Room Service', icon: BuildingOfficeIcon } as const;
+
+// Order type labels - will be used dynamically
+const getOrderTypeLabel = (orderType: OrderType): string => {
+  const labels: Record<OrderType, string> = {
+    'dine-in': 'Dine-In',
+    delivery: 'Delivery',
+    takeaway: 'Takeaway',
+    'room-booking': 'Room Booking',
+    'room-service': 'Room Service',
+  };
+  return labels[orderType] || orderType;
 };
 
 const ORDER_STATUS_LABELS: Record<'pending' | 'paid' | 'cancelled', string> = {
@@ -232,6 +246,18 @@ export default function POSPage() {
   const formatCurrency = useFormatCurrency(); // Use hook to get reactive currency formatting
   const isOwnerOrManager =
     user?.role === 'owner' || user?.role === 'super_admin';
+  
+  // Check if user has access to booking management feature (for room booking / room service)
+  const { hasAccess: hasBookingAccess } = useFeatureAccess('booking-management');
+  
+  // Build order type options based on feature access
+  const ORDER_TYPE_OPTIONS = useMemo(() => {
+    if (hasBookingAccess) {
+      return [...BASE_ORDER_TYPE_OPTIONS, ROOM_BOOKING_OPTION, ROOM_SERVICE_OPTION];
+    }
+    return BASE_ORDER_TYPE_OPTIONS;
+  }, [hasBookingAccess]);
+  
   const {
     data: activeWorkPeriod,
     isLoading: workPeriodLoading,
@@ -243,12 +269,28 @@ export default function POSPage() {
   const [orderType, setOrderType] = useState<OrderType>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pos_orderType') as OrderType | null;
-      if (saved === 'delivery' || saved === 'takeaway' || saved === 'dine-in') {
+      if (
+        saved === 'delivery' ||
+        saved === 'takeaway' ||
+        saved === 'dine-in' ||
+        saved === 'room-booking' ||
+        saved === 'room-service'
+      ) {
         return saved;
       }
     }
     return 'dine-in';
   });
+  
+  // Reset orderType to 'dine-in' if user loses access to hotel features and it's currently selected
+  useEffect(() => {
+    if ((orderType === 'room-booking' || orderType === 'room-service') && hasBookingAccess === false) {
+      setOrderType('dine-in');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pos_orderType', 'dine-in');
+      }
+    }
+  }, [orderType, hasBookingAccess]);
   const [selectedTable, setSelectedTable] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('pos_selectedTable') || '';
@@ -363,6 +405,7 @@ export default function POSPage() {
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string>('');
+  const [roomServiceBookingId, setRoomServiceBookingId] = useState<string>('');
   const [selectedPrinter, setSelectedPrinter] = useState<string>('');
   const [hasStartedOrder, setHasStartedOrder] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -395,6 +438,20 @@ export default function POSPage() {
     selectionChoices: Record<string, string[]>;
     addonSelections: Record<string, boolean>;
   } | null>(null);
+  
+  // Room booking state
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
+  const [checkInDate, setCheckInDate] = useState<string>(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [checkOutDate, setCheckOutDate] = useState<string>(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  });
+  const [numberOfGuests, setNumberOfGuests] = useState<number>(1);
+  const [specialRequests, setSpecialRequests] = useState<string>('');
   const [paymentTab, setPaymentTab] = useState<'full' | 'multi'>('full');
   const [fullPaymentMethod, setFullPaymentMethod] = useState<string>('cash'); // Payment method code
   const [fullPaymentReceived, setFullPaymentReceived] = useState<string>('0');
@@ -403,7 +460,7 @@ export default function POSPage() {
   const [isQueueCollapsed, setIsQueueCollapsed] = useState(true);
   const [queueTab, setQueueTab] = useState<'active' | 'history'>('active');
   const [queueStatusFilter, setQueueStatusFilter] = useState<'all' | 'pending' | 'paid' | 'cancelled'>('pending');
-  const [queueOrderTypeFilter, setQueueOrderTypeFilter] = useState<'all' | OrderType>('all');
+  const [queueOrderTypeFilter, setQueueOrderTypeFilter] = useState<'all' | 'dine-in' | 'delivery' | 'takeaway'>('all');
   const [queueSearchInput, setQueueSearchInput] = useState('');
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const [queueDetailId, setQueueDetailId] = useState<string | null>(null);
@@ -415,8 +472,18 @@ export default function POSPage() {
   const [pendingOrderPaymentReceived, setPendingOrderPaymentReceived] = useState<string>('0');
 
   // Delivery zones for POS (branch-based)
-  const currentBranchId = user?.branchId || (companyContext as any)?.branchId || '';
-  const currentCompanyId = user?.companyId || (companyContext as any)?.companyId || '';
+  // Use same branch resolution logic as Bookings page so POS + Bookings see the same branch
+  const currentBranchId =
+    (user as any)?.branchId
+    || (companyContext as any)?.branchId
+    || (companyContext as any)?.branches?.[0]?._id
+    || (companyContext as any)?.branches?.[0]?.id
+    || '';
+
+  const currentCompanyId =
+    (user as any)?.companyId
+    || (companyContext as any)?.companyId
+    || '';
   const { data: deliveryZones = [], isLoading: zonesLoading } = useGetDeliveryZonesByBranchQuery(
     { branchId: currentBranchId },
     { skip: !currentBranchId }
@@ -449,9 +516,65 @@ export default function POSPage() {
   const requiresTable = orderType === 'dine-in';
   const requiresDeliveryDetails = orderType === 'delivery';
   const requiresTakeawayDetails = orderType === 'takeaway';
+  const requiresRoomBooking = orderType === 'room-booking';
+  const requiresRoomService = orderType === 'room-service';
   const orderTypeLabel = ORDER_TYPE_OPTIONS.find(option => option.value === orderType)?.label ?? 'Dine-In';
-  const activeOrderTypeOption = useMemo(() => ORDER_TYPE_OPTIONS.find(option => option.value === orderType), [orderType]);
+  const activeOrderTypeOption = useMemo(() => ORDER_TYPE_OPTIONS.find(option => option.value === orderType), [orderType, ORDER_TYPE_OPTIONS]);
   const ActiveOrderIcon = activeOrderTypeOption?.icon ?? HomeModernIcon;
+  
+  // Room booking queries
+  const { data: roomsData, isLoading: roomsLoading } = useGetRoomsQuery(
+    { branchId: currentBranchId, status: 'available' },
+    { skip: !currentBranchId || !requiresRoomBooking }
+  );
+  const [createBooking] = useCreateBookingMutation();
+  
+  const rooms = useMemo(() => {
+    if (!roomsData) return [];
+    const response = roomsData as any;
+    if (Array.isArray(response)) return response;
+    if (response.rooms) return response.rooms;
+    if (response.data) return Array.isArray(response.data) ? response.data : response.data.rooms || [];
+    return [];
+  }, [roomsData]);
+
+  // Room service bookings - confirmed or checked-in bookings for current branch
+  const {
+    data: roomServiceBookingsResponse,
+    isLoading: roomServiceBookingsLoading,
+  } = useGetBookingsQuery(
+    { branchId: currentBranchId },
+    { skip: !currentBranchId || !requiresRoomService },
+  );
+
+  const roomServiceBookings: Booking[] = useMemo(() => {
+    if (!roomServiceBookingsResponse) return [];
+    const response = roomServiceBookingsResponse as any;
+    let items: Booking[] = [];
+
+    if (Array.isArray(response.bookings)) items = response.bookings;
+    else if (Array.isArray(response)) items = response;
+    else if (response.data && Array.isArray(response.data.bookings)) {
+      items = response.data.bookings;
+    }
+
+    // Only allow room service for confirmed or checked-in bookings
+    return items.filter(
+      (b: Booking) => b.status === 'confirmed' || b.status === 'checked_in',
+    );
+  }, [roomServiceBookingsResponse]);
+
+  const selectedRoomServiceBooking = useMemo(
+    () => roomServiceBookings.find((b) => b.id === roomServiceBookingId) || null,
+    [roomServiceBookings, roomServiceBookingId],
+  );
+
+  // Auto-select the first available booking for room service when none is selected
+  useEffect(() => {
+    if (orderType === 'room-service' && !roomServiceBookingId && roomServiceBookings.length > 0) {
+      setRoomServiceBookingId(roomServiceBookings[0].id);
+    }
+  }, [orderType, roomServiceBookingId, roomServiceBookings]);
 
   const deliveryFeeValue = useMemo(() => {
     if (!requiresDeliveryDetails) {
@@ -477,9 +600,21 @@ export default function POSPage() {
       && takeawayDetails.contactPhone.trim() !== ''
     );
 
+  const roomBookingIsValid = !requiresRoomBooking || (
+    selectedRoomId !== '' &&
+    checkInDate !== '' &&
+    checkOutDate !== '' &&
+    new Date(checkOutDate) > new Date(checkInDate) &&
+    numberOfGuests > 0
+  );
+
+  const roomServiceIsValid = !requiresRoomService || roomServiceBookingId !== '';
+  
   const checkoutBlocked = (requiresTable && !selectedTable)
     || (requiresDeliveryDetails && !deliveryIsValid)
-    || (requiresTakeawayDetails && !takeawayIsValid);
+    || (requiresTakeawayDetails && !takeawayIsValid)
+    || (requiresRoomBooking && !roomBookingIsValid)
+    || (requiresRoomService && !roomServiceIsValid);
 
   const missingDeliveryFields = useMemo(() => {
     if (!requiresDeliveryDetails) return [] as string[];
@@ -622,7 +757,7 @@ export default function POSPage() {
     const params: {
       branchId?: string;
       status?: string;
-      orderType?: OrderType;
+      orderType?: 'dine-in' | 'delivery' | 'takeaway';
       limit: number;
       page: number;
       search?: string;
@@ -1415,7 +1550,7 @@ export default function POSPage() {
     []
   );
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart([]);
     setItemDiscounts({});
     setDiscountValue('0');
@@ -1433,7 +1568,7 @@ export default function POSPage() {
       removeEncryptedItem('pos_customerInfo');
     }
     toast.success('Cart cleared');
-  };
+  }, []);
 
   const resetFilters = () => {
     setSelectedCategory('all');
@@ -1446,11 +1581,13 @@ export default function POSPage() {
       setOrderType(type);
       if (type === 'dine-in') {
         setHasStartedOrder(Boolean(selectedTable));
+      } else if (type === 'room-booking') {
+        setHasStartedOrder(Boolean(selectedRoomId));
       } else {
         setHasStartedOrder(false);
       }
     },
-    [selectedTable]
+    [selectedTable, selectedRoomId]
   );
 
   const [occupiedTableModal, setOccupiedTableModal] = useState<{ tableId: string; orderDetails: any } | null>(null);
@@ -1790,7 +1927,29 @@ export default function POSPage() {
     const requiresTable = orderType === 'dine-in';
     const isDelivery = orderType === 'delivery';
     const isTakeaway = orderType === 'takeaway';
- 
+    const isRoomBooking = orderType === 'room-booking';
+    const isRoomService = orderType === 'room-service';
+
+    // For room bookings we only go through the dedicated booking flow
+    if (isRoomBooking) {
+      toast.error('For room bookings, please use the Room Booking flow instead of Create Order.');
+      return;
+    }
+
+    // For room service pending charges we require a linked booking
+    let roomServiceBookingIdToUse = roomServiceBookingId;
+    if (isRoomService && !roomServiceBookingIdToUse && roomServiceBookings.length > 0) {
+      roomServiceBookingIdToUse = roomServiceBookings[0].id;
+      setRoomServiceBookingId(roomServiceBookingIdToUse);
+    }
+    if (isRoomService && !roomServiceBookingIdToUse) {
+      toast.error('Please select a checked-in booking / room before creating a room service order.');
+      return;
+    }
+    const roomServiceBookingForOrder = isRoomService
+      ? roomServiceBookings.find((b) => b.id === roomServiceBookingIdToUse) || roomServiceBookings[0]
+      : null;
+
     try {
       const deliveryPayload = isDelivery
         ? (sanitizeDetails(deliveryDetails) as CreatePOSOrderRequest['deliveryDetails'])
@@ -1798,11 +1957,11 @@ export default function POSPage() {
       const takeawayPayload = isTakeaway
         ? (sanitizeDetails(takeawayDetails) as CreatePOSOrderRequest['takeawayDetails'])
         : undefined;
- 
+
       const noteSegments: string[] = [];
       if (orderNotes.trim()) {
         noteSegments.push(orderNotes.trim());
-    }
+      }
       if (selectedWaiterName) {
         noteSegments.push(`Waiter: ${selectedWaiterName}`);
       }
@@ -1812,15 +1971,18 @@ export default function POSPage() {
       if (orderSummary.discount > 0) {
         if (discountMode === 'full') {
           noteSegments.push(
-            `Discount applied: ${discountType === 'percent' ? `${discountValue}%` : formatCurrency(Number(discountValue || '0'))} on full order`
+            `Discount applied: ${discountType === 'percent' ? `${discountValue}%` : formatCurrency(Number(discountValue || '0'))} on full order`,
           );
         } else {
           noteSegments.push('Item-wise discounts applied.');
-    }
+        }
       }
- 
+
+      const orderTypeForBackend: CreatePOSOrderRequest['orderType'] =
+        isRoomService ? 'room_service' : (orderType as 'dine-in' | 'delivery' | 'takeaway');
+
       const orderData: CreatePOSOrderRequest = {
-        orderType,
+        orderType: orderTypeForBackend,
         ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
         ...(requiresTable && selectedTable ? { guestCount: guestCount || 1 } : {}),
         ...(isDelivery
@@ -1834,7 +1996,14 @@ export default function POSPage() {
               takeawayDetails: takeawayPayload,
             }
           : {}),
-        items: cart.map(item => ({
+        ...(isRoomService && roomServiceBookingIdToUse
+          ? {
+              bookingId: roomServiceBookingIdToUse,
+              roomId: roomServiceBookingForOrder?.roomId,
+              roomNumber: roomServiceBookingForOrder?.roomNumber,
+            }
+          : {}),
+        items: cart.map((item) => ({
           menuItemId: item.menuItemId,
           quantity: item.quantity,
           price: item.price,
@@ -1911,12 +2080,15 @@ export default function POSPage() {
     refetchTables,
     formatCurrency,
     paymentMode,
+    clearCart,
   ]);
 
   const handlePayment = async () => {
     const requiresTable = orderType === 'dine-in';
     const isDelivery = orderType === 'delivery';
     const isTakeaway = orderType === 'takeaway';
+    const isRoomBooking = orderType === 'room-booking';
+    const isRoomService = orderType === 'room-service';
 
     if (requiresTable && !selectedTable) {
       toast.error('Please select a table for dine-in orders');
@@ -1939,8 +2111,35 @@ export default function POSPage() {
         return;
       }
     }
+    
+    if (isRoomBooking) {
+      if (!selectedRoomId) {
+        toast.error('Please select a room for booking');
+        return;
+      }
+      if (!checkInDate || !checkOutDate) {
+        toast.error('Please select check-in and check-out dates');
+        return;
+      }
+      if (new Date(checkOutDate) <= new Date(checkInDate)) {
+        toast.error('Check-out date must be after check-in date');
+        return;
+      }
+      if (numberOfGuests < 1) {
+        toast.error('Number of guests must be at least 1');
+        return;
+      }
+      if (!customerInfo.name || !customerInfo.name.trim()) {
+        toast.error('Please enter guest name');
+        return;
+      }
+      if (!customerInfo.phone || !customerInfo.phone.trim()) {
+        toast.error('Please enter phone number');
+        return;
+      }
+    }
 
-    if (cart.length === 0) {
+    if (!isRoomBooking && cart.length === 0) {
       toast.error('Cart is empty');
       return;
     }
@@ -1965,7 +2164,10 @@ export default function POSPage() {
       let changeDue = 0;
       let paymentBreakdown: Array<{ method: string; amount: number }> = [];
  
-      if (paymentTab === 'full') {
+      // For room service in pay-later mode, we don't take payment now.
+      const skipFullPaymentValidation = isRoomService && paymentMode === 'pay-later';
+
+      if (paymentTab === 'full' && !skipFullPaymentValidation) {
         const received = parseFloat(fullPaymentReceived || '0');
         if (!Number.isFinite(received) || received <= 0) {
           toast.error('Enter the amount received before completing payment');
@@ -1990,7 +2192,7 @@ export default function POSPage() {
         } else {
           paymentNotes.push(`${methodName} payment processed for ${formatCurrency(totalDue)}`);
         }
-      } else {
+      } else if (!skipFullPaymentValidation) {
         const activeRows = multiPayments.filter((row) => parseFloat(row.amount || '0') > 0);
         if (activeRows.length === 0) {
           toast.error('Add at least one payment row with an amount to process a split payment');
@@ -2049,6 +2251,90 @@ export default function POSPage() {
       }
       noteSegments.push(...paymentNotes);
  
+      // Handle room booking separately
+      if (isRoomBooking) {
+        const selectedRoom = rooms.find((r: any) => r.id === selectedRoomId);
+        if (!selectedRoom) {
+          toast.error('Selected room not found');
+          return;
+        }
+        
+        const checkIn = new Date(checkInDate);
+        const checkOut = new Date(checkOutDate);
+        const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+        const roomRate = selectedRoom.basePrice || 0;
+        const totalRoomCharges = roomRate * nights;
+        
+        // Calculate booking total (room charges + tax/service if applicable)
+        const bookingTotal = totalRoomCharges; // You can add tax/service charge here if needed
+        
+        try {
+          const bookingData = {
+            branchId: currentBranchId,
+            roomId: selectedRoomId,
+            guestId: selectedCustomerId || undefined,
+            guestName: customerInfo.name || 'Guest',
+            guestEmail: customerInfo.email || undefined,
+            guestPhone: customerInfo.phone || '',
+            numberOfGuests: numberOfGuests,
+            checkInDate: checkInDate,
+            checkOutDate: checkOutDate,
+            roomRate: roomRate,
+            paymentStatus: paymentMode === 'pay-first' ? 'paid' as const : 'pending' as const,
+            paymentMethod: fullPaymentMethod,
+            depositAmount: paymentMode === 'pay-first' ? bookingTotal : undefined,
+            specialRequests: specialRequests || undefined,
+            notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
+          };
+          
+          const bookingResponse = await createBooking(bookingData).unwrap();
+          const booking = (bookingResponse as any).data || bookingResponse;
+          const bookingId = booking.id || booking._id;
+          const bookingNumber = booking.bookingNumber || booking.booking_number || bookingId;
+          
+          // Process payment if in pay-later mode
+          if (paymentMode === 'pay-later') {
+            // Note: Booking payment processing would need to be implemented in the backend
+            // For now, we'll just mark it as paid if payment was received
+            toast.success('Booking created. Payment processing for bookings will be handled separately.');
+          }
+          
+          setCurrentOrderId(bookingId);
+          setPaymentSuccessOrder({
+            orderId: bookingId,
+            orderNumber: bookingNumber,
+            totalPaid: bookingTotal,
+            changeDue: changeDue > 0 ? changeDue : undefined,
+            summary: `Room Booking: ${selectedRoom.roomNumber} | ${nights} night(s) | ${paymentNotes.join(' | ')}`,
+            breakdown: paymentBreakdown,
+          });
+          toast.success('Room booking created successfully');
+          
+          // Reset form
+          setSelectedRoomId('');
+          setCheckInDate(new Date().toISOString().split('T')[0]);
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          setCheckOutDate(tomorrow.toISOString().split('T')[0]);
+          setNumberOfGuests(1);
+          setSpecialRequests('');
+          setCustomerInfo({ name: '', phone: '', email: '' });
+          setHasStartedOrder(false);
+          setIsPaymentModalOpen(false);
+          setIsCartModalOpen(false);
+          
+          return;
+        } catch (error: any) {
+          toast.error(error?.data?.message || 'Failed to create booking');
+          return;
+        }
+      }
+ 
+      // At this point, isRoomBooking is false (we returned early if true)
+      if (isRoomBooking) {
+        return;
+      }
+
       // Determine the actual payment method to store in order
       // For full payment, use the actual method code (bkash, nagad, etc.)
       // For split payment, use the primary method or 'split' with breakdown
@@ -2056,8 +2342,11 @@ export default function POSPage() {
         ? fullPaymentMethod  // Store actual method code (bkash, nagad, cash, etc.)
         : paymentMethodForBackend; // For split, keep as 'split'
 
+      const orderTypeForBackend: CreatePOSOrderRequest['orderType'] =
+        isRoomService ? 'room_service' : (orderType as 'dine-in' | 'delivery' | 'takeaway');
+
       const orderData: CreatePOSOrderRequest = {
-        orderType,
+        orderType: orderTypeForBackend,
         ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
         ...(requiresTable && selectedTable ? { guestCount: guestCount || 1 } : {}),
         ...(isDelivery
@@ -2071,6 +2360,13 @@ export default function POSPage() {
               takeawayDetails: takeawayPayload,
             }
           : {}),
+        ...(isRoomService && roomServiceBookingId && selectedRoomServiceBooking
+          ? {
+              bookingId: roomServiceBookingId,
+              roomId: selectedRoomServiceBooking.roomId,
+              roomNumber: selectedRoomServiceBooking.roomNumber,
+            }
+          : {}),
         items: cart.map((item) => ({
           menuItemId: item.menuItemId,
           quantity: item.quantity,
@@ -2080,7 +2376,7 @@ export default function POSPage() {
         customerInfo: customerInfo,
         totalAmount: totalDue,
         // In "pay-first" mode, create order as 'paid' (payment happens before order creation)
-        // In "pay-later" mode, create order as 'pending' then process payment
+        // In "pay-later" mode, create order as 'pending' then process payment (except room service)
         status: paymentMode === 'pay-first' ? 'paid' as const : 'pending' as const,
         paymentMethod: actualPaymentMethod, // Store actual method code (bkash, nagad, etc.)
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
@@ -2102,8 +2398,10 @@ export default function POSPage() {
       const orderNumber = order.orderNumber || order.order_number || orderId;
       
       // Only process payment separately if order was created as 'pending' (pay-later mode)
-      // In pay-first mode, order is already created as 'paid', so we don't need to process payment again
-      if (paymentMode === 'pay-later') {
+      // In pay-first mode, order is already created as 'paid', so we don't need to process payment again.
+      // For room service in pay-later mode, we intentionally do NOT process payment here so that
+      // charges remain pending on the booking and are settled at hotel checkout.
+      if (paymentMode === 'pay-later' && !isRoomService) {
         await processPayment({
           orderId,
           amount: totalDue,
@@ -2318,6 +2616,11 @@ export default function POSPage() {
   const isOrderingActive = useMemo(() => {
     if (orderType === 'dine-in') {
       return hasStartedOrder && Boolean(selectedTable);
+    }
+    // For room-booking and room-service, show the ordering workspace immediately
+    // (no gateway screen). Checkout is still blocked until required fields are valid.
+    if (orderType === 'room-booking' || orderType === 'room-service') {
+      return true;
     }
     return hasStartedOrder;
   }, [orderType, hasStartedOrder, selectedTable]);
@@ -2620,6 +2923,13 @@ export default function POSPage() {
       );
     }
 
+    // For room-booking and room-service, show the main ordering workspace directly
+    // (no delivery/takeaway pre-order card). The UI for these modes already lives
+    // inside renderOrderingWorkspace.
+    if (orderType === 'room-booking' || orderType === 'room-service') {
+      return null;
+    }
+
     const isDelivery = orderType === 'delivery';
     const IconComponent = isDelivery ? TruckIcon : ShoppingBagIcon;
     const label = isDelivery ? 'Create Delivery Order' : 'Create Takeaway Order';
@@ -2752,11 +3062,17 @@ export default function POSPage() {
               <Button
                 variant="primary"
                 onClick={() => setIsPaymentModalOpen(true)}
-                disabled={cart.length === 0 || checkoutBlocked}
+                disabled={(orderType !== 'room-booking' && cart.length === 0) || checkoutBlocked}
                 className="flex items-center gap-1 sm:gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 flex-1 sm:flex-initial"
               >
                 <CreditCardIcon className="h-4 w-4" />
-                <span>Checkout</span>
+                <span>
+                  {requiresRoomBooking
+                    ? 'Book Room'
+                    : requiresRoomService
+                    ? 'Charge to Room'
+                    : 'Checkout'}
+                </span>
               </Button>
             </div>
           </div>
@@ -2764,7 +3080,257 @@ export default function POSPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 sm:p-4 min-h-0">
-        {menuItemsLoading ? (
+        {/* Room service booking summary */}
+        {requiresRoomService && selectedRoomServiceBooking && (
+          <div className="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 sm:px-5 sm:py-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-200 text-xs sm:text-sm font-semibold">
+                  <BuildingOfficeIcon className="h-4 w-4" />
+                  Room Service for Room {selectedRoomServiceBooking.roomNumber || '—'}
+                </span>
+                <span className="text-gray-800 dark:text-slate-100 font-medium">
+                  {selectedRoomServiceBooking.guestName}
+                </span>
+                <span className="text-xs text-gray-500 dark:text-slate-400">
+                  #{selectedRoomServiceBooking.bookingNumber}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-gray-600 dark:text-slate-300">
+                <span>
+                  Stay:{' '}
+                  {new Date(selectedRoomServiceBooking.checkInDate).toLocaleDateString()}
+                  {' → '}
+                  {new Date(selectedRoomServiceBooking.checkOutDate).toLocaleDateString()}
+                  {' '}
+                  ({selectedRoomServiceBooking.numberOfNights || 1} night
+                  {selectedRoomServiceBooking.numberOfNights === 1 ? '' : 's'})
+                </span>
+                <span className="hidden sm:inline">•</span>
+                <span>
+                  Current total:{' '}
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-300">
+                    {formatCurrency(selectedRoomServiceBooking.totalAmount || 0)}
+                  </span>
+                </span>
+                {selectedRoomServiceBooking.additionalCharges &&
+                  selectedRoomServiceBooking.additionalCharges.length > 0 && (
+                    <span>
+                      Room service charges so far:{' '}
+                      <span className="font-semibold">
+                        {formatCurrency(
+                          selectedRoomServiceBooking.additionalCharges.reduce(
+                            (sum, charge) => sum + (charge.amount || 0),
+                            0,
+                          ),
+                        )}
+                      </span>
+                    </span>
+                  )}
+              </div>
+            </div>
+            <div className="text-xs sm:text-sm text-gray-600 dark:text-slate-300">
+              <div>Status:&nbsp;
+                <span className="inline-flex items-center rounded-full bg-emerald-600/15 px-2 py-0.5 text-emerald-700 dark:text-emerald-200 text-[11px] sm:text-xs font-semibold capitalize">
+                  {selectedRoomServiceBooking.status.replace('_', ' ')}
+                </span>
+              </div>
+              <div className="mt-1">
+                Payment:&nbsp;
+                <span className="capitalize">{selectedRoomServiceBooking.paymentStatus}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {requiresRoomBooking ? (
+          <div className="space-y-6">
+            {/* Date Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300">
+                  Check-in Date
+                </label>
+                <Input
+                  type="date"
+                  value={checkInDate}
+                  onChange={(e) => setCheckInDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300">
+                  Check-out Date
+                </label>
+                <Input
+                  type="date"
+                  value={checkOutDate}
+                  onChange={(e) => setCheckOutDate(e.target.value)}
+                  min={checkInDate || new Date().toISOString().split('T')[0]}
+                  className="w-full"
+                />
+              </div>
+            </div>
+            
+            {/* Number of Guests */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300">
+                Number of Guests
+              </label>
+              <Input
+                type="number"
+                value={numberOfGuests}
+                onChange={(e) => setNumberOfGuests(Math.max(1, parseInt(e.target.value) || 1))}
+                min="1"
+                className="w-full max-w-xs"
+              />
+            </div>
+            
+            {/* Room Selection */}
+            <div>
+              <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-slate-300">
+                Select Room
+              </label>
+              {roomsLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Card key={i} className="animate-pulse bg-gray-100 dark:bg-slate-900/40">
+                      <CardContent className="p-4">
+                        <div className="h-32 bg-gray-200 dark:bg-slate-800 rounded-lg mb-3"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-slate-800 rounded mb-2"></div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : rooms.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {rooms.map((room: any) => {
+                    const isSelected = selectedRoomId === room.id;
+                    const nights = checkInDate && checkOutDate 
+                      ? Math.ceil((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / (1000 * 60 * 60 * 24))
+                      : 1;
+                    const totalPrice = (room.basePrice || 0) * nights;
+                    
+                    return (
+                      <Card
+                        key={room.id}
+                        className={`cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-2 border-sky-500 bg-sky-50 dark:bg-sky-900/20'
+                            : 'border border-gray-200 dark:border-slate-800 hover:border-sky-300'
+                        }`}
+                        onClick={() => {
+                          setSelectedRoomId(room.id);
+                          setHasStartedOrder(true);
+                        }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-semibold text-lg text-gray-900 dark:text-slate-100">
+                                Room {room.roomNumber}
+                              </h3>
+                              {isSelected && (
+                                <Badge variant="success">Selected</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 capitalize">
+                              {room.roomType} • Max {room.maxOccupancy} guests
+                            </p>
+                            {room.floor && (
+                              <p className="text-xs text-gray-500 dark:text-slate-500">
+                                Floor {room.floor}
+                              </p>
+                            )}
+                            <div className="pt-2 border-t border-gray-200 dark:border-slate-700">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600 dark:text-slate-400">
+                                  {nights} night{nights !== 1 ? 's' : ''}
+                                </span>
+                                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                  {formatCurrency(totalPrice)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                                {formatCurrency(room.basePrice)}/night
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-600 dark:text-slate-400">
+                  <p>No available rooms found</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Customer Information */}
+            <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-slate-100">
+                Guest Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300">
+                    Guest Name *
+                  </label>
+                  <Input
+                    value={customerInfo.name}
+                    onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                    placeholder="Enter guest name"
+                    className="w-full"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300">
+                    Phone Number *
+                  </label>
+                  <Input
+                    value={customerInfo.phone}
+                    onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                    className="w-full"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300">
+                    Email Address
+                  </label>
+                  <Input
+                    type="email"
+                    value={customerInfo.email}
+                    onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                    placeholder="Enter email (optional)"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Special Requests */}
+            {selectedRoomId && (
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300">
+                  Special Requests
+                </label>
+                <textarea
+                  value={specialRequests}
+                  onChange={(e) => setSpecialRequests(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100"
+                  placeholder="Any special requests or notes..."
+                />
+              </div>
+            )}
+          </div>
+        ) : menuItemsLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
             {[...Array(8)].map((_, i) => (
               <Card key={i} className="animate-pulse bg-gray-100 dark:bg-slate-900/40 border border-gray-200 dark:border-slate-800">
@@ -3055,7 +3621,7 @@ export default function POSPage() {
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-300">
                     <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
-                      {ORDER_TYPE_LABELS[order.orderType as OrderType] || order.orderType}
+                      {getOrderTypeLabel(order.orderType as OrderType)}
                     </span>
                     <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
                       {formatCurrency(Number(order.totalAmount || 0))}
@@ -3292,8 +3858,35 @@ export default function POSPage() {
                     </Badge>
                   ) : null}
                 </div>
+              ) : requiresRoomService ? (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={roomServiceBookingId}
+                    onChange={(event) => setRoomServiceBookingId(event.target.value)}
+                    disabled={roomServiceBookingsLoading || roomServiceBookings.length === 0}
+                    className="rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-1.5 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {roomServiceBookingsLoading
+                        ? 'Loading room bookings…'
+                        : roomServiceBookings.length === 0
+                        ? 'No confirmed or checked-in bookings'
+                        : 'Select booking / room'}
+                    </option>
+                    {roomServiceBookings.map((booking: Booking) => (
+                      <option key={booking.id} value={booking.id}>
+                        {booking.roomNumber
+                          ? `Room ${booking.roomNumber}`
+                          : 'Room'}{' '}
+                        • {booking.guestName} • {booking.bookingNumber}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ) : (
-                <span className="text-gray-600 dark:text-slate-200">Table not required for this order</span>
+                <span className="text-gray-600 dark:text-slate-200">
+                  Table not required for this order
+                </span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-slate-200">
@@ -3646,7 +4239,7 @@ export default function POSPage() {
                   )}
                   {cartSubtotal < 1000 && (selectedCustomer.loyaltyPoints || 0) >= 2000 && (
                     <div className="mt-2 text-xs text-amber-400">
-                      ⚠️ Minimum order amount ৳1,000 required for loyalty redemption
+                      ⚠️ Minimum order amount {formatCurrency(1000)} required for loyalty redemption
                     </div>
                   )}
                 </div>
@@ -4088,7 +4681,7 @@ export default function POSPage() {
                   <CurrencyDollarIcon className="h-4 w-4" />
                   Calculator
                 </Button>
-                {paymentMode === 'pay-later' && (
+                {paymentMode === 'pay-later' && !requiresRoomBooking && (
                   <Button 
                     variant="secondary" 
                     onClick={handleCreateOrder} 
@@ -4619,7 +5212,7 @@ export default function POSPage() {
                   <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Order Type</p>
                     <p className="text-sm font-semibold text-slate-100">
-                      {ORDER_TYPE_LABELS[queueDetail.orderType as OrderType] || queueDetail.orderType}
+                      {getOrderTypeLabel(queueDetail.orderType as OrderType)}
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3">

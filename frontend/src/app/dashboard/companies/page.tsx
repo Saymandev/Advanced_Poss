@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import {
   Company,
   CreateCompanyRequest,
@@ -38,11 +39,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-const SUBSCRIPTION_PLANS = [
-  { value: 'basic', label: 'Basic' },
-  { value: 'premium', label: 'Premium' },
-  { value: 'enterprise', label: 'Enterprise' },
-];
+
 
 export default function CompaniesPage() {
   const { user } = useAppSelector((state) => state.auth);
@@ -72,6 +69,8 @@ export default function CompaniesPage() {
   const [deleteCompany, { isLoading: isDeleting }] = useDeleteCompanyMutation();
   const [deactivateCompany] = useDeactivateCompanyMutation();
   const [activateCompany] = useActivateCompanyMutation();
+
+  const formatCurrency = useFormatCurrency();
 
   const companies = useMemo(() => {
     if (!companiesData) return [];
@@ -114,7 +113,7 @@ export default function CompaniesPage() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (company) =>
+        (company: Company) =>
           company.name.toLowerCase().includes(query) ||
           company.email.toLowerCase().includes(query) ||
           company.slug?.toLowerCase().includes(query)
@@ -122,7 +121,7 @@ export default function CompaniesPage() {
     }
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter((company) => {
+      filtered = filtered.filter((company: Company) => {
         if (statusFilter === 'active') return company.isActive;
         if (statusFilter === 'inactive') return !company.isActive;
         return true;
@@ -131,7 +130,7 @@ export default function CompaniesPage() {
 
     if (subscriptionFilter !== 'all') {
       filtered = filtered.filter(
-        (company) => company.subscriptionStatus === subscriptionFilter
+        (company: Company) => company.subscriptionStatus === subscriptionFilter
       );
     }
 
@@ -999,12 +998,7 @@ export default function CompaniesPage() {
                         <CurrencyDollarIcon className="w-8 h-8 text-yellow-600" />
                         <div>
                           <p className="text-2xl font-bold">
-                            {companyStatsData.stats?.totalRevenue 
-                              ? new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency: 'BDT',
-                                }).format(companyStatsData.stats.totalRevenue)
-                              : '৳0'}
+                            {formatCurrency(companyStatsData.stats?.totalRevenue || 0)}
                           </p>
                           <p className="text-xs text-gray-500">Total Revenue</p>
                         </div>
@@ -1025,10 +1019,10 @@ export default function CompaniesPage() {
                           <p className="text-sm text-gray-500">Average Order Value</p>
                           <p className="text-lg font-semibold">
                             {(companyStatsData.stats?.totalOrders ?? 0) > 0
-                              ? new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency: 'BDT',
-                                }).format((companyStatsData.stats?.totalRevenue ?? 0) / (companyStatsData.stats?.totalOrders ?? 1))
+                              ? formatCurrency(
+                                  (companyStatsData.stats?.totalRevenue ?? 0) /
+                                    (companyStatsData.stats?.totalOrders ?? 1)
+                                )
                               : 'N/A'}
                           </p>
                         </div>
@@ -1036,10 +1030,10 @@ export default function CompaniesPage() {
                           <div>
                             <p className="text-sm text-gray-500">Revenue per Employee</p>
                             <p className="text-lg font-semibold">
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: 'BDT',
-                              }).format((companyStatsData.stats?.totalRevenue ?? 0) / (companyStatsData.stats?.totalUsers ?? 1))}
+                              {formatCurrency(
+                                (companyStatsData.stats?.totalRevenue ?? 0) /
+                                  (companyStatsData.stats?.totalUsers ?? 1)
+                              )}
                             </p>
                           </div>
                         )}

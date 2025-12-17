@@ -40,7 +40,7 @@ interface RoleAccess {
 const ROLE_CATEGORY_MAP: Partial<Record<UserRole, string[] | 'all'>> = {
   [UserRole.SUPER_ADMIN]: 'all',
   [UserRole.OWNER]: 'all',
-  [UserRole.MANAGER]: ['Overview', 'Staff', 'Menu', 'Orders', 'Customers', 'Inventory', 'Financial'],
+  [UserRole.MANAGER]: ['Overview', 'Staff', 'Menu', 'Orders', 'Customers', 'Inventory', 'Financial', 'Hotel'],
   [UserRole.CHEF]: ['Overview', 'Menu', 'Orders', 'Inventory'],
   [UserRole.WAITER]: ['Overview', 'Orders', 'Customers'],
   [UserRole.CASHIER]: ['Overview', 'Orders', 'Customers', 'Financial'],

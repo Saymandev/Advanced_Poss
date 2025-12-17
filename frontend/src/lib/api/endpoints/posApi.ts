@@ -9,8 +9,11 @@ export interface POSOrderItem {
 }
 
 export interface CreatePOSOrderRequest {
-  orderType: 'dine-in' | 'delivery' | 'takeaway';
+  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
   tableId?: string;
+  roomId?: string;
+  bookingId?: string;
+  roomNumber?: string;
   deliveryFee?: number;
   deliveryDetails?: {
     contactName?: string;
@@ -116,7 +119,7 @@ export const posApi = apiSlice.injectEndpoints({
       endDate?: string;
       page?: number;
       limit?: number;
-      orderType?: 'dine-in' | 'delivery' | 'takeaway';
+      orderType?: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
       search?: string;
     }>({
       query: (params) => ({

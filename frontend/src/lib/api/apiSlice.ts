@@ -323,6 +323,8 @@ export const apiSlice = createApi({
     'Category',
     'Order',
     'Table',
+    'Room',
+    'Booking',
     'Customer',
     'Kitchen',
     'Ingredient',

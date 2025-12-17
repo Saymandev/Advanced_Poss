@@ -36,6 +36,11 @@ export const FEATURE_ROUTE_MAP: Record<string, string | string[] | null> = {
   '/dashboard/customer-display': 'customer-display',
   '/dashboard/digital-receipts': 'digital-receipts',
   
+  // Hotel Management
+  '/dashboard/hotel': ['room-management', 'booking-management'],
+  '/dashboard/rooms': 'room-management',
+  '/dashboard/bookings': 'booking-management',
+  
   // Customers
   '/dashboard/customers': 'customer-management',
   '/dashboard/customer-loyalty-ai': 'ai-customer-loyalty', // Requires AI Customer Loyalty feature

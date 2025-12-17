@@ -62,6 +62,44 @@ export interface DeliveryZone {
   isActive: boolean;
 }
 
+export interface PublicRoom {
+  id: string;
+  roomNumber: string;
+  roomType: string;
+  floor?: number;
+  building?: string;
+  maxOccupancy: number;
+  beds: {
+    single?: number;
+    double?: number;
+    king?: number;
+  };
+  amenities: string[];
+  basePrice: number;
+  size?: string;
+  view?: string;
+  smokingAllowed: boolean;
+  images: string[];
+  description?: string;
+}
+
+export interface PublicBooking {
+  id: string;
+  bookingNumber: string;
+  guestName: string;
+  guestEmail: string;
+  guestPhone: string;
+  checkInDate: string;
+  checkOutDate: string;
+  numberOfNights: number;
+  roomRate: number;
+  totalAmount: number;
+  paymentStatus: string;
+  status: string;
+  specialRequests?: string;
+  createdAt: string;
+}
+
 export const publicApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getCompanyBySlug: builder.query<PublicCompany, string>({
@@ -263,6 +301,92 @@ export const publicApi = apiSlice.injectEndpoints({
         body: formData,
       }),
     }),
+
+    // ========== Hotel/Room Public Endpoints ==========
+
+    getBranchRooms: builder.query<PublicRoom[], {
+      companySlug: string;
+      branchSlug: string;
+      checkInDate?: string;
+      checkOutDate?: string;
+    }>({
+      query: ({ companySlug, branchSlug, checkInDate, checkOutDate }) => {
+        const params = new URLSearchParams();
+        if (checkInDate) params.append('checkInDate', checkInDate);
+        if (checkOutDate) params.append('checkOutDate', checkOutDate);
+        return `/public/companies/${companySlug}/branches/${branchSlug}/rooms${params.toString() ? `?${params.toString()}` : ''}`;
+      },
+      transformResponse: (response: any) => {
+        return response.data || [];
+      },
+    }),
+
+    getRoomDetails: builder.query<PublicRoom, {
+      companySlug: string;
+      branchSlug: string;
+      roomId: string;
+    }>({
+      query: ({ companySlug, branchSlug, roomId }) =>
+        `/public/companies/${companySlug}/branches/${branchSlug}/rooms/${roomId}`,
+      transformResponse: (response: any) => {
+        return response.data;
+      },
+    }),
+
+    checkRoomAvailability: builder.query<{
+      checkInDate: string;
+      checkOutDate: string;
+      availableRooms: PublicRoom[];
+      count: number;
+    }, {
+      companySlug: string;
+      branchSlug: string;
+      checkInDate: string;
+      checkOutDate: string;
+    }>({
+      query: ({ companySlug, branchSlug, checkInDate, checkOutDate }) =>
+        `/public/companies/${companySlug}/branches/${branchSlug}/rooms/available?checkInDate=${checkInDate}&checkOutDate=${checkOutDate}`,
+      transformResponse: (response: any) => {
+        return response.data;
+      },
+    }),
+
+    createPublicBooking: builder.mutation<PublicBooking, {
+      companySlug: string;
+      branchSlug: string;
+      bookingData: {
+        roomId: string;
+        guestName: string;
+        guestEmail: string;
+        guestPhone: string;
+        checkInDate: string;
+        checkOutDate: string;
+        roomRate: number;
+        numberOfGuests?: number;
+        specialRequests?: string;
+      };
+    }>({
+      query: ({ companySlug, branchSlug, bookingData }) => ({
+        url: `/public/companies/${companySlug}/branches/${branchSlug}/bookings`,
+        method: 'POST',
+        body: bookingData,
+      }),
+      transformResponse: (response: any) => {
+        return response.data;
+      },
+    }),
+
+    getBookingDetails: builder.query<PublicBooking, {
+      companySlug: string;
+      branchSlug: string;
+      bookingId: string;
+    }>({
+      query: ({ companySlug, branchSlug, bookingId }) =>
+        `/public/companies/${companySlug}/branches/${branchSlug}/bookings/${bookingId}`,
+      transformResponse: (response: any) => {
+        return response.data;
+      },
+    }),
   }),
 });
 
@@ -281,5 +405,11 @@ export const {
   useFindDeliveryZoneMutation,
   useSubmitContactFormMutation,
   useSubmitGeneralContactFormMutation,
+  // Hotel/Room queries
+  useGetBranchRoomsQuery,
+  useGetRoomDetailsQuery,
+  useCheckRoomAvailabilityQuery,
+  useCreatePublicBookingMutation,
+  useGetBookingDetailsQuery,
 } = publicApi;
 
