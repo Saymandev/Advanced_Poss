@@ -178,6 +178,10 @@ export function getFeaturesByCategory() {
       { key: FEATURES.BRANCHES, name: 'Branches' },
       { key: FEATURES.NOTIFICATIONS, name: 'Notifications' },
     ],
+    Hotel: [
+      { key: FEATURES.ROOM_MANAGEMENT, name: 'Room Management' },
+      { key: FEATURES.BOOKING_MANAGEMENT, name: 'Booking Management' },
+    ],
   };
 
   return categories;

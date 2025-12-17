@@ -15,6 +15,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BackupsModule } from './modules/backups/backups.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { CmsModule } from './modules/cms/cms.module';
@@ -43,6 +44,7 @@ import { QRCodesModule } from './modules/qr-codes/qr-codes.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { RolePermissionsModule } from './modules/role-permissions/role-permissions.module';
+import { RoomsModule } from './modules/rooms/rooms.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { SystemSettings, SystemSettingsSchema } from './modules/settings/schemas/system-settings.schema';
 import { SettingsModule } from './modules/settings/settings.module';
@@ -143,6 +145,8 @@ import { SubscriptionLockMiddleware } from './common/middleware/subscription-loc
     CmsModule,
     MenuItemsModule,
     TablesModule,
+    RoomsModule,
+    BookingsModule,
     OrdersModule,
     PaymentsModule,
     POSModule,

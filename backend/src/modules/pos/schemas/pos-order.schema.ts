@@ -23,14 +23,23 @@ export class POSOrder {
   @Prop({ required: true, unique: true })
   orderNumber: string;
 
-  @Prop({ required: true, enum: ['dine-in', 'delivery', 'takeaway'] })
-  orderType: 'dine-in' | 'delivery' | 'takeaway';
+  @Prop({ required: true, enum: ['dine-in', 'delivery', 'takeaway', 'room_service'] })
+  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
 
   @Prop({ type: Types.ObjectId, ref: 'Table' })
-  tableId: Types.ObjectId;
+  tableId?: Types.ObjectId;
 
   @Prop({ type: String })
   tableNumber?: string; // Store table number for historical records (even after tableId is cleared)
+
+  @Prop({ type: Types.ObjectId, ref: 'Room' })
+  roomId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Booking' })
+  bookingId?: Types.ObjectId;
+
+  @Prop({ type: String })
+  roomNumber?: string; // Store room number for quick reference
 
   @Prop({ type: Number, default: 0 })
   deliveryFee?: number;

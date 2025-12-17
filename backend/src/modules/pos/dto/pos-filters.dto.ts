@@ -11,8 +11,8 @@ export class POSOrderFiltersDto {
   status?: string;
 
   @IsOptional()
-  @IsEnum(['dine-in', 'delivery', 'takeaway'])
-  orderType?: 'dine-in' | 'delivery' | 'takeaway';
+  @IsEnum(['dine-in', 'delivery', 'takeaway', 'room_service'])
+  orderType?: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
 
   @IsOptional()
   @IsString()
@@ -54,7 +54,7 @@ export class POSStatsFiltersDto {
   endDate?: string;
 
   @IsOptional()
-  @IsEnum(['dine-in', 'delivery', 'takeaway'])
-  orderType?: 'dine-in' | 'delivery' | 'takeaway';
+  @IsEnum(['dine-in', 'delivery', 'takeaway', 'room_service'])
+  orderType?: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
 }
 

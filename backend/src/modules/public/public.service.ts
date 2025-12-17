@@ -478,5 +478,42 @@ export class PublicService {
       };
     }
   }
+
+  // ========== Hotel/Booking Helper Methods ==========
+
+  async findCustomerByEmail(email: string, companyId: string) {
+    return this.customerModel.findOne({
+      email: email.toLowerCase().trim(),
+      companyId: new Types.ObjectId(companyId),
+    }).lean().exec();
+  }
+
+  async findCustomerByPhone(phone: string, companyId: string) {
+    return this.customerModel.findOne({
+      phone: phone.trim(),
+      companyId: new Types.ObjectId(companyId),
+    }).lean().exec();
+  }
+
+  async createCustomerFromBooking(bookingData: any, companyId: string) {
+    const customerData = {
+      firstName: bookingData.guestName?.split(' ')[0] || 'Guest',
+      lastName: bookingData.guestName?.split(' ').slice(1).join(' ') || '',
+      email: bookingData.guestEmail?.toLowerCase().trim(),
+      phone: bookingData.guestPhone?.trim(),
+      companyId: new Types.ObjectId(companyId),
+      isActive: true,
+    };
+
+    // Remove undefined fields
+    Object.keys(customerData).forEach(key => {
+      if (customerData[key] === undefined) {
+        delete customerData[key];
+      }
+    });
+
+    const customer = new this.customerModel(customerData);
+    return customer.save();
+  }
 }
 

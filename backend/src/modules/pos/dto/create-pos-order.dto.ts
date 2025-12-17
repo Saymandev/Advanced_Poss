@@ -90,8 +90,8 @@ export class DeliveryDetailsDto {
 
 export class CreatePOSOrderDto {
   @IsNotEmpty()
-  @IsEnum(['dine-in', 'delivery', 'takeaway'])
-  orderType: 'dine-in' | 'delivery' | 'takeaway';
+  @IsEnum(['dine-in', 'delivery', 'takeaway', 'room_service'])
+  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
 
   @ValidateIf((o) => o.orderType === 'dine-in')
   @IsNotEmpty()
@@ -103,6 +103,21 @@ export class CreatePOSOrderDto {
   @IsNumber()
   @Min(1)
   guestCount?: number;
+
+  // Room service: attach order to a specific booking/room
+  @ValidateIf((o) => o.orderType === 'room_service')
+  @IsNotEmpty()
+  @IsString()
+  bookingId?: string;
+
+  @ValidateIf((o) => o.orderType === 'room_service')
+  @IsNotEmpty()
+  @IsString()
+  roomId?: string;
+
+  @IsOptional()
+  @IsString()
+  roomNumber?: string;
 
   @ValidateIf((o) => o.orderType === 'delivery')
   @IsNumber()

@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EmailService } from '../../common/services/email.service';
 import { SmsService } from '../../common/services/sms.service';
+import { BookingsService } from '../bookings/bookings.service';
 import { CustomersService } from '../customers/customers.service';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { KitchenService } from '../kitchen/kitchen.service';
@@ -39,6 +40,8 @@ export class POSService {
     private kitchenService: KitchenService,
     @Inject(forwardRef(() => CustomersService))
     private customersService: CustomersService,
+    @Inject(forwardRef(() => BookingsService))
+    private bookingsService: BookingsService,
   ) {}
 
   // Generate unique order number
@@ -380,6 +383,21 @@ export class POSService {
         } catch (inventoryError) {
           await this.posOrderModel.deleteOne({ _id: savedOrder._id });
           throw inventoryError;
+        }
+
+        // If this is a room_service order, a bookingId is required so that the charge hits the folio.
+        if (createOrderDto.orderType === 'room_service') {
+          if (!createOrderDto.bookingId) {
+            throw new BadRequestException('bookingId is required for room service orders');
+          }
+
+          await this.bookingsService.applyAdditionalCharge(
+            createOrderDto.bookingId,
+            savedOrder.totalAmount,
+            'room_service',
+            `Room service order ${savedOrder.orderNumber}`,
+            savedOrder.status === 'paid', // Only mark as already paid if the POS order itself is paid
+          );
         }
 
         // Update table status if dine-in order

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -9,11 +10,13 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
+import { BookingsService } from '../bookings/bookings.service';
 import { BranchesService } from '../branches/branches.service';
 import { CategoriesService } from '../categories/categories.service';
 import { CompaniesService } from '../companies/companies.service';
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
+import { RoomsService } from '../rooms/rooms.service';
 import { PublicService } from './public.service';
 
 @ApiTags('Public')
@@ -26,6 +29,8 @@ export class PublicController {
     private readonly categoriesService: CategoriesService,
     private readonly zonesService: DeliveryZonesService,
     private readonly publicService: PublicService,
+    private readonly roomsService: RoomsService,
+    private readonly bookingsService: BookingsService,
   ) {}
 
   @Public()
@@ -501,6 +506,318 @@ export class PublicController {
   @ApiOperation({ summary: 'Get public system statistics' })
   async getPublicStats() {
     return this.publicService.getPublicStats();
+  }
+
+  // ========== Hotel/Room Public Endpoints ==========
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/rooms')
+  @ApiOperation({ summary: 'Get all rooms for a branch (public)' })
+  async getBranchRooms(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Query('checkInDate') checkInDate?: string,
+    @Query('checkOutDate') checkOutDate?: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException(`Company with slug "${companySlug}" not found`);
+    }
+
+    const branch = await this.branchesService.findBySlug(companySlug, branchSlug);
+    if (!branch) {
+      throw new NotFoundException(`Branch with slug "${branchSlug}" not found`);
+    }
+
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+
+    let rooms;
+    if (checkInDate && checkOutDate) {
+      // Get available rooms for the date range
+      const checkIn = new Date(checkInDate);
+      const checkOut = new Date(checkOutDate);
+      rooms = await this.roomsService.findAvailable(branchId, checkIn, checkOut);
+    } else {
+      // Get all active rooms
+      rooms = await this.roomsService.findByBranch(branchId);
+    }
+
+    // Filter out sensitive information for public access
+    const publicRooms = rooms.map((room: any) => {
+      const roomData = room.toObject ? room.toObject() : room;
+      return {
+        id: roomData._id?.toString() || roomData.id,
+        roomNumber: roomData.roomNumber,
+        roomType: roomData.roomType,
+        floor: roomData.floor,
+        building: roomData.building,
+        maxOccupancy: roomData.maxOccupancy,
+        beds: roomData.beds,
+        amenities: roomData.amenities,
+        basePrice: roomData.basePrice,
+        size: roomData.size,
+        view: roomData.view,
+        smokingAllowed: roomData.smokingAllowed,
+        images: roomData.images || [],
+        description: roomData.description,
+        // Don't expose: status, currentBookingId, qrCode, etc.
+      };
+    });
+
+    return {
+      success: true,
+      data: publicRooms,
+    };
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/rooms/:roomId')
+  @ApiOperation({ summary: 'Get room details by ID (public)' })
+  async getRoomDetails(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Param('roomId') roomId: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException(`Company with slug "${companySlug}" not found`);
+    }
+
+    const branch = await this.branchesService.findBySlug(companySlug, branchSlug);
+    if (!branch) {
+      throw new NotFoundException(`Branch with slug "${branchSlug}" not found`);
+    }
+
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    const room = await this.roomsService.findOne(roomId);
+
+    // Verify room belongs to this branch
+    const roomBranchId = (room as any).branchId?._id?.toString() || 
+                        (room as any).branchId?.toString() || 
+                        (room as any).branchId;
+    
+    if (roomBranchId !== branchId) {
+      throw new NotFoundException('Room not found in this branch');
+    }
+
+    // Filter out sensitive information
+    const roomData = (room as any).toObject ? (room as any).toObject() : room;
+    const publicRoom = {
+      id: roomData._id?.toString() || roomData.id,
+      roomNumber: roomData.roomNumber,
+      roomType: roomData.roomType,
+      floor: roomData.floor,
+      building: roomData.building,
+      maxOccupancy: roomData.maxOccupancy,
+      beds: roomData.beds,
+      amenities: roomData.amenities,
+      basePrice: roomData.basePrice,
+      size: roomData.size,
+      view: roomData.view,
+      smokingAllowed: roomData.smokingAllowed,
+      images: roomData.images || [],
+      description: roomData.description,
+    };
+
+    return {
+      success: true,
+      data: publicRoom,
+    };
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/rooms/available')
+  @ApiOperation({ summary: 'Check room availability for date range (public)' })
+  async checkRoomAvailability(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Query('checkInDate') checkInDate: string,
+    @Query('checkOutDate') checkOutDate: string,
+  ) {
+    if (!checkInDate || !checkOutDate) {
+      throw new BadRequestException('checkInDate and checkOutDate are required');
+    }
+
+    const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException(`Company with slug "${companySlug}" not found`);
+    }
+
+    const branch = await this.branchesService.findBySlug(companySlug, branchSlug);
+    if (!branch) {
+      throw new NotFoundException(`Branch with slug "${branchSlug}" not found`);
+    }
+
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    const checkIn = new Date(checkInDate);
+    const checkOut = new Date(checkOutDate);
+
+    if (checkIn >= checkOut) {
+      throw new BadRequestException('Check-out date must be after check-in date');
+    }
+
+    const availableRooms = await this.roomsService.findAvailable(branchId, checkIn, checkOut);
+
+    // Filter out sensitive information
+    const publicRooms = availableRooms.map((room: any) => {
+      const roomData = room.toObject ? room.toObject() : room;
+      return {
+        id: roomData._id?.toString() || roomData.id,
+        roomNumber: roomData.roomNumber,
+        roomType: roomData.roomType,
+        floor: roomData.floor,
+        building: roomData.building,
+        maxOccupancy: roomData.maxOccupancy,
+        beds: roomData.beds,
+        amenities: roomData.amenities,
+        basePrice: roomData.basePrice,
+        size: roomData.size,
+        view: roomData.view,
+        smokingAllowed: roomData.smokingAllowed,
+        images: roomData.images || [],
+        description: roomData.description,
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        checkInDate: checkInDate,
+        checkOutDate: checkOutDate,
+        availableRooms: publicRooms,
+        count: publicRooms.length,
+      },
+    };
+  }
+
+  @Public()
+  @Post('companies/:companySlug/branches/:branchSlug/bookings')
+  @ApiOperation({ summary: 'Create a booking (public, no auth required)' })
+  async createPublicBooking(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Body() createBookingDto: any,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException(`Company with slug "${companySlug}" not found`);
+    }
+
+    const branch = await this.branchesService.findBySlug(companySlug, branchSlug);
+    if (!branch) {
+      throw new NotFoundException(`Branch with slug "${branchSlug}" not found`);
+    }
+
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+
+    // Set branchId and companyId from URL params (security: prevent branch/company mismatch)
+    createBookingDto.branchId = branchId;
+    createBookingDto.companyId = companyId;
+
+    // Create or find customer from guest information
+    if (createBookingDto.guestEmail || createBookingDto.guestPhone) {
+      // Try to find existing customer
+      let customer = null;
+      if (createBookingDto.guestEmail) {
+        customer = await this.publicService.findCustomerByEmail(createBookingDto.guestEmail, companyId);
+      }
+      if (!customer && createBookingDto.guestPhone) {
+        customer = await this.publicService.findCustomerByPhone(createBookingDto.guestPhone, companyId);
+      }
+
+      // Create customer if not found
+      if (!customer) {
+        customer = await this.publicService.createCustomerFromBooking(createBookingDto, companyId);
+      }
+
+      if (customer) {
+        createBookingDto.guestId = (customer as any)._id?.toString() || (customer as any).id;
+      }
+    }
+
+    // Create booking (no userId for public bookings)
+    const booking = await this.bookingsService.create(createBookingDto);
+
+    // Return booking with sensitive info filtered
+    const bookingData = (booking as any).toObject ? (booking as any).toObject() : booking;
+    const publicBooking = {
+      id: bookingData._id?.toString() || bookingData.id,
+      bookingNumber: bookingData.bookingNumber,
+      guestName: bookingData.guestName,
+      guestEmail: bookingData.guestEmail,
+      guestPhone: bookingData.guestPhone,
+      checkInDate: bookingData.checkInDate,
+      checkOutDate: bookingData.checkOutDate,
+      numberOfNights: bookingData.numberOfNights,
+      roomRate: bookingData.roomRate,
+      totalAmount: bookingData.totalAmount,
+      paymentStatus: bookingData.paymentStatus,
+      status: bookingData.status,
+      specialRequests: bookingData.specialRequests,
+      createdAt: bookingData.createdAt,
+    };
+
+    return {
+      success: true,
+      data: publicBooking,
+      message: 'Booking created successfully',
+    };
+  }
+
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/bookings/:bookingId')
+  @ApiOperation({ summary: 'Get booking details by ID (public)' })
+  async getBookingDetails(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Param('bookingId') bookingId: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    if (!company) {
+      throw new NotFoundException(`Company with slug "${companySlug}" not found`);
+    }
+
+    const branch = await this.branchesService.findBySlug(companySlug, branchSlug);
+    if (!branch) {
+      throw new NotFoundException(`Branch with slug "${branchSlug}" not found`);
+    }
+
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    const booking = await this.bookingsService.findOne(bookingId);
+
+    // Verify booking belongs to this branch
+    const bookingBranchId = (booking as any).branchId?._id?.toString() || 
+                            (booking as any).branchId?.toString() || 
+                            (booking as any).branchId;
+    
+    if (bookingBranchId !== branchId) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    // Filter out sensitive information
+    const bookingData = (booking as any).toObject ? (booking as any).toObject() : booking;
+    const publicBooking = {
+      id: bookingData._id?.toString() || bookingData.id,
+      bookingNumber: bookingData.bookingNumber,
+      guestName: bookingData.guestName,
+      guestEmail: bookingData.guestEmail,
+      guestPhone: bookingData.guestPhone,
+      checkInDate: bookingData.checkInDate,
+      checkOutDate: bookingData.checkOutDate,
+      numberOfNights: bookingData.numberOfNights,
+      roomRate: bookingData.roomRate,
+      totalAmount: bookingData.totalAmount,
+      paymentStatus: bookingData.paymentStatus,
+      status: bookingData.status,
+      specialRequests: bookingData.specialRequests,
+      createdAt: bookingData.createdAt,
+    };
+
+    return {
+      success: true,
+      data: publicBooking,
+    };
   }
 }
 

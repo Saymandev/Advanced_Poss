@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { EmailService } from '../../common/services/email.service';
 import { SmsService } from '../../common/services/sms.service';
+import { BookingsModule } from '../bookings/bookings.module';
 import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { CustomersModule } from '../customers/customers.module';
@@ -10,11 +11,11 @@ import { IngredientsModule } from '../ingredients/ingredients.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
+import { SystemSettings, SystemSettingsSchema } from '../settings/schemas/system-settings.schema';
 import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schemas/subscription-plan.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
-import { SystemSettings, SystemSettingsSchema } from '../settings/schemas/system-settings.schema';
 import { Table, TableSchema } from '../tables/schemas/table.schema';
 import { TablesModule } from '../tables/tables.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
@@ -56,6 +57,7 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
     forwardRef(() => KitchenModule),
     forwardRef(() => CustomersModule),
     forwardRef(() => WorkPeriodsModule),
+    forwardRef(() => BookingsModule),
     DeliveryZonesModule,
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard

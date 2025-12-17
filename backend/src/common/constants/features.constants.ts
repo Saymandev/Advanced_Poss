@@ -62,6 +62,10 @@ export const FEATURES = {
   SETTINGS: 'settings',
   BRANCHES: 'branches',
   NOTIFICATIONS: 'notifications',
+
+  // Hotel Management
+  ROOM_MANAGEMENT: 'room-management',
+  BOOKING_MANAGEMENT: 'booking-management',
 } as const;
 
 /**
@@ -91,6 +95,7 @@ export const FEATURE_CATEGORIES = {
   INVENTORY: ['inventory', 'suppliers', 'purchase-orders', 'wastage-management'],
   FINANCIAL: ['expenses', 'accounting', 'work-periods'],
   SYSTEM: ['settings', 'branches', 'notifications'],
+  HOTEL: ['room-management', 'booking-management'],
 } as const;
 
 /**
@@ -129,6 +134,8 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.SETTINGS,
     FEATURES.BRANCHES,
     FEATURES.NOTIFICATIONS,
+    FEATURES.ROOM_MANAGEMENT,
+    FEATURES.BOOKING_MANAGEMENT,
   ],
   manager: [
     FEATURES.DASHBOARD,
@@ -153,6 +160,8 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.EXPENSES,
     FEATURES.WORK_PERIODS,
     FEATURES.NOTIFICATIONS,
+    FEATURES.ROOM_MANAGEMENT,
+    FEATURES.BOOKING_MANAGEMENT,
   ],
   chef: [
     FEATURES.DASHBOARD,

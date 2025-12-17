@@ -1,14 +1,14 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateSubscriptionFeatureDto, UpdateSubscriptionFeatureDto } from './dto/subscription-feature.dto';
 import {
-    SubscriptionFeature,
-    SubscriptionFeatureDocument,
+  SubscriptionFeature,
+  SubscriptionFeatureDocument,
 } from './schemas/subscription-feature.schema';
 
 @Injectable()
@@ -366,6 +366,30 @@ export class SubscriptionFeaturesService {
           maxBranches: -1, // Unlimited
         },
         sortOrder: 6,
+      },
+      {
+        key: 'room-management',
+        name: 'Room Management',
+        description: 'Hotel room management and availability tracking',
+        category: 'Hotel',
+        basePriceMonthly: 400,
+        basePriceYearly: 4000,
+        perBranchPriceMonthly: 200,
+        defaultLimits: {
+          maxTables: 50, // Can be used for room limits
+        },
+        sortOrder: 7,
+      },
+      {
+        key: 'booking-management',
+        name: 'Booking Management',
+        description: 'Hotel booking system with check-in/check-out',
+        category: 'Hotel',
+        basePriceMonthly: 500,
+        basePriceYearly: 5000,
+        perBranchPriceMonthly: 250,
+        defaultLimits: {},
+        sortOrder: 8,
       },
     ];
 

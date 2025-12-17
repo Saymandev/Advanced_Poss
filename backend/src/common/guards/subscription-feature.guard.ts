@@ -7,6 +7,7 @@ import { Subscription, SubscriptionDocument, SubscriptionStatus } from '../../mo
 import { SubscriptionPlansService } from '../../modules/subscriptions/subscription-plans.service';
 import { isFeatureEnabledInPlan } from '../../modules/subscriptions/utils/plan-features.helper';
 import { REQUIRES_FEATURE } from '../decorators/requires-feature.decorator';
+import { isSuperAdmin } from '../utils/query.utils';
 
 @Injectable()
 export class SubscriptionFeatureGuard implements CanActivate {
@@ -30,8 +31,17 @@ export class SubscriptionFeatureGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const user = (request as any).user;
 
-    if (!user || !user.companyId) {
+    if (!user) {
       throw new ForbiddenException('User not authenticated');
+    }
+
+    // Super admin bypasses all subscription feature checks
+    if (isSuperAdmin(user.role)) {
+      return true;
+    }
+
+    if (!user.companyId) {
+      throw new ForbiddenException('User not authenticated with company');
     }
 
     // Fetch the actual subscription document
