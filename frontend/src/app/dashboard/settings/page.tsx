@@ -182,8 +182,11 @@ export default function SettingsPage() {
     { skip: !companyId }
   );
 
-  // Check if custom domain feature is enabled
-  const isCustomDomainEnabled = (subscription?.plan?.limits as any)?.customDomainEnabled ?? false;
+  // Check if custom domain feature is enabled (plan.limits or subscription.limits)
+  const isCustomDomainEnabled =
+    (subscription as any)?.limits?.customDomainEnabled ??
+    (subscription?.plan?.limits as any)?.customDomainEnabled ??
+    false;
 
   // Get branches for the company
   const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(

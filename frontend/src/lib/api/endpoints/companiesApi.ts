@@ -204,12 +204,50 @@ export const companiesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Company'],
     }),
-    updateCompanySettings: builder.mutation<Company, { id: string; settings: Partial<Company['settings']> }>({
-      query: ({ id, settings }) => ({
-        url: `/companies/${id}/settings`,
-        method: 'PATCH',
-        body: { settings },
-      }),
+    // Legacy compatibility: we no longer use /companies/:id/settings for general settings.
+    // Forward to settings endpoint with validated companyId.
+    updateCompanySettings: builder.mutation<
+      Company,
+      { id?: string; companyId?: string; settings: Partial<Company['settings']> }
+    >({
+      query: ({ id, companyId, settings }) => {
+        let resolvedId = companyId || id;
+
+        // Fallback to cached user/companyContext if missing
+        if (!resolvedId && typeof window !== 'undefined') {
+          try {
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+              const parsed = JSON.parse(storedUser);
+              resolvedId = parsed?.companyId || resolvedId;
+            }
+            const storedCtx = localStorage.getItem('companyContext');
+            if (storedCtx) {
+              const parsed = JSON.parse(storedCtx);
+              resolvedId =
+                parsed?.companyId ||
+                parsed?.companyId?._id ||
+                parsed?.companyId?.id ||
+                resolvedId;
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+
+        const isValidObjectId = (val?: string) =>
+          typeof val === 'string' && /^[a-f\d]{24}$/i.test(val);
+
+        if (!isValidObjectId(resolvedId)) {
+          throw new Error('Invalid company ID');
+        }
+
+        return {
+          url: `/settings/company`,
+          method: 'PATCH',
+          body: { companyId: resolvedId, ...settings },
+        };
+      },
       invalidatesTags: ['Company'],
     }),
     deactivateCompany: builder.mutation<Company, string>({
