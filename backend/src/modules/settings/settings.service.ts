@@ -99,7 +99,7 @@ export class SettingsService {
         { new: true, upsert: true },
       )
       .lean();
-
+    console.log('updated', updated);
     return updated;
   }
 
