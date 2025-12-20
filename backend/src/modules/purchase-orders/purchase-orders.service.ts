@@ -353,7 +353,7 @@ export class PurchaseOrdersService {
     if (fullyReceived) {
       order.status = PurchaseOrderStatus.RECEIVED;
       order.actualDeliveryDate = new Date();
-      
+
       // Automatically create an expense entry when purchase order is fully received
       try {
         const supplier = await this.supplierModel.findById(order.supplierId).lean();
@@ -380,19 +380,7 @@ export class PurchaseOrdersService {
           purchaseOrderId: order._id.toString(), // Link expense to purchase order
         };
 
-        console.log('📝 Creating expense from purchase order:', {
-          orderNumber: order.orderNumber,
-          amount: receivedAmount,
-          branchId: expenseData.branchId,
-          companyId: expenseData.companyId,
-        });
-
         const createdExpense = await this.expensesService.create(expenseData);
-        console.log('✅ Expense created successfully:', {
-          expenseNumber: (createdExpense as any).expenseNumber,
-          id: (createdExpense as any)._id?.toString() || (createdExpense as any).id,
-          amount: createdExpense.amount,
-        });
       } catch (expenseError: any) {
         // Log error but don't fail the receive operation
         console.error('❌ Failed to create expense from purchase order:', {
@@ -431,5 +419,3 @@ export class PurchaseOrdersService {
     return this.findOne(id);
   }
 }
-
-

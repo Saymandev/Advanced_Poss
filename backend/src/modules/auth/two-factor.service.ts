@@ -3,27 +3,21 @@ import { ConfigService } from '@nestjs/config';
 import * as QRCode from 'qrcode';
 import * as speakeasy from 'speakeasy';
 // import { WinstonLoggerService } from '../../common/logger/winston.logger';
-
 @Injectable()
 export class TwoFactorService {
   // private readonly logger = new WinstonLoggerService('TwoFactorService');
-
   constructor(private configService: ConfigService) {}
-
   // Generate 2FA secret for a user
   async generateSecret(email: string): Promise<{ secret: string; qrCode: string }> {
     try {
       const appName = this.configService.get<string>('APP_NAME') || 'Restaurant POS';
-
       // Generate secret
       const secret = speakeasy.generateSecret({
         name: `${appName} (${email})`,
         length: 32,
       });
-
       // Generate QR code
       const qrCode = await QRCode.toDataURL(secret.otpauth_url);
-
       return {
         secret: secret.base32,
         qrCode,
@@ -33,7 +27,6 @@ export class TwoFactorService {
       throw error;
     }
   }
-
   // Verify 2FA token
   verifyToken(token: string, secret: string): boolean {
     try {
@@ -41,14 +34,8 @@ export class TwoFactorService {
         console.error('Missing secret or token for 2FA verification');
         return false;
       }
-
       // Clean the token (remove any whitespace)
       const cleanToken = token.trim();
-      
-      console.log(`🔍 Verifying 2FA token: ${cleanToken}`);
-      console.log(`🔍 Secret (first 10 chars): ${secret.substring(0, 10)}...`);
-      console.log(`🔍 Secret length: ${secret.length}`);
-      
       // Verify the token with wider window first (5 steps = 2.5 minutes tolerance)
       const isValid = speakeasy.totp.verify({
         secret,
@@ -56,19 +43,14 @@ export class TwoFactorService {
         token: cleanToken,
         window: 5, // Allow 5 time steps (2.5 minutes) of tolerance for clock drift
       });
-
-      console.log(`🔍 Verification result: ${isValid}`);
-      
       if (!isValid) {
         // Try generating what the current token should be for debugging
         const currentToken = speakeasy.totp({
           secret,
           encoding: 'base32',
         });
-        console.log(`🔍 Current expected token: ${currentToken}`);
-        console.log(`🔍 Token match: ${cleanToken === currentToken}`);
+        // Token verification failed
       }
-
       return isValid;
     } catch (error) {
       console.error('Failed to verify 2FA token', error);
@@ -77,44 +59,34 @@ export class TwoFactorService {
       return false;
     }
   }
-
   // Generate backup codes
   generateBackupCodes(count: number = 10): string[] {
     const codes: string[] = [];
-
     for (let i = 0; i < count; i++) {
       const code = this.generateRandomCode(8);
       codes.push(code);
     }
-
     return codes;
   }
-
   // Verify backup code
   verifyBackupCode(code: string, backupCodes: string[]): boolean {
     return backupCodes.includes(code);
   }
-
   // Remove used backup code
   removeBackupCode(code: string, backupCodes: string[]): string[] {
     return backupCodes.filter((c) => c !== code);
   }
-
   // Helper: Generate random code
   private generateRandomCode(length: number): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
-
     for (let i = 0; i < length; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
     // Format as XXXX-XXXX for 8 character codes
     if (length === 8) {
       return `${code.substring(0, 4)}-${code.substring(4)}`;
     }
-
     return code;
   }
 }
-

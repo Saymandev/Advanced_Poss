@@ -16,14 +16,12 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserDocument } from '../users/schemas/user.schema';
 import { ContactFormsService } from './contact-forms.service';
 import { UpdateContactFormDto } from './dto/update-contact-form.dto';
-
 @ApiTags('Contact Forms')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('contact-forms')
 export class ContactFormsController {
   constructor(private readonly contactFormsService: ContactFormsService) {}
-
   @Get()
   @ApiOperation({ summary: 'Get all contact forms (filtered by company for non-super-admin)' })
   @ApiQuery({ name: 'companyId', required: false, description: 'Filter by company ID (null for general inquiries)' })
@@ -45,17 +43,7 @@ export class ContactFormsController {
     if (user?.role !== UserRole.SUPER_ADMIN && user?.companyId) {
       filterCompanyId = (user.companyId as any).toString();
     }
-
     // Debug logging
-    console.log('[ContactFormsController] findAll:', {
-      userRole: user?.role,
-      userCompanyId: user?.companyId,
-      queryCompanyId: companyId,
-      filterCompanyId,
-      status,
-      search,
-    });
-
     return this.contactFormsService.findAll({
       companyId: filterCompanyId,
       status,
@@ -64,7 +52,6 @@ export class ContactFormsController {
       limit: limit ? parseInt(limit, 10) : undefined,
     });
   }
-
   @Get('stats')
   @ApiOperation({ summary: 'Get contact form statistics' })
   @ApiQuery({ name: 'companyId', required: false, description: 'Filter by company ID (null for general inquiries)' })
@@ -78,25 +65,15 @@ export class ContactFormsController {
     if (user?.role !== UserRole.SUPER_ADMIN && user?.companyId) {
       filterCompanyId = (user.companyId as any).toString();
     }
-
     // Debug logging
-    console.log('[ContactFormsController] getStats:', {
-      userRole: user?.role,
-      userCompanyId: user?.companyId,
-      queryCompanyId: companyId,
-      filterCompanyId,
-    });
-
     return this.contactFormsService.getStats(filterCompanyId);
   }
-
   @Get(':id')
   @ApiOperation({ summary: 'Get contact form by ID' })
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async findOne(@Param('id') id: string) {
     return this.contactFormsService.findOne(id);
   }
-
   @Patch(':id')
   @ApiOperation({ summary: 'Update contact form (status, notes)' })
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
@@ -107,5 +84,4 @@ export class ContactFormsController {
   ) {
     return this.contactFormsService.update(id, updateDto, user.id);
   }
-}
-
+}

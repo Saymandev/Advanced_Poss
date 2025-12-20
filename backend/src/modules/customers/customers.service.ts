@@ -10,7 +10,6 @@ import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { Customer, CustomerDocument } from './schemas/customer.schema';
-
 @Injectable()
 export class CustomersService {
   constructor(
@@ -19,23 +18,19 @@ export class CustomersService {
     @InjectModel(POSOrder.name)
     private posOrderModel: Model<POSOrderDocument>,
   ) {}
-
   async create(createCustomerDto: CreateCustomerDto): Promise<Customer> {
     // Check if customer already exists
     const existingConditions: any[] = [
       { email: createCustomerDto.email },
     ];
-    
     // Only check phone if provided
     if (createCustomerDto.phone && createCustomerDto.phone.trim()) {
       existingConditions.push({ phone: createCustomerDto.phone });
     }
-    
     const existingCustomer = await this.customerModel.findOne({
       companyId: new Types.ObjectId(createCustomerDto.companyId),
       $or: existingConditions,
     });
-
     if (existingCustomer) {
       if (existingCustomer.email === createCustomerDto.email) {
         throw new BadRequestException(
@@ -46,32 +41,25 @@ export class CustomersService {
         'Customer with this phone number already exists',
       );
     }
-
     // Convert branchId to ObjectId if provided
     const customerData: any = {
       ...createCustomerDto,
       loyaltyTier: 'bronze',
       loyaltyTierSince: new Date(),
     };
-    
     if (createCustomerDto.branchId && Types.ObjectId.isValid(createCustomerDto.branchId)) {
       customerData.branchId = new Types.ObjectId(createCustomerDto.branchId);
     }
-    
     if (createCustomerDto.companyId && Types.ObjectId.isValid(createCustomerDto.companyId)) {
       customerData.companyId = new Types.ObjectId(createCustomerDto.companyId);
     }
-
     // Normalize email to lowercase for consistent matching
     if (customerData.email) {
       customerData.email = customerData.email.toLowerCase().trim();
     }
-
     const customer = new this.customerModel(customerData);
-
     return customer.save();
   }
-
   async findAll(filterDto: CustomerFilterDto): Promise<{ customers: Customer[], total: number, page: number, limit: number }> {
     const { 
       page = 1, 
@@ -83,15 +71,12 @@ export class CustomersService {
       branchId,
       ...filters 
     } = filterDto;
-    
     const skip = (page - 1) * limit;
     const query: any = {};
-    
     // Convert companyId to ObjectId if provided
     if (companyId && Types.ObjectId.isValid(companyId)) {
       query.companyId = new Types.ObjectId(companyId);
     }
-    
     // Build branchId filter - show customers for this branch OR customers without branchId (company-wide)
     if (branchId && Types.ObjectId.isValid(branchId)) {
       const branchObjectId = new Types.ObjectId(branchId);
@@ -102,7 +87,6 @@ export class CustomersService {
         { branchId: null }
       ];
     }
-
     // Build search filter
     if (search) {
       const searchConditions = [
@@ -114,7 +98,6 @@ export class CustomersService {
         { 'address.city': { $regex: search, $options: 'i' } },
         { 'address.state': { $regex: search, $options: 'i' } }
       ];
-      
       // If we already have $or for branchId, combine with $and
       if (query.$or) {
         query.$and = [
@@ -126,16 +109,12 @@ export class CustomersService {
         query.$or = searchConditions;
       }
     }
-    
     // Log query for debugging
-    console.log('🔍 Customer findAll query:', JSON.stringify(query, null, 2));
-
+   
     const sortOptions: any = {};
     sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
-
     try {
       // Debug logging
-      console.log('🔍 Customer findAll query:', JSON.stringify(query, null, 2));
       
       const customers = await this.customerModel
         .find(query)
@@ -145,19 +124,7 @@ export class CustomersService {
         .skip(skip)
         .limit(limit)
         .exec();
-
-      console.log('📊 Found customers:', customers.length);
-      if (customers.length > 0) {
-        console.log('📋 First customer:', {
-          id: customers[0]._id,
-          firstName: customers[0].firstName,
-          branchId: customers[0].branchId,
-          companyId: customers[0].companyId
-        });
-      }
-
       const total = await this.customerModel.countDocuments(query);
-
       return {
         customers,
         total,
@@ -172,7 +139,6 @@ export class CustomersService {
       );
     }
   }
-
   async findOrCreate(customerData: any): Promise<Customer> {
     // Try to find existing customer by email or phone
     const existingCustomer = await this.customerModel.findOne({
@@ -182,15 +148,12 @@ export class CustomersService {
         { phone: customerData.phone },
       ],
     });
-
     if (existingCustomer) {
       return existingCustomer;
     }
-
     // Create new customer
     const [firstName, ...lastNameParts] = (customerData.name || customerData.firstName || 'Customer').split(' ');
     const lastName = lastNameParts.join(' ') || customerData.lastName || '';
-
     return this.create({
       companyId: customerData.companyId,
       firstName,
@@ -199,25 +162,19 @@ export class CustomersService {
       phone: customerData.phone || '',
     } as any);
   }
-
   async findOne(id: string): Promise<Customer> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const customer = await this.customerModel.findById(id);
-
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     return customer;
   }
-
   async findByEmail(companyId: string, email: string): Promise<Customer | null> {
     if (!email) return null;
     const normalizedEmail = email.toLowerCase().trim();
-    console.log(`🔍 Searching for customer with email: "${normalizedEmail}" in company: ${companyId}`);
     const customer = await this.customerModel.findOne({
       companyId: new Types.ObjectId(companyId),
       $or: [
@@ -225,27 +182,22 @@ export class CustomersService {
         { email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
       ],
     });
-    console.log(customer ? `✅ Found customer: ${customer.email} (ID: ${(customer as any)._id})` : `❌ No customer found for email: ${normalizedEmail}`);
     return customer;
   }
-
   async findByPhone(companyId: string, phone: string): Promise<Customer | null> {
     return this.customerModel.findOne({
       companyId: new Types.ObjectId(companyId),
       phone,
     });
   }
-
   async getCustomerOrders(customerId: string): Promise<{ orders: any[]; total: number }> {
     if (!Types.ObjectId.isValid(customerId)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const customer = await this.customerModel.findById(customerId);
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     // Find orders by customer email from POS orders
     if (!customer.email) {
       return {
@@ -253,7 +205,6 @@ export class CustomersService {
         total: customer.totalOrders || 0,
       };
     }
-
     try {
       const orders = await this.posOrderModel
         .find({
@@ -263,7 +214,6 @@ export class CustomersService {
         .sort({ createdAt: -1 })
         .limit(50)
         .lean();
-
       const formattedOrders = orders.map((order: any) => ({
         id: order._id?.toString() || order.id,
         orderNumber: order.orderNumber,
@@ -275,7 +225,6 @@ export class CustomersService {
         completedAt: order.completedAt,
         items: order.items || [],
       }));
-
       return {
         orders: formattedOrders,
         total: formattedOrders.length,
@@ -288,14 +237,12 @@ export class CustomersService {
       };
     }
   }
-
   async findByCompany(companyId: string): Promise<Customer[]> {
     return this.customerModel
       .find({ companyId: new Types.ObjectId(companyId), isActive: true })
       .sort({ totalSpent: -1 })
       .exec();
   }
-
   async findVIPCustomers(companyId: string): Promise<Customer[]> {
     return this.customerModel
       .find({
@@ -306,7 +253,6 @@ export class CustomersService {
       .sort({ totalSpent: -1 })
       .exec();
   }
-
   async findTopCustomers(
     companyId: string,
     limit: number = 10,
@@ -317,7 +263,6 @@ export class CustomersService {
       .limit(limit)
       .exec();
   }
-
   async search(companyId: string, query: string, branchId?: string): Promise<Customer[]> {
     const searchQuery: any = {
       companyId: new Types.ObjectId(companyId),
@@ -329,7 +274,6 @@ export class CustomersService {
       ],
       isActive: true,
     };
-
     // If branchId is provided, show customers for this branch OR customers without branchId (company-wide)
     if (branchId && Types.ObjectId.isValid(branchId)) {
       const branchObjectId = new Types.ObjectId(branchId);
@@ -345,19 +289,13 @@ export class CustomersService {
       ];
       delete searchQuery.$or;
     }
-
-    console.log('🔍 Customer search query:', JSON.stringify(searchQuery, null, 2));
-
+   
     const customers = await this.customerModel
       .find(searchQuery)
       .limit(20)
       .exec();
-
-    console.log('📊 Found customers in search:', customers.length);
-
     return customers;
   }
-
   async update(
     id: string,
     updateCustomerDto: UpdateCustomerDto,
@@ -365,33 +303,25 @@ export class CustomersService {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const customer = await this.customerModel.findByIdAndUpdate(
       id,
       updateCustomerDto,
       { new: true },
     );
-
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     return customer;
   }
-
   async addLoyaltyPoints(id: string, points: number): Promise<Customer> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const customer = await this.customerModel.findById(id);
-
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     customer.loyaltyPoints += points;
-
     // Update tier based on points
     if (customer.loyaltyPoints >= 10000) {
       customer.loyaltyTier = 'platinum';
@@ -400,30 +330,22 @@ export class CustomersService {
     } else if (customer.loyaltyPoints >= 1000) {
       customer.loyaltyTier = 'silver';
     }
-
     return customer.save();
   }
-
   async redeemLoyaltyPoints(id: string, points: number): Promise<Customer> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const customer = await this.customerModel.findById(id);
-
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     if (customer.loyaltyPoints < points) {
       throw new BadRequestException('Insufficient loyalty points');
     }
-
     customer.loyaltyPoints -= points;
-
     return customer.save();
   }
-
   async updateOrderStats(
     id: string,
     orderAmount: number,
@@ -431,34 +353,25 @@ export class CustomersService {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
-    console.log(`📊 Updating order stats for customer ID: ${id}, orderAmount: ${orderAmount}`);
-
     const customer = await this.customerModel.findById(id);
-
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     const oldStats = {
       totalOrders: customer.totalOrders,
       totalSpent: customer.totalSpent,
       loyaltyPoints: customer.loyaltyPoints,
     };
-
     customer.totalOrders += 1;
     customer.totalSpent += orderAmount;
     customer.averageOrderValue = customer.totalSpent / customer.totalOrders;
     customer.lastOrderDate = new Date();
-
     if (!customer.firstOrderDate) {
       customer.firstOrderDate = new Date();
     }
-
     // Award loyalty points (1 point per dollar spent)
     const pointsEarned = Math.floor(orderAmount);
     customer.loyaltyPoints += pointsEarned;
-
     // Update tier
     if (customer.loyaltyPoints >= 10000) {
       customer.loyaltyTier = 'platinum';
@@ -467,21 +380,13 @@ export class CustomersService {
     } else if (customer.loyaltyPoints >= 1000) {
       customer.loyaltyTier = 'silver';
     }
-
     const savedCustomer = await customer.save();
-    
-    console.log(`✅ Customer stats updated:`);
-    console.log(`   Before: Orders=${oldStats.totalOrders}, Spent=$${oldStats.totalSpent}, Points=${oldStats.loyaltyPoints}`);
-    console.log(`   After:  Orders=${savedCustomer.totalOrders}, Spent=$${savedCustomer.totalSpent}, Points=${savedCustomer.loyaltyPoints}`);
-
     return savedCustomer;
   }
-
   async makeVIP(id: string): Promise<Customer> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const customer = await this.customerModel.findByIdAndUpdate(
       id,
       {
@@ -490,19 +395,15 @@ export class CustomersService {
       },
       { new: true },
     );
-
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     return customer;
   }
-
   async removeVIP(id: string): Promise<Customer> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const customer = await this.customerModel.findByIdAndUpdate(
       id,
       {
@@ -511,19 +412,15 @@ export class CustomersService {
       },
       { new: true },
     );
-
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     return customer;
   }
-
   async deactivate(id: string): Promise<Customer> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const customer = await this.customerModel.findByIdAndUpdate(
       id,
       {
@@ -532,33 +429,25 @@ export class CustomersService {
       },
       { new: true },
     );
-
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-
     return customer;
   }
-
   async remove(id: string): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid customer ID');
     }
-
     const result = await this.customerModel.findByIdAndDelete(id);
-
     if (!result) {
       throw new NotFoundException('Customer not found');
     }
   }
-
   async getStats(companyId: string): Promise<any> {
     const customers = await this.customerModel.find({
       companyId: new Types.ObjectId(companyId),
     });
-
     const activeCustomers = customers.filter((c) => c.isActive);
-
     return {
       total: customers.length,
       active: activeCustomers.length,
@@ -579,4 +468,3 @@ export class CustomersService {
     };
   }
 }
-

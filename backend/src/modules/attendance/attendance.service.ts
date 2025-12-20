@@ -54,19 +54,9 @@ export class AttendanceService {
       .findOne(query)
       .sort({ checkIn: -1 })
       .exec();
-    
+
     // DEBUG: Log what we're finding
-    if (result) {
-      console.log('🔍 Found open attendance:', {
-        id: result._id,
-        userId: result.userId,
-        branchId: result.branchId,
-        date: result.date,
-        checkIn: result.checkIn,
-        checkOut: result.checkOut,
-        status: result.status,
-      });
-    } else {
+    if (!result) {
       // Also check what records exist for this user
       const userFilter: any = isValidObjectId
         ? {
@@ -83,19 +73,23 @@ export class AttendanceService {
         .sort({ checkIn: -1 })
         .exec();
 
-      console.log(
-        '🔍 No open attendance found. Recent records for user:',
-        allRecords.map((r) => ({
-          id: r._id,
-          userId: r.userId,
-          date: r.date,
-          checkIn: r.checkIn,
-          checkOut: r.checkOut,
-          hasCheckOut: !!r.checkOut,
-        })),
-      );
+      // Return null if no records found, or return the first record with recent records
+      if (allRecords.length > 0) {
+        const firstRecord = allRecords[0];
+        return {
+          ...firstRecord.toObject(),
+          recentRecords: allRecords.map((r: any) => ({
+            id: r._id,
+            userId: r.userId,
+            date: r.date,
+            checkIn: r.checkIn,
+            checkOut: r.checkOut,
+            hasCheckOut: !!r.checkOut,
+          })),
+        } as any;
+      }
     }
-    
+
     return result;
   }
 
@@ -141,12 +135,12 @@ export class AttendanceService {
     // Add offset to UTC time to get local time
     const localTimestamp = timestamp.getTime() + (offsetHours * 60 * 60 * 1000);
     const localDate = new Date(localTimestamp);
-    
+
     // Get YYYY-MM-DD from the local time
     const year = localDate.getUTCFullYear();
     const month = String(localDate.getUTCMonth() + 1).padStart(2, '0');
     const day = String(localDate.getUTCDate()).padStart(2, '0');
-    
+
     return `${year}-${month}-${day}`;
   }
 
@@ -154,7 +148,7 @@ export class AttendanceService {
   private getLocalDateRange(dateString: string, timezone: string): { start: Date; end: Date } {
     // Parse YYYY-MM-DD
     const [year, month, day] = dateString.split('-').map(Number);
-    
+
     // Timezone offsets (UTC offset - positive means ahead of UTC)
     const timezoneOffsets: { [key: string]: number } = {
       'Asia/Dhaka': 6,        // UTC+6
@@ -168,12 +162,12 @@ export class AttendanceService {
     };
 
     const offsetHours = timezoneOffsets[timezone] || 6;
-    
+
     // Create UTC dates representing start and end of the local day
     // If timezone is UTC+6, midnight local = 6 PM previous day UTC
     const startLocal = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
     const startUTC = new Date(startLocal.getTime() - (offsetHours * 60 * 60 * 1000));
-    
+
     const endLocal = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
     const endUTC = new Date(endLocal.getTime() - (offsetHours * 60 * 60 * 1000));
 
@@ -186,30 +180,21 @@ export class AttendanceService {
     }
 
     const checkInTime = new Date();
-    
+
     // Get company timezone to calculate the correct local date
     const timezone = await this.getCompanyTimezone(checkInDto.branchId);
     const localDateString = this.getLocalDateString(checkInTime, timezone);
-    
+
     // Get the date range for today in local timezone (as UTC timestamps)
     const { start: todayStart } = this.getLocalDateRange(localDateString, timezone);
 
     // Check if there's any OPEN attendance record using shared helper
     // This ensures checkIn and checkOut find the SAME record
-    console.log('🔵 CHECK-IN: Checking for open attendance for user:', checkInDto.userId);
     const openAttendance = await this.findOpenAttendance(checkInDto.userId);
 
     if (openAttendance) {
-      console.log('❌ CHECK-IN BLOCKED: Found open attendance record:', {
-        id: openAttendance._id,
-        date: openAttendance.date,
-        checkIn: openAttendance.checkIn,
-        branchId: openAttendance.branchId,
-      });
       throw new BadRequestException('You have already checked in. Please check out first.');
     }
-    console.log('✅ CHECK-IN ALLOWED: No open attendance found');
-
     const expectedStartTime = new Date(checkInTime);
     expectedStartTime.setHours(9, 0, 0, 0); // Assuming 9 AM start time
 
@@ -233,7 +218,7 @@ export class AttendanceService {
 
     try {
       const savedAttendance = await attendance.save();
-      
+
       // Populate user and branch data before returning
       return this.attendanceModel
         .findById(savedAttendance._id)
@@ -291,7 +276,7 @@ export class AttendanceService {
     }
 
     const savedAttendance = await attendance.save();
-    
+
     // Populate user and branch data before returning
     return this.attendanceModel
       .findById(savedAttendance._id)
@@ -320,7 +305,7 @@ export class AttendanceService {
       search,
       ...filters 
     } = filterDto;
-    
+
     const skip = (page - 1) * limit;
     const andConditions: any[] = [];
 
@@ -502,15 +487,6 @@ export class AttendanceService {
 
     const query: any = { $and: andConditions };
 
-    // Debug logging
-    console.log('📅 getTodayAttendance query:', {
-      branchId,
-      userId,
-      todayStart: todayStart.toISOString(),
-      todayEnd: todayEnd.toISOString(),
-      now: new Date().toISOString()
-    });
-
     let attendances = await this.attendanceModel
       .find(query)
       .populate('userId', 'firstName lastName employeeId role email')
@@ -518,16 +494,10 @@ export class AttendanceService {
       .sort({ checkIn: -1 })
       .exec();
 
-    console.log('📅 getTodayAttendance found:', attendances.length, 'records');
-
     // Fallback: if nothing matched the date-range query but we have a userId, return
     // the MOST RECENT attendance record for this user in this branch using the same
     // flexible ID matching rules.
     if (attendances.length === 0 && userId) {
-      console.log(
-        '📅 getTodayAttendance fallback: no records in range, fetching most recent record for user/branch',
-      );
-
       const fallbackBranchFilter =
         branchConditions.length > 1 ? { $or: branchConditions } : branchConditions[0];
 
@@ -546,12 +516,7 @@ export class AttendanceService {
         .sort({ checkIn: -1 })
         .limit(1)
         .exec();
-      console.log(
-        '📅 getTodayAttendance fallback found:',
-        attendances.length,
-        'records',
-      );
-    }
+      }
 
     // Transform to include userName and branchName
     return attendances.map((attendance: any) => {
@@ -675,18 +640,7 @@ export class AttendanceService {
       query.$and.push({ $or: userConditions });
     }
 
-    // Debug logging
-    console.log('📊 getStats query:', {
-      branchId,
-      userId,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      query: JSON.stringify(query, null, 2)
-    });
-
     const attendances = await this.attendanceModel.find(query);
-
-    console.log('📊 getStats found:', attendances.length, 'records');
 
     const totalDays = Math.ceil(
       (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
@@ -764,4 +718,3 @@ export class AttendanceService {
     };
   }
 }
-

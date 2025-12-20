@@ -3,19 +3,15 @@ import {
   SubscriptionPlan,
   SubscriptionPlanDocument,
 } from './schemas/subscription-plan.schema';
-
 export async function seedSubscriptionPlans(
   planModel: Model<SubscriptionPlanDocument>,
 ) {
   const existingPlans = await planModel.countDocuments();
   if (existingPlans > 0) {
-    console.log('Subscription plans already seeded');
     return;
   }
-
   const priceFromEnv = (key: string, fallback: string) =>
     process.env[key] && process.env[key]?.trim() !== '' ? process.env[key] : fallback;
-
   const plans: Partial<SubscriptionPlan>[] = [
     {
       name: 'free',
@@ -165,7 +161,5 @@ export async function seedSubscriptionPlans(
       sortOrder: 4,
     },
   ];
-
   await planModel.insertMany(plans);
-  console.log('Subscription plans seeded successfully');
-}
+  }

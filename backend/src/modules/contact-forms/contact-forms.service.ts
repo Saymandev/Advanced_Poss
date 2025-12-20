@@ -3,14 +3,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ContactForm, ContactFormDocument } from '../public/schemas/contact-form.schema';
 import { UpdateContactFormDto } from './dto/update-contact-form.dto';
-
 @Injectable()
 export class ContactFormsService {
   constructor(
     @InjectModel(ContactForm.name)
     private contactFormModel: Model<ContactFormDocument>,
   ) {}
-
   async findAll(filters: {
     companyId?: string;
     status?: string;
@@ -26,9 +24,7 @@ export class ContactFormsService {
         page = 1,
         limit = 20,
       } = filters;
-
       const query: any = { isActive: true };
-
       // Filter by companyId (null for general inquiries, specific ID for company-specific)
       if (companyId !== undefined) {
         if (companyId === null || companyId === 'null') {
@@ -45,12 +41,10 @@ export class ContactFormsService {
           }
         }
       }
-
       // Filter by status
       if (status) {
         query.status = status;
       }
-
       // Search by name, email, subject, or message
       // MongoDB will AND this $or with other query conditions automatically
       if (search) {
@@ -61,12 +55,9 @@ export class ContactFormsService {
           { message: { $regex: search, $options: 'i' } },
         ];
       }
-
       const skip = (page - 1) * limit;
-
       // Debug logging
-      console.log('[ContactFormsService] findAll query:', JSON.stringify(query, null, 2));
-
+      
       const [data, total] = await Promise.all([
         this.contactFormModel
           .find(query)
@@ -79,7 +70,6 @@ export class ContactFormsService {
           .exec(),
         this.contactFormModel.countDocuments(query),
       ]);
-
       return {
         success: true,
         data: data.map((form: any) => ({
@@ -124,7 +114,6 @@ export class ContactFormsService {
       );
     }
   }
-
   async findOne(id: string) {
     try {
       const contactForm = await this.contactFormModel
@@ -133,11 +122,9 @@ export class ContactFormsService {
         .populate('readBy', 'firstName lastName email')
         .lean()
         .exec();
-
       if (!contactForm) {
         throw new NotFoundException('Contact form not found');
       }
-
       return {
         success: true,
         data: {
@@ -179,38 +166,30 @@ export class ContactFormsService {
       );
     }
   }
-
   async update(id: string, updateDto: UpdateContactFormDto, userId: string) {
     try {
       const contactForm = await this.contactFormModel.findById(id).exec();
-
       if (!contactForm) {
         throw new NotFoundException('Contact form not found');
       }
-
       const updateData: any = {};
-
       if (updateDto.status !== undefined) {
         updateData.status = updateDto.status;
-        
         // If marking as read, set readAt and readBy
         if (updateDto.status === 'read' && !contactForm.readAt) {
           updateData.readAt = new Date();
           updateData.readBy = new Types.ObjectId(userId);
         }
       }
-
       if (updateDto.adminNotes !== undefined) {
         updateData.adminNotes = updateDto.adminNotes;
       }
-
       const updated = await this.contactFormModel
         .findByIdAndUpdate(id, updateData, { new: true })
         .populate('companyId', 'name slug')
         .populate('readBy', 'firstName lastName email')
         .lean()
         .exec();
-
       return {
         success: true,
         message: 'Contact form updated successfully',
@@ -253,11 +232,9 @@ export class ContactFormsService {
       );
     }
   }
-
   async getStats(companyId?: string) {
     try {
       const query: any = { isActive: true };
-      
       if (companyId !== undefined) {
         if (companyId === null || companyId === 'null') {
           query.companyId = null;
@@ -265,7 +242,6 @@ export class ContactFormsService {
           query.companyId = new Types.ObjectId(companyId);
         }
       }
-
       const [total, newCount, readCount, repliedCount, archivedCount] = await Promise.all([
         this.contactFormModel.countDocuments(query),
         this.contactFormModel.countDocuments({ ...query, status: 'new' }),
@@ -273,7 +249,6 @@ export class ContactFormsService {
         this.contactFormModel.countDocuments({ ...query, status: 'replied' }),
         this.contactFormModel.countDocuments({ ...query, status: 'archived' }),
       ]);
-
       return {
         success: true,
         data: {
@@ -291,4 +266,3 @@ export class ContactFormsService {
     }
   }
 }
-

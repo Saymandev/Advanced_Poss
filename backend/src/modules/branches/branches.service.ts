@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -294,6 +294,11 @@ export class BranchesService {
   }
 
   async findBySlug(companyId: string, branchSlug: string): Promise<Branch> {
+    // Validate companyId before using it
+    if (!Types.ObjectId.isValid(companyId)) {
+      throw new BadRequestException(`Invalid company ID format: ${companyId}`);
+    }
+
     // First, try to find branch by company + slug (preferred, multi-tenant safe)
     let branch = await this.branchModel
       .findOne({

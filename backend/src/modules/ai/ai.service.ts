@@ -6,11 +6,9 @@ import { Customer, CustomerDocument } from '../customers/schemas/customer.schema
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
-
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-
   constructor(
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
@@ -18,7 +16,6 @@ export class AiService {
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     private openAIService: OpenAIService,
   ) {}
-
   async generateSalesAnalytics(
     branchId: string,
     startDate: Date,
@@ -55,7 +52,6 @@ export class AiService {
       },
       { $sort: { _id: 1 } },
     ]);
-
     // Get order type breakdown
     const orderTypeData = await this.orderModel.aggregate([
       {
@@ -73,7 +69,6 @@ export class AiService {
         },
       },
     ]);
-
     // Get hourly performance
     const hourlyData = await this.orderModel.aggregate([
       {
@@ -93,29 +88,23 @@ export class AiService {
       { $sort: { revenue: -1 } },
       { $limit: 3 },
     ]);
-
     // Calculate trends
     const totalDays = salesData.length;
     const firstHalf = salesData.slice(0, Math.floor(totalDays / 2));
     const secondHalf = salesData.slice(Math.floor(totalDays / 2));
-
     const firstHalfAvg = firstHalf.reduce((sum, day) => sum + day.totalRevenue, 0) / firstHalf.length;
     const secondHalfAvg = secondHalf.reduce((sum, day) => sum + day.totalRevenue, 0) / secondHalf.length;
-
     const trendPercentage = firstHalfAvg > 0 ? ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100 : 0;
     const trend: 'up' | 'down' | 'stable' = 
       trendPercentage > 5 ? 'up' : 
       trendPercentage < -5 ? 'down' : 'stable';
-
     // Generate insights
     const insights = [];
     const recommendations = [];
     const suggestions = [];
-
     // Revenue insights
     const totalRevenue = salesData.reduce((sum, day) => sum + day.totalRevenue, 0);
     const avgDailyRevenue = totalRevenue / totalDays;
-    
     if (avgDailyRevenue > 5000) {
       insights.push('Strong daily revenue performance with consistent sales');
     } else if (avgDailyRevenue > 2000) {
@@ -123,12 +112,10 @@ export class AiService {
     } else {
       insights.push('Revenue performance needs improvement');
     }
-
     // Order type insights
     const dineInData = orderTypeData.find(item => item._id === 'dineIn');
     const deliveryData = orderTypeData.find(item => item._id === 'delivery');
     const takeawayData = orderTypeData.find(item => item._id === 'takeaway');
-
     if (dineInData && dineInData.count > 0) {
       const dineInPercentage = (dineInData.count / salesData.reduce((sum, day) => sum + day.totalOrders, 0)) * 100;
       if (dineInPercentage > 60) {
@@ -136,7 +123,6 @@ export class AiService {
         recommendations.push('Consider optimizing table turnover and service speed');
       }
     }
-
     if (deliveryData && deliveryData.count > 0) {
       const deliveryPercentage = (deliveryData.count / salesData.reduce((sum, day) => sum + day.totalOrders, 0)) * 100;
       if (deliveryPercentage > 40) {
@@ -144,7 +130,6 @@ export class AiService {
         recommendations.push('Focus on delivery time optimization and customer satisfaction');
       }
     }
-
     // Trend-based recommendations
     if (trend === 'up') {
       insights.push('Positive sales trend detected');
@@ -153,19 +138,16 @@ export class AiService {
       insights.push('Declining sales trend requires attention');
       recommendations.push('Review pricing strategy and consider promotional campaigns');
     }
-
     // Hourly performance insights
     const topHours = hourlyData.map(hour => `${hour._id}:00`);
     if (topHours.length > 0) {
       insights.push(`Peak performance hours: ${topHours.join(', ')}`);
       recommendations.push('Optimize staffing during peak hours');
     }
-
     // Generate suggestions
     suggestions.push('Consider implementing loyalty programs for repeat customers');
     suggestions.push('Analyze customer feedback to identify improvement areas');
     suggestions.push('Monitor inventory levels to prevent stockouts during peak hours');
-
     return {
       insights,
       recommendations,
@@ -178,7 +160,6 @@ export class AiService {
       suggestions,
     };
   }
-
   async generateOrderAnalytics(
     branchId: string,
     startDate: Date,
@@ -223,20 +204,16 @@ export class AiService {
         },
       },
     ]);
-
     const avgPreparationTimeMs = efficiencyData[0]?.avgPreparationTime || 0;
     const avgPreparationTimeMinutes = Math.round(avgPreparationTimeMs / (1000 * 60));
-
     // Calculate efficiency score (0-100)
     let efficiencyScore = 100;
     if (avgPreparationTimeMinutes > 30) efficiencyScore -= 20;
     if (avgPreparationTimeMinutes > 45) efficiencyScore -= 20;
     if (avgPreparationTimeMinutes > 60) efficiencyScore -= 30;
-
     // Generate insights
     const insights = [];
     const recommendations = [];
-
     if (avgPreparationTimeMinutes < 20) {
       insights.push('Excellent order preparation speed');
     } else if (avgPreparationTimeMinutes < 30) {
@@ -245,7 +222,6 @@ export class AiService {
       insights.push('Order preparation time needs improvement');
       recommendations.push('Review kitchen workflow and staff allocation');
     }
-
     if (efficiencyScore > 80) {
       insights.push('High operational efficiency');
     } else if (efficiencyScore > 60) {
@@ -254,27 +230,22 @@ export class AiService {
       insights.push('Operational efficiency needs attention');
       recommendations.push('Implement process improvements and staff training');
     }
-
     // Customer satisfaction estimation
     const satisfactionFactors = [];
     let estimatedScore = 75; // Base score
-
     if (avgPreparationTimeMinutes < 25) {
       estimatedScore += 10;
       satisfactionFactors.push('Fast service delivery');
     }
-
     if (efficiencyScore > 70) {
       estimatedScore += 10;
       satisfactionFactors.push('Efficient operations');
     }
-
     if (estimatedScore > 85) {
       satisfactionFactors.push('High customer satisfaction expected');
     } else if (estimatedScore < 70) {
       satisfactionFactors.push('Customer satisfaction may be impacted');
     }
-
     return {
       insights,
       recommendations,
@@ -289,22 +260,18 @@ export class AiService {
       },
     };
   }
-
   // Predict sales for the next N days
   async predictSales(companyId: any, branchId?: any, daysAhead = 7): Promise<any> {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30); // Use last 30 days for prediction
-
     const matchQuery: any = {
       status: 'completed',
       completedAt: { $gte: startDate, $lte: endDate },
     };
-
     if (branchId) {
       matchQuery.branchId = branchId;
     }
-
     // Get historical sales data
     const historicalData = await this.orderModel.aggregate([
       { $match: matchQuery },
@@ -319,7 +286,6 @@ export class AiService {
       },
       { $sort: { _id: 1 } },
     ]);
-
     // Simple linear regression for prediction
     const n = historicalData.length;
     if (n < 2) {
@@ -329,26 +295,21 @@ export class AiService {
         message: 'Insufficient data for accurate prediction',
       };
     }
-
     // Calculate trend
     const sumX = (n * (n - 1)) / 2;
     const sumY = historicalData.reduce((sum, item) => sum + item.dailyRevenue, 0);
     const sumXY = historicalData.reduce((sum, item, index) => sum + (index * item.dailyRevenue), 0);
     const sumXX = (n * (n - 1) * (2 * n - 1)) / 6;
-
     const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
     const intercept = (sumY - slope * sumX) / n;
-
     // Generate predictions
     const predictions = [];
     const avgDailyRevenue = sumY / n;
     const variance = historicalData.reduce((sum, item) => sum + Math.pow(item.dailyRevenue - avgDailyRevenue, 2), 0) / n;
     const standardDeviation = Math.sqrt(variance);
-
     for (let i = 1; i <= daysAhead; i++) {
       const predictedRevenue = slope * (n + i - 1) + intercept;
       const confidence = Math.max(0, 1 - (standardDeviation / avgDailyRevenue));
-      
       predictions.push({
         date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         predictedRevenue: Math.max(0, predictedRevenue),
@@ -359,7 +320,6 @@ export class AiService {
         },
       });
     }
-
     return {
       predictions,
       confidence: standardDeviation < avgDailyRevenue * 0.3 ? 'high' : 'medium',
@@ -367,7 +327,6 @@ export class AiService {
       averageDailyRevenue: avgDailyRevenue,
     };
   }
-
   // Recommend pricing for menu items
   async recommendPricing(menuItemId: any): Promise<any> {
     // Get sales data for this menu item
@@ -391,27 +350,22 @@ export class AiService {
         },
       },
     ]);
-
     if (menuItemData.length === 0) {
       return {
         message: 'No sales data found for this menu item',
         recommendations: [],
       };
     }
-
     const item = menuItemData[0];
     const currentPrice = item.currentPrice;
     const totalQuantity = item.totalQuantity;
     const totalRevenue = item.totalRevenue;
     const avgOrderValue = item.avgOrderValue;
-
     // Calculate price elasticity (simplified)
     const priceElasticity = -0.5; // Assumed elasticity
     const optimalPrice = currentPrice * (1 + (1 / Math.abs(priceElasticity)));
-
     // Generate recommendations
     const recommendations = [];
-
     if (totalQuantity < 10) {
       recommendations.push({
         type: 'price_reduction',
@@ -427,7 +381,6 @@ export class AiService {
         expectedImpact: 'Increase revenue by 10-15%',
       });
     }
-
     if (currentPrice > avgOrderValue * 0.5) {
       recommendations.push({
         type: 'premium_positioning',
@@ -436,7 +389,6 @@ export class AiService {
         expectedImpact: 'Maintain current performance',
       });
     }
-
     return {
       currentPrice,
       totalQuantity,
@@ -446,22 +398,18 @@ export class AiService {
       priceElasticity,
     };
   }
-
   // Analyze peak hours
   async analyzePeakHours(companyId: any, branchId?: any): Promise<any> {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
-
     const matchQuery: any = {
       status: 'completed',
       completedAt: { $gte: startDate, $lte: endDate },
     };
-
     if (branchId) {
       matchQuery.branchId = branchId;
     }
-
     const hourlyData = await this.orderModel.aggregate([
       { $match: matchQuery },
       {
@@ -474,7 +422,6 @@ export class AiService {
       },
       { $sort: { _id: 1 } },
     ]);
-
     // Find peak hours
     const peakHours = hourlyData
       .sort((a, b) => b.totalOrders - a.totalOrders)
@@ -486,11 +433,9 @@ export class AiService {
         revenue: hour.totalRevenue,
         avgOrderValue: hour.avgOrderValue,
       }));
-
     // Calculate busy periods
     const totalOrders = hourlyData.reduce((sum, hour) => sum + hour.totalOrders, 0);
     const busyThreshold = totalOrders * 0.1; // 10% of total orders
-
     const busyHours = hourlyData
       .filter(hour => hour.totalOrders >= busyThreshold)
       .map(hour => ({
@@ -500,7 +445,6 @@ export class AiService {
         revenue: hour.totalRevenue,
         percentage: Math.round((hour.totalOrders / totalOrders) * 100),
       }));
-
     return {
       peakHours,
       busyHours,
@@ -512,7 +456,6 @@ export class AiService {
       ],
     };
   }
-
   // Get customer recommendations
   async getCustomerRecommendations(customerId: any): Promise<any> {
     // Get customer's order history
@@ -520,19 +463,16 @@ export class AiService {
       'customerInfo.customerId': customerId,
       status: 'completed',
     }).sort({ completedAt: -1 }).limit(20);
-
     if (customerOrders.length === 0) {
       return {
         message: 'No order history found for this customer',
         recommendations: [],
       };
     }
-
     // Analyze customer preferences
     const itemFrequency = {};
     const totalSpent = customerOrders.reduce((sum, order) => sum + order.total, 0);
     const avgOrderValue = totalSpent / customerOrders.length;
-
     customerOrders.forEach(order => {
       order.items.forEach(item => {
         const itemId = item.menuItemId.toString();
@@ -547,7 +487,6 @@ export class AiService {
         itemFrequency[itemId].totalSpent += item.quantity * (item.basePrice + (item.selectedVariant?.priceModifier || 0) + (item.selectedAddons?.reduce((sum, addon) => sum + addon.price, 0) || 0));
       });
     });
-
     // Get most popular items across all customers
     const popularItems = await this.orderModel.aggregate([
       {
@@ -570,14 +509,11 @@ export class AiService {
       { $sort: { totalOrders: -1 } },
       { $limit: 10 },
     ]);
-
     // Generate recommendations
     const recommendations = [];
-
     // Recommend items customer hasn't tried but are popular
     const customerItemIds = Object.keys(itemFrequency);
     const newItems = popularItems.filter(item => !customerItemIds.includes(item._id.toString()));
-
     if (newItems.length > 0) {
       recommendations.push({
         type: 'new_items',
@@ -588,12 +524,10 @@ export class AiService {
         })),
       });
     }
-
     // Recommend similar items to what they order frequently
     const frequentItems = Object.values(itemFrequency)
       .sort((a: any, b: any) => b.quantity - a.quantity)
       .slice(0, 3);
-
     if (frequentItems.length > 0) {
       recommendations.push({
         type: 'similar_items',
@@ -603,7 +537,6 @@ export class AiService {
         })),
       });
     }
-
     return {
       customerStats: {
         totalOrders: customerOrders.length,
@@ -616,22 +549,18 @@ export class AiService {
       recommendations,
     };
   }
-
   // Analyze menu performance
   async analyzeMenuPerformance(companyId: any, branchId?: any): Promise<any> {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
-
     const matchQuery: any = {
       status: 'completed',
       completedAt: { $gte: startDate, $lte: endDate },
     };
-
     if (branchId) {
       matchQuery.branchId = branchId;
     }
-
     const menuPerformance = await this.orderModel.aggregate([
       {
         $unwind: '$items',
@@ -656,20 +585,16 @@ export class AiService {
       },
       { $sort: { totalRevenue: -1 } },
     ]);
-
     const totalRevenue = menuPerformance.reduce((sum, item) => sum + item.totalRevenue, 0);
     const totalQuantity = menuPerformance.reduce((sum, item) => sum + item.totalQuantity, 0);
-
     // Categorize items
     const topPerformers = menuPerformance.slice(0, 5);
     const underPerformers = menuPerformance
       .filter(item => item.totalRevenue < totalRevenue / menuPerformance.length)
       .slice(0, 5);
-
     // Calculate menu efficiency
     const menuEfficiency = menuPerformance.length > 0 ? 
       (topPerformers.reduce((sum, item) => sum + item.totalRevenue, 0) / totalRevenue) * 100 : 0;
-
     return {
       totalItems: menuPerformance.length,
       totalRevenue,
@@ -691,12 +616,10 @@ export class AiService {
       ],
     };
   }
-
   // Generate business insights
   async generateBusinessInsights(companyId: any, branchId?: any, period = 'month'): Promise<any> {
     const endDate = new Date();
     const startDate = new Date();
-    
     switch (period) {
       case 'week':
         startDate.setDate(startDate.getDate() - 7);
@@ -710,16 +633,13 @@ export class AiService {
       default:
         startDate.setDate(startDate.getDate() - 30);
     }
-
     const matchQuery: any = {
       status: 'completed',
       completedAt: { $gte: startDate, $lte: endDate },
     };
-
     if (branchId) {
       matchQuery.branchId = branchId;
     }
-
     // Get comprehensive business data
     const [revenueData, orderData, customerData] = await Promise.all([
       this.orderModel.aggregate([
@@ -764,21 +684,16 @@ export class AiService {
         },
       ]),
     ]);
-
     const revenue = revenueData[0] || { totalRevenue: 0, avgOrderValue: 0, maxOrderValue: 0, minOrderValue: 0 };
     const orders = orderData;
     const customers = customerData[0] || { uniqueCustomers: 0, avgOrdersPerCustomer: 0, avgSpentPerCustomer: 0 };
-
     // Calculate trends
     const revenueTrend = orders.length > 1 ? 
       ((orders[orders.length - 1].dailyRevenue - orders[0].dailyRevenue) / orders[0].dailyRevenue) * 100 : 0;
-
     const orderTrend = orders.length > 1 ? 
       ((orders[orders.length - 1].dailyOrders - orders[0].dailyOrders) / orders[0].dailyOrders) * 100 : 0;
-
     // Generate insights
     const insights = [];
-
     if (revenueTrend > 10) {
       insights.push({
         type: 'positive',
@@ -792,7 +707,6 @@ export class AiService {
         impact: 'high',
       });
     }
-
     if (customers.avgOrdersPerCustomer > 3) {
       insights.push({
         type: 'positive',
@@ -800,7 +714,6 @@ export class AiService {
         impact: 'medium',
       });
     }
-
     if (revenue.avgOrderValue > revenue.maxOrderValue * 0.7) {
       insights.push({
         type: 'positive',
@@ -808,7 +721,6 @@ export class AiService {
         impact: 'medium',
       });
     }
-
     return {
       period,
       summary: {
@@ -832,23 +744,18 @@ export class AiService {
       ],
     };
   }
-
   // Get menu optimization suggestions
   async getMenuOptimization(branchId: string, category?: string): Promise<any[]> {
     if (!Types.ObjectId.isValid(branchId)) {
       throw new BadRequestException('Invalid branch ID');
     }
-
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 90); // Last 90 days
-
     // Build menu items query - match menu-items service logic
     // Include both branch-specific items and company-wide items (branchId: null)
     const branchIdObj = new Types.ObjectId(branchId);
-    
-    console.log(`[AI Menu Optimization] Querying menu items for branchId: ${branchId} (ObjectId: ${branchIdObj})`);
-    
+
     let menuItems = await this.menuItemModel.find({
       $or: [
         { branchId: branchIdObj },
@@ -858,36 +765,24 @@ export class AiService {
     })
       .populate('categoryId', 'name type')
       .lean();
-    
-    console.log(`[AI Menu Optimization] Found ${menuItems.length} menu items (before filtering)`);
-    
+
     // Filter out unavailable items
     menuItems = menuItems.filter((item: any) => item.isAvailable !== false);
-    
-    console.log(`[AI Menu Optimization] After filtering unavailable: ${menuItems.length} menu items`);
-
     // Filter by category name if provided
     if (category && category !== 'all') {
       menuItems = menuItems.filter((item: any) => {
         const populatedCategory = item.categoryId;
         if (!populatedCategory) return false;
-        
         // Handle both populated ObjectId with name property and direct name access
         const categoryName = populatedCategory.name || populatedCategory;
         return categoryName && categoryName.toString().toLowerCase() === category.toLowerCase();
       });
     }
-
     // If there are no menu items, return empty array
     // Note: We'll generate suggestions for ALL menu items, even without sales data
     if (menuItems.length === 0) {
-      console.log(`[AI Menu Optimization] No menu items found for branchId: ${branchId}`);
-      console.log(`[AI Menu Optimization] Tried ObjectId format: ${new Types.ObjectId(branchId)}`);
       return [];
     }
-    
-    console.log(`[AI Menu Optimization] Found ${menuItems.length} menu items for branchId: ${branchId}`);
-
     // Get order data for these menu items - Use POSOrder for actual sales data
     // Note: This will be empty if there are no sales yet, but we'll still generate suggestions
     const menuItemIds = menuItems.map(item => item._id);
@@ -916,51 +811,41 @@ export class AiService {
         },
       },
     ]);
-
     // Create a map of order data by menu item ID
     const orderDataMap = new Map();
     orderData.forEach(item => {
       orderDataMap.set(item._id.toString(), item);
     });
-
     // Calculate total revenue for comparison (not used in current logic but useful for future enhancements)
     const totalBranchRevenue = orderData.reduce((sum, item) => sum + item.totalRevenue, 0);
-
     // Generate optimization suggestions for ALL menu items
     const suggestions = [];
-
     for (const menuItem of menuItems) {
       const itemId = menuItem._id.toString();
       const itemOrderData = orderDataMap.get(itemId);
-      
       const currentPrice = menuItem.price || 0;
       const totalQuantity = itemOrderData?.totalQuantity || 0;
       const totalRevenue = itemOrderData?.totalRevenue || 0;
       const orderCount = itemOrderData?.orderCount || 0;
       const avgPrice = itemOrderData?.avgPrice || currentPrice;
-
       // Calculate metrics
       const daysSinceLastOrder = itemOrderData?.lastOrderDate 
         ? Math.floor((endDate.getTime() - new Date(itemOrderData.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
         : 999; // Never ordered
-
       // Calculate demand score (0-10)
       const demandScore = Math.min(10, Math.max(0, 
         (totalQuantity / 10) + // Base on quantity
         (orderCount / 5) + // Base on order frequency
         (daysSinceLastOrder < 7 ? 3 : daysSinceLastOrder < 30 ? 1 : -2) // Recency bonus
       ));
-
       // Calculate popularity score (0-5)
       const popularityScore = Math.min(5, Math.max(0,
         (totalQuantity / 20) + // Base on total quantity
         (orderCount / 10) // Base on order count
       ));
-
       // Calculate profit margin (simplified - assuming 30% cost)
       const estimatedCost = currentPrice * 0.3;
       const profitMargin = currentPrice > 0 ? ((currentPrice - estimatedCost) / currentPrice) * 100 : 0;
-
       // Determine recommendation - Try OpenAI first, fallback to rule-based
       let recommendation: 'increase_price' | 'decrease_price' | 'maintain_price' | 'remove_item' | 'add_item' = 'maintain_price';
       let suggestedPrice = currentPrice;
@@ -968,22 +853,18 @@ export class AiService {
       let reasoning = '';
       let confidence = 0.5;
       let expectedImpactFromAI: { revenue: number; profit: number; orders: number } | null = null;
-
       // Try to get AI-powered recommendation if OpenAI is available
       if (this.openAIService.isAvailable()) {
         try {
           const categoryName = (menuItem.categoryId as any)?.name || menuItem.categoryId;
-          
           // Get sales trend data
           const sales30Days = orderData.filter((o: any) => {
             const orderDate = new Date(o.lastOrderDate || 0);
             const daysDiff = Math.floor((endDate.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
             return daysDiff <= 30;
           }).reduce((sum: number, o: any) => sum + (o.totalQuantity || 0), 0);
-
           const sales90Days = totalQuantity;
           const avgDailySales = totalQuantity > 0 ? totalQuantity / 90 : 0;
-          
           let trend: 'increasing' | 'decreasing' | 'stable' = 'stable';
           if (sales30Days > 0 && sales90Days > 0) {
             const avg30Days = sales30Days / 30;
@@ -991,7 +872,6 @@ export class AiService {
             if (avg30Days > avg90Days * 1.2) trend = 'increasing';
             else if (avg30Days < avg90Days * 0.8) trend = 'decreasing';
           }
-
           const aiRecommendation = await this.openAIService.generateMenuOptimizationRecommendation({
             itemName: menuItem.name || 'Unknown Item',
             currentPrice,
@@ -1009,7 +889,6 @@ export class AiService {
               trend,
             },
           });
-
           if (aiRecommendation) {
             this.logger.log(`✅ Using AI recommendation for ${menuItem.name}`);
             recommendation = aiRecommendation.recommendation;
@@ -1028,7 +907,6 @@ export class AiService {
           // Continue with rule-based logic
         }
       }
-
       // Fallback to rule-based recommendations if AI is not available or failed
       if (!expectedImpactFromAI) {
         // Handle items with no sales differently - provide useful initial recommendations
@@ -1067,11 +945,9 @@ export class AiService {
           confidence = 0.6;
         }
       }
-
       // Calculate expected impact - use AI prediction if available, otherwise calculate
       let expectedRevenueChange = 0;
       let expectedOrderChange = 0;
-      
       if (expectedImpactFromAI) {
         // Use AI-provided impact
         expectedRevenueChange = expectedImpactFromAI.revenue;
@@ -1089,9 +965,7 @@ export class AiService {
           expectedOrderChange = priceChange < 0 ? 3 : 0; // Promotional pricing might attract 3 more orders
         }
       }
-      
       const expectedProfitChange = expectedImpactFromAI?.profit || (expectedRevenueChange * (profitMargin / 100));
-
       suggestions.push({
         id: itemId,
         itemId: itemId,
@@ -1113,25 +987,18 @@ export class AiService {
         createdAt: new Date().toISOString(),
       });
     }
-
     // Sort by expected revenue impact (descending)
     const sortedSuggestions = suggestions.sort((a, b) => b.expectedImpact.revenue - a.expectedImpact.revenue);
-    
-    console.log(`[AI Menu Optimization] Generated ${sortedSuggestions.length} suggestions for branchId: ${branchId}`);
-    
     return sortedSuggestions;
   }
-
   // Get demand predictions
   async getDemandPredictions(branchId: string): Promise<any[]> {
     if (!Types.ObjectId.isValid(branchId)) {
       throw new BadRequestException('Invalid branch ID');
     }
-
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30); // Last 30 days
-
     // Get menu items - match the same logic as menu-items service
     const branchIdObj = new Types.ObjectId(branchId);
     let menuItems = await this.menuItemModel.find({
@@ -1143,16 +1010,12 @@ export class AiService {
     })
       .populate('categoryId', 'name type')
       .lean();
-    
     // Filter out unavailable items
     menuItems = menuItems.filter((item: any) => item.isAvailable !== false);
-
     if (menuItems.length === 0) {
       return [];
     }
-
     const menuItemIds = menuItems.map(item => item._id);
-
     // Get historical order data - Use POSOrder for actual sales data
     // Try both string and ObjectId formats for branchId
     const orderData = await this.posOrderModel.aggregate([
@@ -1183,14 +1046,11 @@ export class AiService {
         },
       },
     ]);
-
     // Calculate predictions for each menu item
     const predictions = [];
-
     for (const menuItem of menuItems) {
       const itemId = menuItem._id.toString();
       const itemOrders = orderData.filter(o => o._id.menuItemId.toString() === itemId);
-
       // Generate predictions even for items with no sales data
       if (itemOrders.length === 0) {
         // For items with no sales, provide baseline predictions
@@ -1212,24 +1072,19 @@ export class AiService {
         });
         continue;
       }
-
       // Calculate average daily demand
       const totalQuantity = itemOrders.reduce((sum, o) => sum + o.quantity, 0);
       const avgDailyDemand = totalQuantity / 30;
-
       // Predict next 7 days (simple average)
       const predictedDemand = Math.round(avgDailyDemand * 7);
-
       // Calculate factors
       const timeOfDayFactor = itemOrders.filter(o => o._id.hour >= 11 && o._id.hour <= 14 || o._id.hour >= 18 && o._id.hour <= 21).length / itemOrders.length;
       const dayOfWeekFactor = itemOrders.filter(o => o._id.dayOfWeek >= 5 && o._id.dayOfWeek <= 7).length / itemOrders.length; // Weekend
       const seasonFactor = 0.7; // Placeholder - could be enhanced with actual seasonal data
       const eventsFactor = 0.5; // Placeholder - could be enhanced with event data
       const trendsFactor = avgDailyDemand > 5 ? 0.8 : 0.5; // Higher for popular items
-
       // Calculate confidence based on data availability
       const confidence = Math.min(0.95, Math.max(0.5, itemOrders.length / 20));
-
       // Generate recommendations
       const recommendations = [];
       if (predictedDemand > 50) {
@@ -1239,11 +1094,9 @@ export class AiService {
         recommendations.push('Low predicted demand - consider promotional pricing');
         recommendations.push('Review if this item should remain on the menu');
       }
-
       if (timeOfDayFactor > 0.6) {
         recommendations.push('Peak demand during meal times - optimize preparation');
       }
-
       predictions.push({
         id: itemId,
         itemId: itemId,
@@ -1261,11 +1114,9 @@ export class AiService {
         createdAt: new Date().toISOString(),
       });
     }
-
     // Sort by predicted demand (descending)
     return predictions.sort((a, b) => b.predictedDemand - a.predictedDemand);
   }
-
   // Generate personalized offers for a customer
   async generatePersonalizedOffers(
     customerId: string,
@@ -1287,17 +1138,14 @@ export class AiService {
     if (!Types.ObjectId.isValid(branchId)) {
       throw new BadRequestException('Invalid branch ID');
     }
-
     // Fetch customer data
     const customer = await this.customerModel
       .findById(customerId)
       .lean()
       .exec();
-
     if (!customer) {
       throw new BadRequestException('Customer not found');
     }
-
     // Fetch customer order history
     const customerOrders = await this.posOrderModel
       .find({
@@ -1309,7 +1157,6 @@ export class AiService {
       .limit(50)
       .lean()
       .exec();
-
     const totalOrders = customerOrders.length;
     const daysSinceLastOrder = customer.lastOrderDate
       ? Math.floor(
@@ -1321,7 +1168,6 @@ export class AiService {
       totalOrders > 0
         ? customer.totalSpent / customer.totalOrders
         : customer.totalSpent;
-
     // Generate offers based on customer behavior
     const offers: Array<{
       id: string;
@@ -1332,7 +1178,6 @@ export class AiService {
       expiryDate: string;
       conditions?: string[];
     }> = [];
-
     // Offer 1: Welcome discount for new customers
     if (totalOrders < 3) {
       const expiryDate = new Date();
@@ -1347,7 +1192,6 @@ export class AiService {
         conditions: ['Minimum order value: $10', 'First-time customer offer'],
       });
     }
-
     // Offer 2: Loyalty points bonus for frequent customers
     if (totalOrders >= 5 && customer.loyaltyPoints < 500) {
       const expiryDate = new Date();
@@ -1362,7 +1206,6 @@ export class AiService {
         conditions: ['Valid for next order only', 'Minimum order value: $20'],
       });
     }
-
     // Offer 3: Re-engagement offer for customers who haven't ordered in a while
     if (daysSinceLastOrder > 30 && daysSinceLastOrder < 90) {
       const expiryDate = new Date();
@@ -1381,7 +1224,6 @@ export class AiService {
         ],
       });
     }
-
     // Offer 4: Tier upgrade incentive
     const tierPoints = {
       bronze: 0,
@@ -1415,7 +1257,6 @@ export class AiService {
         ],
       });
     }
-
     // Offer 5: High-value customer VIP offer
     if (customer.totalSpent > 500 || customer.isVIP) {
       const expiryDate = new Date();
@@ -1430,7 +1271,6 @@ export class AiService {
         conditions: ['VIP customer exclusive', 'Includes priority booking'],
       });
     }
-
     // Offer 6: Birthday/Anniversary special (if date available)
     if (customer.dateOfBirth) {
       const today = new Date();
@@ -1456,14 +1296,12 @@ export class AiService {
         });
       }
     }
-
     // Sort offers by relevance (new customers first, then by value)
     offers.sort((a, b) => {
       if (a.type === 'discount' && b.type !== 'discount') return -1;
       if (b.type === 'discount' && a.type !== 'discount') return 1;
       return b.value - a.value;
     });
-
     // Limit to top 5 offers
     return offers.slice(0, 5);
   }

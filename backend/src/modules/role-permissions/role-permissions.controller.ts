@@ -14,7 +14,6 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UpdateRolePermissionDto } from './dto/update-role-permission.dto';
 import { RolePermissionsService } from './role-permissions.service';
-
 @ApiTags('Role Permissions')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,7 +22,6 @@ export class RolePermissionsController {
   constructor(
     private readonly rolePermissionsService: RolePermissionsService,
   ) {}
-
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Get all role permissions for company' })
@@ -33,15 +31,12 @@ export class RolePermissionsController {
     }
     return this.rolePermissionsService.getRolePermissions(companyId);
   }
-
   @Get('my-permissions')
   @ApiOperation({ summary: 'Get current user\'s role permissions' })
   getMyPermissions(
     @CurrentUser('companyId') companyId: string,
     @CurrentUser('role') role: string,
   ) {
-    console.log(`[RolePermissionsController] my-permissions endpoint called - Company: ${companyId}, Role: ${role}`);
-    
     if (!companyId) {
       console.error(`[RolePermissionsController] Company ID is missing`);
       throw new Error('Company ID is required');
@@ -50,11 +45,8 @@ export class RolePermissionsController {
       console.error(`[RolePermissionsController] User role is missing`);
       throw new Error('User role is required');
     }
-    
-    console.log(`[RolePermissionsController] Calling service with companyId: ${companyId}, role: ${role.toLowerCase()}`);
     return this.rolePermissionsService.getRolePermission(companyId, role.toLowerCase());
   }
-
   @Patch()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Update role permissions (owner only)' })
@@ -72,14 +64,12 @@ export class RolePermissionsController {
       userId,
     );
   }
-
   @Get('system/company/:companyId')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get role permissions for any company (Super Admin only)' })
   getCompanyRolePermissions(@Param('companyId') companyId: string) {
     return this.rolePermissionsService.getRolePermissions(companyId);
   }
-
   @Patch('system/company/:companyId')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update role permissions for any company (Super Admin only)' })
@@ -95,4 +85,3 @@ export class RolePermissionsController {
     );
   }
 }
-

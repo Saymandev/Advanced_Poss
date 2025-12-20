@@ -14,11 +14,9 @@ import {
   SubscriptionPaymentMethod,
   SubscriptionPaymentMethodDocument,
 } from './schemas/subscription-payment-method.schema';
-
 @Injectable()
 export class SubscriptionPaymentsService {
   private stripe: Stripe;
-
   constructor(
     private configService: ConfigService,
     @InjectModel(SubscriptionPaymentMethod.name)
@@ -34,11 +32,9 @@ export class SubscriptionPaymentsService {
       });
     }
   }
-
   // Get all available payment methods (for public/company use - only active)
   async getAvailablePaymentMethods(countryCode?: string, currency?: string) {
     const query: any = { isActive: true };
-
     // Filter by country if provided
     if (countryCode) {
       query.$or = [
@@ -46,7 +42,6 @@ export class SubscriptionPaymentsService {
         { supportedCountries: countryCode }, // Country-specific
       ];
     }
-
     // Filter by currency if provided
     if (currency) {
       query.$and = [
@@ -58,19 +53,16 @@ export class SubscriptionPaymentsService {
         },
       ];
     }
-
     // Sort by: isDefault (desc), then sortOrder, then name
     return this.paymentMethodModel
       .find(query)
       .sort({ isDefault: -1, sortOrder: 1, name: 1 })
       .exec();
   }
-
   // Get all payment methods (for super admin - includes inactive)
   async getAllPaymentMethods() {
     return this.paymentMethodModel.find().sort({ isDefault: -1, sortOrder: 1, name: 1 }).exec();
   }
-
   // Get payment method by ID
   async getPaymentMethodById(id: string) {
     const paymentMethod = await this.paymentMethodModel.findById(id);
@@ -79,7 +71,6 @@ export class SubscriptionPaymentsService {
     }
     return paymentMethod;
   }
-
   // Create payment method
   async createPaymentMethod(dto: CreateSubscriptionPaymentMethodDto) {
     // Check if code already exists
@@ -87,12 +78,10 @@ export class SubscriptionPaymentsService {
     if (existing) {
       throw new BadRequestException(`Payment method with code "${dto.code}" already exists`);
     }
-
     // If setting as default, unset other defaults
     if (dto.isDefault) {
       await this.paymentMethodModel.updateMany({ isDefault: true }, { $set: { isDefault: false } });
     }
-
     const paymentMethod = new this.paymentMethodModel({
       ...dto,
       isActive: dto.isActive ?? true,
@@ -101,17 +90,14 @@ export class SubscriptionPaymentsService {
       supportedCountries: dto.supportedCountries ?? [],
       supportedCurrencies: dto.supportedCurrencies ?? [],
     });
-
     return paymentMethod.save();
   }
-
   // Update payment method
   async updatePaymentMethod(id: string, dto: UpdateSubscriptionPaymentMethodDto) {
     const paymentMethod = await this.paymentMethodModel.findById(id);
     if (!paymentMethod) {
       throw new NotFoundException('Payment method not found');
     }
-
     // If code is being updated, check for duplicates
     if (dto.code && dto.code !== paymentMethod.code) {
       const existing = await this.paymentMethodModel.findOne({ code: dto.code });
@@ -119,7 +105,6 @@ export class SubscriptionPaymentsService {
         throw new BadRequestException(`Payment method with code "${dto.code}" already exists`);
       }
     }
-
     // If setting as default, unset other defaults (except current one)
     if (dto.isDefault && !paymentMethod.isDefault) {
       await this.paymentMethodModel.updateMany(
@@ -127,59 +112,48 @@ export class SubscriptionPaymentsService {
         { $set: { isDefault: false } },
       );
     }
-
     Object.assign(paymentMethod, dto);
     return paymentMethod.save();
   }
-
   // Delete payment method
   async deletePaymentMethod(id: string) {
     const paymentMethod = await this.paymentMethodModel.findById(id);
     if (!paymentMethod) {
       throw new NotFoundException('Payment method not found');
     }
-
     await this.paymentMethodModel.findByIdAndDelete(id);
     return { message: 'Payment method deleted successfully' };
   }
-
   // Toggle payment method status
   async togglePaymentMethodStatus(id: string) {
     const paymentMethod = await this.paymentMethodModel.findById(id);
     if (!paymentMethod) {
       throw new NotFoundException('Payment method not found');
     }
-
     paymentMethod.isActive = !paymentMethod.isActive;
     return paymentMethod.save();
   }
-
   // Initialize payment based on gateway
   async initializePayment(dto: CreateSubscriptionPaymentDto) {
     const { companyId, planName, paymentGateway, paymentDetails } = dto;
-
     // Get company
     const company = await this.companyModel.findById(companyId);
     if (!company) {
       throw new NotFoundException('Company not found');
     }
-
     // Get plan
     const plan = await this.subscriptionPlansService.findByName(planName);
     if (!plan) {
       throw new NotFoundException('Subscription plan not found');
     }
-
     // Get payment method config
     const paymentMethod = await this.paymentMethodModel.findOne({
       gateway: paymentGateway,
       isActive: true,
     });
-
     if (!paymentMethod) {
       throw new NotFoundException('Payment method not available');
     }
-
     // Route to appropriate gateway
     switch (paymentGateway) {
       case PaymentGateway.STRIPE:
@@ -196,13 +170,11 @@ export class SubscriptionPaymentsService {
         throw new BadRequestException(`Payment gateway ${paymentGateway} not implemented`);
     }
   }
-
   // Stripe payment initialization
   private async initializeStripePayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument) {
     if (!this.stripe) {
       throw new BadRequestException('Stripe is not configured');
     }
-
     // Create or get Stripe customer
     let customerId = company.stripeCustomerId;
     if (!customerId) {
@@ -216,7 +188,6 @@ export class SubscriptionPaymentsService {
         stripeCustomerId: customerId,
       });
     }
-
     // Create checkout session
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
@@ -245,7 +216,6 @@ export class SubscriptionPaymentsService {
         planName: plan.name,
       },
     });
-
     return {
       gateway: PaymentGateway.STRIPE,
       sessionId: session.id,
@@ -253,23 +223,19 @@ export class SubscriptionPaymentsService {
       clientSecret: null,
     };
   }
-
   // PayPal payment initialization
   private async initializePayPalPayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument) {
     const paypalClientId = paymentMethod.config?.clientId || this.configService.get('paypal.clientId');
     const paypalSecret = paymentMethod.config?.secret || this.configService.get('paypal.secret');
     const paypalMode = paymentMethod.config?.mode || this.configService.get('paypal.mode') || 'sandbox';
-
     if (!paypalClientId || !paypalSecret) {
       throw new BadRequestException('PayPal is not configured. Please provide client ID and secret in payment method config or environment variables.');
     }
-
     // PayPal subscription creation using REST API
     // Note: This requires PayPal REST API v2 for subscriptions
     const baseUrl = paypalMode === 'live' 
       ? 'https://api-m.paypal.com' 
       : 'https://api-m.sandbox.paypal.com';
-
     // Get PayPal access token
     const tokenResponse = await fetch(`${baseUrl}/v1/oauth2/token`, {
       method: 'POST',
@@ -281,14 +247,11 @@ export class SubscriptionPaymentsService {
       },
       body: 'grant_type=client_credentials',
     });
-
     if (!tokenResponse.ok) {
       throw new BadRequestException('Failed to authenticate with PayPal');
     }
-
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
-
     // Create PayPal product
     const productResponse = await fetch(`${baseUrl}/v1/catalogs/products`, {
       method: 'POST',
@@ -304,7 +267,6 @@ export class SubscriptionPaymentsService {
         category: 'SOFTWARE',
       }),
     });
-
     let productId: string;
     if (productResponse.ok) {
       const productData = await productResponse.json();
@@ -313,12 +275,10 @@ export class SubscriptionPaymentsService {
       // Use a default product ID or create one
       productId = 'PROD-' + company._id.toString().slice(-8);
     }
-
     // Create PayPal billing plan
     const billingCycle = plan.billingCycle || 'monthly';
     const intervalUnit = billingCycle === 'yearly' ? 'YEAR' : 'MONTH';
     const intervalCount = billingCycle === 'yearly' ? 1 : 1;
-
     const planResponse = await fetch(`${baseUrl}/v1/billing/plans`, {
       method: 'POST',
       headers: {
@@ -359,15 +319,12 @@ export class SubscriptionPaymentsService {
         },
       }),
     });
-
     if (!planResponse.ok) {
       const errorData = await planResponse.json();
       throw new BadRequestException(`Failed to create PayPal plan: ${errorData.message || 'Unknown error'}`);
     }
-
     const planData = await planResponse.json();
     const paypalPlanId = planData.id;
-
     // Create subscription
     const subscriptionResponse = await fetch(`${baseUrl}/v1/billing/subscriptions`, {
       method: 'POST',
@@ -400,15 +357,12 @@ export class SubscriptionPaymentsService {
         },
       }),
     });
-
     if (!subscriptionResponse.ok) {
       const errorData = await subscriptionResponse.json();
       throw new BadRequestException(`Failed to create PayPal subscription: ${errorData.message || 'Unknown error'}`);
     }
-
     const subscriptionData = await subscriptionResponse.json();
     const approvalUrl = subscriptionData.links?.find((link: any) => link.rel === 'approve')?.href;
-
     return {
       gateway: PaymentGateway.PAYPAL,
       sessionId: subscriptionData.id,
@@ -417,7 +371,6 @@ export class SubscriptionPaymentsService {
       subscriptionId: subscriptionData.id,
     };
   }
-
   // Google Pay payment initialization
   private async initializeGooglePayPayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument) {
     // Google Pay can work through Stripe (recommended) or directly
@@ -425,7 +378,6 @@ export class SubscriptionPaymentsService {
     if (!this.stripe) {
       throw new BadRequestException('Stripe is not configured. Google Pay requires Stripe integration.');
     }
-
     // Create or get Stripe customer
     let customerId = company.stripeCustomerId;
     if (!customerId) {
@@ -439,7 +391,6 @@ export class SubscriptionPaymentsService {
         stripeCustomerId: customerId,
       });
     }
-
     // Create checkout session with Google Pay enabled
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
@@ -475,7 +426,6 @@ export class SubscriptionPaymentsService {
         },
       },
     });
-
     return {
       gateway: PaymentGateway.GOOGLE_PAY,
       sessionId: session.id,
@@ -483,7 +433,6 @@ export class SubscriptionPaymentsService {
       clientSecret: null,
     };
   }
-
   // bKash payment initialization
   private async initializeBkashPayment(
     company: CompanyDocument,
@@ -496,11 +445,9 @@ export class SubscriptionPaymentsService {
     const username = paymentMethod.config?.username || this.configService.get('bkash.username');
     const password = paymentMethod.config?.password || this.configService.get('bkash.password');
     const isSandbox = paymentMethod.config?.isSandbox !== false; // Default to sandbox
-
     // Generate unique payment reference
     const paymentReference = `SUB-${company._id.toString().slice(-6)}-${Date.now()}`;
     const amount = plan.price.toString();
-
     // If bKash credentials are not configured, return manual payment flow
     if (!appKey || !appSecret || !username || !password) {
       return {
@@ -519,12 +466,10 @@ export class SubscriptionPaymentsService {
         paymentReference,
       };
     }
-
     // bKash API integration
     const baseUrl = isSandbox
       ? 'https://tokenized.sandbox.bka.sh/v1.2.0-beta'
       : 'https://tokenized.pay.bka.sh/v1.2.0-beta';
-
     try {
       // Step 1: Get bKash token
       const tokenResponse = await fetch(`${baseUrl}/tokenized/checkout/token/grant`, {
@@ -540,14 +485,11 @@ export class SubscriptionPaymentsService {
           app_secret: appSecret,
         }),
       });
-
       if (!tokenResponse.ok) {
         throw new Error('Failed to get bKash token');
       }
-
       const tokenData = await tokenResponse.json();
       const idToken = tokenData.id_token;
-
       // Step 2: Create payment
       const paymentResponse = await fetch(`${baseUrl}/tokenized/checkout/payment/create`, {
         method: 'POST',
@@ -567,16 +509,13 @@ export class SubscriptionPaymentsService {
           merchantInvoiceNumber: paymentReference,
         }),
       });
-
       if (!paymentResponse.ok) {
         const errorData = await paymentResponse.json();
         throw new Error(`bKash payment creation failed: ${errorData.errorMessage || 'Unknown error'}`);
       }
-
       const paymentData = await paymentResponse.json();
       const paymentId = paymentData.paymentID;
       const bkashUrl = paymentData.bkashURL;
-
       return {
         gateway: PaymentGateway.BKASH,
         sessionId: paymentId,
@@ -605,7 +544,6 @@ export class SubscriptionPaymentsService {
       };
     }
   }
-
   // Nagad payment initialization
   private async initializeNagadPayment(
     company: CompanyDocument,
@@ -617,11 +555,9 @@ export class SubscriptionPaymentsService {
     const publicKey = paymentMethod.config?.publicKey || this.configService.get('nagad.publicKey');
     const privateKey = paymentMethod.config?.privateKey || this.configService.get('nagad.privateKey');
     const isSandbox = paymentMethod.config?.isSandbox !== false; // Default to sandbox
-
     // Generate unique payment reference
     const paymentReference = `SUB-${company._id.toString().slice(-6)}-${Date.now()}`;
     const amount = plan.price.toString();
-
     // If Nagad credentials are not configured, return manual payment flow
     if (!merchantId || !publicKey || !privateKey) {
       return {
@@ -640,12 +576,10 @@ export class SubscriptionPaymentsService {
         paymentReference,
       };
     }
-
     // Nagad API integration
     const baseUrl = isSandbox
       ? 'https://sandbox.mynagad.com:10080/remote-payment-gateway-1.0/api/dfs'
       : 'https://api.mynagad.com/api/dfs';
-
     try {
       // Step 1: Initialize payment
       const initResponse = await fetch(`${baseUrl}/check-out/initialize/${merchantId}/${paymentReference}`, {
@@ -663,17 +597,13 @@ export class SubscriptionPaymentsService {
           challenge: paymentReference,
         }),
       });
-
       if (!initResponse.ok) {
         throw new Error('Failed to initialize Nagad payment');
       }
-
       const initData = await initResponse.json();
-
       // Step 2: Complete payment (this would typically be done after user confirms)
       // For now, we return the payment URL for user to complete
       const paymentUrl = `${baseUrl}/check-out/complete/${merchantId}/${paymentReference}`;
-
       return {
         gateway: PaymentGateway.NAGAD,
         sessionId: paymentReference,
@@ -704,33 +634,26 @@ export class SubscriptionPaymentsService {
       };
     }
   }
-
   // Manual activation by super admin
   async manualActivation(dto: ManualActivationDto) {
     const { companyId, planName, billingCycle, notes } = dto;
-
     const company = await this.companyModel.findById(companyId);
     if (!company) {
       throw new NotFoundException('Company not found');
     }
-
     const plan = await this.subscriptionPlansService.findByName(planName);
     if (!plan) {
       throw new NotFoundException('Subscription plan not found');
     }
-
     const now = new Date();
     const cycle = billingCycle || 'monthly';
     let periodDays = 30;
-
     if (cycle === 'quarterly') {
       periodDays = 90;
     } else if (cycle === 'yearly') {
       periodDays = 365;
     }
-
     const subscriptionEndDate = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
-
     // Update company subscription
     await this.companyModel.findByIdAndUpdate(companyId, {
       $set: {
@@ -748,7 +671,6 @@ export class SubscriptionPaymentsService {
         trialEndDate: '',
       },
     });
-
     return {
       success: true,
       message: 'Subscription activated successfully',
@@ -762,7 +684,6 @@ export class SubscriptionPaymentsService {
       notes,
     };
   }
-
   // Verify payment (for manual payment methods)
   async verifyPayment(paymentId: string, transactionId: string) {
     // TODO: Implement payment verification
@@ -773,13 +694,11 @@ export class SubscriptionPaymentsService {
       transactionId,
     };
   }
-
   // PayPal webhook handler
   async handlePayPalWebhook(body: any, headers: any) {
     // Verify webhook signature (implement proper verification)
     const eventType = body.event_type;
     const resource = body.resource;
-
     // Handle different PayPal webhook events
     switch (eventType) {
       case 'BILLING.SUBSCRIPTION.CREATED':
@@ -789,31 +708,24 @@ export class SubscriptionPaymentsService {
           // Find company by subscription ID and activate
           // This would require storing PayPal subscription ID in company model
           // For now, log the event
-          console.log('PayPal subscription activated:', resource.id);
-        }
+          }
         break;
       case 'BILLING.SUBSCRIPTION.CANCELLED':
       case 'BILLING.SUBSCRIPTION.EXPIRED':
         // Subscription cancelled - update company subscription
-        console.log('PayPal subscription cancelled:', resource.id);
         break;
       case 'PAYMENT.SALE.COMPLETED':
         // Payment completed
-        console.log('PayPal payment completed:', resource.id);
         break;
     }
-
     return { received: true };
   }
-
   // bKash callback handler
   async handleBkashCallback(body: any, query: any) {
     const { paymentID, status, transactionStatus } = body || query;
-
     if (!paymentID) {
       throw new BadRequestException('Payment ID is required');
     }
-
     // Verify payment status with bKash
     // This would require calling bKash API to verify the transaction
     // For now, return the status
@@ -823,15 +735,12 @@ export class SubscriptionPaymentsService {
       verified: status === 'success' || transactionStatus === 'Completed',
     };
   }
-
   // Nagad callback handler
   async handleNagadCallback(body: any, query: any) {
     const { paymentReferenceId, status, transactionStatus } = body || query;
-
     if (!paymentReferenceId) {
       throw new BadRequestException('Payment reference ID is required');
     }
-
     // Verify payment status with Nagad
     // This would require calling Nagad API to verify the transaction
     // For now, return the status
@@ -841,5 +750,4 @@ export class SubscriptionPaymentsService {
       verified: status === 'success' || transactionStatus === 'Completed',
     };
   }
-}
-
+}

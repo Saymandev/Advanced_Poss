@@ -9,7 +9,6 @@ import { MenuItemsService } from '../menu-items/menu-items.service';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { PurchaseOrder, PurchaseOrderDocument } from '../purchase-orders/schemas/purchase-order.schema';
 import { WastageService } from '../wastage/wastage.service';
-
 @Injectable()
 export class ReportsService {
   constructor(
@@ -24,7 +23,6 @@ export class ReportsService {
     private ingredientsService: IngredientsService,
     private wastageService: WastageService,
   ) {}
-
   /**
    * Financial summary that combines sales (POS orders), expenses, and purchase orders.
    * Defaults to current month if no range is provided.
@@ -38,15 +36,12 @@ export class ReportsService {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
     // Parse date range with safe defaults
     const startDate = startDateInput ? new Date(startDateInput) : startOfMonth;
     const endDate = endDateInput ? new Date(endDateInput) : endOfMonth;
-
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       throw new Error('Invalid date range');
     }
-
     // Build common filters
     const salesFilter: any = {
       createdAt: { $gte: startDate, $lte: endDate },
@@ -55,26 +50,22 @@ export class ReportsService {
     if (branchId) {
       salesFilter.branchId = new Types.ObjectId(branchId);
     }
-
     const expenseFilter: any = {
       date: { $gte: startDate, $lte: endDate },
     };
     if (branchId) expenseFilter.branchId = new Types.ObjectId(branchId);
     if (companyId) expenseFilter.companyId = new Types.ObjectId(companyId);
-
     const purchaseFilter: any = {
       orderDate: { $gte: startDate, $lte: endDate },
     };
     if (branchId) purchaseFilter.branchId = new Types.ObjectId(branchId);
     if (companyId) purchaseFilter.companyId = new Types.ObjectId(companyId);
-
     // Run queries in parallel
     const [salesOrders, expenses, purchases] = await Promise.all([
       this.posOrderModel.find(salesFilter).lean().exec(),
       this.expenseModel.find(expenseFilter).lean().exec(),
       this.purchaseOrderModel.find(purchaseFilter).lean().exec(),
     ]);
-
     // Sales aggregates
     const salesTotal = salesOrders.reduce((sum, o: any) => sum + (o.totalAmount || 0), 0);
     const salesByPayment = salesOrders.reduce((acc: any, o: any) => {
@@ -87,7 +78,6 @@ export class ReportsService {
       acc[key] = (acc[key] || 0) + (o.totalAmount || 0);
       return acc;
     }, {});
-
     // Expense aggregates (paid vs unpaid)
     const expenseTotals = expenses.reduce(
       (acc: any, e: any) => {
@@ -107,7 +97,6 @@ export class ReportsService {
       acc[key] = (acc[key] || 0) + (e.amount || 0);
       return acc;
     }, {});
-
     // Purchase aggregates (received as paid)
     const purchaseTotals = purchases.reduce(
       (acc: any, p: any) => {
@@ -129,7 +118,6 @@ export class ReportsService {
       acc[key] = (acc[key] || 0) + (p.totalAmount || 0);
       return acc;
     }, {});
-
     // Build merged daily series (sales vs expenses vs purchases)
     const allDates = new Set<string>([
       ...Object.keys(salesDaily),
@@ -145,9 +133,7 @@ export class ReportsService {
         purchases: purchaseDaily[date] || 0,
         net: (salesDaily[date] || 0) - (expenseDaily[date] || 0) - (purchaseDaily[date] || 0),
       }));
-
     const netProfit = salesTotal - expenseTotals.paid - purchaseTotals.received;
-
     return {
       period: {
         startDate,
@@ -164,7 +150,6 @@ export class ReportsService {
       timeline,
     };
   }
-
   async getSalesSummary(
     branchId: string,
     startDate: Date,
@@ -175,13 +160,11 @@ export class ReportsService {
       status: 'paid',
       createdAt: { $gte: startDate, $lte: endDate },
     });
-
     const totalOrders = orders.length;
     const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const totalTax = 0; // POSOrder doesn't have separate tax field
     const totalDiscount = 0; // POSOrder doesn't have separate discount field
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
     // Group by date
     const dailySales = orders.reduce((acc, order: any) => {
       const date = (order.createdAt || new Date()).toISOString().split('T')[0];
@@ -192,7 +175,6 @@ export class ReportsService {
       acc[date].revenue += (order.totalAmount || 0);
       return acc;
     }, {});
-
     // Group by hour
     const hourlySales = orders.reduce((acc, order: any) => {
       const hour = (order.createdAt || new Date()).getHours();
@@ -203,7 +185,6 @@ export class ReportsService {
       acc[hour].revenue += (order.totalAmount || 0);
       return acc;
     }, {});
-
     return {
       summary: {
         totalOrders,
@@ -224,7 +205,6 @@ export class ReportsService {
       },
     };
   }
-
   async getOrdersAnalytics(
     branchId: string,
     startDate: Date,
@@ -234,16 +214,13 @@ export class ReportsService {
       branchId: new Types.ObjectId(branchId),
       createdAt: { $gte: startDate, $lte: endDate },
     });
-
     const paid = orders.filter((o) => o.status === 'paid');
     const cancelled = orders.filter((o) => o.status === 'cancelled');
     const pending = orders.filter((o) => o.status === 'pending');
-
     // By type
     const dineIn = paid.filter((o) => o.orderType === 'dine-in');
     const takeaway = paid.filter((o) => o.orderType === 'takeaway');
     const delivery = paid.filter((o) => o.orderType === 'delivery');
-
     // By payment method - POS orders have paymentMethod field
     const paymentMethods = {};
     paid.forEach((order) => {
@@ -254,7 +231,6 @@ export class ReportsService {
       paymentMethods[method].count += 1;
       paymentMethods[method].amount += (order.totalAmount || 0);
     });
-
     return {
       total: orders.length,
       completed: paid.length,
@@ -279,8 +255,6 @@ export class ReportsService {
       paymentMethods,
     };
   }
-
-
   async getCategoryPerformance(
     branchId: string,
     startDate: Date,
@@ -293,15 +267,12 @@ export class ReportsService {
         createdAt: { $gte: startDate, $lte: endDate },
       })
       .populate('items.menuItemId', 'name categoryId');
-
     const categoryStats = {};
-
     orders.forEach((order) => {
       if (order.items && Array.isArray(order.items)) {
         order.items.forEach((item: any) => {
           const categoryId = item.menuItemId?.categoryId?.toString();
           if (!categoryId) return;
-
           if (!categoryStats[categoryId]) {
             categoryStats[categoryId] = {
               categoryId,
@@ -316,30 +287,25 @@ export class ReportsService {
         });
       }
     });
-
     // Convert Set to count
     const result = Object.values(categoryStats).map((stat: any) => ({
       ...stat,
       orders: stat.orders.size,
     }));
-
     return result.sort((a: any, b: any) => b.revenue - a.revenue);
   }
-
   async getCustomerAnalytics(
     companyId: string,
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
     const stats = await this.customersService.getStats(companyId);
-
     // POSOrder doesn't have companyId, need to filter by branchId through company
     // For now, get all orders with customerInfo
     const orders = await this.posOrderModel.find({
       customerInfo: { $exists: true, $ne: null },
       createdAt: { $gte: startDate, $lte: endDate },
     });
-
     // Customer retention - use customerInfo.phone or customerInfo.email as identifier
     const uniqueCustomers = new Set(
       orders
@@ -347,21 +313,17 @@ export class ReportsService {
         .filter(Boolean)
     );
     const repeatCustomers = {};
-
     orders.forEach((order) => {
       const customerId = order.customerInfo?.phone || order.customerInfo?.email;
       if (!customerId) return;
-
       if (!repeatCustomers[customerId]) {
         repeatCustomers[customerId] = 0;
       }
       repeatCustomers[customerId] += 1;
     });
-
     const repeatCount = Object.values(repeatCustomers).filter(
       (count: any) => count > 1,
     ).length;
-
     return {
       ...stats,
       period: {
@@ -373,7 +335,6 @@ export class ReportsService {
       },
     };
   }
-
   async getRevenueBreakdown(
     branchId: string,
     startDate: Date,
@@ -384,7 +345,6 @@ export class ReportsService {
       status: 'paid',
       createdAt: { $gte: startDate, $lte: endDate },
     });
-
     const breakdown = {
       subtotal: 0,
       tax: 0,
@@ -394,7 +354,6 @@ export class ReportsService {
       total: 0,
       netRevenue: 0,
     };
-
     orders.forEach((order) => {
       breakdown.subtotal += (order.totalAmount || 0);
       breakdown.tax += 0; // POSOrder doesn't have separate tax field
@@ -403,12 +362,9 @@ export class ReportsService {
       breakdown.discount += 0; // POSOrder doesn't have separate discount field
       breakdown.total += (order.totalAmount || 0);
     });
-
     breakdown.netRevenue = breakdown.total - breakdown.tax;
-
     return breakdown;
   }
-
   async getPeakHours(
     branchId: string,
     startDate: Date,
@@ -419,23 +375,19 @@ export class ReportsService {
       status: 'paid',
       createdAt: { $gte: startDate, $lte: endDate },
     });
-
     const hourlyData = Array.from({ length: 24 }, (_, i) => ({
       hour: i,
       orders: 0,
       revenue: 0,
     }));
-
     orders.forEach((order: any) => {
       const hour = (order.createdAt || new Date()).getHours();
       hourlyData[hour].orders += 1;
       hourlyData[hour].revenue += (order.totalAmount || 0);
     });
-
     // Find peak hours
     const sorted = [...hourlyData].sort((a, b) => b.orders - a.orders);
     const peakHours = sorted.slice(0, 3);
-
     return {
       hourlyData,
       peakHours,
@@ -443,14 +395,12 @@ export class ReportsService {
       quietestHour: sorted[sorted.length - 1],
     };
   }
-
   async getInventoryReport(companyId: string): Promise<any> {
     const stats = await this.ingredientsService.getStats(companyId);
     const valuation = await this.ingredientsService.getValuation(companyId);
     const lowStock = await this.ingredientsService.findLowStock(companyId);
     const outOfStock = await this.ingredientsService.findOutOfStock(companyId);
     const needReorder = await this.ingredientsService.findNeedReorder(companyId);
-
     return {
       stats,
       valuation: {
@@ -481,7 +431,6 @@ export class ReportsService {
       },
     };
   }
-
   async getDashboardStats(
     branchId?: string,
     companyId?: string,
@@ -490,12 +439,9 @@ export class ReportsService {
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
     const thisWeekStart = new Date(today);
     thisWeekStart.setDate(today.getDate() - today.getDay());
-
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
     // Today's stats
     const todayFilter: any = {
       createdAt: { $gte: today, $lt: tomorrow },
@@ -504,10 +450,8 @@ export class ReportsService {
       todayFilter.branchId = new Types.ObjectId(branchId);
     }
     const todayOrders = await this.posOrderModel.find(todayFilter);
-
     const todayPaid = todayOrders.filter((o) => o.status === 'paid');
     const todayRevenue = todayPaid.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-
     // This week
     const weekFilter: any = {
       createdAt: { $gte: thisWeekStart },
@@ -517,9 +461,7 @@ export class ReportsService {
       weekFilter.branchId = new Types.ObjectId(branchId);
     }
     const weekOrders = await this.posOrderModel.find(weekFilter);
-
     const weekRevenue = weekOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-
     // This month
     const monthFilter: any = {
       createdAt: { $gte: thisMonthStart },
@@ -529,9 +471,7 @@ export class ReportsService {
       monthFilter.branchId = new Types.ObjectId(branchId);
     }
     const monthOrders = await this.posOrderModel.find(monthFilter);
-
     const monthRevenue = monthOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-
     // Active orders
     const activeFilter: any = {
       status: { $nin: ['paid', 'cancelled'] },
@@ -540,14 +480,11 @@ export class ReportsService {
       activeFilter.branchId = new Types.ObjectId(branchId);
     }
     const activeOrders = await this.posOrderModel.countDocuments(activeFilter);
-
     // Customer stats
     const customerStats = companyId ? await this.customersService.getStats(companyId) : { total: 0, active: 0, vip: 0 };
-
     // Inventory alerts
     const lowStock = companyId ? await this.ingredientsService.findLowStock(companyId) : [];
     const outOfStock = companyId ? await this.ingredientsService.findOutOfStock(companyId) : [];
-
     return {
       today: {
         orders: todayOrders.length,
@@ -579,7 +516,6 @@ export class ReportsService {
       timestamp: new Date(),
     };
   }
-
   async getComparisonReport(
     branchId: string,
     currentStart: Date,
@@ -592,28 +528,23 @@ export class ReportsService {
       status: 'paid',
       createdAt: { $gte: currentStart, $lte: currentEnd },
     });
-
     const previousOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
       status: 'paid',
       createdAt: { $gte: previousStart, $lte: previousEnd },
     });
-
     const currentRevenue = currentOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const previousRevenue = previousOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-
     const revenueChange =
       previousRevenue > 0
         ? ((currentRevenue - previousRevenue) / previousRevenue) * 100
         : 0;
-
     const ordersChange =
       previousOrders.length > 0
         ? ((currentOrders.length - previousOrders.length) /
             previousOrders.length) *
           100
         : 0;
-
     return {
       current: {
         orders: currentOrders.length,
@@ -637,35 +568,22 @@ export class ReportsService {
       },
     };
   }
-
   async getSalesAnalytics(period: string = 'week', branchId?: string, customStartDate?: Date, customEndDate?: Date): Promise<any> {
     const now = new Date();
     let startDate: Date;
     let endDate = new Date(now);
-
     // Use custom dates if provided, otherwise calculate from period
     if (customStartDate && customEndDate) {
       // Parse dates - extract UTC date components to preserve the intended date
       const start = new Date(customStartDate);
       const end = new Date(customEndDate);
-      
       // Use UTC date components from the ISO string to get the correct date
       // This ensures that if frontend sends "2025-12-08T00:00:00.000Z", we get "2025-12-08"
       const startDateStr = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}-${String(start.getUTCDate()).padStart(2, '0')}`;
       const endDateStr = `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, '0')}-${String(end.getUTCDate()).padStart(2, '0')}`;
-      
       // Create dates in UTC - start at 00:00:00, end at 23:59:59.999
       startDate = new Date(startDateStr + 'T00:00:00.000Z');
       endDate = new Date(endDateStr + 'T23:59:59.999Z');
-      
-      console.log('📅 Using custom dates:', {
-        originalStart: customStartDate,
-        originalEnd: customEndDate,
-        startDateStr,
-        endDateStr,
-        parsedStart: startDate.toISOString(),
-        parsedEnd: endDate.toISOString(),
-      });
     } else {
       switch (period) {
         case 'day':
@@ -696,7 +614,6 @@ export class ReportsService {
           endDate.setHours(23, 59, 59, 999);
       }
     }
-
     // Include orders that are paid OR have a paymentId (indicating payment was processed)
     const filter: any = {
       $or: [
@@ -708,37 +625,12 @@ export class ReportsService {
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
-
-    // Debug logging
-    console.log('🔍 Reports Filter:', {
-      period,
-      branchId,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      filter,
-    });
-
     const orders = await this.posOrderModel.find(filter);
-    
-    // Debug logging
-    console.log('📊 Orders Found:', {
-      count: orders.length,
-      sampleOrder: orders.length > 0 ? {
-        orderNumber: orders[0].orderNumber,
-        status: orders[0].status,
-        totalAmount: orders[0].totalAmount,
-        createdAt: (orders[0] as any).createdAt,
-        branchId: orders[0].branchId,
-      } : null,
-    });
-
     // Also check total orders without status filter for debugging
     const allOrdersCount = await this.posOrderModel.countDocuments({
       branchId: branchId ? new Types.ObjectId(branchId) : undefined,
       createdAt: { $gte: startDate, $lte: endDate },
     });
-    console.log('📊 All Orders (any status) in date range:', allOrdersCount);
-    
     // Check orders by status
     const ordersByStatus = await this.posOrderModel.aggregate([
       {
@@ -754,8 +646,6 @@ export class ReportsService {
         },
       },
     ]);
-    console.log('📊 Orders by Status:', ordersByStatus);
-
     // Group by date
     const dailyData = {};
     const currentDate = new Date(startDate);
@@ -769,7 +659,6 @@ export class ReportsService {
       };
       currentDate.setDate(currentDate.getDate() + 1);
     }
-
     orders.forEach((order: any) => {
       const orderDate = order.createdAt || new Date();
       // Use UTC date to match the dateKey format (YYYY-MM-DD)
@@ -779,33 +668,16 @@ export class ReportsService {
         dailyData[dateKey].orders += 1;
       } else {
         // Log if date key doesn't match (helps debug timezone issues)
-        console.log('⚠️ Order date not in dailyData range:', {
-          orderNumber: order.orderNumber,
-          orderDate: orderDate,
-          dateKey,
-          orderTotal: order.totalAmount,
-          availableDateKeys: Object.keys(dailyData).slice(0, 10),
-        });
       }
     });
-
     // Calculate average order value
     Object.values(dailyData).forEach((day: any) => {
       day.averageOrderValue = day.orders > 0 ? day.revenue / day.orders : 0;
     });
-
     const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const totalOrders = orders.length;
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    
-    console.log('📊 Summary Calculation:', {
-      totalRevenue,
-      totalOrders,
-      averageOrderValue,
-      dailyDataEntries: Object.keys(dailyData).length,
-      dailyDataWithOrders: Object.values(dailyData).filter((d: any) => d.orders > 0).length,
-    });
-
+    const dailyDataWithOrders = Object.values(dailyData).filter((d: any) => d.orders > 0).length;
     return {
       period,
       data: Object.values(dailyData),
@@ -816,12 +688,10 @@ export class ReportsService {
       },
     };
   }
-
   async getTopSellingItems(limit: number = 10, branchId?: string): Promise<any> {
     const now = new Date();
     const startDate = new Date(now);
     startDate.setDate(now.getDate() - 30); // Last 30 days
-
     const filter: any = {
       status: 'paid',
       createdAt: { $gte: startDate },
@@ -829,7 +699,6 @@ export class ReportsService {
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
-
     // Use aggregation pipeline to properly join with menu items
     const pipeline: any[] = [
       { $match: filter },
@@ -863,9 +732,7 @@ export class ReportsService {
         },
       },
     ];
-
     const topItems = await this.posOrderModel.aggregate(pipeline);
-
     // Transform to match expected format
     return topItems.map((item: any) => ({
       menuItemId: item.menuItemId,
@@ -875,23 +742,19 @@ export class ReportsService {
       orders: item.orders || 0,
     }));
   }
-
   async getRevenueByCategory(branchId?: string, customStartDate?: Date, customEndDate?: Date): Promise<any> {
     const now = new Date();
     let startDate: Date;
     let endDate = new Date(now);
     endDate.setHours(23, 59, 59, 999);
-
     // Use custom dates if provided, otherwise default to last 30 days
     if (customStartDate && customEndDate) {
       // Parse dates - extract UTC date components to preserve the intended date
       const start = new Date(customStartDate);
       const end = new Date(customEndDate);
-      
       // Use UTC date components to get the correct date from the ISO string
       const startDateStr = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}-${String(start.getUTCDate()).padStart(2, '0')}`;
       const endDateStr = `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, '0')}-${String(end.getUTCDate()).padStart(2, '0')}`;
-      
       // Create dates in UTC - start at 00:00:00, end at 23:59:59.999
       startDate = new Date(startDateStr + 'T00:00:00.000Z');
       endDate = new Date(endDateStr + 'T23:59:59.999Z');
@@ -901,7 +764,6 @@ export class ReportsService {
       startDate.setDate(now.getDate() - 30);
       startDate.setHours(0, 0, 0, 0);
     }
-
     // Include orders that are paid OR have a paymentId (indicating payment was processed)
     const filter: any = {
       $or: [
@@ -913,14 +775,6 @@ export class ReportsService {
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
-
-    console.log('📊 getRevenueByCategory - Filter:', {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      branchId,
-      filter,
-    });
-
     // Use aggregation to properly populate nested categoryId
     const orders = await this.posOrderModel.aggregate([
       { $match: filter },
@@ -960,7 +814,6 @@ export class ReportsService {
         },
       },
     ]);
-
     // Transform back to order-like structure for compatibility
     const transformedOrders = orders.map((order: any) => ({
       _id: order._id,
@@ -978,31 +831,15 @@ export class ReportsService {
         price: item.price,
       })),
     }));
-
-    console.log('📊 getRevenueByCategory - Orders Found:', {
-      count: transformedOrders.length,
-      sampleOrder: transformedOrders[0] ? {
-        orderNumber: transformedOrders[0].orderNumber,
-        itemsCount: transformedOrders[0].items?.length,
-        firstItem: transformedOrders[0].items?.[0] ? {
-          menuItemId: transformedOrders[0].items[0].menuItemId?._id,
-          categoryId: transformedOrders[0].items[0].menuItemId?.categoryId?._id,
-          categoryName: transformedOrders[0].items[0].menuItemId?.categoryId?.name,
-        } : null,
-      } : null,
-    });
-
     const categoryStats = {};
     let itemsWithoutCategory = 0;
     let itemsWithCategory = 0;
-
     transformedOrders.forEach((order) => {
       if (order.items && Array.isArray(order.items)) {
         order.items.forEach((item: any) => {
           // Try multiple ways to get categoryId
           let categoryId: string | null = null;
           let categoryName = 'Uncategorized';
-          
           // Check if menuItemId is populated
           if (item.menuItemId) {
             // Try different paths for categoryId
@@ -1017,7 +854,6 @@ export class ReportsService {
               }
             }
           }
-          
           // If still no categoryId, use 'Uncategorized' as a fallback
           if (!categoryId) {
             categoryId = 'uncategorized';
@@ -1025,7 +861,6 @@ export class ReportsService {
           } else {
             itemsWithCategory++;
           }
-
           if (!categoryStats[categoryId]) {
             categoryStats[categoryId] = {
               categoryId,
@@ -1044,26 +879,12 @@ export class ReportsService {
         });
       }
     });
-
-    console.log('📊 getRevenueByCategory - Category Stats:', {
-      itemsWithCategory,
-      itemsWithoutCategory,
-      categoryCount: Object.keys(categoryStats).length,
-      categories: Object.keys(categoryStats).map(key => ({
-        categoryId: categoryStats[key].categoryId,
-        category: categoryStats[key].category,
-        revenue: categoryStats[key].revenue,
-      })),
-    });
-
     // Convert Set to count and calculate percentages
     const result = Object.values(categoryStats).map((stat: any) => ({
       ...stat,
       orders: stat.orders.size,
     }));
-
     const totalRevenue = result.reduce((sum: number, stat: any) => sum + stat.revenue, 0);
-
     const finalResult = result
       .map((stat: any) => ({
         categoryId: stat.categoryId,
@@ -1073,20 +894,8 @@ export class ReportsService {
         percentage: totalRevenue > 0 ? (stat.revenue / totalRevenue) * 100 : 0,
       }))
       .sort((a: any, b: any) => b.revenue - a.revenue);
-
-    console.log('📊 getRevenueByCategory - Final Result:', {
-      totalRevenue,
-      categoryCount: finalResult.length,
-      categories: finalResult.map((cat: any) => ({
-        category: cat.category,
-        revenue: cat.revenue,
-        percentage: cat.percentage,
-      })),
-    });
-
     return finalResult;
   }
-
   async getWastageReport(
     branchId?: string,
     companyId?: string,
@@ -1099,9 +908,7 @@ export class ReportsService {
       startDate,
       endDate,
     );
-
     const totalCost = stats.summary.totalCost || 0;
-
     return {
       summary: {
         totalWastageCount: stats.summary.totalWastageCount || 0,
@@ -1134,25 +941,20 @@ export class ReportsService {
       })),
     };
   }
-
   async getLowStockItems(companyId?: string): Promise<any> {
     if (!companyId) return [];
     return this.ingredientsService.findLowStock(companyId);
   }
-
   async getDueSettlements(branchId?: string, companyId?: string): Promise<any> {
     const filter: any = {
       status: 'pending', // Orders that are completed but payment is pending
     };
-
     if (branchId) {
       filter.branchId = new Types.ObjectId(branchId);
     }
-
     // If companyId is provided, we need to filter through branches
     // For now, we'll just use branchId if available
     const pendingOrders = await this.posOrderModel.find(filter).sort({ createdAt: -1 });
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayFilter = { ...filter, createdAt: { $gte: today } };
@@ -1160,10 +962,8 @@ export class ReportsService {
       ...todayFilter,
       status: 'paid',
     });
-
     const totalDueAmount = pendingOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const settledTodayAmount = settledToday.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-
     return {
       pendingSettlements: pendingOrders.length,
       totalDueAmount,
@@ -1181,4 +981,3 @@ export class ReportsService {
     };
   }
 }
-

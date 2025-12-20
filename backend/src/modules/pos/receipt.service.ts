@@ -10,7 +10,6 @@ import { PDFGeneratorService } from './pdf-generator.service';
 import { PrinterService, PrintJob } from './printer.service';
 import { POSOrder, POSOrderDocument } from './schemas/pos-order.schema';
 import { POSSettings, POSSettingsDocument } from './schemas/pos-settings.schema';
-
 @Injectable()
 export class ReceiptService {
   constructor(
@@ -23,7 +22,6 @@ export class ReceiptService {
     private branchesService: BranchesService,
     private settingsService: SettingsService,
   ) {}
-
   // Helper function to format currency
   private formatCurrency(amount: number, currency: string = 'BDT'): string {
     try {
@@ -36,7 +34,6 @@ export class ReceiptService {
       return `${currency} ${amount.toFixed(2)}`;
     }
   }
-
   // Generate receipt data
   async generateReceiptData(orderId: string): Promise<any> {
     const order = await this.posOrderModel
@@ -45,27 +42,12 @@ export class ReceiptService {
       .populate('userId', 'name email')
       .populate('paymentId')
       .exec();
-
     if (!order) {
       throw new Error('Order not found');
     }
-
-    // Debug: Log tableId information
-    console.log('🔍 [Receipt] Order tableId debug:', {
-      orderId: orderId,
-      orderType: order.orderType,
-      hasTableId: !!order.tableId,
-      tableIdType: typeof order.tableId,
-      tableIdValue: order.tableId,
-      tableIdKeys: order.tableId && typeof order.tableId === 'object' ? Object.keys(order.tableId) : [],
-      tableNumber: (order.tableId as any)?.tableNumber,
-      number: (order.tableId as any)?.number,
-    });
-
     const settings = await this.posSettingsModel
       .findOne({ branchId: order.branchId })
       .exec();
-
     // Get branch and company to find public URL and logo
     let publicUrl: string | undefined;
     let companyLogo: string | undefined;
@@ -76,7 +58,6 @@ export class ReceiptService {
       if (branch?.publicUrl) {
         publicUrl = branch.publicUrl;
       }
-      
       // Get company for logo and slug
       // branch.companyId might be populated (object) or ObjectId
       let companyIdStr: string | undefined;
@@ -98,7 +79,6 @@ export class ReceiptService {
         } else {
           companyIdStr = branch.companyId.toString();
         }
-        
         // Validate ObjectId format before calling findOne
         if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
           try {
@@ -106,17 +86,6 @@ export class ReceiptService {
             // Get company logo
             if (company?.logo) {
               companyLogo = company.logo;
-              console.log('Company logo found for receipt:', {
-                companyId: companyIdStr,
-                hasLogo: !!company.logo,
-                logoUrl: company.logo?.substring(0, 50) + '...',
-              });
-            } else {
-              console.log('No company logo found:', {
-                companyId: companyIdStr,
-                hasCompany: !!company,
-                companyKeys: company ? Object.keys(company) : [],
-              });
             }
             // Generate public URL - prioritize custom domain, then slug-based
             if (!publicUrl) {
@@ -129,17 +98,14 @@ export class ReceiptService {
                   publicUrl = `${protocol}${company.customDomain}`;
                 }
               } else if (company?.slug) {
-                // Fallback to slug-based URL
+                // Fallback to slug-based URL - use company landing page (not branch)
                 // Prefer FRONTEND_URL, then APP_URL, then localhost as last resort
                 const baseUrl =
                   process.env.FRONTEND_URL ||
                   process.env.APP_URL ||
                   'http://localhost:3000';
+                // Use company landing page URL so customers can select branch
                 publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
-                // If branch has slug, use it too
-                if (branch.slug) {
-                  publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}/${branch.slug}`;
-                }
               }
             }
           } catch (companyError) {
@@ -163,7 +129,6 @@ export class ReceiptService {
       // If we can't get the URL, continue without it
       console.warn('Could not retrieve public URL or logo for receipt:', error);
     }
-
     const safeItems = Array.isArray(order.items)
       ? order.items.map((item: any) => ({
           name: item?.name ?? '',
@@ -172,7 +137,6 @@ export class ReceiptService {
           notes: item?.notes ?? '',
         }))
       : [];
-
     // Get currency from company settings
     let currency = 'BDT'; // Default
     try {
@@ -184,7 +148,6 @@ export class ReceiptService {
         } else {
           companyIdStr = branch.companyId.toString();
         }
-        
         if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
           const companySettings = await this.settingsService.getCompanySettings(companyIdStr);
           currency = companySettings?.currency || 'BDT';
@@ -193,19 +156,15 @@ export class ReceiptService {
     } catch (error) {
       console.warn('Could not retrieve currency from company settings, using default:', error);
     }
-
     // Extract table number - prioritize stored tableNumber (works even after table release)
     // If tableNumber is stored in order, use it (this persists even after tableId is cleared)
     let tableNumber = 'N/A';
-    
     // First, check if tableNumber is directly stored in the order (for released tables)
     if ((order as any).tableNumber) {
       tableNumber = (order as any).tableNumber;
-      console.log(`✅ [Receipt] Using stored tableNumber from order: ${tableNumber}`);
-    } else if (order.tableId) {
+      } else if (order.tableId) {
       // Fallback: Check if tableId is populated (object with tableNumber) or just an ObjectId
       const tableIdValue = order.tableId as any;
-      
       // If it's a populated object (has tableNumber property), use it directly
       if (tableIdValue && typeof tableIdValue === 'object' && !(tableIdValue instanceof Types.ObjectId) && tableIdValue.tableNumber) {
         tableNumber = tableIdValue.tableNumber || 'N/A';
@@ -227,21 +186,16 @@ export class ReceiptService {
       // For dine-in orders without tableId or tableNumber, log a warning
       console.warn(`⚠️ [Receipt] Dine-in order ${order.orderNumber} has no tableId or tableNumber`);
     }
-
-    console.log('🔍 [Receipt] Final tableNumber:', tableNumber);
-
     // Calculate discount amount
     // The discount can be applied before tax (on subtotal) or after tax (on total)
     // We need to reverse-engineer the discount from the actual total
     const subtotal = this.calculateSubtotal(safeItems);
     const actualTotal = Number(order.totalAmount || 0);
-    
     // Try to find discount - it could be:
     // 1. loyaltyDiscount field on the order
     // 2. Calculated from the difference
     let discountAmount = 0;
     let discountPercentage = 0;
-    
     if ((order as any).loyaltyDiscount && (order as any).loyaltyDiscount > 0) {
       // Use loyalty discount if available
       discountAmount = (order as any).loyaltyDiscount;
@@ -249,28 +203,22 @@ export class ReceiptService {
       // Try to reverse-engineer the discount
       // If discount is applied before tax: subtotal - discount, then tax on (subtotal - discount)
       // If discount is applied after tax: (subtotal + tax) - discount
-      
       // First, try discount on subtotal (before tax)
       const taxRate = settings?.taxRate || 0;
       const serviceChargeRate = settings?.serviceCharge || 0;
-      
       // Calculate what the total would be with different discount scenarios
       // Scenario 1: Discount on subtotal, then tax on discounted amount
       // Let d = discount amount on subtotal
       // (subtotal - d) * (1 + taxRate/100) * (1 + serviceChargeRate/100) = actualTotal
       // Solving for d: d = subtotal - (actualTotal / ((1 + taxRate/100) * (1 + serviceChargeRate/100)))
-      
       const taxMultiplier = 1 + (taxRate / 100);
       const serviceChargeMultiplier = 1 + (serviceChargeRate / 100);
       const totalMultiplier = taxMultiplier * serviceChargeMultiplier;
-      
       const expectedSubtotalAfterDiscount = actualTotal / totalMultiplier;
       const discountOnSubtotal = subtotal - expectedSubtotalAfterDiscount;
-      
       // Scenario 2: Discount on total (after tax)
       const subtotalWithTaxAndService = subtotal * totalMultiplier;
       const discountOnTotal = subtotalWithTaxAndService - actualTotal;
-      
       // Use the discount that makes more sense (positive and reasonable)
       if (discountOnSubtotal > 0 && discountOnSubtotal <= subtotal) {
         discountAmount = Math.round(discountOnSubtotal * 100) / 100;
@@ -280,7 +228,6 @@ export class ReceiptService {
         discountPercentage = subtotalWithTaxAndService > 0 ? Math.round((discountAmount / subtotalWithTaxAndService) * 100 * 100) / 100 : 0;
       }
     }
-    
     // Recalculate tax and service charge based on discounted subtotal (if discount is on subtotal)
     // For now, we'll calculate tax on the original subtotal and show discount separately
     // This matches the payment screen behavior where discount is shown separately
@@ -289,30 +236,15 @@ export class ReceiptService {
       safeItems,
       settings?.serviceCharge || 0,
     );
-    
     // If discount is on subtotal, recalculate tax on discounted amount
     let finalTaxAmount = taxAmount;
     let finalServiceChargeAmount = serviceChargeAmount;
-    
     if (discountAmount > 0 && discountAmount <= subtotal) {
       // Discount is likely on subtotal, recalculate tax on discounted amount
       const discountedSubtotal = subtotal - discountAmount;
       finalTaxAmount = Math.round(discountedSubtotal * (settings?.taxRate || 0) / 100 * 100) / 100;
       finalServiceChargeAmount = Math.round(discountedSubtotal * (settings?.serviceCharge || 0) / 100 * 100) / 100;
     }
-    
-    // Debug logging
-    console.log('🔍 [Receipt] Discount calculation:', {
-      subtotal,
-      discountAmount,
-      discountPercentage,
-      taxAmount: finalTaxAmount,
-      serviceChargeAmount: finalServiceChargeAmount,
-      calculatedTotal: subtotal - discountAmount + finalTaxAmount + finalServiceChargeAmount,
-      actualTotal,
-      loyaltyDiscount: (order as any).loyaltyDiscount,
-    });
-
     const receiptData = {
       orderNumber: order.orderNumber,
       orderId: order._id,
@@ -341,31 +273,18 @@ export class ReceiptService {
         logoUrl: (() => {
           const customLogoUrl = settings?.receiptSettings?.logoUrl;
           const showLogoEnabled = settings?.receiptSettings?.showLogo === true;
-          
           // If custom logo URL exists and is not empty, use it
           if (customLogoUrl && typeof customLogoUrl === 'string' && customLogoUrl.trim() !== '') {
-            console.log('Receipt: Using custom logo URL from POS settings');
             return customLogoUrl.trim();
           }
-          
           // If showLogo is enabled and company logo exists, use company logo
           if (showLogoEnabled && companyLogo) {
-            console.log('Receipt: Using company logo (showLogo enabled)');
             return companyLogo;
           }
-          
           // If showLogo is not explicitly false and company logo exists, use it
           if (settings?.receiptSettings?.showLogo !== false && companyLogo) {
-            console.log('Receipt: Using company logo (showLogo not disabled)');
             return companyLogo;
           }
-          
-          console.log('Receipt: No logo URL set', {
-            customLogoUrl: customLogoUrl || 'none',
-            showLogoEnabled,
-            hasCompanyLogo: !!companyLogo,
-            posShowLogo: settings?.receiptSettings?.showLogo,
-          });
           return undefined;
         })(),
         // Show logo if explicitly enabled in POS settings, or if company logo exists and not disabled
@@ -373,19 +292,14 @@ export class ReceiptService {
           const posShowLogo = settings?.receiptSettings?.showLogo;
           const shouldShow = posShowLogo === true || 
                            (companyLogo && posShowLogo !== false);
-          console.log('Receipt showLogo decision:', {
-            posShowLogo,
-            hasCompanyLogo: !!companyLogo,
-            finalShowLogo: shouldShow,
-            logoUrl: (() => {
-              const customLogoUrl = settings?.receiptSettings?.logoUrl;
-              if (customLogoUrl && typeof customLogoUrl === 'string' && customLogoUrl.trim() !== '') {
-                return customLogoUrl.trim();
-              }
-              return companyLogo || undefined;
-            })(),
-          });
-          return shouldShow;
+          if (shouldShow) {
+            const customLogoUrl = settings?.receiptSettings?.logoUrl;
+            if (customLogoUrl && typeof customLogoUrl === 'string' && customLogoUrl.trim() !== '') {
+              return customLogoUrl.trim();
+            }
+            return companyLogo || undefined;
+          }
+          return undefined;
         })(),
       },
       printerSettings: settings?.printerSettings || {
@@ -400,13 +314,11 @@ export class ReceiptService {
       orderReviewUrl: (() => {
         const orderId = (order as any)._id?.toString() || (order as any).id?.toString();
         if (!orderId) return null;
-        
         // Use the company we already fetched earlier
         // Use custom domain if available and verified
         if (company?.customDomain && company?.domainVerified) {
           return `https://${company.customDomain}/display/customerreview/${orderId}`;
         }
-        
         // Fallback to base URL
         const baseUrl =
           process.env.FRONTEND_URL ||
@@ -415,14 +327,11 @@ export class ReceiptService {
         return `${baseUrl}/display/customerreview/${orderId}`;
       })(),
     };
-
     return receiptData;
   }
-
   // Generate receipt HTML
   async generateReceiptHTML(orderId: string): Promise<string> {
     const receiptData = await this.generateReceiptData(orderId);
-    
     // Generate QR code image if order review URL exists
     let qrCodeImageData = '';
     if (receiptData.orderReviewUrl) {
@@ -432,7 +341,6 @@ export class ReceiptService {
         console.error('Failed to generate QR code for receipt:', error);
       }
     }
-    
     const html = `
 <!DOCTYPE html>
 <html>
@@ -554,7 +462,6 @@ export class ReceiptService {
           `<img src="${receiptData.receiptSettings.logoUrl}" alt="Logo" class="logo">` : ''}
         <h1>${receiptData.receiptSettings.header}</h1>
     </div>
-
     <div class="order-info">
         <div><strong>Order #:</strong> ${receiptData.orderNumber}</div>
         <div><strong>Table #:</strong> ${receiptData.tableNumber}</div>
@@ -562,7 +469,6 @@ export class ReceiptService {
         ${receiptData.customerInfo?.name ? `<div><strong>Customer:</strong> ${receiptData.customerInfo.name}</div>` : ''}
         ${receiptData.customerInfo?.phone ? `<div><strong>Phone:</strong> ${receiptData.customerInfo.phone}</div>` : ''}
     </div>
-
     <div class="items">
         <div style="font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
             <span>Item</span>
@@ -581,7 +487,6 @@ export class ReceiptService {
         `;
         }).join('')}
     </div>
-
     <div class="totals">
         <div class="total-line">
             <span>Subtotal:</span>
@@ -604,7 +509,6 @@ export class ReceiptService {
             <span>${this.formatCurrency(receiptData.totalAmount, receiptData.currency)}</span>
         </div>
     </div>
-
     ${receiptData.paymentMethod ? `
         <div class="payment-info">
             <div><strong>Payment Method:</strong> ${receiptData.paymentMethod.toUpperCase()}</div>
@@ -612,13 +516,11 @@ export class ReceiptService {
             ${receiptData.paymentDetails?.referenceNumber ? `<div><strong>Reference:</strong> ${receiptData.paymentDetails.referenceNumber}</div>` : ''}
         </div>
     ` : ''}
-
     ${receiptData.notes ? `
         <div class="notes">
             <strong>Order Notes:</strong> ${receiptData.notes}
         </div>
     ` : ''}
-
     ${receiptData.orderReviewUrl && qrCodeImageData ? `
         <div style="margin-top: 20px; text-align: center; padding: 15px; border-top: 1px solid #ddd;">
             <div style="font-size: 11px; margin-bottom: 10px; color: #111827;">
@@ -632,7 +534,6 @@ export class ReceiptService {
             </div>
         </div>
     ` : ''}
-
     <div class="footer">
         <div>${receiptData.receiptSettings.footer}</div>
         ${receiptData.publicUrl ? `
@@ -649,10 +550,8 @@ export class ReceiptService {
     </div>
 </body>
 </html>`;
-
     return html;
   }
-
   // Generate QR code image as data URL
   private async generateQRCodeImage(url: string): Promise<string> {
     try {
@@ -671,7 +570,6 @@ export class ReceiptService {
       return '';
     }
   }
-
   // Generate receipt PDF using Puppeteer
   async generateReceiptPDF(orderId: string): Promise<Buffer> {
     try {
@@ -680,7 +578,6 @@ export class ReceiptService {
       const settings = {
         receiptSettings: receiptData.receiptSettings,
       };
-
       return await this.pdfGeneratorService.generateReceiptPDFFromOrder(receiptData, settings);
     } catch (error) {
       // Fallback to HTML if PDF generation fails
@@ -688,22 +585,18 @@ export class ReceiptService {
       return Buffer.from(html, 'utf-8');
     }
   }
-
   // Print receipt to printer
   async printReceipt(orderId: string, printerId?: string): Promise<{ success: boolean; message: string; jobId?: string }> {
     try {
       const receiptData = await this.generateReceiptData(orderId);
-      
       if (!receiptData.printerSettings.enabled) {
         return {
           success: false,
           message: 'Printing is not enabled for this branch'
         };
       }
-
       // Generate receipt content
       const htmlContent = await this.generateReceiptHTML(orderId);
-      
       // Send to printer
       const printJob = await this.printerService.printReceipt(
         htmlContent,
@@ -713,7 +606,6 @@ export class ReceiptService {
           priority: receiptData.printerSettings.priority || 'normal'
         }
       );
-
       return {
         success: true,
         message: `Receipt sent to printer successfully`,
@@ -726,22 +618,18 @@ export class ReceiptService {
       };
     }
   }
-
   // Print receipt as PDF
   async printReceiptPDF(orderId: string, printerId?: string): Promise<{ success: boolean; message: string; jobId?: string }> {
     try {
       const receiptData = await this.generateReceiptData(orderId);
-      
       if (!receiptData.printerSettings.enabled) {
         return {
           success: false,
           message: 'Printing is not enabled for this branch'
         };
       }
-
       // Generate PDF
       const pdfBuffer = await this.generateReceiptPDF(orderId);
-      
       // Send PDF to printer
       const printJob = await this.printerService.printPDF(
         pdfBuffer,
@@ -751,7 +639,6 @@ export class ReceiptService {
           priority: receiptData.printerSettings.priority || 'normal'
         }
       );
-
       return {
         success: true,
         message: `PDF receipt sent to printer successfully`,
@@ -764,54 +651,44 @@ export class ReceiptService {
       };
     }
   }
-
   // Get print job status
   async getPrintJobStatus(jobId: string): Promise<PrintJob | null> {
     return await this.printerService.getPrintJob(jobId);
   }
-
   // Cancel print job
   async cancelPrintJob(jobId: string): Promise<boolean> {
     return await this.printerService.cancelPrintJob(jobId);
   }
-
   // Get available printers
   async getAvailablePrinters(): Promise<any[]> {
     return await this.printerService.getAvailablePrinters();
   }
-
   // Test printer
   async testPrinter(printerName: string): Promise<boolean> {
     return await this.printerService.testPrinter(printerName);
   }
-
   async getPrintQueue(): Promise<PrintJob[]> {
     return await this.printerService.getPrintQueue();
   }
-
   // Calculate subtotal
   private calculateSubtotal(items: any[]): number {
     return items.reduce((total, item) => total + (item.quantity * item.price), 0);
   }
-
   // Calculate tax amount
   private calculateTax(items: any[], taxRate: number): number {
     const subtotal = this.calculateSubtotal(items);
     return (subtotal * taxRate) / 100;
   }
-
   // Calculate service charge
   private calculateServiceCharge(items: any[], serviceCharge: number): number {
     const subtotal = this.calculateSubtotal(items);
     return (subtotal * serviceCharge) / 100;
   }
-
   // Get receipt settings for a branch
   async getReceiptSettings(branchId: string): Promise<any> {
     const settings = await this.posSettingsModel
       .findOne({ branchId })
       .exec();
-
     return settings?.receiptSettings || {
       header: 'Restaurant Receipt',
       footer: 'Thank you for your visit!',
@@ -820,7 +697,6 @@ export class ReceiptService {
       paperWidth: 80,
     };
   }
-
   // Update receipt settings
   async updateReceiptSettings(branchId: string, receiptSettings: any): Promise<any> {
     return this.posSettingsModel.findOneAndUpdate(

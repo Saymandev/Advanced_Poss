@@ -13,7 +13,6 @@ import {
   RolePermission,
   RolePermissionDocument,
 } from './schemas/role-permission.schema';
-
 @Injectable()
 export class RolePermissionsService {
   constructor(
@@ -23,40 +22,31 @@ export class RolePermissionsService {
     private subscriptionModel: Model<SubscriptionDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
   ) {}
-
   async getRolePermissions(companyId: string): Promise<RolePermission[]> {
     if (!Types.ObjectId.isValid(companyId)) {
       throw new BadRequestException('Invalid company ID');
     }
-
     const permissions = await this.rolePermissionModel
       .find({ companyId: new Types.ObjectId(companyId) })
       .lean()
       .exec();
-
     // If no permissions exist, initialize with defaults
     if (permissions.length === 0) {
       return await this.initializeDefaultPermissions(companyId);
     }
-
     return permissions.map((perm: any) => ({
       ...perm,
       id: perm._id.toString(),
     }));
   }
-
   async getRolePermission(
     companyId: string,
     role: string,
   ): Promise<RolePermission | null> {
-    console.log(`[RolePermissions] getRolePermission called - Company: ${companyId}, Role: ${role}`);
-    
     if (!Types.ObjectId.isValid(companyId)) {
       console.error(`[RolePermissions] Invalid company ID: ${companyId}`);
       throw new BadRequestException('Invalid company ID');
     }
-
-    console.log(`[RolePermissions] Looking up permission for company ${companyId}, role ${role}`);
     const permission = await this.rolePermissionModel
       .findOne({
         companyId: new Types.ObjectId(companyId),
@@ -64,11 +54,7 @@ export class RolePermissionsService {
       })
       .lean()
       .exec();
-    
-    console.log(`[RolePermissions] Permission found: ${permission ? 'YES' : 'NO'}`);
-
     let roleFeatures: string[] = [];
-
     if (!permission) {
       // If permission doesn't exist, initialize default permissions for the company
       // This ensures users always have permissions
@@ -81,7 +67,6 @@ export class RolePermissionsService {
     } else {
       roleFeatures = permission.features || [];
     }
-
     // Filter features based on subscription - only return features enabled in subscription
     // CRITICAL: Query for active subscriptions that are NOT expired
     // This prevents expired subscriptions from being used even if isActive hasn't been fixed yet
@@ -95,10 +80,8 @@ export class RolePermissionsService {
       })
       .lean()
       .exec();
-
     // If no subscription, return only core features
     if (!subscription) {
-      console.log(`[RolePermissions] No active subscription for company ${companyId}, returning core features only`);
       return {
         ...(permission || {}),
         id: permission?._id?.toString() || '',
@@ -107,16 +90,13 @@ export class RolePermissionsService {
         features: [...CORE_FEATURES],
       } as RolePermission;
     }
-
     // CRITICAL: Check if subscription is expired or inactive
     const subscriptionStatus = subscription.status as string;
     const isExpired = subscriptionStatus === SubscriptionStatus.EXPIRED || 
                      subscriptionStatus === 'expired' ||
                      subscription.isActive === false;
-    
     // If subscription is expired or inactive, return only core features
     if (isExpired) {
-      console.log(`[RolePermissions] ⚠️ Subscription is expired or inactive for company ${companyId} (status: ${subscriptionStatus}, isActive: ${subscription.isActive}), returning core features only`);
       return {
         ...(permission || {}),
         id: permission?._id?.toString() || '',
@@ -125,26 +105,21 @@ export class RolePermissionsService {
         features: [...CORE_FEATURES],
       } as RolePermission;
     }
-
     // Check subscription status for active/trial
     const isActiveOrTrial = subscriptionStatus === SubscriptionStatus.ACTIVE || 
                             subscriptionStatus === SubscriptionStatus.TRIAL ||
                             subscriptionStatus === 'active' || 
                             subscriptionStatus === 'trial';
-
     // Get enabled features from subscription
     let enabledFeatures: string[] = [];
-
     // Priority 1: Check if feature-based subscription (new flexible model)
     // BUT: If subscription.enabledFeatures has very few features (< 5), it's likely incomplete
     // In that case, fall back to plan lookup to get the full feature set
     if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures) && subscription.enabledFeatures.length >= 5) {
       enabledFeatures = subscription.enabledFeatures;
-      console.log(`[RolePermissions] ✅ Using ${enabledFeatures.length} features from subscription.enabledFeatures`);
-    } else if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures) && subscription.enabledFeatures.length > 0) {
-      console.log(`[RolePermissions] ⚠️ Subscription has only ${subscription.enabledFeatures.length} features in enabledFeatures (likely incomplete), falling back to plan lookup`);
+      } else if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures) && subscription.enabledFeatures.length > 0) {
+      // Fallback to plan lookup
     }
-    
     // Priority 2: Get features from plan (if subscription.enabledFeatures is empty or has too few features)
     if (enabledFeatures.length < 5 && subscription.plan) {
       try {
@@ -152,30 +127,15 @@ export class RolePermissionsService {
         const planName = typeof subscription.plan === 'string' 
           ? subscription.plan 
           : (subscription.plan as any)?.name || subscription.plan;
-        
-        console.log(`[RolePermissions] 🔍 Looking up plan '${planName}' for company ${companyId}`);
         const plan = await this.subscriptionPlansService.findByName(planName);
-        
         if (plan) {
-          console.log(`[RolePermissions] ✅ Plan '${planName}' found`);
-          console.log(`[RolePermissions] Plan structure:`, {
-            hasEnabledFeatureKeys: !!(plan as any).enabledFeatureKeys,
-            enabledFeatureKeysLength: (plan as any).enabledFeatureKeys?.length || 0,
-            hasFeatures: !!(plan as any).features,
-            featuresType: typeof (plan as any).features,
-          });
-          
           // Check new enabledFeatureKeys first
           if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
             enabledFeatures = plan.enabledFeatureKeys;
-            console.log(`[RolePermissions] ✅ Using ${enabledFeatures.length} features from plan.enabledFeatureKeys`);
-          } 
+            } 
           // Fallback to legacy features object
           else if (plan.features) {
-            console.log(`[RolePermissions] 🔄 Converting legacy features:`, JSON.stringify(plan.features, null, 2));
             enabledFeatures = convertLegacyFeaturesToKeys(plan.features);
-            console.log(`[RolePermissions] ✅ Converted ${enabledFeatures.length} features from legacy plan.features`);
-            console.log(`[RolePermissions] Converted features (first 15):`, enabledFeatures.slice(0, 15));
           } else {
             console.warn(`[RolePermissions] ⚠️ Plan '${planName}' has no enabledFeatureKeys or features object`);
             console.warn(`[RolePermissions] Plan object keys:`, Object.keys(plan || {}));
@@ -194,11 +154,9 @@ export class RolePermissionsService {
     } else {
       console.warn(`[RolePermissions] ⚠️ Subscription has no plan property`);
     }
-
     // If subscription is active/trial but no features extracted (or very few), return all role features
     // This handles cases where subscription.enabledFeatures is incomplete or plan lookup failed
     if (enabledFeatures.length < 5 && isActiveOrTrial) {
-      console.log(`[RolePermissions] ⚠️ Active subscription (plan: ${subscription.plan}, status: ${subscription.status}) but only ${enabledFeatures.length} features extracted (< 5), returning all ${roleFeatures.length} role features as fallback`);
       return {
         ...(permission || {}),
         id: permission?._id?.toString() || '',
@@ -207,23 +165,11 @@ export class RolePermissionsService {
         features: roleFeatures, // Return all role features as fallback
       } as RolePermission;
     }
-
     // Always ensure core features are included
     enabledFeatures = [...new Set([...CORE_FEATURES, ...enabledFeatures])];
-
     // Debug logging
-    console.log(`[RolePermissions] Company ${companyId}, Role ${role}:`, {
-      roleFeaturesCount: roleFeatures.length,
-      enabledFeaturesCount: enabledFeatures.length,
-      subscriptionPlan: subscription.plan,
-      subscriptionStatus: subscription.status,
-    });
-
     // Filter role features to only include features enabled in subscription
     const filteredFeatures = roleFeatures.filter(feature => enabledFeatures.includes(feature));
-
-    console.log(`[RolePermissions] Filtered ${filteredFeatures.length} features from ${roleFeatures.length} role features`);
-    
     // Safety check: If filtering resulted in no features but subscription is active, return all role features
     if (filteredFeatures.length === 0 && isActiveOrTrial) {
       console.warn(`[RolePermissions] Filtering resulted in 0 features for active subscription, returning all ${roleFeatures.length} role features as safety fallback`);
@@ -235,7 +181,6 @@ export class RolePermissionsService {
         features: roleFeatures,
       } as RolePermission;
     }
-
     return {
       ...(permission || {}),
       id: permission?._id?.toString() || '',
@@ -244,7 +189,6 @@ export class RolePermissionsService {
       features: filteredFeatures,
     } as RolePermission;
   }
-
   async updateRolePermission(
     companyId: string,
     updateDto: UpdateRolePermissionDto,
@@ -253,17 +197,14 @@ export class RolePermissionsService {
     if (!Types.ObjectId.isValid(companyId)) {
       throw new BadRequestException('Invalid company ID');
     }
-
     const updateData: any = {
       companyId: new Types.ObjectId(companyId),
       role: updateDto.role,
       features: updateDto.features,
     };
-
     if (updatedBy && Types.ObjectId.isValid(updatedBy)) {
       updateData.updatedBy = new Types.ObjectId(updatedBy);
     }
-
     const permission = await this.rolePermissionModel
       .findOneAndUpdate(
         {
@@ -275,25 +216,20 @@ export class RolePermissionsService {
       )
       .lean()
       .exec();
-
     return {
       ...permission,
       id: permission._id.toString(),
     } as RolePermission;
   }
-
   async initializeDefaultPermissions(
     companyId: string,
   ): Promise<RolePermission[]> {
     if (!Types.ObjectId.isValid(companyId)) {
       throw new BadRequestException('Invalid company ID');
     }
-
     // Default feature sets for each role (using constants for consistency)
     const defaultPermissions = DEFAULT_ROLE_FEATURES;
-
     const createdPermissions: RolePermission[] = [];
-
     for (const [role, features] of Object.entries(defaultPermissions)) {
       const permission = await this.rolePermissionModel
         .findOneAndUpdate(
@@ -310,14 +246,11 @@ export class RolePermissionsService {
         )
         .lean()
         .exec();
-
       createdPermissions.push({
         ...permission,
         id: permission._id.toString(),
       } as RolePermission);
     }
-
     return createdPermissions;
   }
 }
-

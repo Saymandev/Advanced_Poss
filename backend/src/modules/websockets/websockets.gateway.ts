@@ -1,16 +1,15 @@
 import { Logger } from '@nestjs/common';
 import {
-    ConnectedSocket,
-    MessageBody,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    OnGatewayInit,
-    SubscribeMessage,
-    WebSocketGateway,
-    WebSocketServer,
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnGatewayInit,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-
 @WebSocketGateway({
   cors: {
     origin: '*', // Configure for production
@@ -23,7 +22,6 @@ export class WebsocketsGateway
 {
   @WebSocketServer()
   server: Server;
-
   private logger: Logger = new Logger('WebSocketGateway');
   private rooms: Map<string, Set<string>> = new Map(); // branchId -> Set<socketId>
   private userRooms: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
@@ -33,14 +31,11 @@ export class WebsocketsGateway
   private socketToBranch: Map<string, string> = new Map(); // socketId -> branchId
   private socketToCompany: Map<string, string> = new Map(); // socketId -> companyId
   private socketToFeatures: Map<string, Set<string>> = new Map(); // socketId -> features
-
   afterInit(server: Server) {
     this.logger.log('WebSocket Gateway initialized');
   }
-
   handleConnection(client: Socket, ...args: any[]) {
     this.logger.log(`Client connected: ${client.id}`);
-    
     // Extract user ID from handshake auth if available
     const auth = client.handshake.auth as any;
     const query = client.handshake.query as any;
@@ -63,17 +58,14 @@ export class WebsocketsGateway
       client.join(`user:${userId}`);
       this.logger.log(`Client ${client.id} associated with user ${userId}`);
     }
-
     if (branchId) {
       this.socketToBranch.set(client.id, branchId);
       client.join(`branch:${branchId}`);
     }
-
     if (companyId) {
       this.socketToCompany.set(client.id, companyId);
       client.join(`company:${companyId}`);
     }
-
     if (role) {
       this.socketToRole.set(client.id, role);
       if (!this.roleRooms.has(role)) {
@@ -82,15 +74,12 @@ export class WebsocketsGateway
       this.roleRooms.get(role).add(client.id);
       client.join(`role:${role}`);
     }
-
     if (features.length > 0) {
       this.socketToFeatures.set(client.id, new Set(features));
     }
   }
-
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
-
     // Remove from all branch rooms
     for (const [branchId, sockets] of this.rooms.entries()) {
       sockets.delete(client.id);
@@ -98,7 +87,6 @@ export class WebsocketsGateway
         this.rooms.delete(branchId);
       }
     }
-
     // Remove from user room
     const userId = this.socketToUser.get(client.id);
     if (userId) {
@@ -112,21 +100,17 @@ export class WebsocketsGateway
       this.socketToUser.delete(client.id);
       client.leave(`user:${userId}`);
     }
-
     const branchId = this.socketToBranch.get(client.id);
     if (branchId) {
       client.leave(`branch:${branchId}`);
       this.socketToBranch.delete(client.id);
     }
-
     const companyId = this.socketToCompany.get(client.id);
     if (companyId) {
       client.leave(`company:${companyId}`);
       this.socketToCompany.delete(client.id);
     }
-
     this.socketToFeatures.delete(client.id);
-
     // Remove from role room
     const role = this.socketToRole.get(client.id);
     if (role) {
@@ -141,7 +125,6 @@ export class WebsocketsGateway
       client.leave(`role:${role}`);
     }
   }
-
   @SubscribeMessage('join-branch')
   handleJoinBranch(
     @MessageBody() data: { branchId: string },
@@ -149,52 +132,40 @@ export class WebsocketsGateway
   ) {
     const { branchId } = data;
     const claimedBranch = this.socketToBranch.get(client.id);
-
     // Enforce: client can only join the branch it declared at handshake
     if (claimedBranch && claimedBranch !== branchId) {
       return { success: false, message: 'Branch mismatch' };
     }
-
     if (!claimedBranch) {
       this.socketToBranch.set(client.id, branchId);
     }
-
     if (!this.rooms.has(branchId)) {
       this.rooms.set(branchId, new Set());
     }
-
     this.rooms.get(branchId).add(client.id);
     client.join(`branch:${branchId}`);
-
     this.logger.log(`Client ${client.id} joined branch ${branchId}`);
-
     return {
       success: true,
       message: `Joined branch ${branchId}`,
     };
   }
-
   @SubscribeMessage('leave-branch')
   handleLeaveBranch(
     @MessageBody() data: { branchId: string },
     @ConnectedSocket() client: Socket,
   ) {
     const { branchId } = data;
-
     if (this.rooms.has(branchId)) {
       this.rooms.get(branchId).delete(client.id);
     }
-
     client.leave(`branch:${branchId}`);
-
     this.logger.log(`Client ${client.id} left branch ${branchId}`);
-
     return {
       success: true,
       message: `Left branch ${branchId}`,
     };
   }
-
   @SubscribeMessage('join-role')
   handleJoinRole(
     @MessageBody() data: { role: string },
@@ -204,34 +175,26 @@ export class WebsocketsGateway
     if (!role) {
       return { success: false, message: 'Role is required' };
     }
-
     const normalizedRole = role.toLowerCase();
     const claimedRole = this.socketToRole.get(client.id);
-
     // Enforce: client can only join the role it declared at handshake
     if (claimedRole && claimedRole !== normalizedRole) {
       return { success: false, message: 'Role mismatch' };
     }
-
     if (!claimedRole) {
       this.socketToRole.set(client.id, normalizedRole);
     }
-
     if (!this.roleRooms.has(normalizedRole)) {
       this.roleRooms.set(normalizedRole, new Set());
     }
-
     this.roleRooms.get(normalizedRole).add(client.id);
     client.join(`role:${normalizedRole}`);
-
     this.logger.log(`Client ${client.id} joined role ${normalizedRole}`);
-
     return {
       success: true,
       message: `Joined role ${normalizedRole}`,
     };
   }
-
   @SubscribeMessage('join-user')
   handleJoinUser(
     @MessageBody() data: { userId: string },
@@ -241,30 +204,24 @@ export class WebsocketsGateway
     if (!userId) {
       return { success: false, message: 'User ID is required' };
     }
-
     const claimedUser = this.socketToUser.get(client.id);
     if (claimedUser && claimedUser !== userId) {
       return { success: false, message: 'User mismatch' };
     }
-
     if (!claimedUser) {
       this.socketToUser.set(client.id, userId);
     }
-
     client.join(`user:${userId}`);
     this.logger.log(`Client ${client.id} joined user ${userId}`);
-
     return {
       success: true,
       message: `Joined user ${userId}`,
     };
   }
-
   broadcastToRole(role: string, event: string, payload: any) {
     const normalizedRole = role.toLowerCase();
     this.server.to(`role:${normalizedRole}`).emit(event, payload);
   }
-
   emitScopedNotification(params: {
     companyId?: string;
     branchId?: string;
@@ -277,35 +234,28 @@ export class WebsocketsGateway
     const roleSet = new Set((roles || []).map((r) => r.toLowerCase()));
     const featureSet = new Set((features || []).map((f) => f.toLowerCase()));
     const userIdSet = new Set(userIds || []);
-
     this.server.sockets.sockets.forEach((socket) => {
       const sockUser = this.socketToUser.get(socket.id);
       const sockBranch = this.socketToBranch.get(socket.id);
       const sockCompany = this.socketToCompany.get(socket.id);
       const sockRole = this.socketToRole.get(socket.id);
       const sockFeatures = this.socketToFeatures.get(socket.id);
-
       // Company / branch scoping
       if (companyId && sockCompany !== companyId) return;
       if (branchId && sockBranch !== branchId) return;
-
       // Role scoping
       if (roleSet.size > 0 && (!sockRole || !roleSet.has(sockRole))) return;
-
       // User targeting
       if (userIdSet.size > 0 && (!sockUser || !userIdSet.has(sockUser))) return;
-
       // Feature scoping
       if (featureSet.size > 0) {
         if (!sockFeatures) return;
         const hasFeature = [...featureSet].some((f) => sockFeatures.has(f));
         if (!hasFeature) return;
       }
-
       socket.emit('notification', payload);
     });
   }
-
   @SubscribeMessage('join-table')
   handleJoinTable(
     @MessageBody() data: { tableId: string },
@@ -313,15 +263,12 @@ export class WebsocketsGateway
   ) {
     const { tableId } = data;
     client.join(`table:${tableId}`);
-
     this.logger.log(`Client ${client.id} joined table ${tableId}`);
-
     return {
       success: true,
       message: `Joined table ${tableId}`,
     };
   }
-
   @SubscribeMessage('join-kitchen')
   handleJoinKitchen(
     @MessageBody() data: { branchId: string },
@@ -329,15 +276,12 @@ export class WebsocketsGateway
   ) {
     const { branchId } = data;
     client.join(`kitchen:${branchId}`);
-
     this.logger.log(`Client ${client.id} joined kitchen ${branchId}`);
-
     return {
       success: true,
       message: `Joined kitchen ${branchId}`,
     };
   }
-
   @SubscribeMessage('join-order')
   handleJoinOrder(
     @MessageBody() data: { orderId: string },
@@ -346,15 +290,12 @@ export class WebsocketsGateway
     const { orderId } = data;
     const orderRoom = `order:${orderId}`;
     client.join(orderRoom);
-
     this.logger.log(`Client ${client.id} joined order room ${orderId} (public tracking)`);
-
     return {
       success: true,
       message: `Joined order room ${orderId}`,
     };
   }
-
   @SubscribeMessage('leave-order')
   handleLeaveOrder(
     @MessageBody() data: { orderId: string },
@@ -363,26 +304,21 @@ export class WebsocketsGateway
     const { orderId } = data;
     const orderRoom = `order:${orderId}`;
     client.leave(orderRoom);
-
     this.logger.log(`Client ${client.id} left order room ${orderId}`);
-
     return {
       success: true,
       message: `Left order room ${orderId}`,
     };
   }
-
   // Emit to specific user
   emitToUser(userId: string, event: string, data: any) {
     const userRoom = `user:${userId}`;
-    
     // Safely check socket count using our manual tracking or adapter if available
     let socketCount = 0;
     try {
       // First try to use our manual tracking
       const userSocketIds = this.userRooms.get(userId);
       socketCount = userSocketIds ? userSocketIds.size : 0;
-      
       // Fallback to adapter if manual tracking is empty but adapter is available
       if (socketCount === 0 && this.server?.sockets?.adapter?.rooms) {
         const socketsInRoom = this.server.sockets.adapter.rooms.get(userRoom);
@@ -393,68 +329,46 @@ export class WebsocketsGateway
       const userSocketIds = this.userRooms.get(userId);
       socketCount = userSocketIds ? userSocketIds.size : 0;
     }
-    
-    console.log(`📡 [WebSocket] Emitting ${event} to room: ${userRoom}`);
-    console.log(`📡 [WebSocket] Sockets in room: ${socketCount}`);
-    
     // Always emit the event - Socket.IO will handle delivery
     this.server.to(userRoom).emit(event, data);
     this.logger.log(`📬 Emitted ${event} to user ${userId} (${socketCount} socket(s) in room)`);
-    
     if (socketCount === 0) {
       console.warn(`⚠️ [WebSocket] No sockets found in room ${userRoom} - waiter may not be connected!`);
     }
   }
-
   // Emit events to specific rooms
-
   emitToClient(clientId: string, event: string, data: any) {
     this.server.to(clientId).emit(event, data);
   }
-
   emitToBranch(branchId: string, event: string, data: any) {
     this.server.to(`branch:${branchId}`).emit(event, data);
     this.logger.debug(`Emitted ${event} to branch ${branchId}`);
   }
-
   emitToTable(tableId: string, event: string, data: any) {
     this.server.to(`table:${tableId}`).emit(event, data);
     this.logger.debug(`Emitted ${event} to table ${tableId}`);
   }
-
   emitToKitchen(branchId: string, event: string, data: any) {
     this.server.to(`kitchen:${branchId}`).emit(event, data);
     this.logger.debug(`Emitted ${event} to kitchen ${branchId}`);
   }
-
   emitToAll(event: string, data: any) {
     this.server.emit(event, data);
     this.logger.debug(`Emitted ${event} to all clients`);
   }
-
   // Order events
-
   notifyNewOrder(branchId: string, order: any) {
-    console.log(`📦 [WebSocket] notifyNewOrder called for order ${order.orderNumber || 'N/A'}, waiterId: ${order.waiterId || 'NONE'}`);
-    
     this.emitToBranch(branchId, 'order:new', order);
     this.emitToKitchen(branchId, 'kitchen:new-order', order);
-
     if (order.tableId) {
       this.emitToTable(order.tableId, 'table:order-created', order);
     }
-
     // Notify specific waiter if assigned
     if (order.waiterId) {
       const waiterIdStr = typeof order.waiterId === 'string' ? order.waiterId : String(order.waiterId);
-      console.log(`🔔 [WebSocket] Order has waiterId: ${waiterIdStr}, notifying waiter for order ${order.orderNumber || 'N/A'}...`);
       this.notifyWaiterAssigned(waiterIdStr, order);
-    } else {
-      console.log(`⚠️ [WebSocket] Order ${order.orderNumber || 'N/A'} has no waiterId - skipping waiter notification`);
-      console.log(`⚠️ [WebSocket] Order keys: ${Object.keys(order).join(', ')}`);
     }
   }
-
   notifyWaiterAssigned(waiterId: string | any, order: any) {
     // Ensure waiterId is a string (convert ObjectId if needed)
     let waiterIdStr: string;
@@ -465,7 +379,6 @@ export class WebsocketsGateway
     } else {
       waiterIdStr = String(waiterId || '');
     }
-    
     // Extract tableNumber from tableId if populated
     let tableNumber: string | undefined;
     if (order.tableId) {
@@ -477,7 +390,6 @@ export class WebsocketsGateway
         tableNumber = undefined;
       }
     }
-    
     const notificationData = {
       orderId: order.id || (order._id ? String(order._id) : null),
       orderNumber: order.orderNumber,
@@ -490,44 +402,30 @@ export class WebsocketsGateway
       timestamp: new Date(),
       order: order,
     };
-
-    console.log(`📬 [WebSocket] Emitting order:assigned to user room: user:${waiterIdStr}`);
-    console.log(`📬 [WebSocket] Notification data:`, JSON.stringify(notificationData, null, 2));
-    
-    console.log(`📬 [WebSocket] About to emit order:assigned to waiter ${waiterIdStr}`);
-    console.log(`📬 [WebSocket] Order details: #${order.orderNumber || 'N/A'}, Table: ${order.tableNumber || 'N/A'}, Items: ${order.items?.length || 0}`);
     
     this.emitToUser(waiterIdStr, 'order:assigned', notificationData);
-    
     this.logger.log(`📬 Notified waiter ${waiterIdStr} about assigned order ${order.orderNumber || 'N/A'}`);
-    console.log(`✅ [WebSocket] Notification sent to waiter ${waiterIdStr} for order ${order.orderNumber || 'N/A'}`);
-  }
-
+    }
   notifyOrderUpdated(branchId: string, order: any) {
     this.emitToBranch(branchId, 'order:updated', order);
-
     if (order.tableId) {
       this.emitToTable(order.tableId, 'table:order-updated', order);
     }
   }
-
   notifyOrderStatusChanged(branchId: string, order: any) {
     const orderId = order.id || order._id?.toString() || order.orderNumber;
-    
     // Emit to branch room (for authenticated users)
     this.emitToBranch(branchId, 'order:status-changed', {
       orderId,
       status: order.status,
       order,
     });
-
     // Emit to kitchen room
     this.emitToKitchen(branchId, 'kitchen:order-status-changed', {
       orderId,
       status: order.status,
       order,
     });
-
     // Emit to table room if applicable
     if (order.tableId) {
       this.emitToTable(order.tableId, 'table:order-status-changed', {
@@ -535,7 +433,6 @@ export class WebsocketsGateway
         status: order.status,
       });
     }
-
     // Emit to order-specific room for public tracking (no auth required)
     if (orderId) {
       const orderRoom = `order:${orderId}`;
@@ -547,26 +444,22 @@ export class WebsocketsGateway
       this.logger.debug(`📡 Emitted order status change to order room: ${orderRoom}`);
     }
   }
-
   notifyOrderItemReady(branchId: string, orderId: string, itemId: string) {
     this.emitToBranch(branchId, 'order:item-ready', {
       orderId,
       itemId,
     });
-
     this.emitToKitchen(branchId, 'kitchen:item-ready', {
       orderId,
       itemId,
     });
   }
-
   notifyPaymentReceived(branchId: string, order: any, payment: any) {
     this.emitToBranch(branchId, 'order:payment-received', {
       orderId: order.id,
       payment,
       order,
     });
-
     if (order.tableId) {
       // Include order object in table:payment-received so frontend can access tableId
       this.emitToTable(order.tableId, 'table:payment-received', {
@@ -576,21 +469,17 @@ export class WebsocketsGateway
       });
     }
   }
-
   // Table events
-
   notifyTableStatusChanged(branchId: string, table: any) {
     this.emitToBranch(branchId, 'table:status-changed', {
       tableId: table.id,
       status: table.status,
       table,
     });
-
     this.emitToTable(table.id, 'table:status-changed', {
       status: table.status,
     });
   }
-
   notifyTableOccupied(branchId: string, table: any, order: any) {
     this.emitToBranch(branchId, 'table:occupied', {
       tableId: table.id,
@@ -599,14 +488,12 @@ export class WebsocketsGateway
       order,
     });
   }
-
   notifyTableAvailable(branchId: string, table: any) {
     this.emitToBranch(branchId, 'table:available', {
       tableId: table.id,
       table,
     });
   }
-
   notifyTableReserved(branchId: string, table: any, reservation: any) {
     this.emitToBranch(branchId, 'table:reserved', {
       tableId: table.id,
@@ -614,9 +501,7 @@ export class WebsocketsGateway
       table,
     });
   }
-
   // Inventory events
-
   notifyLowStock(branchId: string, ingredient: any) {
     this.emitToBranch(branchId, 'inventory:low-stock', {
       ingredientId: ingredient.id,
@@ -626,7 +511,6 @@ export class WebsocketsGateway
       ingredient,
     });
   }
-
   notifyOutOfStock(branchId: string, ingredient: any) {
     this.emitToBranch(branchId, 'inventory:out-of-stock', {
       ingredientId: ingredient.id,
@@ -634,7 +518,6 @@ export class WebsocketsGateway
       ingredient,
     });
   }
-
   notifyStockUpdated(branchId: string, ingredient: any) {
     this.emitToBranch(branchId, 'inventory:stock-updated', {
       ingredientId: ingredient.id,
@@ -642,17 +525,13 @@ export class WebsocketsGateway
       ingredient,
     });
   }
-
   // Customer events
-
   notifyNewCustomer(branchId: string, customer: any) {
     this.emitToBranch(branchId, 'customer:new', customer);
   }
-
   notifyCustomerUpdated(branchId: string, customer: any) {
     this.emitToBranch(branchId, 'customer:updated', customer);
   }
-
   notifyLoyaltyPointsEarned(branchId: string, customer: any, points: number) {
     this.emitToBranch(branchId, 'customer:loyalty-points-earned', {
       customerId: customer.id,
@@ -661,13 +540,10 @@ export class WebsocketsGateway
       customer,
     });
   }
-
   // Kitchen Display events
-
   notifyKitchenOrderReceived(branchId: string, order: any) {
     this.emitToKitchen(branchId, 'kitchen:order-received', order);
   }
-
   notifyKitchenItemStarted(
     branchId: string,
     orderId: string,
@@ -678,7 +554,6 @@ export class WebsocketsGateway
       itemId,
     });
   }
-
   notifyKitchenItemCompleted(
     branchId: string,
     orderId: string,
@@ -688,25 +563,19 @@ export class WebsocketsGateway
       orderId,
       itemId,
     });
-
     this.emitToBranch(branchId, 'order:item-completed', {
       orderId,
       itemId,
     });
   }
-
   // System events
-
   notifySystemAlert(branchId: string, alert: any) {
     this.emitToBranch(branchId, 'system:alert', alert);
   }
-
   notifySystemNotification(branchId: string, notification: any) {
     this.emitToBranch(branchId, 'system:notification', notification);
   }
-
   // Stats
-
   getConnectionStats() {
     const stats = {
       totalConnections: this.server.sockets.sockets.size,
@@ -715,9 +584,6 @@ export class WebsocketsGateway
         connections: sockets.size,
       })),
     };
-
     return stats;
   }
 }
-
-

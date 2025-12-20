@@ -9,11 +9,9 @@ import { BillingCycle, Subscription, SubscriptionDocument, SubscriptionStatus } 
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
-
 @Injectable()
 export class PaymentsService {
   private stripe: Stripe;
-
   constructor(
     private configService: ConfigService,
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
@@ -26,7 +24,6 @@ export class PaymentsService {
       apiVersion: '2023-10-16',
     });
   }
-
   private resolveStripePriceId(planName: string, fallback?: string) {
     const map: Record<string, string | undefined> = {
       free: process.env.STRIPE_PRICE_FREE_MONTHLY,
@@ -36,20 +33,17 @@ export class PaymentsService {
     };
     return map[planName] || fallback;
   }
-
   async createPaymentIntent(companyId: string, planName: string) {
     // Get company details
     const company = await this.companyModel.findById(companyId);
     if (!company) {
       throw new NotFoundException('Company not found');
     }
-
     // Get subscription plan details
     const plan = await this.subscriptionPlansService.findByName(planName);
     if (!plan) {
       throw new NotFoundException('Subscription plan not found');
     }
-
     // Create Stripe customer if not exists
     let customerId = company.stripeCustomerId;
     if (!customerId) {
@@ -61,13 +55,11 @@ export class PaymentsService {
         },
       });
       customerId = customer.id;
-
       // Update company with Stripe customer ID
       await this.companyModel.findByIdAndUpdate(companyId, {
         stripeCustomerId: customerId,
       });
     }
-
     // Create payment intent
     const paymentIntent = await this.stripe.paymentIntents.create({
       amount: plan.price * 100, // Convert to cents
@@ -80,7 +72,6 @@ export class PaymentsService {
       },
       description: `${plan.displayName} subscription for ${company.name}`,
     });
-
     return {
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
@@ -93,32 +84,25 @@ export class PaymentsService {
       },
     };
   }
-
   async confirmPayment(paymentIntentId: string) {
     try {
       const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
-      
       if (paymentIntent.status !== 'succeeded') {
         throw new BadRequestException('Payment not completed');
       }
-
       const { companyId, planName } = paymentIntent.metadata;
-      
       // Update company subscription
       const company = await this.companyModel.findById(companyId);
       if (!company) {
         throw new NotFoundException('Company not found');
       }
-
       const plan = await this.subscriptionPlansService.findByName(planName);
       if (!plan) {
         throw new NotFoundException('Subscription plan not found');
       }
-
       // Calculate subscription dates using millisecond-based calculation
       const now = new Date();
       const subscriptionEndDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days (1 month)
-
       // Update company subscription
       await this.companyModel.findByIdAndUpdate(companyId, {
         subscriptionPlan: planName,
@@ -131,7 +115,6 @@ export class PaymentsService {
           features: plan.features,
         },
       });
-
       return {
         success: true,
         message: 'Payment confirmed and subscription activated',
@@ -147,20 +130,17 @@ export class PaymentsService {
       throw new BadRequestException('Failed to confirm payment');
     }
   }
-
   async createCheckoutSession(companyId: string, planName: string, successUrl: string, cancelUrl: string) {
     // Get company details
     const company = await this.companyModel.findById(companyId);
     if (!company) {
       throw new NotFoundException('Company not found');
     }
-
     // Get subscription plan details
     const plan = await this.subscriptionPlansService.findByName(planName);
     if (!plan) {
       throw new NotFoundException('Subscription plan not found');
     }
-
     // Create Stripe customer if not exists
     let customerId = company.stripeCustomerId;
     if (!customerId) {
@@ -172,19 +152,16 @@ export class PaymentsService {
         },
       });
       customerId = customer.id;
-
       // Update company with Stripe customer ID
       await this.companyModel.findByIdAndUpdate(companyId, {
         stripeCustomerId: customerId,
       });
     }
-
     // Create checkout session
     // Append session_id to success_url for manual activation fallback
     const successUrlWithSession = successUrl.includes('?') 
       ? `${successUrl}&session_id={CHECKOUT_SESSION_ID}`
       : `${successUrl}?session_id={CHECKOUT_SESSION_ID}`;
-    
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -213,16 +190,13 @@ export class PaymentsService {
         planId: (plan as any)._id.toString(),
       },
     });
-
     return {
       sessionId: session.id,
       url: session.url,
     };
   }
-
   async handleWebhook(payload: Buffer, signature: string) {
     const webhookSecret = this.configService.get('stripe.webhookSecret');
-    
     let event: Stripe.Event;
     try {
       event = this.stripe.webhooks.constructEvent(payload, signature, webhookSecret);
@@ -230,7 +204,6 @@ export class PaymentsService {
       console.error('Webhook signature verification failed:', err);
       throw new BadRequestException('Invalid webhook signature');
     }
-
     // Handle the event
     switch (event.type) {
       case 'checkout.session.completed':
@@ -246,48 +219,38 @@ export class PaymentsService {
         await this.handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
       default:
-        console.log(`Unhandled event type: ${event.type}`);
-    }
-
+        }
     return { received: true };
   }
-
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const { companyId, planName } = session.metadata;
-    
     if (!companyId || !planName) {
       console.error('Missing metadata in checkout session');
       return;
     }
-
     // Update company subscription
     const company = await this.companyModel.findById(companyId);
     if (!company) {
       console.error('Company not found:', companyId);
       return;
     }
-
     const plan = await this.subscriptionPlansService.findByName(planName);
     if (!plan) {
       console.error('Plan not found:', planName);
       return;
     }
-
     // Calculate subscription dates using millisecond-based calculation
     const now = new Date();
     // Add 30 days for monthly subscription (more accurate than setMonth)
     const subscriptionEndDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
-
     // Update company subscription - use $unset to completely remove trialEndDate field
     // Properly merge settings to ensure features are saved correctly
     const existingSettings = company.settings || {};
-    
     // Create updated settings object with plan features
     const updatedSettings = {
       ...existingSettings,
       features: plan.features, // Ensure plan features override any existing features
     };
-    
     await this.companyModel.findByIdAndUpdate(
       companyId,
       {
@@ -304,26 +267,13 @@ export class PaymentsService {
         },
       },
     );
-    
     // Verify the update by fetching the company again
     const updatedCompany = await this.companyModel.findById(companyId).lean().exec();
-    console.log(`✅ Company ${companyId} updated after payment:`, {
-      subscriptionStatus: updatedCompany?.subscriptionStatus,
-      subscriptionPlan: updatedCompany?.subscriptionPlan,
-      trialEndDate: updatedCompany?.trialEndDate,
-      hasTrialEndDate: updatedCompany?.trialEndDate !== null && updatedCompany?.trialEndDate !== undefined,
-      subscriptionEndDate: updatedCompany?.subscriptionEndDate,
-      features: updatedCompany?.settings?.features,
-      hasFeatures: !!updatedCompany?.settings?.features,
-      allKeys: updatedCompany ? Object.keys(updatedCompany) : [],
-    });
-
     // Find or create subscription record
     const companyObjectId = new Types.ObjectId(companyId);
     let subscription = await this.subscriptionModel.findOne({
       companyId: companyObjectId,
     }).exec();
-
     if (subscription) {
       // Update existing subscription
       subscription.status = SubscriptionStatus.ACTIVE;
@@ -344,29 +294,21 @@ export class PaymentsService {
       const subscriptionId = typeof session.subscription === 'string'
         ? (session.subscription || undefined)
         : (session.subscription as any)?.id || undefined;
-      
-      console.log(`[Payments] 🔍 Extracting Stripe IDs: customerId='${customerId}', subscriptionId='${subscriptionId}'`);
-      
       subscription.isActive = true; // CRITICAL: Ensure isActive is true for active subscriptions
       subscription.stripeCustomerId = customerId;
       subscription.stripeSubscriptionId = subscriptionId;
       subscription.stripePriceId = this.resolveStripePriceId(plan.name, plan.stripePriceId) || undefined;
-      
       // CRITICAL: Populate enabledFeatures from plan's enabledFeatureKeys
       if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
         subscription.enabledFeatures = plan.enabledFeatureKeys;
-        console.log(`[Payments] ✅ Set ${subscription.enabledFeatures.length} enabled features from plan:`, subscription.enabledFeatures.slice(0, 10));
       } else {
         // Fallback: convert legacy features to keys
         subscription.enabledFeatures = [];
-        console.log(`[Payments] ⚠️ Plan has no enabledFeatureKeys, leaving enabledFeatures empty`);
-      }
-      
+        }
       // Build limits from plan (using same logic as SubscriptionsService)
       const maxBranches = plan.limits?.maxBranches ?? plan.features?.maxBranches ?? -1;
       const maxUsers = plan.limits?.maxUsers ?? plan.features?.maxUsers ?? -1;
       const derive = (value: number, multiplier: number) => value > 0 ? value * multiplier : -1;
-      
       subscription.limits = {
         maxBranches,
         maxUsers,
@@ -390,15 +332,12 @@ export class PaymentsService {
         reviewModerationRequired: plan.limits?.reviewModerationRequired ?? false,
         maxReviewsPerMonth: plan.limits?.maxReviewsPerMonth ?? -1, // Default to unlimited
       } as any;
-      
       await subscription.save();
-      console.log(`[Payments] ✅ Subscription updated: id=${subscription._id}, plan=${subscription.plan}, status=${subscription.status}, isActive=${subscription.isActive}, enabledFeatures=${subscription.enabledFeatures?.length || 0}`);
-    } else {
+      } else {
       // Create new subscription record
       const maxBranches = plan.limits?.maxBranches ?? plan.features?.maxBranches ?? -1;
       const maxUsers = plan.limits?.maxUsers ?? plan.features?.maxUsers ?? -1;
       const derive = (value: number, multiplier: number) => value > 0 ? value * multiplier : -1;
-      
       subscription = new this.subscriptionModel({
         companyId: companyObjectId,
         plan: planName as any,
@@ -451,24 +390,17 @@ export class PaymentsService {
         autoRenew: true,
         isActive: true,
       });
-      
       await subscription.save();
-      console.log(`[Payments] ✅ New subscription created: id=${subscription._id}, plan=${subscription.plan}, status=${subscription.status}, isActive=${subscription.isActive}, enabledFeatures=${subscription.enabledFeatures?.length || 0}`);
-    }
-
-    console.log(`✅ Subscription activated for company ${companyId} with plan ${planName}`);
-    
+      }
     // Notify all super admins about new subscription
     try {
       const superAdmins = await this.userModel.find({ 
         role: UserRole.SUPER_ADMIN,
         isActive: true 
       }).select('_id email firstName lastName').exec();
-      
       if (superAdmins && superAdmins.length > 0) {
         const companyName = company.name || 'Unknown Company';
         const planDisplayName = plan.displayName || planName;
-        
         // Send notification to each super admin via WebSocket
         for (const admin of superAdmins) {
           // Use admin ID as branchId to send personal notification
@@ -489,15 +421,12 @@ export class PaymentsService {
             timestamp: new Date(),
           });
         }
-        
-        console.log(`📧 Notified ${superAdmins.length} super admin(s) about new subscription`);
       }
     } catch (error) {
       console.error('❌ Error notifying super admins:', error);
       // Don't fail subscription activation if notification fails
     }
   }
-  
   // Manual activation method - called from frontend when webhook hasn't processed yet
   async activateSubscriptionFromSession(sessionId: string): Promise<{ success: boolean; message: string }> {
     try {
@@ -505,7 +434,6 @@ export class PaymentsService {
       const session = await this.stripe.checkout.sessions.retrieve(sessionId, {
         expand: ['line_items', 'customer', 'subscription'],
       });
-      
       // Check if payment was successful
       if (session.payment_status !== 'paid') {
         return {
@@ -513,7 +441,6 @@ export class PaymentsService {
           message: `Payment status is ${session.payment_status}. Subscription cannot be activated.`,
         };
       }
-      
       // Check if already processed
       const { companyId } = session.metadata || {};
       if (!companyId) {
@@ -522,7 +449,6 @@ export class PaymentsService {
           message: 'No company ID found in session metadata.',
         };
       }
-      
       const company = await this.companyModel.findById(companyId);
       if (!company) {
         return {
@@ -530,11 +456,9 @@ export class PaymentsService {
           message: 'Company not found.',
         };
       }
-      
       // Check if this is a plan change (different plan than current)
       const { planName } = session.metadata || {};
       const isPlanChange = planName && company.subscriptionPlan && company.subscriptionPlan !== planName;
-      
       // If subscription is already active and NOT a plan change, return early
       if (company.subscriptionStatus === 'active' && !company.trialEndDate && !isPlanChange) {
         return {
@@ -542,11 +466,9 @@ export class PaymentsService {
           message: 'Subscription is already active.',
         };
       }
-      
       // Call handleCheckoutCompleted to activate or update plan
       // This will handle both initial activation and plan changes
       await this.handleCheckoutCompleted(session);
-      
       return {
         success: true,
         message: 'Subscription activated successfully.',
@@ -559,19 +481,13 @@ export class PaymentsService {
       };
     }
   }
-
   private async handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     // Handle successful recurring payment
-    console.log('Invoice payment succeeded:', invoice.id);
-  }
-
+    }
   private async handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     // Handle failed payment
-    console.log('Invoice payment failed:', invoice.id);
-  }
-
+    }
   private async handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     // Handle subscription cancellation
-    console.log('Subscription deleted:', subscription.id);
-  }
+    }
 }

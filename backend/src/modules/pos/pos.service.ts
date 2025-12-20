@@ -20,7 +20,6 @@ import { ReceiptService } from './receipt.service';
 import { POSOrder, POSOrderDocument } from './schemas/pos-order.schema';
 import { POSPayment, POSPaymentDocument } from './schemas/pos-payment.schema';
 import { POSSettings, POSSettingsDocument } from './schemas/pos-settings.schema';
-
 @Injectable()
 export class POSService {
   constructor(
@@ -43,59 +42,48 @@ export class POSService {
     @Inject(forwardRef(() => BookingsService))
     private bookingsService: BookingsService,
   ) {}
-
   // Generate unique order number
   private async generateOrderNumber(branchId: string): Promise<string> {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
     const branchCode = branchId.slice(-4).toUpperCase();
-    
     const lastOrder = await this.posOrderModel
       .findOne({ branchId: new Types.ObjectId(branchId) })
       .sort({ createdAt: -1 })
       .exec();
-
     let sequence = 1;
     if (lastOrder && lastOrder.orderNumber.includes(dateStr)) {
       const parts = lastOrder.orderNumber.split('-');
       const lastSequence = parts.length >= 4 ? parseInt(parts[3], 10) || 0 : 0;
       sequence = lastSequence + 1;
     }
-
     return `POS-${branchCode}-${dateStr}-${sequence.toString().padStart(4, '0')}`;
   }
-
   // Create POS order
   async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string, companyId?: string, userBranchId?: string): Promise<POSOrder> {
-    console.log(`📦 [createOrder] Starting order creation - orderType: ${createOrderDto.orderType}, status: ${createOrderDto.status}, tableId: ${createOrderDto.tableId || 'N/A'}`);
     // Validate the user creating the order is assigned to the branch (owners can work across branches)
     const creatingUser = await this.userModel.findById(userId).select('role branchId companyId');
     if (!creatingUser) {
       throw new NotFoundException('User not found');
     }
-    
     const creatingUserBranchId = creatingUser.branchId?.toString();
     const orderBranchId = branchId.toString();
-    
     // Owners can create orders for any branch in their company, but other roles must be assigned to the branch
     if (creatingUser.role !== 'owner' && creatingUserBranchId !== orderBranchId) {
       throw new BadRequestException(`You are not assigned to branch ${orderBranchId}. Please assign yourself to this branch first.`);
     }
-    
     // Validate waiter/employee assignment if waiterId is provided
     if (createOrderDto.waiterId && createOrderDto.waiterId !== userId) {
       const waiter = await this.userModel.findById(createOrderDto.waiterId).select('role branchId firstName lastName');
       if (!waiter) {
         throw new NotFoundException('Selected waiter/employee not found');
       }
-      
       const waiterBranchId = waiter.branchId?.toString();
       if (waiterBranchId !== orderBranchId) {
         throw new BadRequestException(
           `${waiter.firstName} ${waiter.lastName} is not assigned to this branch. Please select an employee assigned to this branch.`
         );
       }
-      
       // Validate waiter role - only waiters can be assigned as waiters
       const waiterRole = waiter.role.toLowerCase();
       if (waiterRole !== 'waiter' && waiterRole !== 'server') {
@@ -104,7 +92,6 @@ export class POSService {
         );
       }
     }
-
     // Validate payment mode: If pay-first mode is enabled, orders cannot be created as 'pending'
     const posSettings = await this.getPOSSettings(branchId);
     if (posSettings.defaultPaymentMode === 'pay-first' && createOrderDto.status === 'pending') {
@@ -114,7 +101,6 @@ export class POSService {
     }
     // Cache menu items to fetch names efficiently
     const menuItemCache = new Map<string, any>();
-    
     // Fetch menu item names for all items
     const itemsWithNames = await Promise.all(
       createOrderDto.items.map(async (item) => {
@@ -129,7 +115,6 @@ export class POSService {
             console.error(`Failed to fetch menu item ${item.menuItemId}:`, error);
           }
         }
-        
         return {
           menuItemId: new Types.ObjectId(item.menuItemId),
           name: menuItem?.name || 'Unknown Item',
@@ -139,48 +124,35 @@ export class POSService {
         };
       })
     );
-
     // Process loyalty points redemption if customerId is provided
     let loyaltyPointsRedeemed = 0;
     let loyaltyDiscount = 0;
     let customer = null;
     let finalOrderTotal = createOrderDto.totalAmount;
-
     if (createOrderDto.customerId && companyId) {
       try {
         customer = await this.customersService.findOne(createOrderDto.customerId);
-        
         if (customer) {
           const MIN_ORDER_AMOUNT = 1000; // Minimum order amount in TK
           const POINTS_PER_DISCOUNT = 2000; // 2000 points = 20 TK discount
           const DISCOUNT_AMOUNT = 20; // 20 TK discount per 2000 points
-
           // Check if order meets minimum amount requirement
           if (createOrderDto.totalAmount >= MIN_ORDER_AMOUNT) {
             const availablePoints = customer.loyaltyPoints || 0;
-            
             // Calculate how many discount blocks can be applied
             const discountBlocks = Math.floor(availablePoints / POINTS_PER_DISCOUNT);
-            
             if (discountBlocks > 0) {
               // Apply maximum discount blocks (can be limited by order total)
               const maxDiscount = discountBlocks * DISCOUNT_AMOUNT;
               const orderSubtotal = createOrderDto.totalAmount;
-              
               // Discount cannot exceed order total
               loyaltyDiscount = Math.min(maxDiscount, orderSubtotal);
-              
               // Calculate points to redeem (in full blocks of 2000)
               const blocksToRedeem = Math.floor(loyaltyDiscount / DISCOUNT_AMOUNT);
               loyaltyPointsRedeemed = blocksToRedeem * POINTS_PER_DISCOUNT;
-              
               // Update order total with discount
               finalOrderTotal = orderSubtotal - loyaltyDiscount;
-              
-              console.log(`💰 Loyalty redemption: ${loyaltyPointsRedeemed} points = ${loyaltyDiscount} TK discount`);
-            }
-          } else {
-            console.log(`⚠️ Order amount ${createOrderDto.totalAmount} is below minimum ${MIN_ORDER_AMOUNT} TK for loyalty redemption`);
+              }
           }
         }
       } catch (error) {
@@ -188,7 +160,6 @@ export class POSService {
         // Don't fail order creation if loyalty processing fails
       }
     }
-
     const baseOrderData: any = {
       ...createOrderDto,
       branchId: new Types.ObjectId(branchId),
@@ -200,20 +171,16 @@ export class POSService {
       loyaltyDiscount,
       totalAmount: finalOrderTotal, // Use discounted amount if loyalty was applied
     };
-
     if (createOrderDto.tableId) {
       baseOrderData.tableId = new Types.ObjectId(createOrderDto.tableId);
-      
       // Validate table capacity for dine-in orders
       if (createOrderDto.orderType === 'dine-in' && createOrderDto.guestCount) {
         const table = await this.tablesService.findOne(createOrderDto.tableId);
         if (!table) {
           throw new NotFoundException(`Table with ID ${createOrderDto.tableId} not found`);
         }
-        
         // Store tableNumber in order for historical records (even if tableId is cleared later)
         baseOrderData.tableNumber = (table as any).tableNumber || '';
-        
         // Get active orders for this table today
         // ALWAYS check both pending AND paid orders, regardless of payment mode setting
         // This handles scenarios where:
@@ -224,7 +191,6 @@ export class POSService {
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
-        
         // Get ALL active orders (both pending and paid) for seat calculation
         const existingOrders = await this.posOrderModel.find({
           tableId: new Types.ObjectId(createOrderDto.tableId),
@@ -232,23 +198,18 @@ export class POSService {
           status: { $in: ['pending', 'paid'] }, // Always check both
           orderType: 'dine-in',
         }).exec();
-        
         // Calculate used seats from ALL orders (both pending and paid)
         // If there are orders with tableId, they're using seats regardless of payment mode
         const usedSeats = existingOrders.reduce((sum, order) => {
           return sum + (order.guestCount || 0);
         }, 0);
-        
         // Log if multiple orders exist (for debugging)
         if (existingOrders.length > 1) {
           const pendingCount = existingOrders.filter(o => o.status === 'pending').length;
           const paidCount = existingOrders.filter(o => o.status === 'paid').length;
-          console.log(`⚠️  [createOrder] Table ${createOrderDto.tableId} has ${existingOrders.length} orders (${pendingCount} pending, ${paidCount} paid). Total used seats: ${usedSeats}`);
         }
-        
         // Calculate remaining seats
         const remainingSeats = Math.max(0, (table.capacity || 0) - usedSeats);
-        
         // Check if new order exceeds capacity
         if (createOrderDto.guestCount > remainingSeats) {
           throw new BadRequestException(
@@ -259,34 +220,27 @@ export class POSService {
     } else {
       delete baseOrderData.tableId;
     }
-
     if (createOrderDto.deliveryDetails) {
       baseOrderData.deliveryDetails = { ...createOrderDto.deliveryDetails };
     }
-
     if (createOrderDto.takeawayDetails) {
       baseOrderData.takeawayDetails = { ...createOrderDto.takeawayDetails };
     }
-
     // Include guestCount for dine-in orders (default to 1 if not provided)
     if (createOrderDto.orderType === 'dine-in') {
       baseOrderData.guestCount = createOrderDto.guestCount || 1;
     }
-
     const ingredientUsage = new Map<
       string,
       { quantity: number; name?: string; unit?: string }
     >();
-
     for (const item of createOrderDto.items) {
       const menuItemId = item.menuItemId;
       if (!menuItemId) {
         continue;
       }
-
       // menuItemCache is already populated above, so just get from cache
       const menuItem = menuItemCache.get(menuItemId);
-
       if (
         !menuItem ||
         menuItem.trackInventory !== true ||
@@ -295,7 +249,6 @@ export class POSService {
       ) {
         continue;
       }
-
       for (const ingredient of menuItem.ingredients) {
         const rawIngredient = ingredient?.ingredientId as any;
         const ingredientObjectId: Types.ObjectId | undefined =
@@ -306,29 +259,24 @@ export class POSService {
             : rawIngredient instanceof Types.ObjectId
             ? rawIngredient
             : undefined;
-
         const ingredientId = ingredientObjectId
           ? ingredientObjectId.toString()
           : rawIngredient
           ? String(rawIngredient)
           : null;
-
         const baseQuantity = Number(ingredient?.quantity ?? 0);
         if (!ingredientId || Number.isNaN(baseQuantity) || baseQuantity <= 0) {
           continue;
         }
-
         const totalUsage = baseQuantity * item.quantity;
         if (totalUsage <= 0) {
           continue;
         }
-
         const existing = ingredientUsage.get(ingredientId) ?? {
           quantity: 0,
           name: rawIngredient?.name,
           unit: ingredient?.unit,
         };
-
         existing.quantity += totalUsage;
         if (!existing.name && rawIngredient?.name) {
           existing.name = rawIngredient.name;
@@ -336,14 +284,11 @@ export class POSService {
         if (!existing.unit && ingredient?.unit) {
           existing.unit = ingredient.unit;
         }
-
         ingredientUsage.set(ingredientId, existing);
       }
     }
-
     for (const [ingredientId, usage] of ingredientUsage.entries()) {
       const ingredient = await this.ingredientsService.findOne(ingredientId);
-
       if (ingredient.currentStock < usage.quantity) {
         throw new BadRequestException(
           `Insufficient stock for ingredient ${
@@ -353,26 +298,21 @@ export class POSService {
           }, available ${ingredient.currentStock}.`,
         );
       }
-
       ingredientUsage.set(ingredientId, {
         quantity: usage.quantity,
         name: ingredient.name,
         unit: ingredient.unit,
       });
     }
-
     let lastError: any = null;
-
     for (let attempt = 0; attempt < 5; attempt++) {
       const orderNumber = await this.generateOrderNumber(branchId);
       const order = new this.posOrderModel({
         ...baseOrderData,
         orderNumber,
       });
-
       try {
         const savedOrder = await order.save();
-
         try {
           for (const [ingredientId, usage] of ingredientUsage.entries()) {
             await this.ingredientsService.removeStock(
@@ -384,13 +324,11 @@ export class POSService {
           await this.posOrderModel.deleteOne({ _id: savedOrder._id });
           throw inventoryError;
         }
-
         // If this is a room_service order, a bookingId is required so that the charge hits the folio.
         if (createOrderDto.orderType === 'room_service') {
           if (!createOrderDto.bookingId) {
             throw new BadRequestException('bookingId is required for room service orders');
           }
-
           await this.bookingsService.applyAdditionalCharge(
             createOrderDto.bookingId,
             savedOrder.totalAmount,
@@ -399,12 +337,8 @@ export class POSService {
             savedOrder.status === 'paid', // Only mark as already paid if the POS order itself is paid
           );
         }
-
         // Update table status if dine-in order
-        console.log(`🔍 [createOrder] Checking table status update - tableId: ${createOrderDto.tableId}, orderType: ${createOrderDto.orderType}, status: ${savedOrder.status}`);
-        
         if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in' && savedOrder.status === 'pending') {
-          console.log(`🔄 [createOrder] Updating table ${createOrderDto.tableId} to occupied (pending order)`);
           try {
             await this.tablesService.updateStatus(
               createOrderDto.tableId.toString(),
@@ -414,7 +348,6 @@ export class POSService {
                 occupiedBy: userId,
               },
             );
-            console.log(`✅ [createOrder] Table ${createOrderDto.tableId} marked as occupied (pending order)`);
           } catch (tableError) {
             // Log error but don't fail order creation
             console.error(`❌ [createOrder] Failed to update table ${createOrderDto.tableId} status:`, tableError);
@@ -422,7 +355,6 @@ export class POSService {
         } else if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in' && savedOrder.status === 'paid') {
           // If order is paid first (pay-first mode), table should still be occupied
           // because the customer is using the table even though they paid upfront
-          console.log(`🔄 [createOrder] Updating table ${createOrderDto.tableId} to occupied (paid order - pay-first mode)`);
           try {
             const tableUpdateResult = await this.tablesService.updateStatus(
               createOrderDto.tableId.toString(),
@@ -432,15 +364,11 @@ export class POSService {
                 occupiedBy: userId,
               },
             );
-            console.log(`✅ [createOrder] Table ${createOrderDto.tableId} (${tableUpdateResult?.tableNumber || 'N/A'}) marked as occupied (order ${savedOrder.orderNumber} created as paid - pay-first mode)`);
           } catch (tableError) {
             console.error(`❌ [createOrder] Failed to update table ${createOrderDto.tableId} status to occupied:`, tableError);
             // Don't fail order creation, but log the error
           }
-        } else {
-          console.log(`⏭️  [createOrder] Skipping table status update - tableId: ${createOrderDto.tableId || 'N/A'}, orderType: ${createOrderDto.orderType}, status: ${savedOrder.status}`);
         }
-
         // If order is created as 'paid' (pay-first mode), create payment record immediately
         if (savedOrder.status === 'paid' && createOrderDto.paymentMethod) {
           try {
@@ -455,23 +383,18 @@ export class POSService {
               branchId: new Types.ObjectId(branchId),
               paymentDetails: {},
             };
-
             const payment = new this.posPaymentModel(paymentData);
             const savedPayment = await payment.save();
-
             // Link payment to order
             await this.posOrderModel.findByIdAndUpdate(savedOrder._id, {
               paymentId: savedPayment._id,
               completedAt: new Date(),
             }).exec();
-
-            console.log(`✅ Payment record created for pay-first order ${savedOrder.orderNumber}`);
-          } catch (paymentError) {
+            } catch (paymentError) {
             // Log error but don't fail order creation
             console.error('Failed to create payment record for paid order:', paymentError);
           }
         }
-
         // Create kitchen order from POS order
         try {
           await this.createKitchenOrderFromPOS(savedOrder, menuItemCache);
@@ -479,61 +402,51 @@ export class POSService {
           // Log error but don't fail order creation
           console.error('Failed to create kitchen order:', kitchenError);
         }
-
         // Handle customer loyalty redemption and stats update if order is paid
         if (savedOrder.status === 'paid') {
           // If loyalty points were redeemed, deduct them from customer
           if (loyaltyPointsRedeemed > 0 && customer) {
             try {
               await this.customersService.redeemLoyaltyPoints(customer._id.toString(), loyaltyPointsRedeemed);
-              console.log(`✅ Redeemed ${loyaltyPointsRedeemed} loyalty points from customer ${customer._id}`);
-            } catch (error) {
+              } catch (error) {
               console.error('❌ Failed to redeem loyalty points:', error);
             }
           }
-
           // Update customer statistics
           if (createOrderDto.customerId && companyId) {
             try {
               const customerForStats = customer || await this.customersService.findOne(createOrderDto.customerId);
               if (customerForStats) {
                 await this.customersService.updateOrderStats(customerForStats._id.toString(), savedOrder.totalAmount);
-                console.log(`✅ Updated customer stats for customer ID: ${customerForStats._id}, amount: ${savedOrder.totalAmount}`);
-              }
+                }
             } catch (customerError) {
               console.error('❌ Failed to update customer statistics:', customerError);
             }
           } else if (createOrderDto.customerInfo?.email && companyId) {
             try {
-              console.log(`📧 Attempting to update customer stats for email: ${createOrderDto.customerInfo.email}, companyId: ${companyId}, orderAmount: ${savedOrder.totalAmount}`);
               const customerByEmail = await this.customersService.findByEmail(companyId, createOrderDto.customerInfo.email);
               if (customerByEmail) {
                 const customerId = (customerByEmail as any)._id?.toString() || (customerByEmail as any).id?.toString();
                 if (customerId) {
-                  console.log(`💰 Updating customer stats for customer ID: ${customerId}, amount: ${savedOrder.totalAmount}`);
                   await this.customersService.updateOrderStats(customerId, savedOrder.totalAmount);
-                  console.log(`✅ Successfully updated customer stats for ${customerByEmail.email}: +${savedOrder.totalAmount}`);
-                }
+                  }
               }
             } catch (customerError) {
               console.error('❌ Failed to update customer statistics:', customerError);
             }
           }
-
           // Send purchase confirmation notification
           if (customer || createOrderDto.customerInfo) {
             try {
               const customerEmail = customer?.email || createOrderDto.customerInfo?.email;
               const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : createOrderDto.customerInfo?.name || 'Customer';
               const customerPhone = customer?.phone || createOrderDto.customerInfo?.phone;
-
               if (customerEmail) {
                 const orderItems = savedOrder.items.map((item: any) => ({
                   name: item.name || 'Unknown Item',
                   quantity: item.quantity,
                   price: item.price,
                 }));
-
                 await this.emailService.sendPurchaseConfirmation(
                   customerEmail,
                   customerName,
@@ -543,24 +456,19 @@ export class POSService {
                   loyaltyPointsRedeemed || undefined,
                   loyaltyDiscount || undefined,
                 );
-                console.log(`✅ Sent purchase confirmation email to ${customerEmail}`);
               }
-
               if (customerPhone) {
                 const smsMessage = `Thank you for your order! Order #${savedOrder.orderNumber} has been confirmed.${loyaltyPointsRedeemed > 0 ? ` You redeemed ${loyaltyPointsRedeemed} points for ${loyaltyDiscount} TK discount.` : ''} Total: ${savedOrder.totalAmount} TK.`;
                 await this.smsService.sendSms(customerPhone, smsMessage);
-                console.log(`✅ Sent purchase confirmation SMS to ${customerPhone}`);
               }
             } catch (notificationError) {
               console.error('❌ Failed to send purchase notifications:', notificationError);
             }
           }
         }
-
         // Notify via WebSocket: new order created
         try {
           const orderData: any = savedOrder.toObject ? savedOrder.toObject() : savedOrder;
-          
           // Ensure waiterId is included in order data for notifications (convert to string)
           // waiterId might not be in savedOrder because it's not in the schema, so use from DTO
           if (createOrderDto.waiterId) {
@@ -568,11 +476,7 @@ export class POSService {
             orderData.waiterId = typeof waiterIdValue === 'string' 
               ? waiterIdValue 
               : String(waiterIdValue);
-            console.log(`🔔 [POS Order ${orderData.orderNumber}] Waiter ID set: ${orderData.waiterId}`);
-          } else {
-            console.log(`⚠️ [POS Order ${orderData.orderNumber}] No waiterId in createOrderDto`);
-          }
-          
+            }
           // Fetch table number if tableId exists
           if (savedOrder.tableId) {
             try {
@@ -580,54 +484,43 @@ export class POSService {
               const table = await this.tablesService.findOne(tableIdStr);
               if (table) {
                 orderData.tableNumber = (table as any).tableNumber || (table as any).number;
-                console.log(`🍽️ [POS Order ${orderData.orderNumber}] Table number: ${orderData.tableNumber}`);
-              }
+                }
             } catch (tableError) {
               console.warn(`⚠️ [POS Order ${orderData.orderNumber}] Could not fetch table number:`, tableError);
             }
           }
-          
-          console.log(`📡 [POS Order ${orderData.orderNumber}] Sending notification, waiterId: ${orderData.waiterId || 'NONE'}, tableNumber: ${orderData.tableNumber || 'NONE'}`);
           this.websocketsGateway.notifyNewOrder(branchId, orderData);
         } catch (wsError) {
           console.error('❌ Failed to emit WebSocket event:', wsError);
         }
-
         return savedOrder;
       } catch (error: any) {
         lastError = error;
         const isDuplicateOrderNumber =
           error?.code === 11000 &&
           (error?.keyPattern?.orderNumber || error?.keyValue?.orderNumber);
-
         if (!isDuplicateOrderNumber) {
           throw error;
         }
       }
     }
-
     throw new ConflictException(
       lastError?.message ||
         'Unable to generate a unique order number after multiple attempts.',
     );
   }
-
   // Get POS orders with filters
   async getOrders(filters: POSOrderFiltersDto): Promise<{ orders: POSOrder[]; total: number }> {
     const query: any = {};
-
     if (filters.branchId) {
       query.branchId = new Types.ObjectId(filters.branchId);
     }
-
     if (filters.status) {
       query.status = filters.status;
     }
-
     if (filters.orderType) {
       query.orderType = filters.orderType;
     }
-
     if (filters.startDate || filters.endDate) {
       query.createdAt = {};
       if (filters.startDate) {
@@ -638,7 +531,6 @@ export class POSService {
             ? filters.startDate
             : filters.startDate + 'T00:00:00.000Z';
           const startDate = new Date(startDateStr);
-          
           if (isNaN(startDate.getTime())) {
             throw new BadRequestException(`Invalid startDate format: ${filters.startDate}`);
           }
@@ -658,11 +550,9 @@ export class POSService {
             ? filters.endDate
             : filters.endDate + 'T23:59:59.999Z';
           const endDate = new Date(endDateStr);
-          
           if (isNaN(endDate.getTime())) {
             throw new BadRequestException(`Invalid endDate format: ${filters.endDate}`);
           }
-          
           query.createdAt.$lte = endDate;
         } catch (error) {
           if (error instanceof BadRequestException) {
@@ -672,7 +562,6 @@ export class POSService {
         }
       }
     }
-
     if (filters.search) {
       query.$or = [
         { orderNumber: { $regex: filters.search, $options: 'i' } },
@@ -680,11 +569,9 @@ export class POSService {
         { 'customerInfo.phone': { $regex: filters.search, $options: 'i' } },
       ];
     }
-
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
-
     const [orders, total] = await Promise.all([
       this.posOrderModel
         .find(query)
@@ -697,10 +584,8 @@ export class POSService {
         .exec(),
       this.posOrderModel.countDocuments(query).exec(),
     ]);
-
     return { orders, total };
   }
-
   // Get single POS order
   async getOrderById(id: string): Promise<POSOrder> {
     const order = await this.posOrderModel
@@ -710,45 +595,35 @@ export class POSService {
       .populate('items.menuItemId', 'name description price')
       .populate('paymentId')
       .exec();
-
     if (!order) {
       throw new NotFoundException('POS order not found');
     }
-
     return order;
   }
-
   // Update POS order
   async updateOrder(id: string, updateOrderDto: UpdatePOSOrderDto, userId: string): Promise<POSOrder> {
     const order = await this.posOrderModel.findById(id).exec();
     if (!order) {
       throw new NotFoundException('POS order not found');
     }
-
     if (order.status === 'paid' && updateOrderDto.status === 'cancelled') {
       throw new ConflictException('Cannot cancel a paid order');
     }
-
     const updateData: any = { ...updateOrderDto };
-    
     if (updateOrderDto.status === 'cancelled') {
       updateData.cancelledAt = new Date();
       updateData.cancelledBy = new Types.ObjectId(userId);
     }
-
     if (updateOrderDto.status === 'paid') {
       updateData.completedAt = new Date();
     }
-
     const updatedOrder = await this.posOrderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
-
     // Notify via WebSocket: order updated
     try {
       this.websocketsGateway.notifyOrderUpdated(
         order.branchId.toString(),
         updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
       );
-      
       if (updateOrderDto.status) {
         this.websocketsGateway.notifyOrderStatusChanged(
           order.branchId.toString(),
@@ -758,21 +633,17 @@ export class POSService {
     } catch (wsError) {
       console.error('Failed to emit WebSocket event:', wsError);
     }
-
     return updatedOrder;
   }
-
   // Cancel POS order
   async cancelOrder(id: string, reason: string, userId: string): Promise<POSOrder> {
     const order = await this.posOrderModel.findById(id).exec();
     if (!order) {
       throw new NotFoundException('POS order not found');
     }
-
     if (order.status === 'paid') {
       throw new ConflictException('Cannot cancel a paid order');
     }
-
     const cancelledOrder = await this.posOrderModel.findByIdAndUpdate(
       id,
       {
@@ -783,7 +654,6 @@ export class POSService {
       },
       { new: true }
     ).exec();
-
     // Free the table if it's a dine-in order and no other active orders exist on this table
     if (order.tableId && order.orderType === 'dine-in') {
       try {
@@ -792,7 +662,6 @@ export class POSService {
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
-
         const otherActiveOrders = await this.posOrderModel.find({
           tableId: order.tableId,
           _id: { $ne: order._id }, // Exclude the current order being cancelled
@@ -800,7 +669,6 @@ export class POSService {
           status: { $in: ['pending', 'paid'] },
           orderType: 'dine-in',
         }).countDocuments().exec();
-
         // Only free the table if no other active orders exist
         if (otherActiveOrders === 0) {
           await this.tablesService.updateStatus(
@@ -815,7 +683,6 @@ export class POSService {
         console.error('Failed to free table after cancellation:', tableError);
       }
     }
-
     // Notify via WebSocket: order cancelled
     try {
       this.websocketsGateway.notifyOrderStatusChanged(
@@ -825,25 +692,20 @@ export class POSService {
     } catch (wsError) {
       console.error('Failed to emit WebSocket event:', wsError);
     }
-
     return cancelledOrder;
   }
-
   // Process payment
   async processPayment(processPaymentDto: ProcessPaymentDto, userId: string, branchId: string, companyId?: string): Promise<POSPayment> {
     const order = await this.posOrderModel.findById(processPaymentDto.orderId).exec();
     if (!order) {
       throw new NotFoundException('POS order not found');
     }
-
     if (order.status === 'paid') {
       throw new ConflictException('Order is already paid');
     }
-
     if (Math.abs(order.totalAmount - processPaymentDto.amount) > 0.01) {
       throw new BadRequestException('Payment amount does not match order total');
     }
-
     const paymentData = {
       orderId: new Types.ObjectId(processPaymentDto.orderId),
       amount: processPaymentDto.amount,
@@ -860,21 +722,32 @@ export class POSService {
         authorizationCode: processPaymentDto.authorizationCode,
       },
     };
-
     const payment = new this.posPaymentModel(paymentData);
     const savedPayment = await payment.save();
-
     // Update order status
     const updatedOrder = await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
       status: 'paid',
       paymentId: savedPayment._id,
       completedAt: new Date(),
     }, { new: true }).exec();
-
+    // If this is a room_service order that was just paid, add the additional charge to the booking
+    if (updatedOrder.orderType === 'room_service' && updatedOrder.bookingId) {
+      try {
+        await this.bookingsService.applyAdditionalCharge(
+          updatedOrder.bookingId.toString(),
+          updatedOrder.totalAmount,
+          'room_service',
+          `Room service order ${updatedOrder.orderNumber}`,
+          true, // alreadyPaid = true since payment was just processed
+        );
+        } catch (chargeError) {
+        console.error(`❌ [processPayment] Failed to add additional charge to booking:`, chargeError);
+        // Don't fail the payment if charge addition fails - log and continue
+      }
+    }
     // Note: We do NOT free the table after payment processing.
     // Tables remain occupied even after payment because customers may still be using them.
     // Tables are only freed when staff explicitly releases them or orders are cancelled.
-
     // Handle customer loyalty redemption and stats update
     let customer = null;
     if (order.customerId && companyId) {
@@ -890,43 +763,35 @@ export class POSService {
         console.error('Error fetching customer by email:', error);
       }
     }
-
     if (customer) {
       try {
         const customerId = (customer as any)._id?.toString() || (customer as any).id?.toString();
-        
         // Redeem loyalty points if they were used
         if (order.loyaltyPointsRedeemed && order.loyaltyPointsRedeemed > 0) {
           try {
             await this.customersService.redeemLoyaltyPoints(customerId, order.loyaltyPointsRedeemed);
-            console.log(`✅ Redeemed ${order.loyaltyPointsRedeemed} loyalty points from customer ${customerId}`);
-          } catch (error) {
+            } catch (error) {
             console.error('❌ Failed to redeem loyalty points:', error);
           }
         }
-
         // Update customer statistics
         await this.customersService.updateOrderStats(customerId, order.totalAmount);
-        console.log(`✅ Updated customer stats for customer ID: ${customerId}, amount: ${order.totalAmount}`);
-      } catch (customerError) {
+        } catch (customerError) {
         console.error('❌ Failed to update customer statistics:', customerError);
       }
     }
-
     // Send purchase confirmation notification
     if (customer || order.customerInfo) {
       try {
         const customerEmail = customer?.email || order.customerInfo?.email;
         const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : order.customerInfo?.name || 'Customer';
         const customerPhone = customer?.phone || order.customerInfo?.phone;
-
         if (customerEmail) {
           const orderItems = order.items.map((item: any) => ({
             name: item.name || 'Unknown Item',
             quantity: item.quantity,
             price: item.price,
           }));
-
           await this.emailService.sendPurchaseConfirmation(
             customerEmail,
             customerName,
@@ -936,19 +801,15 @@ export class POSService {
             order.loyaltyPointsRedeemed || undefined,
             order.loyaltyDiscount || undefined,
           );
-          console.log(`✅ Sent purchase confirmation email to ${customerEmail}`);
-        }
-
+          }
         if (customerPhone) {
           const smsMessage = `Thank you for your order! Order #${order.orderNumber} has been confirmed.${order.loyaltyPointsRedeemed ? ` You redeemed ${order.loyaltyPointsRedeemed} points for ${order.loyaltyDiscount || 0} TK discount.` : ''} Total: ${order.totalAmount} TK.`;
           await this.smsService.sendSms(customerPhone, smsMessage);
-          console.log(`✅ Sent purchase confirmation SMS to ${customerPhone}`);
-        }
+          }
       } catch (notificationError) {
         console.error('❌ Failed to send purchase notifications:', notificationError);
       }
     }
-
     // Notify via WebSocket: payment received
     try {
       this.websocketsGateway.notifyPaymentReceived(
@@ -956,7 +817,6 @@ export class POSService {
         updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
         savedPayment.toObject ? savedPayment.toObject() : savedPayment,
       );
-      
       this.websocketsGateway.notifyOrderStatusChanged(
         branchId,
         updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
@@ -964,22 +824,17 @@ export class POSService {
     } catch (wsError) {
       console.error('Failed to emit WebSocket event:', wsError);
     }
-
     return savedPayment;
   }
-
   // Get POS statistics
   async getStats(filters: POSStatsFiltersDto): Promise<any> {
     const matchQuery: any = {};
-
     if (filters.branchId) {
       matchQuery.branchId = new Types.ObjectId(filters.branchId);
     }
-
     if (filters.orderType) {
       matchQuery.orderType = filters.orderType;
     }
-
     if (filters.startDate || filters.endDate) {
       matchQuery.createdAt = {};
       if (filters.startDate) {
@@ -1002,11 +857,9 @@ export class POSService {
             ? filters.endDate
             : filters.endDate + 'T23:59:59.999Z';
           const endDate = new Date(endDateStr);
-          
           if (isNaN(endDate.getTime())) {
             throw new BadRequestException(`Invalid endDate format: ${filters.endDate}`);
           }
-          
           matchQuery.createdAt.$lte = endDate;
         } catch (error) {
           if (error instanceof BadRequestException) {
@@ -1016,12 +869,10 @@ export class POSService {
         }
       }
     }
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
     const todayMatchQuery = {
       ...matchQuery,
       createdAt: {
@@ -1029,7 +880,6 @@ export class POSService {
         $lt: tomorrow,
       },
     };
-
     const [
       totalOrders,
       totalRevenue,
@@ -1093,11 +943,9 @@ export class POSService {
         },
       ]).exec(),
     ]);
-
     const totalRevenueAmount = totalRevenue[0]?.total || 0;
     const revenueTodayAmount = revenueToday[0]?.total || 0;
     const averageOrderValue = totalOrders > 0 ? totalRevenueAmount / totalOrders : 0;
-
     return {
       totalOrders,
       totalRevenue: totalRevenueAmount,
@@ -1107,15 +955,12 @@ export class POSService {
       topSellingItems,
     };
   }
-
-
   // Get quick stats
   async getQuickStats(branchId: string): Promise<any> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
     const [
       activeOrders,
       availableTables,
@@ -1138,7 +983,6 @@ export class POSService {
         status: 'pending',
       }).exec(),
     ]);
-
     return {
       activeOrders,
       availableTables,
@@ -1146,11 +990,9 @@ export class POSService {
       ordersInProgress,
     };
   }
-
   // POS Settings methods
   async getPOSSettings(branchId: string): Promise<POSSettings> {
     let settings = await this.posSettingsModel.findOne({ branchId: new Types.ObjectId(branchId) }).exec();
-    
     if (!settings) {
       // Create default settings
       settings = new this.posSettingsModel({
@@ -1172,10 +1014,8 @@ export class POSService {
       });
       await settings.save();
     }
-
     return settings;
   }
-
   async updatePOSSettings(branchId: string, updateSettingsDto: UpdatePOSSettingsDto, userId: string): Promise<POSSettings> {
     const settings = await this.posSettingsModel.findOneAndUpdate(
       { branchId: new Types.ObjectId(branchId) },
@@ -1185,57 +1025,44 @@ export class POSService {
       },
       { new: true, upsert: true }
     ).exec();
-
     return settings;
   }
-
   // Print receipt
   async printReceipt(orderId: string, printerId?: string): Promise<{ receiptUrl: string; printResult?: any }> {
     const order = await this.getOrderById(orderId);
-    
     // Generate receipt HTML
     const receiptHtml = await this.receiptService.generateReceiptHTML(orderId);
-    
     // Generate receipt URL (in real implementation, this would generate a PDF)
     const receiptUrl = `/api/pos/receipts/${orderId}.html`;
-    
     // Try to print if printer is specified
     let printResult;
     if (printerId) {
       printResult = await this.receiptService.printReceipt(orderId, printerId);
     }
-    
     return { 
       receiptUrl,
       printResult
     };
   }
-
   // Split order into multiple orders
   async splitOrder(orderId: string, itemsToSplit: any[], userId: string, branchId: string): Promise<{ order1: POSOrder; order2: POSOrder }> {
     const originalOrder = await this.getOrderById(orderId);
-    
     if (originalOrder.status === 'paid') {
       throw new ConflictException('Cannot split a paid order');
     }
-
     // Calculate remaining items
     const remainingItems = originalOrder.items.filter(
       item => !itemsToSplit.some(splitItem => splitItem.menuItemId === item.menuItemId.toString())
     );
-
     if (remainingItems.length === 0) {
       throw new BadRequestException('Cannot split order - no items remaining in original order');
     }
-
     if (itemsToSplit.length === 0) {
       throw new BadRequestException('Cannot split order - no items selected to split');
     }
-
     // Calculate totals
     const splitTotal = itemsToSplit.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     const remainingTotal = remainingItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-
     // Create new order for split items
     const deliveryDetails = originalOrder.deliveryDetails
       ? {
@@ -1250,7 +1077,6 @@ export class POSService {
           assignedDriver: originalOrder.deliveryDetails.assignedDriver,
         }
       : undefined;
-
     const takeawayDetails = originalOrder.takeawayDetails
       ? {
           contactName: originalOrder.takeawayDetails.contactName,
@@ -1259,7 +1085,6 @@ export class POSService {
           assignedDriver: originalOrder.takeawayDetails.assignedDriver,
         }
       : undefined;
-
     const splitOrderData: CreatePOSOrderDto = {
       orderType: (originalOrder.orderType as any) || 'dine-in',
       ...(originalOrder.tableId ? { tableId: originalOrder.tableId.toString() } : {}),
@@ -1286,9 +1111,7 @@ export class POSService {
       paymentMethod: originalOrder.paymentMethod,
       notes: `Split from order ${originalOrder.orderNumber}`,
     };
-
     const newOrder = await this.createOrder(splitOrderData, userId, branchId);
-
     // Update original order with remaining items
     const updateData = {
       items: remainingItems.map(item => ({
@@ -1300,27 +1123,21 @@ export class POSService {
       totalAmount: remainingTotal,
       notes: originalOrder.notes ? `${originalOrder.notes} (Split - remaining items)` : 'Split - remaining items',
     };
-
     const updatedOrder = await this.updateOrder(orderId, updateData, userId);
-
     return {
       order1: updatedOrder,
       order2: newOrder,
     };
   }
-
   // Process refund for an order
   async processRefund(orderId: string, amount: number, reason: string, userId: string, branchId: string): Promise<POSPayment> {
     const order = await this.getOrderById(orderId);
-    
     if (order.status !== 'paid') {
       throw new BadRequestException('Can only refund paid orders');
     }
-
     if (amount > order.totalAmount) {
       throw new BadRequestException('Refund amount cannot exceed order total');
     }
-
     // Create refund payment record
     const refundData = {
       orderId: new Types.ObjectId(orderId),
@@ -1337,10 +1154,8 @@ export class POSService {
         originalOrderId: orderId,
       },
     };
-
     const refund = new this.posPaymentModel(refundData);
     const savedRefund = await refund.save();
-
     // Update order status if full refund
     if (amount === order.totalAmount) {
       await this.posOrderModel.findByIdAndUpdate(orderId, {
@@ -1350,10 +1165,8 @@ export class POSService {
         cancellationReason: `Full refund: ${reason}`,
       }).exec();
     }
-
     return savedRefund;
   }
-
   // Get order history for a specific table
   async getTableOrderHistory(tableId: string, limit: number = 10): Promise<POSOrder[]> {
     return this.posOrderModel
@@ -1365,29 +1178,21 @@ export class POSService {
       .limit(limit)
       .exec();
   }
-
   // Get available tables (integrate with real table service)
   async getAvailableTables(branchId: string): Promise<any[]> {
-    console.log(`🔍 [getAvailableTables] Called for branchId: ${branchId}`);
     // Get all tables from the branch using TablesService
     const allTables = await this.tablesService.findAll({ branchId });
-    console.log(`🔍 [getAvailableTables] Found ${allTables.length} tables from tablesService`);
-    
     // Get POS settings to check payment mode
     const posSettings = await this.getPOSSettings(branchId);
     const isPayFirstMode = posSettings.defaultPaymentMode === 'pay-first';
-    console.log(`🔍 [getAvailableTables] Payment mode from settings: ${posSettings.defaultPaymentMode}, isPayFirstMode: ${isPayFirstMode}`);
-    
     // IMPORTANT: In pay-first mode, paid orders keep tables occupied
     // But we should also check if there are ANY paid orders with tableId to determine if pay-first was used
     // If we find paid orders with tableId, treat them as occupying tables regardless of setting
-    
     // Get active orders for today to determine occupied tables
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
     // Fetch PENDING orders to determine table occupation
     const pendingOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
@@ -1400,11 +1205,9 @@ export class POSService {
     .select('tableId orderNumber totalAmount guestCount userId notes status')
     .lean() // Use lean() for better performance and to ensure tableId is a plain object
     .exec();
-
     // Fetch paid orders - ALWAYS check for paid orders with tableId
     // If there are paid orders with tableId, the customer paid and is using the table
     // This works regardless of payment mode setting (handles frontend toggle vs backend setting mismatch)
-    console.log(`🔍 [getAvailableTables] Querying paid orders: branchId=${branchId}, status=paid, orderType=dine-in, dateRange=${today.toISOString()} to ${tomorrow.toISOString()}`);
     const paidOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
       createdAt: { $gte: today, $lt: tomorrow },
@@ -1415,8 +1218,6 @@ export class POSService {
     .select('tableId orderNumber totalAmount guestCount userId notes status completedAt createdAt')
     .lean() // Use lean() for better performance and to ensure tableId is a plain object
     .exec();
-    console.log(`🔍 [getAvailableTables] Raw paid orders query result: ${paidOrders.length} orders found`);
-    
     // Debug: Also check ALL paid orders (without date filter) to see if there are any
     if (paidOrders.length === 0) {
       const allPaidOrders = await this.posOrderModel.find({
@@ -1429,14 +1230,7 @@ export class POSService {
       .lean()
       .limit(10)
       .exec();
-      console.log(`⚠️  [getAvailableTables] Found ${allPaidOrders.length} total paid orders (without date filter). Sample:`, allPaidOrders.map((o: any) => ({
-        orderNumber: o.orderNumber,
-        tableId: typeof o.tableId === 'object' ? o.tableId.toString() : String(o.tableId),
-        createdAt: (o as any).createdAt,
-        status: o.status
-      })));
     }
-    
     // Populate userId separately after lean() to avoid issues
     const paidOrdersWithUser = await Promise.all(
       paidOrders.map(async (order) => {
@@ -1447,20 +1241,14 @@ export class POSService {
         return order;
       })
     );
-    
     // Always log paid orders if found, regardless of payment mode setting
     if (paidOrdersWithUser.length > 0) {
-      console.log(`🔍 [getAvailableTables] Found ${paidOrdersWithUser.length} paid orders (payment mode setting: ${posSettings.defaultPaymentMode})`);
       paidOrdersWithUser.forEach(order => {
         const tableIdStr = typeof order.tableId === 'object' && order.tableId 
           ? (order.tableId._id || order.tableId).toString() 
           : String(order.tableId || 'null');
-        console.log(`  - Order ${order.orderNumber}: tableId=${tableIdStr} (type: ${typeof order.tableId})`);
       });
-    } else {
-      console.log(`⚠️  [getAvailableTables] No paid orders found! Query: branchId=${branchId}, date range: ${today.toISOString()} to ${tomorrow.toISOString()}`);
     }
-
     // Group PENDING orders by table
     const ordersByTable = new Map<string, any[]>();
     pendingOrders.forEach(order => {
@@ -1480,7 +1268,6 @@ export class POSService {
         ordersByTable.get(tableId)!.push(order);
       }
     });
-
     // Group PAID orders by table
     const paidOrdersByTable = new Map<string, any[]>();
     paidOrdersWithUser.forEach(order => {
@@ -1494,64 +1281,49 @@ export class POSService {
           // If it's already a string or number, convert to string
           tableId = String(order.tableId);
         }
-        
         if (!paidOrdersByTable.has(tableId)) {
           paidOrdersByTable.set(tableId, []);
         }
         paidOrdersByTable.get(tableId)!.push(order);
       }
     });
-    
     if (paidOrdersByTable.size > 0) {
-      console.log(`🔍 [getAvailableTables] Grouped paid orders by ${paidOrdersByTable.size} tables`);
       paidOrdersByTable.forEach((orders, tableId) => {
-        console.log(`  - Table ${tableId}: ${orders.length} paid order(s)`);
+        // Paid orders found for table
       });
     }
-
       // Transform tables to include occupation status and order details
       return allTables.map((table: any) => {
         const tableId = table._id?.toString() || table.id;
         const tablePendingOrders = ordersByTable.get(tableId) || [];
         const tablePaidOrders = paidOrdersByTable.get(tableId) || [];
-        
         // Determine if table is occupied:
         // 1. PENDING orders always occupy tables
         // 2. PAID orders with tableId should also occupy tables (pay-first behavior)
         //    This handles cases where user toggled pay-first in frontend even if backend setting is pay-later
         //    If there's a paid order with tableId, the customer paid and is using the table
         const isOccupied = tablePendingOrders.length > 0 || tablePaidOrders.length > 0;
-        
         // Debug: Log tables with orders or marked as occupied
         const hasOrders = tablePendingOrders.length > 0 || tablePaidOrders.length > 0;
         if (hasOrders || table.status === 'occupied') {
-          console.log(`🔍 [getAvailableTables] Table ${tableId} (${table.tableNumber || table.number}): ${tablePendingOrders.length} pending, ${tablePaidOrders.length} paid, DB status: ${table.status}, will be ${isOccupied ? 'OCCUPIED' : 'AVAILABLE'}`);
-          
           // If table is marked occupied in DB but no orders found, show debug info
           if (!hasOrders && table.status === 'occupied') {
-            console.log(`⚠️  [getAvailableTables] Table ${tableId} is marked occupied in DB but no orders found!`);
-            console.log(`   Available tableIds in ordersByTable: ${Array.from(ordersByTable.keys()).join(', ')}`);
-            console.log(`   Available tableIds in paidOrdersByTable: ${Array.from(paidOrdersByTable.keys()).join(', ')}`);
+            // Table marked as occupied but no orders found
           }
         }
-        
         if (tablePaidOrders.length > 0 && !isPayFirstMode) {
-          console.log(`⚠️  [getAvailableTables] Table ${tableId} has ${tablePaidOrders.length} paid order(s) but payment mode setting is pay-later. Marking as occupied anyway (customer is using table).`);
+          // Paid orders found but payment mode setting is pay-later. Marking as occupied anyway (customer is using table).
         }
-        
         // Primary order: prefer pending, but show paid if no pending (regardless of mode)
         const primaryOrder = tablePendingOrders.length > 0 
           ? tablePendingOrders[0] 
           : (tablePaidOrders.length > 0 ? tablePaidOrders[0] : null);
-        
         // Calculate used seats from both pending and paid orders
         // If there are paid orders with tableId, they're using seats regardless of payment mode setting
         const usedSeats = [...tablePendingOrders, ...tablePaidOrders].reduce((sum: number, order: any) => {
           return sum + (order.guestCount || 0);
         }, 0);
-        
         const remainingSeats = Math.max(0, (table.capacity || 0) - usedSeats);
-        
         // Extract waiter name from notes or userId
         let waiterName = '';
         if (primaryOrder) {
@@ -1564,11 +1336,9 @@ export class POSService {
             waiterName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || '';
           }
         }
-
         // Show order details if there are orders (pending or paid in pay-first mode)
         const shouldShowOrderDetails = primaryOrder !== null;
         const tableStatus = isOccupied ? 'occupied' : 'available';
-
         return {
           id: tableId,
           number: table.tableNumber || table.number || '',
@@ -1600,14 +1370,12 @@ export class POSService {
         };
       });
   }
-
   // Get waiter active orders count (for busy indicator)
   async getWaiterActiveOrdersCount(branchId: string): Promise<Record<string, number>> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
     // Get all active orders for today grouped by userId (waiter)
     const activeOrders = await this.posOrderModel.aggregate([
       {
@@ -1625,7 +1393,6 @@ export class POSService {
         },
       },
     ]).exec();
-
     // Convert to map of waiterId -> activeOrdersCount
     const waiterCounts: Record<string, number> = {};
     activeOrders.forEach((item) => {
@@ -1634,10 +1401,8 @@ export class POSService {
         waiterCounts[waiterId] = item.count || 0;
       }
     });
-
     return waiterCounts;
   }
-
   // Get POS menu items (integrate with real menu service)
   async getPOSMenuItems(filters: any): Promise<any[]> {
     try {
@@ -1651,21 +1416,14 @@ export class POSService {
         page: 1,
         limit: 1000, // Get all items for POS
       };
-
       // Remove undefined values
       Object.keys(queryFilters).forEach(key => {
         if (queryFilters[key] === undefined) {
           delete queryFilters[key];
         }
       });
-
-      console.log('🔍 POS Menu Items Query Filters:', queryFilters);
-
       // Fetch menu items from database (includes populated ingredient stock info)
       const result = await this.menuItemsService.findAll(queryFilters);
-      
-      console.log(`✅ Found ${result.menuItems.length} menu items`);
-      
       // Transform to POS format
       return result.menuItems.map((item: any) => {
         const category = item.categoryId;
@@ -1674,24 +1432,20 @@ export class POSService {
         const firstImage = Array.isArray(item.images) && item.images.length > 0 
           ? item.images[0] 
           : undefined;
-
         // Calculate stock and low-stock flags from ingredient data
         let stock = 999; // Default to "plenty" when not tracking inventory
         let isLowStock = false;
         let isOutOfStock = false;
-
         if (item.trackInventory === true && Array.isArray(item.ingredients) && item.ingredients.length > 0) {
           for (const ing of item.ingredients) {
             const ingredient: any = ing?.ingredientId;
             if (!ingredient) continue;
-
             // Out of stock if any ingredient is out
             if (ingredient.isOutOfStock || ingredient.currentStock <= 0) {
               isOutOfStock = true;
               isLowStock = true;
               break;
             }
-
             // Low stock if any ingredient is flagged low
             if (
               ingredient.isLowStock ||
@@ -1703,19 +1457,16 @@ export class POSService {
               isLowStock = true;
             }
           }
-
           // If any ingredient is out of stock, treat item as out of stock
           if (isOutOfStock) {
             stock = 0;
           }
         }
-
         // If item is manually marked unavailable, treat as out of stock
         if (item.isAvailable === false) {
           stock = 0;
           isOutOfStock = true;
         }
-
         return {
           id: (item._id || item.id).toString(),
           name: item.name,
@@ -1738,7 +1489,6 @@ export class POSService {
       return [];
     }
   }
-
   // Create kitchen order from POS order
   private async createKitchenOrderFromPOS(
     posOrder: POSOrderDocument,
@@ -1754,13 +1504,11 @@ export class POSService {
         console.error('Failed to fetch table for kitchen order:', error);
       }
     }
-
     // Build kitchen order items with menu item names
     const kitchenItems = [];
     for (let index = 0; index < posOrder.items.length; index++) {
       const item = posOrder.items[index];
       const menuItemId = item.menuItemId?.toString();
-      
       // Get menu item name from cache or fetch it
       let menuItem = menuItemCache.get(menuItemId || '');
       if (!menuItem && menuItemId) {
@@ -1773,9 +1521,7 @@ export class POSService {
           console.error(`Failed to fetch menu item ${menuItemId}:`, error);
         }
       }
-
       const itemName = menuItem?.name || `Item ${index + 1}`;
-
       kitchenItems.push({
         itemId: `${posOrder.orderNumber}-${index}`,
         menuItemId: item.menuItemId,
@@ -1786,7 +1532,6 @@ export class POSService {
         priority: 0,
       });
     }
-
     // Transform POS order to kitchen order format
     const kitchenOrderData = {
       _id: posOrder._id,
@@ -1803,13 +1548,10 @@ export class POSService {
       customerId: posOrder.customerInfo ? { firstName: posOrder.customerInfo.name } : undefined,
       customerNotes: posOrder.notes,
     };
-
     // Use kitchen service to create the order
     await this.kitchenService.createFromOrder(kitchenOrderData);
   }
-
   // ========== DELIVERY MANAGEMENT METHODS ==========
-
   /**
    * Get delivery orders with optional status filter
    */
@@ -1822,15 +1564,12 @@ export class POSService {
       branchId: new Types.ObjectId(branchId),
       orderType: 'delivery',
     };
-
     if (deliveryStatus) {
       query.deliveryStatus = deliveryStatus;
     }
-
     if (assignedDriverId) {
       query.assignedDriverId = new Types.ObjectId(assignedDriverId);
     }
-
     return this.posOrderModel
       .find(query)
       .populate('userId', 'firstName lastName email')
@@ -1838,7 +1577,6 @@ export class POSService {
       .sort({ createdAt: -1 })
       .exec();
   }
-
   /**
    * Assign a driver to a delivery order
    */
@@ -1846,46 +1584,36 @@ export class POSService {
     if (!Types.ObjectId.isValid(orderId)) {
       throw new BadRequestException('Invalid order ID');
     }
-
     if (!Types.ObjectId.isValid(driverId)) {
       throw new BadRequestException('Invalid driver ID');
     }
-
     // Verify driver exists
     const driver = await this.userModel.findById(driverId);
     if (!driver) {
       throw new NotFoundException('Driver not found');
     }
-
     const order = await this.posOrderModel.findById(orderId);
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-
     if (order.orderType !== 'delivery') {
       throw new BadRequestException('This order is not a delivery order');
     }
-
     // Update order with driver assignment
     order.assignedDriverId = new Types.ObjectId(driverId);
     order.deliveryStatus = 'assigned';
     order.assignedAt = new Date();
-
     // Update deliveryDetails.assignedDriver for backward compatibility
     if (order.deliveryDetails) {
       order.deliveryDetails.assignedDriver = driverId;
     } else {
       order.deliveryDetails = { assignedDriver: driverId };
     }
-
     const updatedOrder = await order.save();
-
     // TODO: Optionally emit websocket event for delivery updates in future
     // (No emit here because WebsocketsGateway doesn't expose a generic emit method yet)
-
     return updatedOrder;
   }
-
   /**
    * Update delivery status
    */
@@ -1897,19 +1625,15 @@ export class POSService {
     if (!Types.ObjectId.isValid(orderId)) {
       throw new BadRequestException('Invalid order ID');
     }
-
     const order = await this.posOrderModel.findById(orderId);
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-
     if (order.orderType !== 'delivery') {
       throw new BadRequestException('This order is not a delivery order');
     }
-
     // Update status and timestamps
     order.deliveryStatus = status;
-
     switch (status) {
       case 'out_for_delivery':
         order.outForDeliveryAt = new Date();
@@ -1923,11 +1647,8 @@ export class POSService {
         order.cancelledBy = new Types.ObjectId(userId);
         break;
     }
-
     const updatedOrder = await order.save();
-
     // TODO: Optionally emit websocket event for delivery updates in future
-
     return updatedOrder;
   }
 }

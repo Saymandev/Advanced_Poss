@@ -41,7 +41,6 @@ import {
   TaxSetting,
   TaxSettingDocument,
 } from './schemas/tax-setting.schema';
-
 @Injectable()
 export class SettingsService {
   constructor(
@@ -57,41 +56,33 @@ export class SettingsService {
     private readonly systemSettingsModel: Model<SystemSettingsDocument>,
     private readonly companiesService: CompaniesService,
   ) {}
-
-
   private toObjectId(id: string): Types.ObjectId {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid identifier supplied');
     }
     return new Types.ObjectId(id);
   }
-
   private async assertCompany(companyId: string) {
     await this.companiesService.findOne(companyId);
   }
-
   async getCompanySettings(companyId: string) {
     await this.assertCompany(companyId);
     const existing = await this.companySettingsModel
       .findOne({ companyId: this.toObjectId(companyId) })
       .lean();
-
     if (existing) {
       return existing;
     }
-
     const created = await this.companySettingsModel.create({
       companyId: this.toObjectId(companyId),
     });
     return created.toJSON();
   }
-
   async updateCompanySettings(
     companyId: string,
     payload: UpdateCompanySettingsDto,
   ) {
     await this.assertCompany(companyId);
-
     const updated = await this.companySettingsModel
       .findOneAndUpdate(
         { companyId: this.toObjectId(companyId) },
@@ -99,26 +90,21 @@ export class SettingsService {
         { new: true, upsert: true },
       )
       .lean();
-    console.log('updated', updated);
     return updated;
   }
-
   async getInvoiceSettings(companyId: string) {
     await this.assertCompany(companyId);
     const existing = await this.invoiceSettingsModel
       .findOne({ companyId: this.toObjectId(companyId) })
       .lean();
-
     if (existing) {
       return existing;
     }
-
     const created = await this.invoiceSettingsModel.create({
       companyId: this.toObjectId(companyId),
     });
     return created.toJSON();
   }
-
   async updateInvoiceSettings(
     companyId: string,
     payload: UpdateInvoiceSettingsDto,
@@ -131,10 +117,8 @@ export class SettingsService {
         { new: true, upsert: true },
       )
       .lean();
-
     return updated;
   }
-
   async listTaxSettings(companyId: string) {
     await this.assertCompany(companyId);
     return this.taxModel
@@ -142,7 +126,6 @@ export class SettingsService {
       .sort({ createdAt: -1 })
       .lean();
   }
-
   async createTaxSetting(payload: CreateTaxSettingDto) {
     await this.assertCompany(payload.companyId);
     try {
@@ -158,26 +141,21 @@ export class SettingsService {
       throw error;
     }
   }
-
   async updateTaxSetting(id: string, payload: UpdateTaxSettingDto) {
     const updated = await this.taxModel
       .findByIdAndUpdate(id, payload, { new: true })
       .lean();
-
     if (!updated) {
       throw new NotFoundException('Tax setting not found');
     }
-
     return updated;
   }
-
   async deleteTaxSetting(id: string) {
     const deleted = await this.taxModel.findByIdAndDelete(id);
     if (!deleted) {
       throw new NotFoundException('Tax setting not found');
     }
   }
-
   async listServiceChargeSettings(companyId: string) {
     await this.assertCompany(companyId);
     return this.serviceChargeModel
@@ -185,7 +163,6 @@ export class SettingsService {
       .sort({ createdAt: -1 })
       .lean();
   }
-
   async createServiceChargeSetting(payload: CreateServiceChargeSettingDto) {
     await this.assertCompany(payload.companyId);
     try {
@@ -203,7 +180,6 @@ export class SettingsService {
       throw error;
     }
   }
-
   async updateServiceChargeSetting(
     id: string,
     payload: UpdateServiceChargeSettingDto,
@@ -211,32 +187,26 @@ export class SettingsService {
     const updated = await this.serviceChargeModel
       .findByIdAndUpdate(id, payload, { new: true })
       .lean();
-
     if (!updated) {
       throw new NotFoundException('Service charge setting not found');
     }
-
     return updated;
   }
-
   async deleteServiceChargeSetting(id: string) {
     const deleted = await this.serviceChargeModel.findByIdAndDelete(id);
     if (!deleted) {
       throw new NotFoundException('Service charge setting not found');
     }
   }
-
   // System Settings methods (Super Admin only)
   private cleanSystemSettings(settings: any): SystemSettings {
     // Remove MongoDB internal fields
     const { _id, __v, createdAt, updatedAt, ...cleanSettings } = settings || {};
     return cleanSettings as SystemSettings;
   }
-
   async getSystemSettings(): Promise<SystemSettings> {
     // There should only be one system settings document
     let settings = await this.systemSettingsModel.findOne().lean().exec();
-    
     if (!settings) {
       // Create default system settings with BD-based defaults if none exist
       const defaultSettings = await this.systemSettingsModel.create({
@@ -259,7 +229,6 @@ export class SettingsService {
         currentSettings.dateFormat !== 'DD/MM/YYYY' ||
         currentSettings.timeFormat !== '12h' ||
         currentSettings.language !== 'en';
-
       if (shouldUpdate) {
         // Update to BD defaults (BDT, Asia/Dhaka, DD/MM/YYYY, 12h, en)
         const updated = await this.systemSettingsModel.findOneAndUpdate(
@@ -275,21 +244,16 @@ export class SettingsService {
           },
           { new: true, upsert: true }
         ).lean().exec();
-        
         settings = updated;
       }
     }
-    
     return this.cleanSystemSettings(settings);
   }
-
   async updateSystemSettings(payload: UpdateSystemSettingsDto): Promise<SystemSettings> {
     const updated = await this.systemSettingsModel
       .findOneAndUpdate({}, { $set: payload }, { new: true, upsert: true })
       .lean()
       .exec();
-
     return this.cleanSystemSettings(updated);
   }
-}
-
+}

@@ -155,7 +155,7 @@ export class TablesService {
           if (tableIdStr) occupiedTableIds.add(tableIdStr);
         }
       });
-      
+
       // ALWAYS mark tables with paid orders as occupied (regardless of payment mode setting)
       // If there's a paid order with tableId, the customer is using the table
       paidOrders.forEach(order => {
@@ -166,17 +166,17 @@ export class TablesService {
           if (tableIdStr) occupiedTableIds.add(tableIdStr);
         }
       });
-      
+
       // Log for debugging
       if (paidOrders.length > 0) {
-        console.log(`🔍 [TablesService.findAll] Found ${paidOrders.length} paid orders with tableId (payment mode setting: ${posSettings.defaultPaymentMode}). Marking tables as occupied.`);
+        // Marking tables as occupied
       }
 
       // Update table status based on orders
       return tables.map((table: any) => {
         const tableId = table._id?.toString() || table.id;
         const hasOrder = occupiedTableIds.has(tableId);
-        
+
         // Calculate status: occupied if has order (pending or paid)
         // Paid orders with tableId always occupy tables (customer paid and is using the table)
         // This works regardless of payment mode setting (handles frontend toggle vs backend setting mismatch)
@@ -189,7 +189,7 @@ export class TablesService {
           calculatedStatus = 'available';
         }
         // Keep 'reserved' and 'cleaning' statuses as-is
-        
+
         return {
           ...table,
           status: calculatedStatus,
@@ -299,7 +299,7 @@ export class TablesService {
       updateData.occupiedAt = null;
       updateData.currentOrderId = null;
       updateData.occupiedBy = null;
-      
+
       // When releasing a table, we need to:
       // 1. Cancel pending orders (they're not paid yet)
       // 2. Clear tableId from paid orders (they're paid but table is being released)
@@ -309,7 +309,7 @@ export class TablesService {
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
-        
+
         // Cancel all pending orders for this table
         const pendingOrders = await this.posOrderModel.find({
           tableId: new Types.ObjectId(id),
@@ -317,7 +317,7 @@ export class TablesService {
           status: 'pending',
           orderType: 'dine-in',
         }).exec();
-        
+
         if (pendingOrders.length > 0) {
           await this.posOrderModel.updateMany(
             {
@@ -331,36 +331,36 @@ export class TablesService {
               },
             }
           ).exec();
-          
-          console.log(`✅ Cancelled ${pendingOrders.length} pending order(s) for table ${id} when releasing`);
+
+          // Error cancelling orders for table when releasing
         }
-        
+
         // Clear tableId from paid orders (don't cancel them, just remove table association)
         // IMPORTANT: Store tableNumber in orders BEFORE clearing tableId so it remains in history/receipts
-        const paidOrders = await this.posOrderModel.find({
+        const tablePaidOrders = await this.posOrderModel.find({
           tableId: new Types.ObjectId(id),
           createdAt: { $gte: today, $lt: tomorrow },
           status: 'paid',
           orderType: 'dine-in',
         }).exec();
-        
-        if (paidOrders.length > 0) {
+
+        if (tablePaidOrders.length > 0) {
           // Get table number before clearing tableId
           const table = await this.tableModel.findById(id).exec();
           const tableNumber = (table as any)?.tableNumber || (table as any)?.number || '';
-          
+
           // Store tableNumber in orders, then clear tableId
           await this.posOrderModel.updateMany(
             {
-              _id: { $in: paidOrders.map(o => o._id) },
+              _id: { $in: tablePaidOrders.map(o => o._id) },
             },
             {
               $set: { tableNumber: tableNumber }, // Store table number for history/receipts
               $unset: { tableId: '' }, // Clear tableId to release table
             }
           ).exec();
-          
-          console.log(`✅ Stored tableNumber "${tableNumber}" and cleared tableId from ${paidOrders.length} paid order(s) for table ${id} when releasing`);
+
+          // Error updating orders for table when releasing
         }
       } catch (orderCancelError) {
         // Log error but don't fail table release
@@ -385,9 +385,7 @@ export class TablesService {
         if (!tableObj.id && tableObj._id) {
           tableObj.id = tableObj._id.toString();
         }
-        
-        console.log(`📢 Emitting table:status-changed for table ${tableObj.id || tableObj._id} in branch ${branchIdForSocket}, status: ${tableObj.status}`);
-        
+
         this.websocketsGateway.notifyTableStatusChanged(
           branchIdForSocket,
           tableObj,

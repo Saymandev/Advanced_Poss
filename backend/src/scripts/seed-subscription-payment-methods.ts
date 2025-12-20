@@ -3,11 +3,10 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { AppModule } from '../app.module';
 import {
-    PaymentGateway,
-    PaymentMethodType,
-    SubscriptionPaymentMethod,
+  PaymentGateway,
+  PaymentMethodType,
+  SubscriptionPaymentMethod,
 } from '../modules/subscription-payments/schemas/subscription-payment-method.schema';
-
 const defaultPaymentMethods = [
   // Worldwide payment methods
   {
@@ -133,32 +132,22 @@ const defaultPaymentMethods = [
     },
   },
 ];
-
 async function seedPaymentMethods() {
   const app = await NestFactory.createApplicationContext(AppModule);
   const paymentMethodModel = app.get<Model<SubscriptionPaymentMethod>>(
     getModelToken(SubscriptionPaymentMethod.name),
   );
-
-  console.log('🌱 Seeding subscription payment methods...');
-
   for (const method of defaultPaymentMethods) {
     const existing = await paymentMethodModel.findOne({ code: method.code });
     if (existing) {
-      console.log(`⏭️  Skipping ${method.code} (already exists)`);
+      
       continue;
     }
-
     await paymentMethodModel.create(method);
-    console.log(`✅ Created ${method.code} - ${method.displayName}`);
-  }
-
-  console.log('✅ Payment methods seeding completed!');
+    }
   await app.close();
 }
-
 seedPaymentMethods().catch((error) => {
   console.error('❌ Error seeding payment methods:', error);
   process.exit(1);
 });
-
