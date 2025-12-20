@@ -196,11 +196,11 @@ export class ReceiptService {
                 }
               } else if (company?.slug) {
                 // Fallback to slug-based URL - use company landing page (not branch)
-                // Use ConfigService to get frontend URL, with fallback
+                // Prioritize APP_URL environment variable
                 const baseUrl =
+                  process.env.APP_URL ||
                   this.configService.get<string>('frontend.url') ||
                   process.env.FRONTEND_URL ||
-                  process.env.APP_URL ||
                   'http://localhost:3000';
                 // Use company landing page URL so customers can select branch
                 publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
@@ -427,11 +427,11 @@ export class ReceiptService {
         if (company?.customDomain && company?.domainVerified) {
           return `https://${company.customDomain}/display/customerreview/${orderId}`;
         }
-        // Fallback to base URL - use ConfigService
+        // Fallback to base URL - prioritize APP_URL
         const baseUrl =
+          process.env.APP_URL ||
           this.configService.get<string>('frontend.url') ||
           process.env.FRONTEND_URL ||
-          process.env.APP_URL ||
           'http://localhost:3000';
         return `${baseUrl}/display/customerreview/${orderId}`;
       })(),
