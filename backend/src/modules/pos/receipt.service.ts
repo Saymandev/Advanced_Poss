@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as qrcode from 'qrcode';
@@ -21,6 +22,7 @@ export class ReceiptService {
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
     private settingsService: SettingsService,
+    private configService: ConfigService,
   ) {}
   // Helper function to format currency
   private formatCurrency(amount: number, currency: string = 'BDT'): string {
@@ -32,6 +34,101 @@ export class ReceiptService {
     } catch (error) {
       // Fallback to simple format if currency code is invalid
       return `${currency} ${amount.toFixed(2)}`;
+    }
+  }
+  // Helper function to format receipt date with company timezone and format
+  private formatReceiptDate(
+    date: Date | string | undefined,
+    timezone: string = 'Asia/Dhaka',
+    dateFormat: string = 'DD/MM/YYYY',
+    timeFormat: '12h' | '24h' = '12h',
+  ): string {
+    try {
+      const dateObj = date ? new Date(date) : new Date();
+      
+      // Use Intl.DateTimeFormat to format in the company's timezone
+      const options: Intl.DateTimeFormatOptions = {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: timeFormat === '12h',
+      };
+      
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(dateObj);
+      
+      // Extract parts
+      const year = parts.find(p => p.type === 'year')?.value || '';
+      const month = parts.find(p => p.type === 'month')?.value || '';
+      const day = parts.find(p => p.type === 'day')?.value || '';
+      const hour = parts.find(p => p.type === 'hour')?.value || '';
+      const minute = parts.find(p => p.type === 'minute')?.value || '';
+      const second = parts.find(p => p.type === 'second')?.value || '';
+      const dayPeriod = parts.find(p => p.type === 'dayPeriod')?.value || '';
+      
+      // Format date based on company's dateFormat preference
+      let formattedDate: string;
+      switch (dateFormat) {
+        case 'DD/MM/YYYY':
+          formattedDate = `${day}/${month}/${year}`;
+          break;
+        case 'MM/DD/YYYY':
+          formattedDate = `${month}/${day}/${year}`;
+          break;
+        case 'YYYY-MM-DD':
+          formattedDate = `${year}-${month}-${day}`;
+          break;
+        case 'YYYY/MM/DD':
+          formattedDate = `${year}/${month}/${day}`;
+          break;
+        default:
+          formattedDate = `${day}/${month}/${year}`; // Default to DD/MM/YYYY
+      }
+      
+      // Format time
+      const formattedTime = timeFormat === '12h' 
+        ? `${hour}:${minute}:${second} ${dayPeriod}`
+        : `${hour}:${minute}:${second}`;
+      
+      return `${formattedDate}, ${formattedTime}`;
+    } catch (error) {
+      // Fallback to simple format if timezone conversion fails
+      try {
+        const dateObj = date ? new Date(date) : new Date();
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const hours = dateObj.getHours();
+        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+        const seconds = String(dateObj.getSeconds()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        
+        // Apply date format
+        let formattedDate: string;
+        switch (dateFormat) {
+          case 'DD/MM/YYYY':
+            formattedDate = `${day}/${month}/${year}`;
+            break;
+          case 'MM/DD/YYYY':
+            formattedDate = `${month}/${day}/${year}`;
+            break;
+          default:
+            formattedDate = `${day}/${month}/${year}`;
+        }
+        
+        const formattedTime = timeFormat === '12h'
+          ? `${displayHours}:${minutes}:${seconds} ${ampm}`
+          : `${String(hours).padStart(2, '0')}:${minutes}:${seconds}`;
+        
+        return `${formattedDate}, ${formattedTime}`;
+      } catch (fallbackError) {
+        return date ? new Date(date).toISOString() : new Date().toISOString();
+      }
     }
   }
   // Generate receipt data
@@ -99,8 +196,9 @@ export class ReceiptService {
                 }
               } else if (company?.slug) {
                 // Fallback to slug-based URL - use company landing page (not branch)
-                // Prefer FRONTEND_URL, then APP_URL, then localhost as last resort
+                // Use ConfigService to get frontend URL, with fallback
                 const baseUrl =
+                  this.configService.get<string>('frontend.url') ||
                   process.env.FRONTEND_URL ||
                   process.env.APP_URL ||
                   'http://localhost:3000';
@@ -137,8 +235,11 @@ export class ReceiptService {
           notes: item?.notes ?? '',
         }))
       : [];
-    // Get currency from company settings
+    // Get currency, timezone, dateFormat, and timeFormat from company settings
     let currency = 'BDT'; // Default
+    let timezone = 'Asia/Dhaka'; // Default to Bangladesh
+    let dateFormat = 'DD/MM/YYYY'; // Default
+    let timeFormat: '12h' | '24h' = '12h'; // Default
     try {
       const branch = await this.branchesService.findOne(order.branchId.toString());
       if (branch?.companyId) {
@@ -151,10 +252,13 @@ export class ReceiptService {
         if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
           const companySettings = await this.settingsService.getCompanySettings(companyIdStr);
           currency = companySettings?.currency || 'BDT';
+          timezone = companySettings?.timezone || 'Asia/Dhaka';
+          dateFormat = companySettings?.dateFormat || 'DD/MM/YYYY';
+          timeFormat = companySettings?.timeFormat || '12h';
         }
       }
     } catch (error) {
-      console.warn('Could not retrieve currency from company settings, using default:', error);
+      console.warn('Could not retrieve company settings, using defaults:', error);
     }
     // Extract table number - prioritize stored tableNumber (works even after table release)
     // If tableNumber is stored in order, use it (this persists even after tableId is cleared)
@@ -264,6 +368,10 @@ export class ReceiptService {
       paymentDetails: order.paymentId || undefined,
       createdAt: (order as any)?.createdAt || new Date(),
       completedAt: (order as any)?.completedAt || undefined,
+      // Company timezone and format settings
+      timezone,
+      dateFormat,
+      timeFormat,
       receiptSettings: {
         header: settings?.receiptSettings?.header || 'Restaurant Receipt',
         footer: settings?.receiptSettings?.footer || 'Thank you for your visit!',
@@ -319,8 +427,9 @@ export class ReceiptService {
         if (company?.customDomain && company?.domainVerified) {
           return `https://${company.customDomain}/display/customerreview/${orderId}`;
         }
-        // Fallback to base URL
+        // Fallback to base URL - use ConfigService
         const baseUrl =
+          this.configService.get<string>('frontend.url') ||
           process.env.FRONTEND_URL ||
           process.env.APP_URL ||
           'http://localhost:3000';
@@ -465,7 +574,7 @@ export class ReceiptService {
     <div class="order-info">
         <div><strong>Order #:</strong> ${receiptData.orderNumber}</div>
         <div><strong>Table #:</strong> ${receiptData.tableNumber}</div>
-        <div><strong>Date:</strong> ${new Date(receiptData.createdAt).toLocaleString()}</div>
+        <div><strong>Date:</strong> ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, receiptData.timeFormat)}</div>
         ${receiptData.customerInfo?.name ? `<div><strong>Customer:</strong> ${receiptData.customerInfo.name}</div>` : ''}
         ${receiptData.customerInfo?.phone ? `<div><strong>Phone:</strong> ${receiptData.customerInfo.phone}</div>` : ''}
     </div>
@@ -545,7 +654,7 @@ export class ReceiptService {
         </div>
         ` : ''}
         <div style="margin-top: 10px; font-size: 10px;">
-            Generated on ${new Date().toLocaleString()}
+            Generated on ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, receiptData.timeFormat)}
         </div>
     </div>
 </body>

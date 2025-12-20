@@ -364,9 +364,11 @@ export class PrinterService {
 
   async testPrinter(printerName: string): Promise<boolean> {
     try {
+      const now = new Date();
+      const formattedDate = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}, ${String(now.getHours() % 12 || 12).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
       const testContent = `
 === PRINTER TEST ===
-Date: ${new Date().toLocaleString()}
+Date: ${formattedDate}
 Printer: ${printerName}
 Status: Working
 ==================
