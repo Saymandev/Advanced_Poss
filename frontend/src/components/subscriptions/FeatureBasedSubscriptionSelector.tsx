@@ -1,5 +1,4 @@
 'use client';
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
@@ -7,8 +6,7 @@ import { useCalculateFeaturePriceMutation, useGetSubscriptionFeaturesQuery, useS
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useState } from 'react';
-
+import { JSX, useEffect, useMemo, useState } from 'react';
 interface FeatureBasedSubscriptionSelectorProps {
   selectedFeatures: string[];
   onChange: (features: string[]) => void;
@@ -16,25 +14,21 @@ interface FeatureBasedSubscriptionSelectorProps {
   onBillingCycleChange: (cycle: 'monthly' | 'yearly') => void;
   onPriceCalculated?: (price: number) => void;
 }
-
 export function FeatureBasedSubscriptionSelector({
   selectedFeatures,
   onChange,
   billingCycle,
   onBillingCycleChange,
   onPriceCalculated,
-}: FeatureBasedSubscriptionSelectorProps) {
+}: FeatureBasedSubscriptionSelectorProps): JSX.Element {
   const { user } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || '';
   const { data: companyData } = useGetCompanyByIdQuery(companyId, { skip: !companyId });
-  
   const { data: featuresData, isLoading, error: featuresError, refetch: refetchFeatures } = useGetSubscriptionFeaturesQuery();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [calculatePrice, { data: priceData, isLoading: isCalculatingPrice }] = useCalculateFeaturePriceMutation();
   const [seedFeatures, { isLoading: isSeeding }] = useSeedSubscriptionFeaturesMutation();
-  
   const isSuperAdmin = user?.role === 'super_admin';
-  
   const handleSeedFeatures = async () => {
     try {
       await seedFeatures().unwrap();
@@ -43,22 +37,11 @@ export function FeatureBasedSubscriptionSelector({
       console.error('Failed to seed features:', error);
     }
   };
-
-  // Debug logging
-  useEffect(() => {
-    console.log('FeatureBasedSubscriptionSelector - Features Query State:', {
-      featuresData,
-      isLoading,
-      featuresError,
-      featuresCount: Array.isArray(featuresData) ? featuresData.length : 0,
-    });
-  }, [featuresData, isLoading, featuresError]);
-
+  // Debug logging removed
   // Get branch and user counts for price calculation
   // Note: Company type may not have branches/users directly, using defaults
   const branchCount = (companyData as any)?.branches?.length || 1;
   const userCount = (companyData as any)?.users?.length || 1;
-
   // Calculate price when features or billing cycle changes
   useEffect(() => {
     if (selectedFeatures.length > 0) {
@@ -83,10 +66,8 @@ export function FeatureBasedSubscriptionSelector({
       onPriceCalculated(0);
     }
   }, [selectedFeatures, billingCycle, branchCount, userCount, calculatePrice, onPriceCalculated]);
-
   const featuresByCategory = useMemo(() => {
     if (!featuresData || !Array.isArray(featuresData)) return {};
-    
     const grouped: Record<string, any[]> = {};
     featuresData.forEach((feature: any) => {
       if (!feature.isActive) return;
@@ -96,15 +77,12 @@ export function FeatureBasedSubscriptionSelector({
       }
       grouped[category].push(feature);
     });
-    
     // Sort features within each category
     Object.keys(grouped).forEach((category) => {
       grouped[category].sort((a, b) => a.name.localeCompare(b.name));
     });
-    
     return grouped;
   }, [featuresData]);
-
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) =>
       prev.includes(category)
@@ -112,17 +90,14 @@ export function FeatureBasedSubscriptionSelector({
         : [...prev, category]
     );
   };
-
   const toggleFeature = (featureKey: string) => {
     const newFeatures = selectedFeatures.includes(featureKey)
       ? selectedFeatures.filter((f) => f !== featureKey)
       : [...selectedFeatures, featureKey];
     onChange(newFeatures);
   };
-
   const toggleCategoryAll = (category: string, features: any[]) => {
     const allSelected = features.every((f) => selectedFeatures.includes(f.key));
-    
     if (allSelected) {
       const newFeatures = selectedFeatures.filter(
         (f) => !features.some((catFeature) => catFeature.key === f)
@@ -136,12 +111,10 @@ export function FeatureBasedSubscriptionSelector({
       onChange(newFeatures);
     }
   };
-
   const allCategoriesExpanded = useMemo(() => {
     const categories = Object.keys(featuresByCategory);
     return categories.every((cat) => expandedCategories.includes(cat));
   }, [expandedCategories, featuresByCategory]);
-
   const expandAll = () => {
     if (allCategoriesExpanded) {
       setExpandedCategories([]);
@@ -149,7 +122,6 @@ export function FeatureBasedSubscriptionSelector({
       setExpandedCategories(Object.keys(featuresByCategory));
     }
   };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -158,7 +130,6 @@ export function FeatureBasedSubscriptionSelector({
       </div>
     );
   }
-
   if (featuresError) {
     return (
       <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -174,13 +145,11 @@ export function FeatureBasedSubscriptionSelector({
       </div>
     );
   }
-
   const categories = Object.keys(featuresByCategory);
   const totalFeatures = Object.values(featuresByCategory).reduce((sum, features) => sum + features.length, 0);
   const selectedCount = selectedFeatures.length;
   // Handle both { data: {...} } and direct response formats
   const totalPrice = priceData?.totalPrice || (priceData as any)?.data?.totalPrice || 0;
-
   // Show message when no features are available
   if (!isLoading && !featuresError && totalFeatures === 0) {
     return (
@@ -215,7 +184,6 @@ export function FeatureBasedSubscriptionSelector({
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       {/* Billing Cycle Selector */}
@@ -249,7 +217,6 @@ export function FeatureBasedSubscriptionSelector({
             </button>
           </div>
         </div>
-        
         {/* Price Display */}
         {selectedCount > 0 && (
           <div className="text-right">
@@ -267,7 +234,6 @@ export function FeatureBasedSubscriptionSelector({
           </div>
         )}
       </div>
-
       {/* Feature Selection */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -287,7 +253,6 @@ export function FeatureBasedSubscriptionSelector({
             {allCategoriesExpanded ? 'Collapse All' : 'Expand All'}
           </button>
         </div>
-
         <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
           {categories.map((category) => {
             const features = featuresByCategory[category] || [];
@@ -295,7 +260,6 @@ export function FeatureBasedSubscriptionSelector({
             const categorySelected = features.filter((f) => selectedFeatures.includes(f.key)).length;
             const categoryTotal = features.length;
             const allSelected = categorySelected === categoryTotal && categoryTotal > 0;
-
             return (
               <Card key={category} className="border border-gray-200 dark:border-gray-700">
                 <CardHeader
@@ -335,7 +299,6 @@ export function FeatureBasedSubscriptionSelector({
                         const featurePrice = billingCycle === 'monthly' 
                           ? feature.basePriceMonthly 
                           : (feature.basePriceYearly || feature.basePriceMonthly * 10);
-                        
                         return (
                           <div key={feature.key} className="flex items-start justify-between gap-4">
                             <Checkbox
@@ -372,7 +335,6 @@ export function FeatureBasedSubscriptionSelector({
           })}
         </div>
       </div>
-
       {selectedCount === 0 && (
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           Select at least one feature to continue
@@ -381,4 +343,3 @@ export function FeatureBasedSubscriptionSelector({
     </div>
   );
 }
-

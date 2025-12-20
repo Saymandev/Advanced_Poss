@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -31,13 +30,11 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
-
 export default function AIMenuOptimizationPage() {
   const { user } = useAppSelector((state) => state.auth);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<MenuOptimizationSuggestion | null>(null);
-
   const { 
     data: optimizationData, 
     isLoading: optimizationLoading, 
@@ -51,7 +48,6 @@ export default function AIMenuOptimizationPage() {
     refetchOnMountOrArgChange: true,
     refetchOnFocus: false,
   });
-
   const { 
     data: demandData, 
     isLoading: demandLoading,
@@ -64,16 +60,13 @@ export default function AIMenuOptimizationPage() {
     refetchOnMountOrArgChange: true,
     refetchOnFocus: false,
   });
-
   const { data: menuItemsData } = useGetMenuItemsQuery({ branchId: user?.branchId || undefined });
   const [updateMenuItem] = useUpdateMenuItemMutation();
-
   const menuItems = useMemo(() => {
     if (menuItemsData && 'menuItems' in menuItemsData) return menuItemsData.menuItems;
     if (menuItemsData && 'items' in menuItemsData) return menuItemsData.items;
     return [];
   }, [menuItemsData]);
-
   const categoryOptions = useMemo(() => {
     const uniqueCategories = Array.from(new Set(menuItems.map(item => item.category).filter(Boolean)));
     return [
@@ -81,36 +74,24 @@ export default function AIMenuOptimizationPage() {
       ...uniqueCategories.map(cat => ({ value: cat, label: cat }))
     ];
   }, [menuItems]);
-
   // Debug logging (after menuItems is defined)
   if (typeof window !== 'undefined') {
-    console.log('[AI Menu Optimization] Debug:', {
-      branchId: user?.branchId,
-      optimizationData,
-      optimizationError,
-      menuItemsCount: menuItems?.length || 0,
-      optimizationDataCount: Array.isArray(optimizationData) ? optimizationData.length : 0,
-    });
+    // Debug logging removed
   }
-
   const openDetailsModal = (suggestion: MenuOptimizationSuggestion) => {
     setSelectedSuggestion(suggestion);
     setIsDetailsModalOpen(true);
   };
-
   const handleApplySuggestion = async () => {
     if (!selectedSuggestion) return;
-
     if (!confirm(`Are you sure you want to update the price from ${formatCurrency(selectedSuggestion.currentPrice)} to ${formatCurrency(selectedSuggestion.suggestedPrice)}?`)) {
       return;
     }
-
     try {
       await updateMenuItem({
         id: selectedSuggestion.itemId,
         price: selectedSuggestion.suggestedPrice,
       }).unwrap();
-
       toast.success(`Price updated successfully to ${formatCurrency(selectedSuggestion.suggestedPrice)}`);
       setIsDetailsModalOpen(false);
       setSelectedSuggestion(null);
@@ -122,7 +103,6 @@ export default function AIMenuOptimizationPage() {
       console.error('Failed to apply suggestion:', error);
     }
   };
-
   const getRecommendationBadge = (recommendation: MenuOptimizationSuggestion['recommendation']) => {
     const configs = {
       increase_price: { variant: 'warning' as const, icon: ArrowTrendingUpIcon, label: 'Increase Price' },
@@ -131,10 +111,8 @@ export default function AIMenuOptimizationPage() {
       remove_item: { variant: 'danger' as const, icon: XMarkIcon, label: 'Remove Item' },
       add_item: { variant: 'success' as const, icon: SparklesIcon, label: 'Add Item' },
     };
-
     const config = configs[recommendation];
     const Icon = config.icon;
-
     return (
       <Badge variant={config.variant} className="flex items-center gap-1">
         <Icon className="w-3 h-3" />
@@ -142,13 +120,11 @@ export default function AIMenuOptimizationPage() {
       </Badge>
     );
   };
-
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600';
     if (confidence >= 0.6) return 'text-yellow-600';
     return 'text-red-600';
   };
-
   const optimizationColumns = [
     {
       key: 'itemName',
@@ -276,7 +252,6 @@ export default function AIMenuOptimizationPage() {
       ),
     },
   ];
-
   const demandColumns = [
     {
       key: 'itemName',
@@ -351,7 +326,6 @@ export default function AIMenuOptimizationPage() {
       ),
     },
   ];
-
   // Prepare chart data
   const optimizationChartData = useMemo(() => {
     if (!optimizationData || !Array.isArray(optimizationData)) return [];
@@ -362,7 +336,6 @@ export default function AIMenuOptimizationPage() {
       demandScore: item.demandScore || 0,
     }));
   }, [optimizationData]);
-
   const demandChartData = useMemo(() => {
     if (!demandData || !Array.isArray(demandData)) return [];
     return demandData.slice(0, 8).map(item => ({
@@ -370,7 +343,6 @@ export default function AIMenuOptimizationPage() {
       predictedDemand: item.predictedDemand || 0,
     }));
   }, [demandData]);
-
   const stats = useMemo(() => {
     const optimizations = Array.isArray(optimizationData) ? optimizationData : [];
     return {
@@ -383,7 +355,6 @@ export default function AIMenuOptimizationPage() {
         : 0,
     };
   }, [optimizationData]);
-
   // Show loading state for initial load
   if ((optimizationLoading || demandLoading) && (!optimizationData && !demandData)) {
     return (
@@ -405,7 +376,6 @@ export default function AIMenuOptimizationPage() {
       </div>
     );
   }
-
   // Show error state if no branch ID
   if (!user?.branchId) {
     return (
@@ -430,7 +400,6 @@ export default function AIMenuOptimizationPage() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -454,7 +423,6 @@ export default function AIMenuOptimizationPage() {
           </Button>
         </div>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
@@ -468,7 +436,6 @@ export default function AIMenuOptimizationPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -480,7 +447,6 @@ export default function AIMenuOptimizationPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -492,7 +458,6 @@ export default function AIMenuOptimizationPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -504,7 +469,6 @@ export default function AIMenuOptimizationPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -517,7 +481,6 @@ export default function AIMenuOptimizationPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
@@ -533,7 +496,6 @@ export default function AIMenuOptimizationPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
@@ -563,7 +525,6 @@ export default function AIMenuOptimizationPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
             <CardTitle>Demand Predictions</CardTitle>
@@ -587,7 +548,6 @@ export default function AIMenuOptimizationPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Optimization Suggestions Table */}
       <Card>
         <CardHeader>
@@ -631,14 +591,13 @@ export default function AIMenuOptimizationPage() {
             selectable={false}
             exportable={true}
             exportFilename="menu-optimization"
-            onExport={(format, items) => {
-              console.log(`Exporting ${items.length} optimization suggestions as ${format}`);
-            }}
+            onExport={(_format, _items) => {
+              // Export handler
+              }}
             emptyMessage="No optimization suggestions available. The AI will analyze your menu data and provide suggestions soon."
           />
         </CardContent>
       </Card>
-
       {/* Demand Predictions Table */}
       <Card>
         <CardHeader>
@@ -679,14 +638,13 @@ export default function AIMenuOptimizationPage() {
             selectable={false}
             exportable={true}
             exportFilename="demand-predictions"
-            onExport={(format, items) => {
-              console.log(`Exporting ${items.length} demand predictions as ${format}`);
-            }}
+            onExport={(_format, _items) => {
+              // Export handler
+              }}
             emptyMessage="No demand predictions available. The AI will analyze your sales data and provide predictions soon."
           />
         </CardContent>
       </Card>
-
       {/* Suggestion Details Modal */}
       <Modal
         isOpen={isDetailsModalOpen}
@@ -730,7 +688,6 @@ export default function AIMenuOptimizationPage() {
                 </div>
               </div>
             </div>
-
             {/* Analysis Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -776,7 +733,6 @@ export default function AIMenuOptimizationPage() {
                   </div>
                 </div>
               </div>
-
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Expected Impact</h4>
                 <div className="space-y-3">
@@ -801,7 +757,6 @@ export default function AIMenuOptimizationPage() {
                 </div>
               </div>
             </div>
-
             {/* AI Reasoning */}
             <div>
               <h4 className="font-medium text-gray-900 dark:text-white mb-3">AI Analysis & Reasoning</h4>
@@ -811,7 +766,6 @@ export default function AIMenuOptimizationPage() {
                 </p>
               </div>
             </div>
-
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button

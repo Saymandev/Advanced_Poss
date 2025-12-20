@@ -1,5 +1,4 @@
 'use client';
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useGetPOSOrdersQuery, useGetPOSStatsQuery } from '@/lib/api/endpoints/posApi';
@@ -14,9 +13,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-
 type QuickRange = 'today' | 'yesterday' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'lifetime';
-
 const formatDateInput = (date: Date) => {
   // Use local date methods for consistent formatting
   const year = date.getFullYear();
@@ -24,13 +21,11 @@ const formatDateInput = (date: Date) => {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
-
 const computeDateRange = (range: QuickRange): { start: string; end: string } => {
   // Always get today's date fresh
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
   switch (range) {
     case 'today':
       return { start: formatDateInput(today), end: formatDateInput(endDate) };
@@ -58,7 +53,6 @@ const computeDateRange = (range: QuickRange): { start: string; end: string } => 
       return { start: '2020-01-01', end: formatDateInput(endDate) };
   }
 };
-
 const QUICK_RANGE_OPTIONS: Array<{ label: string; value: QuickRange }> = [
   { label: 'Today', value: 'today' },
   { label: 'Yesterday', value: 'yesterday' },
@@ -67,7 +61,6 @@ const QUICK_RANGE_OPTIONS: Array<{ label: string; value: QuickRange }> = [
   { label: 'Last Month', value: 'lastMonth' },
   { label: 'Lifetime', value: 'lifetime' },
 ];
-
 export default function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
   const router = useRouter();
@@ -84,58 +77,46 @@ export default function DashboardPage() {
     };
   });
   const [isRouting, setIsRouting] = useState(true);
-
   // Route users to their appropriate dashboards
   useEffect(() => {
     if (!user?.role) {
       setIsRouting(false);
       return;
     }
-
     const userRole = user.role.toLowerCase();
-
     // Super admin still uses dedicated dashboard
     if (userRole === 'super_admin') {
       router.replace('/dashboard/super-admin');
       return;
     }
-
     // Managers should use the same main dashboard as owner and other roles
     // So we do NOT redirect managers away from this page anymore.
-
     // Owner and other roles stay here - show owner/manager dashboard
     setIsRouting(false);
   }, [user?.role, router]);
-
   const branchId = user?.branchId;
   const { companyContext } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || companyContext?.companyId;
-
   // Get today's date - always fresh
   const todayStr = useMemo(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     return formatDateInput(today);
   }, []);
-
   // Ensure dateRange is always valid before making queries
   const validDateRange = useMemo(() => {
     // Recalculate based on quick range
     const computed = computeDateRange(quickRange);
-    
     // CRITICAL: Force end date to never exceed today
     if (computed.end > todayStr) {
       computed.end = todayStr;
     }
-    
     // Update state if it's different
     if (dateRange.start !== computed.start || dateRange.end !== computed.end) {
       setDateRange(computed);
     }
-    
     return computed;
   }, [dateRange, quickRange, todayStr]);
-
   // Force end date to always be today (never future) for API calls
   const safeDateRange = useMemo(() => {
     // Ensure end date is never in the future
@@ -143,38 +124,26 @@ export default function DashboardPage() {
     if (endDate > todayStr) {
       endDate = todayStr;
     }
-    
     return {
       start: validDateRange.start,
       end: endDate,
     };
   }, [validDateRange, todayStr]);
-
   const statsParams = useMemo(() => ({
     branchId: branchId || undefined,
     startDate: safeDateRange.start,
     endDate: safeDateRange.end,
   }), [branchId, safeDateRange.start, safeDateRange.end]);
-
   const { data: statsData, isLoading: statsLoading, error: statsError } = useGetPOSStatsQuery(
     statsParams,
     { skip: !validDateRange.start || !validDateRange.end }
   );
-
   // Debug: Log query params
   useEffect(() => {
     if (statsError) {
       console.error('Dashboard stats error:', statsError);
     }
-    console.log('Dashboard query params:', {
-      statsParams,
-      validDateRange,
-      branchId,
-      statsLoading,
-      hasStatsData: !!statsData,
-    });
   }, [statsParams, validDateRange, branchId, statsLoading, statsData, statsError]);
-
   const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useGetPOSOrdersQuery(
     {
       branchId: branchId || undefined,
@@ -186,56 +155,31 @@ export default function DashboardPage() {
     },
     { skip: !safeDateRange.start || !safeDateRange.end }
   );
-
   // Debug: Log orders query
   useEffect(() => {
     if (ordersError) {
       console.error('Dashboard orders error:', ordersError);
       console.error('Error details:', ordersError);
     }
-    const ordersArray = ordersData?.orders || [];
-    const now = new Date();
-    const today = formatDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-    console.log('Dashboard orders:', {
-      ordersLoading,
-      ordersCount: ordersArray.length,
-      totalOrders: ordersData?.total || 0,
-      sampleOrder: ordersArray[0] || null,
-      validDateRange,
-      safeDateRange,
-      todayDate: today,
-      endDateIsFuture: safeDateRange.end > today,
-      queryParams: {
-        branchId,
-        startDate: safeDateRange.start,
-        endDate: safeDateRange.end,
-      },
-    });
+    // Debug logging removed
   }, [ordersLoading, ordersData, ordersError, validDateRange, safeDateRange, branchId]);
-
   // Get reviews for waiter ratings
   const { data: reviewsData, error: reviewsError } = useGetReviewsQuery(
     { branchId: branchId || undefined, companyId: companyId || undefined },
     { skip: !branchId && !companyId }
   );
-  
   // Debug: Log reviews data
   useEffect(() => {
     if (reviewsData) {
-      console.log('🔍 Dashboard Reviews Data:', reviewsData);
-      console.log('🔍 Reviews Count:', Array.isArray(reviewsData) ? reviewsData.length : 'Not an array');
+      // Debug logging removed
       if (Array.isArray(reviewsData) && reviewsData.length > 0) {
-        console.log('🔍 Sample Review:', reviewsData[0]);
-        console.log('🔍 Sample Review waiterId:', reviewsData[0]?.waiterId, 'Type:', typeof reviewsData[0]?.waiterId);
-        console.log('🔍 Reviews with waiterId:', reviewsData.filter((r: any) => r.waiterId).length);
-        console.log('🔍 Reviews with waiterRating:', reviewsData.filter((r: any) => r.waiterRating).length);
+        // Debug logging removed
       }
     }
     if (reviewsError) {
       console.error('❌ Reviews Error:', reviewsError);
     }
   }, [reviewsData, reviewsError]);
-
   // Get staff/waiter data - filter by both company and branch
   const { data: staffData } = useGetStaffQuery(
     {
@@ -245,7 +189,6 @@ export default function DashboardPage() {
     },
     { skip: !companyId }
   );
-
   const stats = useMemo(() => {
     if (statsLoading || !statsData) {
       return {
@@ -267,11 +210,9 @@ export default function DashboardPage() {
       topSellingItems: Array.isArray(extracted?.topSellingItems) ? extracted.topSellingItems : [],
     };
   }, [statsData, statsLoading]);
-
   // Transform orders to ensure proper structure
   const orders = useMemo(() => {
     const ordersArray = (ordersData as any)?.orders || [];
-    
     // Transform orders to ensure all required fields are present
     const transformed = ordersArray.map((order: any) => {
       // Payment method can be in multiple places:
@@ -293,7 +234,6 @@ export default function DashboardPage() {
       if (!paymentMethod && order.payment) {
         paymentMethod = order.payment.method || order.payment.method;
       }
-      
       return {
         id: order._id || order.id,
         orderNumber: order.orderNumber || order.order_number || 'N/A',
@@ -306,34 +246,14 @@ export default function DashboardPage() {
         customerInfo: order.customerInfo || order.customer_info,
       };
     });
-    
-    console.log('Processing orders:', {
-      total: transformed.length,
-      statuses: transformed.reduce((acc: any, o: any) => {
-        const status = o.status || 'unknown';
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {}),
-      paymentMethods: transformed.reduce((acc: any, o: any) => {
-        const method = o.paymentMethod || 'unknown';
-        acc[method] = (acc[method] || 0) + 1;
-        return acc;
-      }, {}),
-      dateRange: validDateRange,
-      sampleOrder: transformed[0] || null,
-    });
-    
     return transformed;
-  }, [ordersData, validDateRange]);
-
+  }, [ordersData]);
   // Breakdown by Type (Order Type)
   const breakdownByType = useMemo(() => {
     if (!Array.isArray(orders) || orders.length === 0) {
       return [];
     }
-    
     const breakdown: Record<string, { orders: number; amount: number }> = {};
-    
     orders.forEach((order: any) => {
       const type = order.orderType || order.order_type || 'unknown';
       if (!breakdown[type]) {
@@ -345,7 +265,6 @@ export default function DashboardPage() {
         breakdown[type].amount += amount;
       }
     });
-    
     return Object.entries(breakdown)
       .filter(([, data]) => data.orders > 0) // Only show types with orders
       .map(([type, data]) => ({
@@ -354,11 +273,9 @@ export default function DashboardPage() {
         amount: data.amount,
       }));
   }, [orders]);
-
   // Payment method name mapping for better display
   const getPaymentMethodDisplayName = (method: string): string => {
     if (!method || method === 'unknown') return 'Unknown';
-
     const methodMap: Record<string, string> = {
       'cash': 'Cash',
       'card': 'Card',
@@ -375,18 +292,14 @@ export default function DashboardPage() {
       'due': 'Due',
       'complimentary': 'Complimentary',
     };
-
     return methodMap[method.toLowerCase()] || method.charAt(0).toUpperCase() + method.slice(1);
   };
-
   // Breakdown by Payment Methods
   const breakdownByPayment = useMemo(() => {
     if (!Array.isArray(orders) || orders.length === 0) {
       return [];
     }
-
     const breakdown: Record<string, { orders: number; amount: number }> = {};
-
     orders.forEach((order: any) => {
       const method = order.paymentMethod || order.payment_method || 'unknown';
       if (!breakdown[method]) {
@@ -398,7 +311,6 @@ export default function DashboardPage() {
         breakdown[method].amount += amount;
       }
     });
-
     return Object.entries(breakdown)
       .filter(([, data]) => data.orders > 0) // Only show methods with orders
       .map(([method, data]) => ({
@@ -407,28 +319,22 @@ export default function DashboardPage() {
         amount: data.amount,
       }));
   }, [orders]);
-
   // Hourly sales data (1 AM to 11 PM)
   const hourlySales = useMemo(() => {
     const hourly: Record<number, { sales: number; orders: number }> = {};
-    
     // Initialize all hours from 1 AM to 11 PM (1 to 23)
     for (let i = 1; i <= 23; i++) {
       hourly[i] = { sales: 0, orders: 0 };
     }
-    
     orders.forEach((order: any) => {
       if (!order.createdAt || order.status !== 'paid') return;
       const createdAt = order.createdAt || order.created_at || order.date;
       if (!createdAt) return;
-      
       try {
         const orderDate = new Date(createdAt);
         if (isNaN(orderDate.getTime())) return; // Invalid date
-        
         const hour = orderDate.getHours();
         const amount = order.totalAmount || order.total_amount || order.total || 0;
-        
         if (hour >= 1 && hour <= 23 && amount > 0) {
           hourly[hour].orders += 1;
           hourly[hour].sales += amount;
@@ -437,7 +343,6 @@ export default function DashboardPage() {
         console.warn('Error processing order date:', createdAt, error);
       }
     });
-    
     // Format hours properly: 1 AM, 3 AM, ..., 11 AM, 12 PM, 1 PM, ..., 11 PM
     return Object.entries(hourly)
       .filter(([hour]) => parseInt(hour) >= 1 && parseInt(hour) <= 23)
@@ -445,7 +350,6 @@ export default function DashboardPage() {
         const hour = parseInt(hourStr);
         let displayHour = hour;
         let period = 'AM';
-        
         if (hour === 0) {
           displayHour = 12;
           period = 'AM';
@@ -456,7 +360,6 @@ export default function DashboardPage() {
           displayHour = hour - 12;
           period = 'PM';
         }
-        
         return {
           hour: `${displayHour} ${period}`,
           hourNum: hour,
@@ -466,11 +369,9 @@ export default function DashboardPage() {
       })
       .sort((a, b) => a.hourNum - b.hourNum);
   }, [orders]);
-
   // Top Waiters with Ratings
   const topWaiters = useMemo(() => {
     const waiters: Record<string, { name: string; ratings: number[]; totalOrders: number }> = {};
-    
     // Get all waiters from staff data
     const staff = staffData?.staff || [];
     staff.forEach((member: any) => {
@@ -486,7 +387,6 @@ export default function DashboardPage() {
         }
       }
     });
-
     // Count orders per waiter
     orders.forEach((order: any) => {
       // Normalize waiter ID from order
@@ -495,7 +395,6 @@ export default function DashboardPage() {
         waiters[orderWaiterId].totalOrders += 1;
       }
     });
-
     // Add ratings from reviews
     // Handle both array and object response formats
     let reviews: any[] = [];
@@ -508,7 +407,6 @@ export default function DashboardPage() {
         reviews = (reviewsData as any).reviews;
       }
     }
-    
     reviews.forEach((review: any) => {
       if (review.waiterId && review.waiterRating) {
         // waiterId should already be normalized to string by transformResponse
@@ -534,7 +432,6 @@ export default function DashboardPage() {
             return; // Skip this review
           }
         }
-        
         // Match waiter ID (exact match)
         if (waiterId && waiters[waiterId]) {
           waiters[waiterId].ratings.push(review.waiterRating);
@@ -552,7 +449,6 @@ export default function DashboardPage() {
         }
       }
     });
-
     // Calculate average ratings and sort
     return Object.entries(waiters)
       .map(([waiterId, data]) => ({
@@ -575,18 +471,15 @@ export default function DashboardPage() {
       })
       .slice(0, 5); // Top 5 waiters
   }, [reviewsData, orders, staffData]);
-
   const handleQuickRange = (range: QuickRange) => {
     setQuickRange(range);
     setDateRange(computeDateRange(range));
   };
-
   const handleDateChange = (field: 'start' | 'end', value: string) => {
     if (!value) return;
     setDateRange(prev => ({ ...prev, [field]: value }));
     setQuickRange('lifetime'); // Switch to lifetime when manually selecting dates
   };
-
   if (isRouting) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -597,7 +490,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -609,7 +501,6 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
-
       {/* Date Filters */}
       <Card>
         <CardContent className="p-6 space-y-4">
@@ -653,7 +544,6 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Breakdown Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Breakdown by Type */}
@@ -689,7 +579,6 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-
         {/* Breakdown by Payment Methods */}
         <Card>
           <CardHeader>
@@ -724,7 +613,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Charts Row - Hourly Data */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Total Sales Chart - Hourly */}
@@ -761,7 +649,6 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
         {/* Total Orders Chart - Hourly */}
         <Card>
           <CardHeader>
@@ -796,7 +683,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Top Selling Items and Top Waiters */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top 5 Selling Items */}
@@ -831,7 +717,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
-
         {/* Top Waiters */}
         <Card>
           <CardHeader>

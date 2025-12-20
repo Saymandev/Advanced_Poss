@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -17,13 +16,11 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-
 export default function OrderTrackingPage() {
   const params = useParams();
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
   const orderId = params.orderId as string;
-
   const { 
     data: company, 
     isLoading: companyLoading,
@@ -31,7 +28,6 @@ export default function OrderTrackingPage() {
   } = useGetCompanyBySlugQuery(companySlug, {
     skip: !companySlug,
   });
-  
   const { 
     data: orderData, 
     isLoading: orderLoading, 
@@ -42,54 +38,41 @@ export default function OrderTrackingPage() {
     skip: !orderId,
     // WebSocket handles real-time updates, API call is for initial load and fallback
   });
-
   // Local state for real-time order updates
   const [order, setOrder] = useState<any>(null);
-
   // WebSocket for real-time updates
   const { socket, isConnected, joinOrder, leaveOrder } = usePublicSocket();
-
   // Update local order state when data loads
   useEffect(() => {
     if (orderData) {
       setOrder(orderData);
     }
   }, [orderData]);
-
   // Join order room for real-time updates
   // Support both orderId (MongoDB _id) and orderNumber
   useEffect(() => {
     if (!orderId || !isConnected || !order) return;
-
     // Use order._id if available, otherwise use orderId from URL (could be orderNumber)
     const orderRoomId = (order as any)?._id || (order as any)?.id || orderId;
-    
     if (orderRoomId) {
       joinOrder(orderRoomId);
     }
-
     return () => {
       if (orderRoomId) {
         leaveOrder(orderRoomId);
       }
     };
   }, [orderId, order, isConnected, joinOrder, leaveOrder]);
-
   // Listen for real-time order status updates
   useEffect(() => {
     if (!socket || !isConnected || !orderId) return;
-
     const handleStatusChange = (data: any) => {
-      console.log('📦 Real-time order update received:', data);
-      
       // Match order by orderId, order.id, order._id, or order.orderNumber
       const receivedOrderId = data.orderId || data.order?.id || data.order?._id;
       const currentOrderId = order?.id || order?._id || orderId;
-      
       if (receivedOrderId === currentOrderId || 
           receivedOrderId === orderId ||
           data.order?.orderNumber === order?.orderNumber) {
-        
         // Update local order state with new data
         if (data.order) {
           setOrder((prevOrder: any) => ({
@@ -108,7 +91,6 @@ export default function OrderTrackingPage() {
             refetchOrder();
           }, 500);
         }
-
         // Show toast notification for status changes
         const statusMessages: Record<string, string> = {
           confirmed: 'Your order has been confirmed! 🎉',
@@ -118,7 +100,6 @@ export default function OrderTrackingPage() {
           completed: 'Your order has been delivered! 🎊',
           cancelled: 'Your order has been cancelled. ❌',
         };
-
         if (data.status && statusMessages[data.status] && order?.status !== data.status) {
           const isError = data.status === 'cancelled';
           toast[isError ? 'error' : 'success'](statusMessages[data.status], {
@@ -128,16 +109,13 @@ export default function OrderTrackingPage() {
         }
       }
     };
-
     socket.on('order:status-changed', handleStatusChange);
     socket.on('order:updated', handleStatusChange);
-
     return () => {
       socket.off('order:status-changed', handleStatusChange);
       socket.off('order:updated', handleStatusChange);
     };
   }, [socket, isConnected, orderId, order, refetchOrder]);
-
   useEffect(() => {
     if (companyError) {
       toast.error('Failed to load company information');
@@ -147,7 +125,6 @@ export default function OrderTrackingPage() {
       toast.error(errorMessage);
     }
   }, [companyError, orderError, orderErrorData]);
-
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
@@ -160,39 +137,32 @@ export default function OrderTrackingPage() {
     };
     return colors[status] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300';
   };
-
   const getStatusIcon = (status: string) => {
     if (status === 'completed' || status === 'served') return CheckCircleIcon;
     if (status === 'cancelled') return XCircleIcon;
     return ClockIcon;
   };
-
   const getStatusSteps = () => {
     if (!order) return [];
-    
     const steps = [
       { key: 'pending', label: 'Order Placed', time: (order as any).createdAt },
       { key: 'confirmed', label: 'Confirmed', time: (order as any).confirmedAt },
       { key: 'preparing', label: 'Preparing', time: (order as any).startedPreparingAt },
       { key: 'ready', label: 'Ready', time: (order as any).readyAt },
     ];
-
     if (order.type === 'delivery') {
       steps.push({ key: 'served', label: 'Out for Delivery', time: (order as any).servedAt });
       steps.push({ key: 'completed', label: 'Delivered', time: (order as any).completedAt });
     } else {
       steps.push({ key: 'completed', label: 'Completed', time: (order as any).completedAt });
     }
-
     return steps;
   };
-
   const getCurrentStepIndex = () => {
     const status = order?.status || 'pending';
     const statusOrder = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed'];
     return statusOrder.indexOf(status);
   };
-
   if (companyLoading || orderLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -203,7 +173,6 @@ export default function OrderTrackingPage() {
       </div>
     );
   }
-
   if (orderError || !order) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
@@ -222,11 +191,9 @@ export default function OrderTrackingPage() {
       </div>
     );
   }
-
   const StatusIcon = getStatusIcon(order.status);
   const steps = getStatusSteps();
   const currentStep = getCurrentStepIndex();
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
@@ -262,7 +229,6 @@ export default function OrderTrackingPage() {
             </div>
           </div>
         </div>
-
         {/* Status Timeline */}
         <Card className="mb-6">
           <CardContent className="p-4 md:p-6">
@@ -274,7 +240,6 @@ export default function OrderTrackingPage() {
                 const isCompleted = index <= currentStep;
                 const isCurrent = index === currentStep;
                 const StepIcon = isCompleted ? CheckCircleIcon : ClockIcon;
-
                 return (
                   <div key={step.key} className="flex items-start gap-3 md:gap-4 mb-6 md:mb-8 last:mb-0">
                     <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
@@ -316,7 +281,6 @@ export default function OrderTrackingPage() {
             </div>
           </CardContent>
         </Card>
-
         {/* Order Details */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {/* Order Items */}
@@ -371,14 +335,12 @@ export default function OrderTrackingPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Delivery & Contact Info */}
           <Card>
             <CardContent className="p-4 md:p-6">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4">
                 Delivery Information
               </h2>
-              
               {order.type === 'delivery' && order.deliveryAddress && (
                 <div className="mb-4 md:mb-6">
                   <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
@@ -391,7 +353,6 @@ export default function OrderTrackingPage() {
                   </p>
                 </div>
               )}
-
               {order.type === 'pickup' && (
                 <div className="mb-4 md:mb-6">
                   <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
@@ -409,7 +370,6 @@ export default function OrderTrackingPage() {
                   )}
                 </div>
               )}
-
               <div className="mb-4 md:mb-6">
                 <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
                   Payment Method
@@ -425,7 +385,6 @@ export default function OrderTrackingPage() {
                   {order.paymentStatus === 'paid' ? '✓ Paid' : 'Pending Payment'}
                 </p>
               </div>
-
               {company?.phone && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
@@ -446,5 +405,4 @@ export default function OrderTrackingPage() {
       </div>
     </div>
   );
-}
-
+}

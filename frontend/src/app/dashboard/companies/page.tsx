@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -38,19 +37,14 @@ import {
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
-
-
 export default function CompaniesPage() {
   const { user } = useAppSelector((state) => state.auth);
   const router = useRouter();
-
   useEffect(() => {
     if (!user || user.role !== UserRole.SUPER_ADMIN) {
       router.replace('/dashboard/super-admin');
     }
   }, [user, router]);
-
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -61,17 +55,13 @@ export default function CompaniesPage() {
   const [subscriptionFilter, setSubscriptionFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-
   const { data: companiesData, isLoading, refetch } = useGetCompaniesQuery({});
-
   const [createCompany, { isLoading: isCreating }] = useCreateCompanyMutation();
   const [updateCompany, { isLoading: isUpdating }] = useUpdateCompanyMutation();
   const [deleteCompany, { isLoading: isDeleting }] = useDeleteCompanyMutation();
   const [deactivateCompany] = useDeactivateCompanyMutation();
   const [activateCompany] = useActivateCompanyMutation();
-
   const formatCurrency = useFormatCurrency();
-
   const companies = useMemo(() => {
     if (!companiesData) return [];
     // Handle different response structures
@@ -89,7 +79,6 @@ export default function CompaniesPage() {
     }
     return [];
   }, [companiesData]);
-
   const [formData, setFormData] = useState<Partial<CreateCompanyRequest>>({
     name: '',
     email: '',
@@ -104,12 +93,9 @@ export default function CompaniesPage() {
       zipCode: '',
     },
   });
-
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
   const filteredCompanies = useMemo(() => {
     let filtered = companies;
-
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -119,7 +105,6 @@ export default function CompaniesPage() {
           company.slug?.toLowerCase().includes(query)
       );
     }
-
     if (statusFilter !== 'all') {
       filtered = filtered.filter((company: Company) => {
         if (statusFilter === 'active') return company.isActive;
@@ -127,22 +112,18 @@ export default function CompaniesPage() {
         return true;
       });
     }
-
     if (subscriptionFilter !== 'all') {
       filtered = filtered.filter(
         (company: Company) => company.subscriptionStatus === subscriptionFilter
       );
     }
-
     return filtered;
   }, [companies, searchQuery, statusFilter, subscriptionFilter]);
-
   const totalCompanies = filteredCompanies.length;
   const paginatedCompanies = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredCompanies.slice(start, start + itemsPerPage);
   }, [filteredCompanies, currentPage, itemsPerPage]);
-
   const resetForm = () => {
     setFormData({
       name: '',
@@ -160,10 +141,8 @@ export default function CompaniesPage() {
     });
     setFormErrors({});
   };
-
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-
     if (!formData.name?.trim()) {
       errors.name = 'Company name is required';
     }
@@ -181,17 +160,14 @@ export default function CompaniesPage() {
     if (!formData.address?.country?.trim()) {
       errors.country = 'Country is required';
     }
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
   const handleCreate = async () => {
     if (!validateForm()) {
       toast.error('Please fix the form errors');
       return;
     }
-
     try {
       await createCompany({
         name: formData.name!.trim(),
@@ -209,13 +185,11 @@ export default function CompaniesPage() {
       toast.error(error?.data?.message || 'Failed to create company');
     }
   };
-
   const handleEdit = async () => {
     if (!selectedCompany || !validateForm()) {
       toast.error('Please fix the form errors');
       return;
     }
-
     try {
       await updateCompany({
         id: selectedCompany.id,
@@ -230,12 +204,10 @@ export default function CompaniesPage() {
       toast.error(error?.data?.message || 'Failed to update company');
     }
   };
-
   const handleDelete = async (company: Company) => {
     if (!confirm(`Are you sure you want to delete "${company.name}"? This action cannot be undone.`)) {
       return;
     }
-
     try {
       await deleteCompany(company.id).unwrap();
       toast.success('Company deleted successfully');
@@ -244,13 +216,11 @@ export default function CompaniesPage() {
       toast.error(error?.data?.message || 'Failed to delete company');
     }
   };
-
   const handleDeactivate = async (company: Company) => {
     const action = company.isActive ? 'deactivate' : 'activate';
     if (!confirm(`Are you sure you want to ${action} "${company.name}"?`)) {
       return;
     }
-
     try {
       if (company.isActive) {
         await deactivateCompany(company.id).unwrap();
@@ -263,7 +233,6 @@ export default function CompaniesPage() {
       toast.error(error?.data?.message || `Failed to ${action} company`);
     }
   };
-
   const openEditModal = (company: Company) => {
     setSelectedCompany(company);
     setFormData({
@@ -282,23 +251,19 @@ export default function CompaniesPage() {
     });
     setIsEditModalOpen(true);
   };
-
   const openViewModal = (company: Company) => {
     setSelectedCompany(company);
     setIsViewModalOpen(true);
   };
-
   const openStatsModal = (company: Company) => {
     setSelectedCompany(company);
     setIsStatsModalOpen(true);
   };
-
   // Fetch company stats when stats modal is open
   const { data: companyStatsData, isLoading: isLoadingStats } = useGetCompanyStatsQuery(
     selectedCompany?.id || '',
     { skip: !isStatsModalOpen || !selectedCompany?.id }
   );
-
   // Columns configuration for DataTable
   const columns: { key: keyof Company | string; title: string; render: (value: any, row: Company) => React.ReactNode }[] = [
     {
@@ -428,7 +393,6 @@ export default function CompaniesPage() {
       ),
     },
   ];
-
   if (!user || user.role !== UserRole.SUPER_ADMIN) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -439,7 +403,6 @@ export default function CompaniesPage() {
       </div>
     );
   }
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -460,7 +423,6 @@ export default function CompaniesPage() {
           Add Company
         </Button>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
@@ -507,7 +469,6 @@ export default function CompaniesPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Companies Table */}
       <DataTable
         data={paginatedCompanies}
@@ -526,11 +487,9 @@ export default function CompaniesPage() {
         exportable={true}
         exportFilename="companies"
         onExport={(format, items) => {
-          console.log(`Exporting ${items.length} companies as ${format}`);
-        }}
+          }}
         emptyMessage="No companies found. Create your first company to get started."
       />
-
       {/* Create Company Modal */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -553,7 +512,6 @@ export default function CompaniesPage() {
               />
             </div>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Email *</label>
@@ -574,7 +532,6 @@ export default function CompaniesPage() {
               />
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium mb-1">Website</label>
             <Input
@@ -583,7 +540,6 @@ export default function CompaniesPage() {
               placeholder="https://example.com"
             />
           </div>
-
           <div className="border-t pt-4">
             <h3 className="font-semibold mb-4">Address</h3>
             <div className="space-y-4">
@@ -659,7 +615,6 @@ export default function CompaniesPage() {
               </div>
             </div>
           </div>
-
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
@@ -676,7 +631,6 @@ export default function CompaniesPage() {
           </div>
         </div>
       </Modal>
-
       {/* Edit Company Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -701,7 +655,6 @@ export default function CompaniesPage() {
               />
             </div>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Email *</label>
@@ -722,7 +675,6 @@ export default function CompaniesPage() {
               />
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium mb-1">Website</label>
             <Input
@@ -731,7 +683,6 @@ export default function CompaniesPage() {
               placeholder="https://example.com"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium mb-1">
               Public URL Slug (Custom URL identifier)
@@ -746,7 +697,6 @@ export default function CompaniesPage() {
               Only lowercase letters, numbers, and hyphens allowed.
             </p>
           </div>
-
           <div className="border-t pt-4">
             <h3 className="font-semibold mb-4">Address</h3>
             <div className="space-y-4">
@@ -822,7 +772,6 @@ export default function CompaniesPage() {
               </div>
             </div>
           </div>
-
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
@@ -840,7 +789,6 @@ export default function CompaniesPage() {
           </div>
         </div>
       </Modal>
-
       {/* View Company Modal */}
       <Modal
         isOpen={isViewModalOpen}
@@ -872,7 +820,6 @@ export default function CompaniesPage() {
                 </Badge>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500">Email</p>
@@ -903,7 +850,6 @@ export default function CompaniesPage() {
                 </p>
               </div>
             </div>
-
             {selectedCompany.address && (
               <div>
                 <p className="text-sm text-gray-500 mb-2">Address</p>
@@ -915,7 +861,6 @@ export default function CompaniesPage() {
                 </p>
               </div>
             )}
-
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500">Created</p>
@@ -937,7 +882,6 @@ export default function CompaniesPage() {
           </div>
         )}
       </Modal>
-
       {/* Company Statistics Modal */}
       <Modal
         isOpen={isStatsModalOpen}
@@ -1006,7 +950,6 @@ export default function CompaniesPage() {
                     </CardContent>
                   </Card>
                 </div>
-
                 {/* Additional Metrics */}
                 {(companyStatsData.stats?.totalOrders ?? 0) > 0 && (
                   <Card>
@@ -1052,5 +995,4 @@ export default function CompaniesPage() {
       </Modal>
     </div>
   );
-}
-
+}

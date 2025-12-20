@@ -1,7 +1,5 @@
 'use client';
-
 /* eslint-disable @next/next/no-img-element */
-
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -12,7 +10,6 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 interface CartItem {
   id: string;
   name: string;
@@ -20,7 +17,6 @@ interface CartItem {
   quantity: number;
   image?: string;
 }
-
 export default function BranchShopPage() {
   const params = useParams();
   const router = useRouter();
@@ -28,7 +24,6 @@ export default function BranchShopPage() {
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
   const menuType = searchParams.get('type') || 'full';
-
   const { 
     data: company, 
     isLoading: companyLoading,
@@ -37,7 +32,6 @@ export default function BranchShopPage() {
   } = useGetCompanyBySlugQuery(companySlug, {
     skip: !companySlug,
   });
-  
   const { 
     data: menuData, 
     isLoading: menuLoading,
@@ -47,7 +41,6 @@ export default function BranchShopPage() {
     { companySlug, branchSlug, menuType: menuType !== 'full' ? menuType : undefined },
     { skip: !companySlug || !branchSlug }
   );
-  
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -62,7 +55,6 @@ export default function BranchShopPage() {
     }
     return [];
   });
-
   // Show error toast if API errors occur
   useEffect(() => {
     if (companyError) {
@@ -73,7 +65,6 @@ export default function BranchShopPage() {
       toast.error(errorMessage);
     }
   }, [companyError, menuError, menuErrorData]);
-
   // Save cart to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined' && cart.length >= 0) {
@@ -85,12 +76,10 @@ export default function BranchShopPage() {
       }
     }
   }, [cart, companySlug, branchSlug]);
-
   const categories = useMemo(() => {
     const cats = menuData?.categories;
     return Array.isArray(cats) ? cats : [];
   }, [menuData?.categories]);
-  
   const menuItems = useMemo(() => {
     const items = menuData?.menuItems;
     // Ensure we always have an array
@@ -103,23 +92,19 @@ export default function BranchShopPage() {
     }
     return [];
   }, [menuData?.menuItems]);
-
   // Combined filtering: category + search + availability
   const filteredItems = useMemo(() => {
     if (!Array.isArray(menuItems)) {
       console.error('menuItems is not an array:', menuItems);
       return [];
     }
-    
     let filtered = menuItems.filter((item: any) => item.isAvailable !== false);
-
     // Filter by category
     if (selectedCategory !== 'all') {
       filtered = filtered.filter((item: any) => 
         item.category?.id === selectedCategory || item.categoryId === selectedCategory
       );
     }
-
     // Filter by search query (searches in name, description, and category name)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
@@ -130,25 +115,20 @@ export default function BranchShopPage() {
           ? item.category?.name?.toLowerCase()
           : categories.find((cat: any) => cat.id === item.categoryId)?.name?.toLowerCase();
         const categoryMatch = categoryName?.includes(query);
-        
         return nameMatch || descriptionMatch || categoryMatch;
       });
     }
-
     return filtered;
   }, [menuItems, selectedCategory, searchQuery, categories]);
-
   const addToCart = (item: any) => {
     if (!item.isAvailable) {
       toast.error('This item is currently unavailable');
       return;
     }
-
     if (!item.id || !item.name || !item.price) {
       toast.error('Invalid item data');
       return;
     }
-
     const existingItem = cart.find(c => c.id === item.id);
     if (existingItem) {
       setCart(cart.map(c => 
@@ -166,7 +146,6 @@ export default function BranchShopPage() {
       toast.success(`${item.name} added to cart`);
     }
   };
-
   const updateQuantity = (itemId: string, delta: number) => {
     setCart(prevCart => {
       const updated = prevCart.map(c => {
@@ -177,42 +156,23 @@ export default function BranchShopPage() {
         }
         return c;
       }).filter(Boolean) as CartItem[];
-      
       return updated;
     });
   };
-
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
   // Get company name from menu data if company query fails
   const companyName = company?.name || (menuData?.branch as any)?.companyId?.name || 'Restaurant';
-
   // Update page title when company data is available
   useEffect(() => {
     if (company?.name) {
       document.title = `${company.name} - Order Online`;
     }
   }, [company?.name]);
-
   // Debug logging
   useEffect(() => {
-    console.log('🔍 Shop Page Debug:', {
-      companySlug,
-      branchSlug,
-      companyLoading,
-      companyError,
-      company: company ? { id: company.id, name: company.name, slug: company.slug } : null,
-      menuLoading,
-      menuError,
-      hasMenuData: !!menuData,
-      companyErrorData: companyErrorData ? {
-        status: (companyErrorData as any)?.status,
-        message: (companyErrorData as any)?.data?.message || (companyErrorData as any)?.message,
-      } : null,
-    });
+    // Debug logging removed
   }, [companySlug, branchSlug, companyLoading, companyError, company, menuLoading, menuError, menuData, companyErrorData]);
-
   if (companyLoading || menuLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -223,14 +183,12 @@ export default function BranchShopPage() {
       </div>
     );
   }
-
   // Only show error if menu query fails (menu is required)
   // Company query failure is not critical - we can use menu data for company name
   if (menuError || (!menuData && !menuLoading)) {
     const errorMessage = (menuErrorData as any)?.data?.message || 
                         (menuErrorData as any)?.message || 
                         'Menu not available';
-    
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
         <Card className="max-w-md w-full">
@@ -256,7 +214,6 @@ export default function BranchShopPage() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -285,7 +242,6 @@ export default function BranchShopPage() {
           </div>
         </div>
       </header>
-
       {/* Search and Category Filter */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-[73px] sm:top-[81px] z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-5">
@@ -316,7 +272,6 @@ export default function BranchShopPage() {
               </p>
             )}
           </div>
-
           {/* Category Filter */}
           {categories.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -350,7 +305,6 @@ export default function BranchShopPage() {
           )}
         </div>
       </div>
-
       {/* Menu Items */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         {filteredItems.length === 0 ? (
@@ -475,7 +429,6 @@ export default function BranchShopPage() {
           </div>
         )}
       </main>
-
       {/* Floating Cart Button */}
       {cartCount > 0 && (
         <Link href={`/${companySlug}/${branchSlug}/cart`}>
@@ -490,4 +443,3 @@ export default function BranchShopPage() {
     </div>
   );
 }
-

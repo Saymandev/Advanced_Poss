@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -24,14 +23,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 const LOYALTY_TIERS = [
   { value: 'bronze', label: 'Bronze', minPoints: 0, color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
   { value: 'silver', label: 'Silver', minPoints: 500, color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' },
   { value: 'gold', label: 'Gold', minPoints: 1000, color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
   { value: 'platinum', label: 'Platinum', minPoints: 2000, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
 ];
-
 export default function CustomerLoyaltyAIPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [selectedTier, setSelectedTier] = useState('all');
@@ -39,42 +36,31 @@ export default function CustomerLoyaltyAIPage() {
   const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerLoyaltyInsight | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
   // Check subscription feature access using the standard hook
   // This will automatically redirect to /dashboard/subscriptions if user doesn't have the feature
   useFeatureRedirect('ai-customer-loyalty', '/dashboard/subscriptions');
-
   const companyId = (user as any)?.companyId || 
                    (companyContext as any)?.companyId;
-  
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
-
   const queryParams = useMemo(() => {
     const params: any = {};
-    
     if (branchId) params.branchId = branchId;
     if (companyId) params.companyId = companyId;
-    
     return params;
   }, [branchId, companyId]);
-
   const { data: customersData, isLoading, error: loyaltyError, refetch } = useGetCustomersQuery(queryParams, {
     skip: !branchId && !companyId,
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
   });
-
   const [generateOffers, { isLoading: offersLoading }] = useGetPersonalizedOffersMutation();
-
   // Transform customers data to loyalty insights format
   const loyaltyData = useMemo(() => {
     if (!customersData) return [];
-    
     const customers = Array.isArray(customersData) ? customersData : (customersData.customers || []);
-    
     return customers.map((customer): CustomerLoyaltyInsight => {
       // Calculate next tier progress (simplified calculation)
       const tierPoints = LOYALTY_TIERS.find(t => t.value === customer.tier)?.minPoints || 0;
@@ -82,7 +68,6 @@ export default function CustomerLoyaltyAIPage() {
       const progress = nextTierPoints > tierPoints 
         ? ((customer.loyaltyPoints - tierPoints) / (nextTierPoints - tierPoints)) * 100 
         : 100;
-
       // Calculate churn risk based on last order date
       let churnRisk = 0.5; // Default medium risk
       if (customer.lastOrderDate) {
@@ -95,7 +80,6 @@ export default function CustomerLoyaltyAIPage() {
         else if (daysSinceLastOrder > 14) churnRisk = 0.3; // Low risk
         else churnRisk = 0.1; // Very low risk
       }
-
       // Generate recommendations
       const recommendations: string[] = [];
       if (customer.totalOrders < 3) {
@@ -110,7 +94,6 @@ export default function CustomerLoyaltyAIPage() {
       if (customer.totalSpent > 500) {
         recommendations.push('High-value customer - provide VIP treatment and exclusive offers');
       }
-
       return {
         id: customer.id,
         customerId: customer.id,
@@ -128,41 +111,33 @@ export default function CustomerLoyaltyAIPage() {
       };
     });
   }, [customersData]);
-
   // Filter loyalty data
   const filteredLoyaltyData = useMemo(() => {
     if (!loyaltyData || !Array.isArray(loyaltyData)) return [];
-    
     return loyaltyData.filter((customer) => {
       // Filter by tier
       if (selectedTier !== 'all' && customer.currentTier !== selectedTier) return false;
-      
       // Filter by search query
       if (searchQuery && !customer.customerName.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
-      
       return true;
     });
   }, [loyaltyData, selectedTier, searchQuery]);
-
   const openDetailsModal = (customer: CustomerLoyaltyInsight) => {
     setSelectedCustomer(customer);
     setIsDetailsModalOpen(true);
   };
-
   const openOffersModal = async (customer: CustomerLoyaltyInsight) => {
     try {
       if (!user?.branchId) {
         toast.error('Branch ID is required');
         return;
       }
-
       const result = await generateOffers({
         customerId: customer.customerId,
         branchId: user.branchId,
       }).unwrap();
-
       setSelectedCustomer({ ...customer, personalizedOffers: result.offers || [] });
       setIsOffersModalOpen(true);
       toast.success('Personalized offers generated successfully');
@@ -170,7 +145,6 @@ export default function CustomerLoyaltyAIPage() {
       toast.error(error.data?.message || 'Failed to generate personalized offers');
     }
   };
-
   const handleSendOffer = async (offer: CustomerLoyaltyInsight['personalizedOffers'][0]) => {
     try {
       // TODO: Implement send offer API call
@@ -180,10 +154,8 @@ export default function CustomerLoyaltyAIPage() {
       toast.error('Failed to send offer');
     }
   };
-
   const handleSendAllOffers = async () => {
     if (!selectedCustomer || !selectedCustomer.personalizedOffers?.length) return;
-    
     try {
       // TODO: Implement send all offers API call
       const offerCount = selectedCustomer.personalizedOffers.length;
@@ -195,7 +167,6 @@ export default function CustomerLoyaltyAIPage() {
       toast.error('Failed to send offers');
     }
   };
-
   const getTierBadge = (tier: string) => {
     const tierConfig = LOYALTY_TIERS.find(t => t.value === tier);
     return tierConfig ? (
@@ -206,13 +177,11 @@ export default function CustomerLoyaltyAIPage() {
       <Badge variant="secondary">{tier}</Badge>
     );
   };
-
   const getChurnRiskBadge = (risk: number) => {
     if (risk >= 0.7) return { variant: 'danger' as const, label: 'High Risk' };
     if (risk >= 0.4) return { variant: 'warning' as const, label: 'Medium Risk' };
     return { variant: 'success' as const, label: 'Low Risk' };
   };
-
   const getOfferTypeIcon = (type: string) => {
     const icons = {
       discount: '💰',
@@ -222,7 +191,6 @@ export default function CustomerLoyaltyAIPage() {
     };
     return icons[type as keyof typeof icons] || '🎯';
   };
-
   const columns = [
     {
       key: 'customerName',
@@ -253,7 +221,6 @@ export default function CustomerLoyaltyAIPage() {
       align: 'center' as const,
       render: (value: number, row: CustomerLoyaltyInsight) => {
         const nextTier = LOYALTY_TIERS[LOYALTY_TIERS.findIndex(t => t.value === row.currentTier) + 1];
-
         return (
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
@@ -342,7 +309,6 @@ export default function CustomerLoyaltyAIPage() {
       ),
     },
   ];
-
   const stats = useMemo(() => {
     const customers = Array.isArray(loyaltyData) ? loyaltyData : [];
     return {
@@ -354,7 +320,6 @@ export default function CustomerLoyaltyAIPage() {
       totalOffers: customers.reduce((sum, c) => sum + (c.personalizedOffers?.length || 0), 0),
     };
   }, [loyaltyData]);
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -370,7 +335,6 @@ export default function CustomerLoyaltyAIPage() {
           Refresh AI Analysis
         </Button>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -384,7 +348,6 @@ export default function CustomerLoyaltyAIPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -396,7 +359,6 @@ export default function CustomerLoyaltyAIPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -408,7 +370,6 @@ export default function CustomerLoyaltyAIPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -421,7 +382,6 @@ export default function CustomerLoyaltyAIPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
@@ -447,7 +407,6 @@ export default function CustomerLoyaltyAIPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Loyalty Insights Table */}
       <Card>
         <CardHeader>
@@ -470,13 +429,11 @@ export default function CustomerLoyaltyAIPage() {
             exportable={true}
             exportFilename="customer-loyalty-insights"
             onExport={(format, items) => {
-              console.log(`Exporting ${items.length} customer insights as ${format}`);
-            }}
+              }}
             emptyMessage="No customer loyalty insights found. The AI will analyze customer data and provide insights soon."
           />
         </CardContent>
       </Card>
-
       {/* Customer Details Modal */}
       <Modal
         isOpen={isDetailsModalOpen}
@@ -519,7 +476,6 @@ export default function CustomerLoyaltyAIPage() {
                 </div>
               </div>
             </div>
-
             {/* Loyalty Progress */}
             <div>
               <h4 className="font-medium text-gray-900 dark:text-white mb-3">Loyalty Progress</h4>
@@ -544,7 +500,6 @@ export default function CustomerLoyaltyAIPage() {
                 </div>
               </div>
             </div>
-
             {/* AI Recommendations */}
             <div>
               <h4 className="font-medium text-gray-900 dark:text-white mb-3">AI Recommendations</h4>
@@ -557,7 +512,6 @@ export default function CustomerLoyaltyAIPage() {
                 ))}
               </div>
             </div>
-
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
@@ -583,7 +537,6 @@ export default function CustomerLoyaltyAIPage() {
           </div>
         )}
       </Modal>
-
       {/* Personalized Offers Modal */}
       <Modal
         isOpen={isOffersModalOpen}
@@ -610,7 +563,6 @@ export default function CustomerLoyaltyAIPage() {
                 </p>
               </div>
             </div>
-
             {/* Offers Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {selectedCustomer.personalizedOffers?.map((offer, index) => (
@@ -657,7 +609,6 @@ export default function CustomerLoyaltyAIPage() {
                 </div>
               )}
             </div>
-
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
@@ -683,4 +634,4 @@ export default function CustomerLoyaltyAIPage() {
       </Modal>
     </div>
   );
-}
+}

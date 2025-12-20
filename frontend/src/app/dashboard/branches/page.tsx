@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -27,17 +26,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 export default function BranchesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  
   // Redirect if user doesn't have branches feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('branches');
   const companyId = companyContext?.companyId || user?.companyId || '';
-  
   // Get current active branch ID
   const currentBranchId = user?.branchId || (companyContext as any)?.branchId || '';
-  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -46,7 +41,6 @@ export default function BranchesPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-
   const { data, isLoading, refetch } = useGetBranchesQuery(
     {
       companyId,
@@ -57,15 +51,12 @@ export default function BranchesPage() {
     },
     { skip: !companyId },
   );
-
   const [createBranch, { isLoading: isCreating }] = useCreateBranchMutation();
   const [updateBranch, { isLoading: isUpdating }] = useUpdateBranchMutation();
   const [deleteBranch, { isLoading: isDeleting }] = useDeleteBranchMutation();
   const [toggleBranchStatus, { isLoading: isToggling }] = useToggleBranchStatusMutation();
-  
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   // Reset form when modals close
   useEffect(() => {
     if (!isCreateModalOpen && !isEditModalOpen) {
@@ -73,7 +64,6 @@ export default function BranchesPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCreateModalOpen, isEditModalOpen]);
-
   // Get staff for manager selection
   const { data: staffData } = useGetStaffQuery(
     {
@@ -84,9 +74,7 @@ export default function BranchesPage() {
     },
     { skip: !companyId },
   );
-  
   const managers = staffData?.staff?.filter((s: Staff) => s.role === 'manager' && s.isActive) || [];
-
   const [formData, setFormData] = useState({
     name: '',
     address: {
@@ -112,7 +100,6 @@ export default function BranchesPage() {
     totalSeats: 0,
     companyId: companyId || '',
   });
-
   const resetForm = () => {
     setFormData({
       name: '',
@@ -141,30 +128,25 @@ export default function BranchesPage() {
     });
     setFormErrors({});
   };
-
   // Validation functions
   const validateEmail = (email: string): boolean => {
     if (!email) return true; // Optional field
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
-
   const validatePhone = (phone: string): boolean => {
     if (!phone) return true; // Optional field
     const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/;
     return phoneRegex.test(phone.replace(/\s/g, ''));
   };
-
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-
     // Name validation
     if (!formData.name.trim()) {
       errors.name = 'Branch name is required';
     } else if (formData.name.trim().length < 2) {
       errors.name = 'Branch name must be at least 2 characters';
     }
-
     // Address validation
     if (!formData.address.street.trim()) {
       errors.street = 'Street address is required';
@@ -175,17 +157,14 @@ export default function BranchesPage() {
     if (!formData.address.country.trim()) {
       errors.country = 'Country is required';
     }
-
     // Email validation
     if (formData.email && !validateEmail(formData.email)) {
       errors.email = 'Please enter a valid email address';
     }
-
     // Phone validation
     if (formData.phone && !validatePhone(formData.phone)) {
       errors.phone = 'Please enter a valid phone number';
     }
-
     // Opening hours validation
     formData.openingHours.forEach((day, index) => {
       if (!day.isClosed) {
@@ -196,7 +175,6 @@ export default function BranchesPage() {
         }
       }
     });
-
     // Total tables/seats validation
     if (formData.totalTables < 0) {
       errors.totalTables = 'Total tables cannot be negative';
@@ -204,22 +182,18 @@ export default function BranchesPage() {
     if (formData.totalSeats < 0) {
       errors.totalSeats = 'Total seats cannot be negative';
     }
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
   const handleCreate = async () => {
     if (!companyId) {
       toast.error('Company ID is required');
       return;
     }
-
     if (!validateForm()) {
       toast.error('Please fix the form errors before submitting');
       return;
     }
-
     setIsSubmitting(true);
     try {
       await createBranch({
@@ -256,15 +230,12 @@ export default function BranchesPage() {
       setIsSubmitting(false);
     }
   };
-
   const handleEdit = async () => {
     if (!selectedBranch) return;
-
     if (!validateForm()) {
       toast.error('Please fix the form errors before submitting');
       return;
     }
-
     setIsSubmitting(true);
     try {
       await updateBranch({
@@ -299,10 +270,8 @@ export default function BranchesPage() {
       setIsSubmitting(false);
     }
   };
-
   const handleDelete = async (branch: Branch) => {
     if (!confirm(`Are you sure you want to delete "${branch.name}"? This action cannot be undone.`)) return;
-
     try {
       await deleteBranch(branch.id).unwrap();
       toast.success('Branch deleted successfully');
@@ -313,11 +282,9 @@ export default function BranchesPage() {
       console.error('Delete branch error:', error);
     }
   };
-
   const handleToggleStatus = async (branch: Branch) => {
     const action = branch.isActive ? 'deactivate' : 'activate';
     if (!confirm(`Are you sure you want to ${action} "${branch.name}"?`)) return;
-
     try {
       await toggleBranchStatus(branch.id).unwrap();
       toast.success(`Branch ${action}d successfully`);
@@ -328,7 +295,6 @@ export default function BranchesPage() {
       console.error('Toggle branch status error:', error);
     }
   };
-
   const openEditModal = (branch: Branch) => {
     setSelectedBranch(branch);
     // Handle both old and new address structures
@@ -341,7 +307,6 @@ export default function BranchesPage() {
           country: branch.country || 'BD',
           zipCode: branch.zipCode || '',
         };
-
     setFormData({
       name: branch.name,
       address: address as any,
@@ -364,23 +329,19 @@ export default function BranchesPage() {
     setFormErrors({});
     setIsEditModalOpen(true);
   };
-
   const openViewModal = (branch: Branch) => {
     setSelectedBranch(branch);
     setIsViewModalOpen(true);
   };
-
   // Fetch full branch details and stats when viewing
   const { data: branchDetails, isLoading: isLoadingDetails, error: detailsError } = useGetBranchByIdQuery(selectedBranch?.id || '', {
     skip: !selectedBranch?.id || !isViewModalOpen,
     refetchOnMountOrArgChange: true,
   });
-
   const { data: branchStats, isLoading: isLoadingStats, error: statsError } = useGetBranchStatsQuery(selectedBranch?.id || '', {
     skip: !selectedBranch?.id || !isViewModalOpen,
     refetchOnMountOrArgChange: true,
   });
-
   // Use detailed branch data if available, otherwise fallback to selectedBranch
   // Also merge stats branch data if available (it has totalTables/totalSeats)
   const displayBranch = useMemo(() => {
@@ -405,52 +366,16 @@ export default function BranchesPage() {
         // Merge manager from branchStats.branch if available
         manager: branchDetails.manager ?? branchStats?.branch?.manager ?? undefined,
       };
-      console.log('displayBranch merge:', {
-        branchDetails_totalTables: branchDetails.totalTables,
-        branchDetails_totalSeats: branchDetails.totalSeats,
-        branchStats_stats_totalTables: branchStats?.stats?.totalTables,
-        branchStats_stats_totalSeats: branchStats?.stats?.totalSeats,
-        branchStats_branch_totalTables: branchStats?.branch?.totalTables,
-        branchStats_branch_totalSeats: branchStats?.branch?.totalSeats,
-        merged_totalTables: mergedBranch.totalTables,
-        merged_totalSeats: mergedBranch.totalSeats,
-        merged_manager: mergedBranch.manager,
-      });
       return mergedBranch;
     }
     return selectedBranch;
   }, [branchDetails, branchStats, selectedBranch]);
-  
   // Log for debugging
   useEffect(() => {
     if (isViewModalOpen && selectedBranch) {
-      console.log('Branch Details Debug:', {
-        selectedBranch,
-        branchDetails,
-        branchStats,
-        displayBranch,
-        isLoadingDetails,
-        isLoadingStats,
-        detailsError,
-        statsError,
-        'displayBranch.manager': displayBranch?.manager,
-        'displayBranch.totalTables': (displayBranch as any)?.totalTables,
-        'displayBranch.totalSeats': (displayBranch as any)?.totalSeats,
-        'branchStats.stats': branchStats?.stats,
-        'branchStats full object': branchStats,
-        'branchDetails full object': branchDetails,
-      });
-      
-      // Log the actual structure
-      if (branchStats) {
-        console.log('branchStats structure:', JSON.stringify(branchStats, null, 2));
-      }
-      if (branchDetails) {
-        console.log('branchDetails structure:', JSON.stringify(branchDetails, null, 2));
-      }
+      // Debug logging removed
     }
   }, [isViewModalOpen, selectedBranch, branchDetails, branchStats, displayBranch, isLoadingDetails, isLoadingStats, detailsError, statsError]);
-
   const columns = [
     {
       key: 'name',
@@ -615,7 +540,6 @@ export default function BranchesPage() {
       ),
     },
   ];
-
   if (!companyId) {
     return (
       <div className="flex items-center justify-center h-96 text-center">
@@ -630,7 +554,6 @@ export default function BranchesPage() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -651,7 +574,6 @@ export default function BranchesPage() {
           Add Branch
         </Button>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
@@ -667,7 +589,6 @@ export default function BranchesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -681,7 +602,6 @@ export default function BranchesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -696,7 +616,6 @@ export default function BranchesPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
@@ -723,7 +642,6 @@ export default function BranchesPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Data Table */}
       <DataTable
         data={data?.branches || []}
@@ -741,12 +659,11 @@ export default function BranchesPage() {
         }}
         exportable={true}
         exportFilename="branches"
-        onExport={(format, items) => {
-          console.log(`Exporting ${items.length} branches as ${format}`);
-        }}
+        onExport={(_format, _items) => {
+          // Export handler
+          }}
         emptyMessage="No branches found. Create your first branch to get started."
       />
-
       {/* Create Branch Modal */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -773,7 +690,6 @@ export default function BranchesPage() {
               placeholder="(555) 123-4567"
             />
           </div>
-
           <Input
             label="Street Address"
             value={formData.address.street}
@@ -784,7 +700,6 @@ export default function BranchesPage() {
             placeholder="123 Main Street"
             required
           />
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
               label="City"
@@ -815,7 +730,6 @@ export default function BranchesPage() {
               placeholder="10001"
             />
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Email"
@@ -839,7 +753,6 @@ export default function BranchesPage() {
               })}
             />
           </div>
-
           {managers.length > 0 && (
             <Select
               label="Manager (Optional)"
@@ -854,7 +767,6 @@ export default function BranchesPage() {
               onChange={(value) => setFormData({ ...formData, managerId: value })}
             />
           )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Total Tables"
@@ -903,7 +815,6 @@ export default function BranchesPage() {
               error={formErrors.totalSeats}
             />
           </div>
-
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <h4 className="font-medium text-gray-900 dark:text-white mb-3">Opening Hours</h4>
             <div className="space-y-2">
@@ -1003,7 +914,6 @@ export default function BranchesPage() {
               ))}
             </div>
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -1024,7 +934,6 @@ export default function BranchesPage() {
           </div>
         </div>
       </Modal>
-
       {/* Edit Branch Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -1054,7 +963,6 @@ export default function BranchesPage() {
               </div>
             </div>
           )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Branch Name"
@@ -1100,7 +1008,6 @@ export default function BranchesPage() {
               error={formErrors.phone}
             />
           </div>
-
           <Input
             label="Street Address"
             value={formData.address.street}
@@ -1125,7 +1032,6 @@ export default function BranchesPage() {
             required
             error={formErrors.street}
           />
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
               label="City"
@@ -1170,7 +1076,6 @@ export default function BranchesPage() {
               placeholder="10001"
             />
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Email"
@@ -1255,7 +1160,6 @@ export default function BranchesPage() {
               error={formErrors.country}
             />
           </div>
-
           <div>
             <Input
               label="Public URL Slug (Custom URL identifier)"
@@ -1268,7 +1172,6 @@ export default function BranchesPage() {
               Only lowercase letters, numbers, and hyphens allowed. Must be unique within the company.
             </p>
           </div>
-
           {managers.length > 0 && (
             <Select
               label="Manager (Optional)"
@@ -1283,7 +1186,6 @@ export default function BranchesPage() {
               onChange={(value) => setFormData({ ...formData, managerId: value })}
             />
           )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Total Tables"
@@ -1332,7 +1234,6 @@ export default function BranchesPage() {
               error={formErrors.totalSeats}
             />
           </div>
-
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <h4 className="font-medium text-gray-900 dark:text-white mb-3">Opening Hours</h4>
             <div className="space-y-2">
@@ -1432,7 +1333,6 @@ export default function BranchesPage() {
               ))}
             </div>
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -1454,7 +1354,6 @@ export default function BranchesPage() {
           </div>
         </div>
       </Modal>
-
       {/* View Branch Modal */}
       <Modal
         isOpen={isViewModalOpen}
@@ -1501,7 +1400,6 @@ export default function BranchesPage() {
                 </Badge>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
@@ -1530,7 +1428,6 @@ export default function BranchesPage() {
                   </div>
                 </div>
               </div>
-
               <div className="space-y-4">
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white mb-2">Operating Hours</h4>
@@ -1565,7 +1462,6 @@ export default function BranchesPage() {
                     )}
                   </div>
                 </div>
-
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white mb-2">Capacity & Statistics</h4>
                   <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
@@ -1615,7 +1511,6 @@ export default function BranchesPage() {
                     </div>
                   </div>
                 </div>
-
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white mb-2">Manager</h4>
                   {displayBranch?.manager ? (
@@ -1638,7 +1533,6 @@ export default function BranchesPage() {
                 </div>
               </div>
             </div>
-
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Created: {formatDateTime(displayBranch.createdAt)}

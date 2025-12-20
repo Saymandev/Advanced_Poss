@@ -1,5 +1,4 @@
 import { apiSlice } from '../apiSlice';
-
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -48,7 +47,6 @@ export interface SubscriptionPlan {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface AvailableFeaturesResponse {
   success: boolean;
   data: {
@@ -56,7 +54,6 @@ export interface AvailableFeaturesResponse {
     allFeatureKeys: string[];
   };
 }
-
 export interface Subscription {
   id: string;
   companyId: string;
@@ -73,7 +70,6 @@ export interface Subscription {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface BillingHistory {
   id: string;
   subscriptionId: string;
@@ -85,7 +81,6 @@ export interface BillingHistory {
   paidAt?: string;
   createdAt: string;
 }
-
 export interface UsageStats {
   branches: number;
   users: number;
@@ -95,7 +90,6 @@ export interface UsageStats {
   storageUsed: number;
   storageLimit: number;
 }
-
 export interface SubscriptionListItem extends Subscription {
   company?: {
     id?: string;
@@ -104,12 +98,10 @@ export interface SubscriptionListItem extends Subscription {
     email?: string;
   };
 }
-
 export interface SubscriptionListResponse {
   subscriptions: SubscriptionListItem[];
   total: number;
 }
-
 export const subscriptionsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSubscriptionPlans: builder.query<SubscriptionPlan[] | { plans: SubscriptionPlan[]; total: number }, any>({
@@ -119,10 +111,6 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Subscription'],
       transformResponse: (response: any) => {
-        console.log('getSubscriptionPlans transformResponse - Raw response:', response);
-        console.log('getSubscriptionPlans transformResponse - Response type:', typeof response);
-        console.log('getSubscriptionPlans transformResponse - Is array?', Array.isArray(response));
-        
         // If response is still encrypted (decryption failed), bail out safely
         if (response && typeof response === 'object') {
           const payload = (response as any).data || response;
@@ -131,13 +119,11 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
             return [];
           }
         }
-
         const normalize = (plans: any) => {
           if (!Array.isArray(plans)) {
             console.warn('Expected plans array but received:', plans);
             return [];
           }
-          console.log(`Normalizing ${plans.length} plans`);
           return plans.map((plan) => ({
             ...plan,
             featureList:
@@ -153,14 +139,11 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
                   ].filter(Boolean) as string[],
           }));
         };
-
         // Handle { success: true, data: [...] } format (from backend interceptor)
         if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
-          console.log('Handling { success, data } format');
           const data = response.data;
           if (Array.isArray(data)) {
             const normalized = normalize(data);
-            console.log(`Returning ${normalized.length} normalized plans from success.data array`);
             return normalized;
           }
           // If data is an object with plans property
@@ -169,7 +152,6 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
               ...data,
               plans: normalize(data.plans || []),
             };
-            console.log(`Returning ${normalized.plans.length} normalized plans from success.data.plans`);
             return normalized;
           }
           // If data is an object with items property (fallback)
@@ -178,33 +160,25 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
               ...data,
               items: normalize((data as any).items || []),
             };
-            console.log(`Returning ${normalized.items.length} normalized plans from success.data.items`);
             return normalized;
           }
           // Unknown shape, return empty array to avoid runtime errors
           console.warn('Success response data shape not recognized for subscription plans:', data);
           return [];
         }
-
         // Handle direct array format
         if (Array.isArray(response)) {
-          console.log('Handling direct array format');
           const normalized = normalize(response);
-          console.log(`Returning ${normalized.length} normalized plans from direct array`);
           return normalized;
         }
-
         // Handle { plans: [...] } format
         if (response && typeof response === 'object' && 'plans' in response) {
-          console.log('Handling { plans } format');
           const normalized = {
             ...response,
             plans: normalize(response.plans || []),
           };
-          console.log(`Returning ${normalized.plans.length} normalized plans from plans property`);
           return normalized;
         }
-
         // Fallback: return empty array
         console.warn('Subscription plans response format not recognized:', response);
         console.warn('Response keys:', response && typeof response === 'object' ? Object.keys(response) : 'N/A');
@@ -411,23 +385,17 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Subscription'],
       transformResponse: (response: any) => {
-        console.log('getSubscriptionFeatures transformResponse - Raw response:', response);
-        
         // Handle { success: true, data: [...] } format (from backend interceptor)
         if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
           const data = response.data;
           if (Array.isArray(data)) {
-            console.log(`Returning ${data.length} features from success.data`);
             return data;
           }
         }
-
         // Handle direct array format
         if (Array.isArray(response)) {
-          console.log(`Returning ${response.length} features from direct array`);
           return response;
         }
-
         // Fallback: return empty array
         console.warn('Subscription features response format not recognized:', response);
         return [];
@@ -498,7 +466,6 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
     }),
   }),
 });
-
 export const {
   useGetAllSubscriptionsQuery,
   useGetSubscriptionPlansQuery,

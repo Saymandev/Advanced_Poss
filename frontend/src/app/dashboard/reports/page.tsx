@@ -1,5 +1,4 @@
 'use client';
-
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
@@ -46,42 +45,34 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
-
 const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
-
 export default function ReportsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  
   // Redirect if user doesn't have reports feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('reports');
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('week');
   const [activeReport, setActiveReport] = useState<'financial' | 'sales' | 'wastage' | 'food' | 'settlement'>('financial');
   const [mounted, setMounted] = useState(false);
-  
   useEffect(() => {
     setMounted(true);
   }, []);
-
   const companyId = useMemo(() => {
     return (user as any)?.companyId || 
            (companyContext as any)?.companyId ||
            (companyContext as any)?._id ||
            (companyContext as any)?.id;
   }, [user, companyContext]);
-  
   const branchId = useMemo(() => {
     return (user as any)?.branchId || 
            (companyContext as any)?.branchId ||
            (companyContext as any)?.branches?.[0]?._id ||
            (companyContext as any)?.branches?.[0]?.id;
   }, [user, companyContext]);
-
   // Calculate date ranges based on period
   const { startDate, endDate } = useMemo(() => {
     const now = new Date();
     let end = new Date(now);
     let start = new Date(now);
-
     switch (selectedPeriod) {
       case 'day':
         // For 'day', only show today's data (use local date, not UTC)
@@ -108,7 +99,6 @@ export default function ReportsPage() {
         end.setHours(23, 59, 59, 999);
         break;
     }
-
     // Format dates to ensure the date part is correct regardless of timezone
     // Use UTC date components to create the date string, so the date part matches the user's local date
     const formatDateForAPI = (date: Date) => {
@@ -120,19 +110,16 @@ export default function ReportsPage() {
       const minutes = date.getMinutes();
       const seconds = date.getSeconds();
       const ms = date.getMilliseconds();
-      
       // Create a new Date using UTC components but with the same date values
       // This ensures the date part (YYYY-MM-DD) in the ISO string matches the local date
       const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds, ms));
       return utcDate.toISOString();
     };
-
     return {
       startDate: formatDateForAPI(start),
       endDate: formatDateForAPI(end),
     };
   }, [selectedPeriod]);
-
   const { 
     data: dashboardData, 
     isLoading: isLoadingDashboard,
@@ -145,7 +132,6 @@ export default function ReportsPage() {
     skip: !companyId && !branchId,
     refetchOnMountOrArgChange: true,
   });
-
   const {
     data: financialSummary,
     isLoading: isLoadingFinancialSummary,
@@ -160,7 +146,6 @@ export default function ReportsPage() {
     skip: (!companyId && !branchId) || activeReport !== 'financial',
     refetchOnMountOrArgChange: true,
   });
-
   const { 
     data: salesAnalytics, 
     isLoading: isLoadingAnalytics,
@@ -175,22 +160,12 @@ export default function ReportsPage() {
     skip: !branchId && !companyId,
     refetchOnMountOrArgChange: true,
   });
-
   // Debug logging for sales analytics
   useEffect(() => {
     if (salesAnalytics) {
-      console.log('📊 Frontend - Sales Analytics Data:', {
-        totalSales: salesAnalytics.totalSales,
-        totalOrders: salesAnalytics.totalOrders,
-        averageOrderValue: salesAnalytics.averageOrderValue,
-        salesByDayLength: salesAnalytics.salesByDay?.length,
-        period: salesAnalytics.period,
-        selectedPeriod,
-      });
+      // Debug logging removed
     }
   }, [salesAnalytics, selectedPeriod]);
-
-
   const { 
     data: topSellingItems, 
     isLoading: isLoadingTopItems,
@@ -203,7 +178,6 @@ export default function ReportsPage() {
     skip: !branchId && !companyId,
     refetchOnMountOrArgChange: true,
   });
-
   const { 
     data: revenueByCategory, 
     isLoading: isLoadingCategory,
@@ -217,20 +191,10 @@ export default function ReportsPage() {
     skip: !branchId && !companyId,
     refetchOnMountOrArgChange: true,
   });
-
   // Debug logging for category data
   useEffect(() => {
-    console.log('📊 Frontend - Revenue By Category Query:', {
-      revenueByCategory,
-      isLoadingCategory,
-      categoryError,
-      branchId,
-      startDate,
-      endDate,
-      selectedPeriod,
-    });
+    // Debug logging removed
   }, [revenueByCategory, isLoadingCategory, categoryError, branchId, startDate, endDate, selectedPeriod]);
-
   const { 
     data: peakHoursData, 
     isLoading: isLoadingPeakHours,
@@ -244,7 +208,6 @@ export default function ReportsPage() {
     skip: !branchId || !startDate || !endDate,
     refetchOnMountOrArgChange: true,
   });
-
   const { 
     data: wastageReport, 
     isLoading: isLoadingWastage,
@@ -259,7 +222,6 @@ export default function ReportsPage() {
     skip: (!companyId && !branchId) || activeReport !== 'wastage',
     refetchOnMountOrArgChange: true,
   });
-
   const { 
     data: dueSettlementsData, 
     isLoading: isLoadingSettlements,
@@ -272,30 +234,24 @@ export default function ReportsPage() {
     skip: !branchId && !companyId,
     refetchOnMountOrArgChange: true,
   });
-
   const [exportReport, { isLoading: isExporting }] = useExportReportMutation();
-
   // Transform real API data for charts (memoized to prevent re-renders)
   const salesData = useMemo(() => {
     if (!salesAnalytics?.salesByDay || !Array.isArray(salesAnalytics.salesByDay) || salesAnalytics.salesByDay.length === 0) {
       return [];
     }
-    
     // Filter out days with no sales for better chart display (especially for year period)
     const filtered = salesAnalytics.salesByDay.filter((item: any) => {
       const sales = Number(item.sales) || 0;
       const orders = Number(item.orders) || 0;
       return sales > 0 || orders > 0;
     });
-    
     // If filtering removed all data, show all data anyway (for debugging)
     const dataToUse = filtered.length > 0 ? filtered : salesAnalytics.salesByDay;
-    
     return dataToUse.map((item: any) => {
       // Handle different date formats
       const dateStr = item.day || item.date || '';
       let date: Date;
-      
       if (dateStr) {
         try {
           date = new Date(dateStr);
@@ -309,18 +265,15 @@ export default function ReportsPage() {
       } else {
         date = new Date();
       }
-      
       const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
       const dayNumber = date.getDate();
       const month = date.toLocaleDateString('en-US', { month: 'short' });
-      
       // For year period, show month and day
       const displayName = selectedPeriod === 'year' 
         ? `${month} ${dayNumber}`
         : selectedPeriod === 'day' 
         ? `${dayName} ${dayNumber}` 
         : dayName;
-      
       return {
         name: displayName,
         fullDate: `${dayNumber} ${month}`,
@@ -329,7 +282,6 @@ export default function ReportsPage() {
       };
     });
   }, [salesAnalytics?.salesByDay, selectedPeriod]);
-
   const financialCards = useMemo(() => {
     const net = financialSummary?.net ?? 0;
     const sales = financialSummary?.sales?.total ?? 0;
@@ -358,10 +310,9 @@ export default function ReportsPage() {
       },
     ];
   }, [financialSummary]);
-
   const financialChartData = useMemo(() => {
     if (!financialSummary?.timeline) return [];
-    return financialSummary.timeline.map((item) => {
+    return financialSummary.timeline.map((item: any) => {
       const date = new Date(item.date);
       const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       return {
@@ -370,9 +321,8 @@ export default function ReportsPage() {
       };
     });
   }, [financialSummary]);
-
   const topItems = useMemo(() => {
-    return topSellingItems?.map((item, index) => ({
+    return topSellingItems?.map((item: any, index: number) => ({
       name: item.name || 'Unknown Item',
       orders: item.quantity || 0,
       revenue: item.revenue || 0,
@@ -380,7 +330,6 @@ export default function ReportsPage() {
       index,
     })) || [];
   }, [topSellingItems]);
-
   // Calculate trends (comparing current period with previous period)
   const trends = useMemo(() => {
     if (!salesAnalytics || !dashboardData) {
@@ -390,19 +339,16 @@ export default function ReportsPage() {
         avgOrderValueChange: 0,
       };
     }
-
     const currentRevenue = salesAnalytics.totalSales || 0;
     const currentOrders = salesAnalytics.totalOrders || 0;
     // Calculate current avg order value
     const currentAvgOrderValue = currentOrders > 0 
       ? (salesAnalytics.averageOrderValue || (currentRevenue / currentOrders))
       : 0;
-
     // Compare with previous period based on selected period
     // Use dashboard data which has period-specific comparisons
     let prevRevenue = 0;
     let prevOrders = 0;
-    
     if (selectedPeriod === 'day') {
       // For today, compare with yesterday (use dashboard today data if available, otherwise 0)
       // If we have week data, we can estimate yesterday as (week - today) / 6
@@ -410,7 +356,6 @@ export default function ReportsPage() {
       const todayOrders = dashboardData.today?.completed || 0;
       const weekRevenue = dashboardData.week?.revenue || 0;
       const weekOrders = dashboardData.week?.orders || 0;
-      
       // Estimate previous day as average of other days in week
       if (weekRevenue > todayRevenue && weekOrders > todayOrders) {
         prevRevenue = (weekRevenue - todayRevenue) / Math.max(1, weekOrders - todayOrders) * (weekOrders - todayOrders) / 6;
@@ -432,74 +377,40 @@ export default function ReportsPage() {
       prevRevenue = 0;
       prevOrders = 0;
     }
-
     const prevAvgOrderValue = prevOrders > 0 ? prevRevenue / prevOrders : 0;
-
     // Only calculate change if we have valid previous period data
     const revenueChange = prevRevenue > 0 
       ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 
       : (currentRevenue > 0 ? 0 : -100); // If current > 0 but no previous, show 0% (new data)
-    
     const ordersChange = prevOrders > 0 
       ? ((currentOrders - prevOrders) / prevOrders) * 100 
       : (currentOrders > 0 ? 0 : -100);
-    
     const avgOrderValueChange = prevAvgOrderValue > 0 && currentAvgOrderValue > 0
       ? ((currentAvgOrderValue - prevAvgOrderValue) / prevAvgOrderValue) * 100
       : 0;
-
     return {
       revenueChange,
       ordersChange,
       avgOrderValueChange,
     };
   }, [salesAnalytics, dashboardData, selectedPeriod]);
-
   const categoryData = useMemo(() => {
-    console.log('📊 Frontend - categoryData useMemo:', {
-      revenueByCategory,
-      isArray: Array.isArray(revenueByCategory),
-      length: revenueByCategory?.length,
-      sample: revenueByCategory?.[0],
-    });
-    
     if (!revenueByCategory || !Array.isArray(revenueByCategory) || revenueByCategory.length === 0) {
-      console.log('⚠️ categoryData: No revenueByCategory data');
       return [];
     }
-    
     const filtered = revenueByCategory.filter((item: any) => {
       const sales = item.sales || item.revenue || 0;
       const hasSales = sales > 0;
-      if (!hasSales) {
-        console.log('⚠️ Filtered out category with 0 sales:', item);
-      }
       return item && hasSales;
     });
-    
-    console.log('📊 categoryData - After filtering:', {
-      originalCount: revenueByCategory.length,
-      filteredCount: filtered.length,
-      filtered: filtered.map((item: any) => ({
-        category: item.category,
-        categoryId: item.categoryId,
-        sales: item.sales || item.revenue,
-        percentage: item.percentage,
-      })),
-    });
-    
     const mapped = filtered.map((item: any, index: number) => ({
       name: item.category || item.categoryId?.name || item.categoryId || 'Unknown',
       value: item.percentage || 0,
       sales: item.sales || item.revenue || 0,
       color: COLORS[index % COLORS.length],
     }));
-    
-    console.log('📊 categoryData - Final mapped:', mapped);
-    
     return mapped;
   }, [revenueByCategory]);
-
   const hourlyData = useMemo(() => {
     if (!peakHoursData?.hourlyData || !Array.isArray(peakHoursData.hourlyData)) return [];
     return peakHoursData.hourlyData.map((item: any) => {
@@ -514,7 +425,6 @@ export default function ReportsPage() {
       };
     });
   }, [peakHoursData]);
-
   // Calculate peak hours
   const peakHours = useMemo(() => {
     if (!peakHoursData?.peakHours || peakHoursData.peakHours.length === 0) {
@@ -529,23 +439,20 @@ export default function ReportsPage() {
     const nextHourText = nextHour >= 12 
       ? `${nextHour > 12 ? nextHour - 12 : nextHour} PM` 
       : `${nextHour === 0 ? 12 : nextHour} AM`;
-    
     // Calculate average if period is more than 1 day
     const daysInPeriod = selectedPeriod === 'day' ? 1 : selectedPeriod === 'week' ? 7 : selectedPeriod === 'month' ? 30 : 365;
     const totalOrders = peak.orders || 0;
     const avgOrders = daysInPeriod > 1 ? totalOrders / daysInPeriod : totalOrders;
-    
     return {
       text: `${hourText}-${nextHourText}`,
       orders: daysInPeriod > 1 ? Math.round(avgOrders * 10) / 10 : Math.round(totalOrders),
       isAverage: daysInPeriod > 1,
     };
   }, [peakHoursData, selectedPeriod]);
-
   // Find best performing day
   const bestDay = useMemo(() => {
     if (!salesData || salesData.length === 0) return null;
-    const best = salesData.reduce((max, day) => 
+    const best = salesData.reduce((max: any, day: any) => 
       day.sales > max.sales ? day : max, salesData[0]
     );
     return {
@@ -554,13 +461,11 @@ export default function ReportsPage() {
       orders: best.orders,
     };
   }, [salesData]);
-
   // Find most popular item
   const mostPopularItem = useMemo(() => {
     if (!topItems || topItems.length === 0) return null;
     return topItems[0];
   }, [topItems]);
-
   const isLoading = isLoadingDashboard
     || isLoadingAnalytics
     || isLoadingTopItems
@@ -568,7 +473,6 @@ export default function ReportsPage() {
     || isLoadingPeakHours
     || isLoadingSettlements
     || (activeReport === 'financial' && isLoadingFinancialSummary);
-  
   const hasError = dashboardError
     || salesAnalyticsError
     || topItemsError
@@ -576,7 +480,6 @@ export default function ReportsPage() {
     || peakHoursError
     || settlementsError
     || (activeReport === 'financial' && financialSummaryError);
-
   const handleRefresh = () => {
     refetchDashboard();
     refetchFinancialSummary();
@@ -587,13 +490,11 @@ export default function ReportsPage() {
     refetchSettlements();
     toast.success('Reports refreshed');
   };
-
   const handleExport = async (type: 'sales' | 'inventory' | 'customers' | 'staff', format: 'pdf' | 'excel' | 'csv') => {
     if (!branchId && !companyId) {
       toast.error('Branch or Company ID is required for export');
       return;
     }
-    
     try {
       const result = await exportReport({
         type,
@@ -617,17 +518,14 @@ export default function ReportsPage() {
       toast.error(error?.data?.message || error?.message || 'Failed to export report');
     }
   };
-
   const formatPercentage = (value: number) => {
     const sign = value >= 0 ? '+' : '';
     return `${sign}${value.toFixed(1)}%`;
   };
-
   const TrendIndicator = ({ value }: { value: number }) => {
     const isPositive = value >= 0;
     const Icon = isPositive ? ArrowTrendingUpIcon : ArrowTrendingDownIcon;
     const color = isPositive ? 'text-green-600' : 'text-red-600';
-    
     return (
       <div className="flex items-center gap-1">
         <Icon className={`w-4 h-4 ${color}`} />
@@ -638,7 +536,6 @@ export default function ReportsPage() {
       </div>
     );
   };
-
   if (!mounted) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -646,7 +543,6 @@ export default function ReportsPage() {
       </div>
     );
   }
-
   if (!companyId && !branchId) {
     return (
       <div className="space-y-6">
@@ -672,7 +568,6 @@ export default function ReportsPage() {
       </div>
     );
   }
-
   if (isLoading && !dashboardData && !salesAnalytics) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -683,7 +578,6 @@ export default function ReportsPage() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       {/* Error Banner */}
@@ -709,7 +603,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -747,7 +640,6 @@ export default function ReportsPage() {
           </Button>
         </div>
       </div>
-
       {/* Report Type Selection */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card 
@@ -770,7 +662,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card 
           className={`cursor-pointer transition-all ${activeReport === 'sales' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('sales')}
@@ -791,7 +682,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card 
           className={`cursor-pointer transition-all ${activeReport === 'wastage' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('wastage')}
@@ -812,7 +702,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card 
           className={`cursor-pointer transition-all ${activeReport === 'food' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('food')}
@@ -833,7 +722,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card 
           className={`cursor-pointer transition-all ${activeReport === 'settlement' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('settlement')}
@@ -855,7 +743,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-
       {activeReport === 'financial' && (
         <>
           {/* Financial Summary (Sales vs Expenses vs Purchases) */}
@@ -869,7 +756,6 @@ export default function ReportsPage() {
               </Card>
             ))}
           </div>
-
           <Card className="border border-gray-200 dark:border-gray-800">
             <CardHeader>
               <CardTitle>Net Profit / Loss vs Sales, Expenses, Purchases</CardTitle>
@@ -897,7 +783,6 @@ export default function ReportsPage() {
           </Card>
         </>
       )}
-
       {/* Report Content Based on Selection */}
       {/* Report Content Based on Selection */}
       {activeReport === 'sales' && (
@@ -921,7 +806,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -945,7 +829,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -970,7 +853,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -989,7 +871,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales Trend */}
@@ -1021,7 +902,6 @@ export default function ReportsPage() {
             )}
           </CardContent>
         </Card>
-
         {/* Sales by Category */}
         <Card>
           <CardHeader>
@@ -1062,7 +942,6 @@ export default function ReportsPage() {
             )}
           </CardContent>
         </Card>
-
         {/* Hourly Orders */}
         <Card>
           <CardHeader>
@@ -1099,7 +978,6 @@ export default function ReportsPage() {
             )}
           </CardContent>
         </Card>
-
         {/* Top Selling Items */}
         <Card>
           <CardHeader>
@@ -1119,7 +997,7 @@ export default function ReportsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {topItems.map((item) => (
+                {topItems.map((item: any) => (
                   <div key={item.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -1152,7 +1030,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
@@ -1169,7 +1046,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -1186,7 +1062,6 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -1204,7 +1079,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Additional Insights */}
       <Card>
         <CardHeader>
@@ -1228,7 +1102,6 @@ export default function ReportsPage() {
                 </div>
               </div>
             )}
-
             {mostPopularItem && (
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Most Popular Item</h4>
@@ -1250,7 +1123,6 @@ export default function ReportsPage() {
       </Card>
         </>
       )}
-
       {activeReport === 'wastage' && (
         <div className="space-y-6">
           {/* Summary Cards */}
@@ -1312,7 +1184,6 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
           </div>
-
           {isLoadingWastage ? (
             <Card>
               <CardContent className="p-12 text-center">
@@ -1389,7 +1260,6 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
               )}
-
               {/* Top Wasted Ingredients */}
               {wastageReport.byIngredient && wastageReport.byIngredient.length > 0 && (
                 <Card>
@@ -1419,7 +1289,6 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
               )}
-
               {/* Daily Wastage Trend */}
               {wastageReport.dailyTrend && wastageReport.dailyTrend.length > 0 && (
                 <Card>
@@ -1452,7 +1321,6 @@ export default function ReportsPage() {
           )}
         </div>
       )}
-
       {activeReport === 'food' && (
         <Card>
           <CardHeader>
@@ -1491,13 +1359,12 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
               </div>
-
               {/* Top Selling Items */}
               {topItems.length > 0 && (
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Selling Items</h4>
                   <div className="space-y-3">
-                    {topItems.map((item) => (
+                    {topItems.map((item: any) => (
                       <div key={item.name} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -1526,7 +1393,6 @@ export default function ReportsPage() {
                   </div>
                 </div>
               )}
-
               {/* Sales by Category */}
               {categoryData.length > 0 && (
                 <div>
@@ -1556,7 +1422,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       )}
-
       {activeReport === 'settlement' && (
         <Card>
           <CardHeader>
@@ -1601,7 +1466,6 @@ export default function ReportsPage() {
                     </CardContent>
                   </Card>
                 </div>
-
                 {dueSettlementsData?.pendingSettlements === 0 ? (
                   <div className="text-center py-8">
                     <ArrowPathIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -1646,7 +1510,6 @@ export default function ReportsPage() {
                     </div>
                   </div>
                 )}
-
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
                   <p className="text-sm text-blue-800 dark:text-blue-400">
                     <strong>Note:</strong> Due settlements track orders that have been completed but payment is still pending or needs to be reconciled.

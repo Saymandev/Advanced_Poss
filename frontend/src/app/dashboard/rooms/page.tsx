@@ -46,10 +46,18 @@ export default function RoomsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [roomTypeFilter, setRoomTypeFilter] = useState('all');
 
-  const branchId = (user as any)?.branchId || 
-                   (companyContext as any)?.branchId || 
-                   (companyContext as any)?.branches?.[0]?._id ||
-                   (companyContext as any)?.branches?.[0]?.id;
+  // Extract branchId and ensure it's a string
+  const branchIdRaw = (user as any)?.branchId || 
+                       (companyContext as any)?.branchId || 
+                       (companyContext as any)?.branches?.[0]?._id ||
+                       (companyContext as any)?.branches?.[0]?.id;
+  
+  // Convert to string if it's an ObjectId object
+  const branchId = branchIdRaw 
+    ? (typeof branchIdRaw === 'string' 
+        ? branchIdRaw 
+        : (branchIdRaw.toString ? branchIdRaw.toString() : String(branchIdRaw)))
+    : undefined;
 
   const { data: roomsResponse, isLoading } = useGetRoomsQuery({
     branchId,
@@ -720,6 +728,7 @@ export default function RoomsPage() {
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   {formData.images.map((image: string, index: number) => (
                     <div key={index} className="relative group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={image}
                         alt={`Room ${index + 1}`}
@@ -955,6 +964,7 @@ export default function RoomsPage() {
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   {formData.images.map((image: string, index: number) => (
                     <div key={index} className="relative group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={image}
                         alt={`Room ${index + 1}`}

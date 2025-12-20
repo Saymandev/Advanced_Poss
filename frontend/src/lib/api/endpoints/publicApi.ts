@@ -1,5 +1,4 @@
 import { apiSlice } from '../apiSlice';
-
 export interface PublicCompany {
   id: string;
   slug: string;
@@ -11,7 +10,6 @@ export interface PublicCompany {
   address?: any;
   description?: string;
 }
-
 export interface PublicBranch {
   id: string;
   slug: string;
@@ -28,7 +26,6 @@ export interface PublicBranch {
   }>;
   isActive: boolean;
 }
-
 export interface PublicMenuItem {
   id: string;
   name: string;
@@ -39,13 +36,11 @@ export interface PublicMenuItem {
   isAvailable: boolean;
   preparationTime?: number;
 }
-
 export interface PublicCategory {
   id: string;
   name: string;
   description?: string;
 }
-
 export interface DeliveryZone {
   id: string;
   name: string;
@@ -61,7 +56,6 @@ export interface DeliveryZone {
   };
   isActive: boolean;
 }
-
 export interface PublicRoom {
   id: string;
   roomNumber: string;
@@ -82,7 +76,6 @@ export interface PublicRoom {
   images: string[];
   description?: string;
 }
-
 export interface PublicBooking {
   id: string;
   bookingNumber: string;
@@ -99,7 +92,6 @@ export interface PublicBooking {
   specialRequests?: string;
   createdAt: string;
 }
-
 export const publicApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getCompanyBySlug: builder.query<PublicCompany, string>({
@@ -113,14 +105,12 @@ export const publicApi = apiSlice.injectEndpoints({
         return data;
       },
     }),
-    
     getCompanyBranches: builder.query<PublicBranch[], string>({
       query: (companySlug) => `/public/companies/${companySlug}/branches`,
       transformResponse: (response: any) => {
         return response.data || response;
       },
     }),
-    
     getBranchBySlug: builder.query<PublicBranch, { companySlug: string; branchSlug: string }>({
       query: ({ companySlug, branchSlug }) => 
         `/public/companies/${companySlug}/branches/${branchSlug}`,
@@ -128,7 +118,6 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || response;
       },
     }),
-    
     getBranchMenuById: builder.query<{
       branch?: {
         id: string;
@@ -152,7 +141,6 @@ export const publicApi = apiSlice.injectEndpoints({
         };
       },
     }),
-
     getBranchMenu: builder.query<{
       branch?: {
         id: string;
@@ -171,7 +159,6 @@ export const publicApi = apiSlice.injectEndpoints({
       },
       transformResponse: (response: any) => {
         const data = response.data || response;
-        
         // Ensure categories is an array
         let categories = [];
         if (Array.isArray(data.categories)) {
@@ -179,7 +166,6 @@ export const publicApi = apiSlice.injectEndpoints({
         } else if (data.categories?.categories && Array.isArray(data.categories.categories)) {
           categories = data.categories.categories;
         }
-        
         // Ensure menuItems is an array
         let menuItems = [];
         if (Array.isArray(data.menuItems)) {
@@ -189,7 +175,6 @@ export const publicApi = apiSlice.injectEndpoints({
         } else if (Array.isArray(data.menu)) {
           menuItems = data.menu;
         }
-        
         return {
           branch: data.branch,
           categories,
@@ -197,7 +182,6 @@ export const publicApi = apiSlice.injectEndpoints({
         };
       },
     }),
-    
     getProduct: builder.query<PublicMenuItem, {
       companySlug: string;
       branchSlug: string;
@@ -209,7 +193,6 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || response;
       },
     }),
-    
     createPublicOrder: builder.mutation<any, {
       companySlug: string;
       branchSlug: string;
@@ -221,7 +204,6 @@ export const publicApi = apiSlice.injectEndpoints({
         body: orderData,
       }),
     }),
-    
     getBranchReviews: builder.query<any[], {
       companySlug: string;
       branchSlug: string;
@@ -232,21 +214,18 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || [];
       },
     }),
-    
     getCompanyGallery: builder.query<any[], string>({
       query: (companySlug) => `/public/companies/${companySlug}/gallery`,
       transformResponse: (response: any) => {
         return response.data || [];
       },
     }),
-    
     trackOrder: builder.query<any, string>({
       query: (orderId) => `/public/orders/${orderId}/track`,
       transformResponse: (response: any) => {
         return response.data || response;
       },
     }),
-    
     getBranchZones: builder.query<DeliveryZone[], {
       companySlug: string;
       branchSlug: string;
@@ -257,7 +236,6 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || [];
       },
     }),
-    
     findDeliveryZone: builder.mutation<DeliveryZone | null, {
       companySlug: string;
       branchSlug: string;
@@ -272,7 +250,6 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || null;
       },
     }),
-    
     submitContactForm: builder.mutation<{ success: boolean; message: string }, {
       companySlug: string;
       name: string;
@@ -287,7 +264,6 @@ export const publicApi = apiSlice.injectEndpoints({
         body: formData,
       }),
     }),
-    
     submitGeneralContactForm: builder.mutation<{ success: boolean; message: string }, {
       name: string;
       email: string;
@@ -301,9 +277,7 @@ export const publicApi = apiSlice.injectEndpoints({
         body: formData,
       }),
     }),
-
     // ========== Hotel/Room Public Endpoints ==========
-
     getBranchRooms: builder.query<PublicRoom[], {
       companySlug: string;
       branchSlug: string;
@@ -317,10 +291,21 @@ export const publicApi = apiSlice.injectEndpoints({
         return `/public/companies/${companySlug}/branches/${branchSlug}/rooms${params.toString() ? `?${params.toString()}` : ''}`;
       },
       transformResponse: (response: any) => {
-        return response.data || [];
+        // After decryption, response.data is { success: true, data: [...] }
+        // So we need to extract response.data.data (the array)
+        if (response && response.data) {
+          if (Array.isArray(response.data)) {
+            return response.data;
+          } else if (response.data.data && Array.isArray(response.data.data)) {
+            return response.data.data;
+          } else if (response.data.success && response.data.data) {
+            return response.data.data;
+          }
+        }
+        console.warn('[getBranchRooms] No valid data found, returning empty array');
+        return [];
       },
     }),
-
     getRoomDetails: builder.query<PublicRoom, {
       companySlug: string;
       branchSlug: string;
@@ -332,7 +317,6 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data;
       },
     }),
-
     checkRoomAvailability: builder.query<{
       checkInDate: string;
       checkOutDate: string;
@@ -350,7 +334,6 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data;
       },
     }),
-
     createPublicBooking: builder.mutation<PublicBooking, {
       companySlug: string;
       branchSlug: string;
@@ -375,7 +358,6 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data;
       },
     }),
-
     getBookingDetails: builder.query<PublicBooking, {
       companySlug: string;
       branchSlug: string;
@@ -389,7 +371,6 @@ export const publicApi = apiSlice.injectEndpoints({
     }),
   }),
 });
-
 export const {
   useGetCompanyBySlugQuery,
   useGetCompanyBranchesQuery,
@@ -412,4 +393,3 @@ export const {
   useCreatePublicBookingMutation,
   useGetBookingDetailsQuery,
 } = publicApi;
-

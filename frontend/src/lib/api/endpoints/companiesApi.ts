@@ -1,5 +1,4 @@
 import { apiSlice } from '../apiSlice';
-
 export interface Company {
   id: string;
   name: string;
@@ -59,7 +58,6 @@ export interface Company {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface CreateCompanyRequest {
   name: string;
   type: string;
@@ -77,11 +75,9 @@ export interface CreateCompanyRequest {
   };
   settings?: Partial<Company['settings']>;
 }
-
 export interface UpdateCompanyRequest extends Partial<CreateCompanyRequest> {
   id: string;
 }
-
 export interface CompanyStats {
   totalBranches: number;
   totalUsers: number; // Employees/Staff count
@@ -100,7 +96,6 @@ export interface CompanyStats {
     timestamp: string;
   }>;
 }
-
 export interface SystemStats {
   totalCompanies: number;
   activeCompanies: number;
@@ -109,7 +104,6 @@ export interface SystemStats {
   totalUsers: number;
   companiesByPlan: Record<string, number>;
 }
-
 export interface CustomDomainInfo {
   domain: string | null;
   verified: boolean;
@@ -122,15 +116,12 @@ export interface CustomDomainInfo {
     instructions: string;
   } | null;
 }
-
 export interface AddCustomDomainRequest {
   domain: string;
 }
-
 export interface VerifyCustomDomainRequest {
   token: string;
 }
-
 export const companiesApi = apiSlice.injectEndpoints({
   overrideExisting: true,
   endpoints: (builder) => ({
@@ -163,15 +154,6 @@ export const companiesApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         // Ensure logo field is included
         const data = response?.data ?? response;
-        console.log('📦 getCompanyById response:', {
-          hasLogo: !!data?.logo,
-          logoValue: data?.logo?.substring(0, 50) + '...' || 'null',
-          allKeys: Object.keys(data || {}),
-          subscriptionStatus: data?.subscriptionStatus,
-          subscriptionPlan: data?.subscriptionPlan,
-          trialEndDate: data?.trialEndDate,
-          hasTrialEndDate: data?.trialEndDate !== null && data?.trialEndDate !== undefined,
-        });
         return data;
       },
     }),
@@ -212,7 +194,6 @@ export const companiesApi = apiSlice.injectEndpoints({
     >({
       query: ({ id, companyId, settings }) => {
         let resolvedId = companyId || id;
-
         // Fallback to cached user/companyContext if missing
         if (!resolvedId && typeof window !== 'undefined') {
           try {
@@ -234,14 +215,11 @@ export const companiesApi = apiSlice.injectEndpoints({
             // ignore parse errors
           }
         }
-
         const isValidObjectId = (val?: string) =>
           typeof val === 'string' && /^[a-f\d]{24}$/i.test(val);
-
         if (!isValidObjectId(resolvedId)) {
           throw new Error('Invalid company ID');
         }
-
         return {
           url: `/settings/company`,
           method: 'PATCH',
@@ -312,7 +290,6 @@ export const companiesApi = apiSlice.injectEndpoints({
     }),
   }),
 });
-
 export const {
   useGetCompaniesQuery,
   useGetMyCompaniesQuery,

@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
@@ -21,7 +20,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-
 const ALL_ROLES = [
   { value: 'all', label: 'All Roles' },
   { value: 'super_admin', label: 'Super Admin' },
@@ -31,17 +29,14 @@ const ALL_ROLES = [
   { value: 'waiter', label: 'Waiter' },
   { value: 'cashier', label: 'Cashier' },
 ];
-
 export default function SystemUsersPage() {
   const { user } = useAppSelector((state) => state.auth);
   const router = useRouter();
-
   useEffect(() => {
     if (!user || user.role !== UserRole.SUPER_ADMIN) {
       router.replace('/dashboard/super-admin');
     }
   }, [user, router]);
-
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,7 +45,6 @@ export default function SystemUsersPage() {
   const [companyFilter, setCompanyFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-
   const { data: usersData, isLoading } = useGetAllUsersSystemWideQuery({
     page: currentPage,
     limit: itemsPerPage,
@@ -58,24 +52,19 @@ export default function SystemUsersPage() {
     role: roleFilter !== 'all' ? roleFilter : undefined,
     status: statusFilter !== 'all' ? (statusFilter === 'active' ? 'active' : 'inactive') : undefined,
   });
-
   const { data: companiesData } = useGetCompaniesQuery({});
   const companies = useMemo(() => {
     if (!companiesData) return [];
     if (Array.isArray(companiesData)) return companiesData;
     return companiesData.companies || [];
   }, [companiesData]);
-
   const users = useMemo(() => {
     if (!usersData) return [];
     return usersData.users || [];
   }, [usersData]);
-
   const totalUsers = usersData?.total || 0;
-
   const filteredUsers = useMemo(() => {
     let filtered = users;
-
     // Filter by company if selected
     if (companyFilter !== 'all') {
       filtered = filtered.filter((u: any) => {
@@ -83,20 +72,16 @@ export default function SystemUsersPage() {
         return userCompanyId === companyFilter || userCompanyId?.toString() === companyFilter;
       });
     }
-
     return filtered;
   }, [users, companyFilter]);
-
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredUsers.slice(start, start + itemsPerPage);
   }, [filteredUsers, currentPage, itemsPerPage]);
-
   const openViewModal = (userData: any) => {
     setSelectedUser(userData);
     setIsViewModalOpen(true);
   };
-
   const getRoleBadge = (role: string) => {
     const roleMap: Record<string, string> = {
       super_admin: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
@@ -108,11 +93,9 @@ export default function SystemUsersPage() {
     };
     return roleMap[role] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
   };
-
   const getRoleLabel = (role: string) => {
     return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
-
   const columns = [
     {
       key: 'name',
@@ -219,7 +202,6 @@ export default function SystemUsersPage() {
       ),
     },
   ];
-
   if (!user || user.role !== UserRole.SUPER_ADMIN) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -230,7 +212,6 @@ export default function SystemUsersPage() {
       </div>
     );
   }
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -244,7 +225,6 @@ export default function SystemUsersPage() {
           </p>
         </div>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -263,7 +243,6 @@ export default function SystemUsersPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -282,7 +261,6 @@ export default function SystemUsersPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -299,7 +277,6 @@ export default function SystemUsersPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -319,7 +296,6 @@ export default function SystemUsersPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
@@ -375,7 +351,6 @@ export default function SystemUsersPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Users Table */}
       <DataTable
         data={paginatedUsers}
@@ -394,11 +369,9 @@ export default function SystemUsersPage() {
         exportable={true}
         exportFilename="system-users"
         onExport={(format, items) => {
-          console.log(`Exporting ${items.length} users as ${format}`);
-        }}
+          }}
         emptyMessage="No users found."
       />
-
       {/* View User Modal */}
       <Modal
         isOpen={isViewModalOpen}
@@ -432,7 +405,6 @@ export default function SystemUsersPage() {
                 </Badge>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500">Email</p>
@@ -455,7 +427,6 @@ export default function SystemUsersPage() {
                 </Badge>
               </div>
             </div>
-
             {(selectedUser.companyId || selectedUser.company) && (
               <div>
                 <p className="text-sm text-gray-500 mb-2">Company</p>
@@ -471,7 +442,6 @@ export default function SystemUsersPage() {
                 </div>
               </div>
             )}
-
             {(selectedUser.branchId || selectedUser.branch) && (
               <div>
                 <p className="text-sm text-gray-500 mb-2">Branch</p>
@@ -484,7 +454,6 @@ export default function SystemUsersPage() {
                 </p>
               </div>
             )}
-
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500">Employee ID</p>
@@ -514,5 +483,4 @@ export default function SystemUsersPage() {
       </Modal>
     </div>
   );
-}
-
+}

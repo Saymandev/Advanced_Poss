@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -29,11 +28,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 export default function CategoriesPage() {
   const [mounted, setMounted] = useState(false);
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  
   // Redirect if user doesn't have categories feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('categories');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,20 +52,16 @@ export default function CategoriesPage() {
     isActive: true,
     sortOrder: 0,
   });
-
   useEffect(() => {
     setMounted(true);
   }, []);
-
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
   const companyId = useMemo(() => {
     if (!mounted) return undefined;
     return (user as any)?.companyId || 
@@ -76,7 +69,6 @@ export default function CategoriesPage() {
            (companyContext as any)?._id ||
            (companyContext as any)?.id;
   }, [user, companyContext, mounted]);
-
   const branchId = useMemo(() => {
     if (!mounted) return undefined;
     return (user as any)?.branchId || 
@@ -84,7 +76,6 @@ export default function CategoriesPage() {
            (companyContext as any)?.branches?.[0]?._id ||
            (companyContext as any)?.branches?.[0]?.id;
   }, [user, companyContext, mounted]);
-
   // API calls
   const { 
     data: categoriesResponse, 
@@ -99,19 +90,15 @@ export default function CategoriesPage() {
     skip: !branchId && !companyId,
     refetchOnMountOrArgChange: true,
   });
-
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
   const [deleteCategory, { isLoading: isDeleting }] = useDeleteCategoryMutation();
   const [toggleCategoryStatus] = useToggleCategoryStatusMutation();
-
   // Extract categories from API response (already transformed by API)
   const categories = useMemo(() => {
     if (!categoriesResponse) return [];
-    
     // Handle different response structures
     const cats = categoriesResponse.categories || [];
-    
     // Ensure all required fields are present
     return cats.map((cat: any) => ({
       ...cat,
@@ -123,8 +110,6 @@ export default function CategoriesPage() {
       icon: cat.icon || 'tag',
     }));
   }, [categoriesResponse]);
-
-
   // Get unique category types from existing categories for suggestions
   const existingCategoryTypes = useMemo(() => {
     const types = new Set<string>();
@@ -138,7 +123,6 @@ export default function CategoriesPage() {
       label: type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' '),
     }));
   }, [categories]);
-
   // Combine predefined types with existing types from database
   const categoryTypeOptions = useMemo(() => {
     if (!CATEGORY_TYPE_OPTIONS || CATEGORY_TYPE_OPTIONS.length === 0) {
@@ -150,25 +134,20 @@ export default function CategoriesPage() {
         { value: 'special', label: 'Special' },
       ];
     }
-    
     const predefinedMap = new Map(CATEGORY_TYPE_OPTIONS.map(opt => [opt.value, opt]));
     const combined = [...CATEGORY_TYPE_OPTIONS];
-    
     // Add existing types that aren't in predefined list
     existingCategoryTypes.forEach((type) => {
       if (!predefinedMap.has(type.value)) {
         combined.push(type);
       }
     });
-    
     return combined;
   }, [existingCategoryTypes]);
-
   // Filter categories
   const filteredCategories = useMemo(() => {
     // Create a copy of the array to avoid mutating read-only array
     let filtered = [...categories];
-
     // Search filter (using debounced query)
     if (debouncedSearchQuery) {
       filtered = filtered.filter(cat =>
@@ -176,21 +155,17 @@ export default function CategoriesPage() {
         cat.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
       );
     }
-
     // Status filter
     if (statusFilter === 'active') {
       filtered = filtered.filter(cat => cat.isActive);
     } else if (statusFilter === 'inactive') {
       filtered = filtered.filter(cat => !cat.isActive);
     }
-
     // Sort by sortOrder (now safe since we have a copy)
     return filtered.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }, [categories, debouncedSearchQuery, statusFilter]);
-
   const validateForm = useCallback((): boolean => {
     const errors: Record<string, string> = {};
-
     // Name validation
     if (!formData.name.trim()) {
       errors.name = 'Category name is required';
@@ -199,24 +174,20 @@ export default function CategoriesPage() {
     } else if (formData.name.trim().length > 50) {
       errors.name = 'Category name must be less than 50 characters';
     }
-
     // Type validation - just check it's not empty (allow custom types)
     if (!formData.type || !formData.type.trim()) {
       errors.type = 'Category type is required';
     } else if (formData.type.trim().length > 50) {
       errors.type = 'Category type must be less than 50 characters';
     }
-
     // Description validation
     if (formData.description && formData.description.length > 200) {
       errors.description = 'Description must be less than 200 characters';
     }
-
     // Color validation
     if (formData.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(formData.color)) {
       errors.color = 'Invalid color format';
     }
-
     // Sort order validation
     if (formData.sortOrder !== undefined && formData.sortOrder !== null) {
       if (formData.sortOrder < 0) {
@@ -225,21 +196,17 @@ export default function CategoriesPage() {
         errors.sortOrder = 'Sort order must be less than 10000';
       }
     }
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [formData]);
-
   const handleCreate = async () => {
     if (!validateForm()) {
       return;
     }
-
     if (!companyId) {
       toast.error('Company ID is missing');
       return;
     }
-
     try {
       // Build payload matching backend DTO structure
       const payload: any = {
@@ -247,7 +214,6 @@ export default function CategoriesPage() {
         name: formData.name.trim(),
         type: formData.type, // Required field - validated in validateForm
       };
-
       // Optional fields
       if (formData.description?.trim()) {
         payload.description = formData.description.trim();
@@ -261,23 +227,18 @@ export default function CategoriesPage() {
       if (formData.sortOrder !== undefined && formData.sortOrder !== null) {
         payload.sortOrder = formData.sortOrder;
       }
-
       // Add branchId if available (optional)
       if (branchId) {
         payload.branchId = branchId.toString();
       }
-
       const result = await createCategory(payload).unwrap();
-      console.log('✅ Category created:', result);
       toast.success('Category created successfully');
       setIsModalOpen(false);
       resetForm();
-      
       // Force refetch to ensure new category appears
       setTimeout(async () => {
         await refetch();
-        console.log('✅ Categories refetched after creation');
-      }, 100);
+        }, 100);
     } catch (error: any) {
       const errorMessage = error?.data?.message || 
                           error?.data?.error || 
@@ -286,14 +247,11 @@ export default function CategoriesPage() {
       toast.error(errorMessage);
     }
   };
-
   const handleEdit = async () => {
     if (!selectedCategory) return;
-    
     if (!validateForm()) {
       return;
     }
-    
     try {
       // Build payload matching backend DTO structure
       // Note: isActive is not in the DTO, so we can't update it through the API
@@ -302,7 +260,6 @@ export default function CategoriesPage() {
         name: formData.name.trim(),
         type: formData.type, // Required field - validated in validateForm
       };
-
       // Optional fields - only include if they have values
       if (formData.description?.trim()) {
         payload.description = formData.description.trim();
@@ -318,7 +275,6 @@ export default function CategoriesPage() {
       if (formData.sortOrder !== undefined && formData.sortOrder !== null) {
         payload.sortOrder = formData.sortOrder;
       }
-
       await updateCategory(payload).unwrap();
       toast.success('Category updated successfully');
       setIsEditModalOpen(false);
@@ -333,15 +289,12 @@ export default function CategoriesPage() {
       toast.error(errorMessage);
     }
   };
-
   const handleDeleteClick = (category: Category) => {
     setCategoryToDelete(category);
     setIsDeleteModalOpen(true);
   };
-
   const handleDelete = async () => {
     if (!categoryToDelete) return;
-    
     try {
       await deleteCategory(categoryToDelete.id).unwrap();
       toast.success('Category deleted successfully');
@@ -354,25 +307,21 @@ export default function CategoriesPage() {
                           error?.message || 
                           'Failed to delete category';
       toast.error(errorMessage);
-      
       // If error is about menu items, show more helpful message
       if (errorMessage.includes('menu item')) {
         toast.error(errorMessage, { duration: 6000 });
       }
     }
   };
-
   const openViewModal = (category: Category) => {
     setSelectedCategory(category);
     setIsViewModalOpen(true);
   };
-
   const openEditModal = (category: Category) => {
     setSelectedCategory(category);
     // Use category's type or default
     const categoryType = (category as any).type;
     const type = categoryType && categoryType.trim() ? categoryType.trim() : DEFAULT_CATEGORY_TYPE;
-    
     setFormData({
       name: category.name,
       description: category.description || '',
@@ -384,13 +333,11 @@ export default function CategoriesPage() {
     });
     setIsEditModalOpen(true);
   };
-
   useEffect(() => {
     if (!isModalOpen && !isEditModalOpen) {
       resetForm();
     }
   }, [isModalOpen, isEditModalOpen]);
-
   const resetForm = () => {
     setFormData({
       name: '',
@@ -402,13 +349,11 @@ export default function CategoriesPage() {
       sortOrder: 0,
     });
   };
-
   const getStatusBadge = (isActive: boolean) => (
     <Badge variant={isActive ? 'success' : 'secondary'}>
       {isActive ? 'Active' : 'Inactive'}
     </Badge>
   );
-
   const columns = [
     {
       key: 'name',
@@ -515,7 +460,6 @@ export default function CategoriesPage() {
       ),
     },
   ];
-
   const stats = useMemo(() => {
     return {
       total: categories.length,
@@ -524,7 +468,6 @@ export default function CategoriesPage() {
       totalMenuItems: categories.reduce((sum, c) => sum + ((c as any).menuItemsCount || 0), 0),
     };
   }, [categories]);
-
   // Prevent hydration mismatch by not rendering until client-side mounted
   if (!mounted) {
     return (
@@ -549,7 +492,6 @@ export default function CategoriesPage() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6" suppressHydrationWarning>
       {/* Header */}
@@ -567,7 +509,6 @@ export default function CategoriesPage() {
             onImport={async (data, _result) => {
               let successCount = 0;
               let errorCount = 0;
-
               for (const item of data) {
                 try {
                   const payload: any = {
@@ -577,11 +518,9 @@ export default function CategoriesPage() {
                     type: item.type || item.Type || DEFAULT_CATEGORY_TYPE,
                     isActive: item.isActive !== false && item.Status !== 'Inactive',
                   };
-
                   if (branchId) {
                     payload.branchId = branchId.toString();
                   }
-
                   await createCategory(payload).unwrap();
                   successCount++;
                 } catch (error: any) {
@@ -589,7 +528,6 @@ export default function CategoriesPage() {
                   errorCount++;
                 }
               }
-
               if (successCount > 0) {
                 toast.success(`Successfully imported ${successCount} categories`);
                 await refetch();
@@ -613,7 +551,6 @@ export default function CategoriesPage() {
           </Button>
         </div>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -629,7 +566,6 @@ export default function CategoriesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -643,7 +579,6 @@ export default function CategoriesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -657,7 +592,6 @@ export default function CategoriesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -672,7 +606,6 @@ export default function CategoriesPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
@@ -704,7 +637,6 @@ export default function CategoriesPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Categories Table */}
       <Card>
         <CardHeader>
@@ -750,7 +682,6 @@ export default function CategoriesPage() {
           )}
         </CardContent>
       </Card>
-
       {/* Create Category Modal */}
       <Modal
         isOpen={isModalOpen}
@@ -771,7 +702,6 @@ export default function CategoriesPage() {
               placeholder="Enter category name"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Description
@@ -782,7 +712,6 @@ export default function CategoriesPage() {
               placeholder="Enter category description"
             />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -794,7 +723,6 @@ export default function CategoriesPage() {
                 onChange={(e) => setFormData({ ...formData, color: e.target.value })}
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Sort Order
@@ -807,7 +735,6 @@ export default function CategoriesPage() {
               />
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Type *
@@ -821,7 +748,6 @@ export default function CategoriesPage() {
               error={formErrors.type}
             />
           </div>
-
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -834,7 +760,6 @@ export default function CategoriesPage() {
               Active
             </label>
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="ghost"
@@ -854,7 +779,6 @@ export default function CategoriesPage() {
           </div>
         </div>
       </Modal>
-
       {/* View Category Modal */}
       <Modal
         isOpen={isViewModalOpen}
@@ -880,7 +804,6 @@ export default function CategoriesPage() {
                 {getStatusBadge(selectedCategory.isActive)}
               </div>
             </div>
-
             <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               {selectedCategory.description && (
                 <div>
@@ -890,7 +813,6 @@ export default function CategoriesPage() {
                   <p className="text-gray-900 dark:text-white">{selectedCategory.description}</p>
                 </div>
               )}
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -904,7 +826,6 @@ export default function CategoriesPage() {
                     <span className="text-gray-900 dark:text-white">{selectedCategory.color}</span>
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Sort Order
@@ -912,7 +833,6 @@ export default function CategoriesPage() {
                   <p className="text-gray-900 dark:text-white">{selectedCategory.sortOrder || 0}</p>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                   Menu Items Count
@@ -921,7 +841,6 @@ export default function CategoriesPage() {
                   {(selectedCategory as any).menuItemsCount || 0} items
                 </Badge>
               </div>
-
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -941,7 +860,6 @@ export default function CategoriesPage() {
                 </div>
               </div>
             </div>
-
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
@@ -964,7 +882,6 @@ export default function CategoriesPage() {
           </div>
         )}
       </Modal>
-
       {/* Edit Category Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -986,7 +903,6 @@ export default function CategoriesPage() {
               placeholder="Enter category name"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Description
@@ -997,7 +913,6 @@ export default function CategoriesPage() {
               placeholder="Enter category description"
             />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1009,7 +924,6 @@ export default function CategoriesPage() {
                 onChange={(e) => setFormData({ ...formData, color: e.target.value })}
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Sort Order
@@ -1022,7 +936,6 @@ export default function CategoriesPage() {
               />
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Type *
@@ -1036,7 +949,6 @@ export default function CategoriesPage() {
               error={formErrors.type}
             />
           </div>
-
           {selectedCategory && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <p className="text-sm text-blue-800 dark:text-blue-200">
@@ -1047,7 +959,6 @@ export default function CategoriesPage() {
               </p>
             </div>
           )}
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="ghost"
@@ -1068,7 +979,6 @@ export default function CategoriesPage() {
           </div>
         </div>
       </Modal>
-
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
@@ -1088,7 +998,6 @@ export default function CategoriesPage() {
                 This action cannot be undone. If this category has menu items, you'll need to remove or reassign them first.
               </p>
             </div>
-
             <div className="space-y-2">
               <p className="font-medium text-gray-900 dark:text-white">
                 Category: <span className="text-gray-600 dark:text-gray-400">{categoryToDelete.name}</span>
@@ -1099,7 +1008,6 @@ export default function CategoriesPage() {
                 </p>
               )}
             </div>
-
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 variant="ghost"
@@ -1124,4 +1032,4 @@ export default function CategoriesPage() {
       </Modal>
     </div>
   );
-}
+}

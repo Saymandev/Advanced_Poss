@@ -1,5 +1,4 @@
 import { apiSlice } from '../apiSlice';
-
 export interface Supplier {
   id: string;
   code?: string;
@@ -54,7 +53,6 @@ export interface Supplier {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface CreateSupplierRequest {
   companyId: string;
   name: string;
@@ -89,11 +87,9 @@ export interface CreateSupplierRequest {
   notes?: string;
   tags?: string[];
 }
-
 export interface UpdateSupplierRequest extends Partial<CreateSupplierRequest> {
   rating?: number;
 }
-
 export const suppliersApi = apiSlice.injectEndpoints({
   overrideExisting: true,
   endpoints: (builder) => ({
@@ -115,9 +111,6 @@ export const suppliersApi = apiSlice.injectEndpoints({
             cleanParams[key] = value;
           }
         });
-        
-        console.log('🔍 Suppliers API Query Params:', cleanParams);
-        
         return {
           url: '/suppliers',
           params: cleanParams,
@@ -125,12 +118,8 @@ export const suppliersApi = apiSlice.injectEndpoints({
       },
       transformResponse: (response: any) => {
         try {
-          console.log('📦 Suppliers API Raw Response:', response);
           const data = response.data || response;
-          console.log('📦 Suppliers API Data:', data);
-          
           let suppliers = [];
-          
           if (data.suppliers && Array.isArray(data.suppliers)) {
             suppliers = data.suppliers;
           } else if (Array.isArray(data)) {
@@ -141,9 +130,6 @@ export const suppliersApi = apiSlice.injectEndpoints({
             console.warn('⚠️ Unexpected response structure:', data);
             suppliers = [];
           }
-          
-          console.log(`✅ Suppliers API Extracted ${suppliers.length} suppliers`);
-          
           const transformed = {
             suppliers: suppliers
               .filter((supplier: any) => {
@@ -203,8 +189,6 @@ export const suppliersApi = apiSlice.injectEndpoints({
               } as Supplier)),
             total: typeof data.total === 'number' ? data.total : suppliers.length,
           };
-          
-          console.log(`✅ Suppliers API Transformed: ${transformed.suppliers.length} suppliers, total: ${transformed.total}`);
           return transformed;
         } catch (error) {
           console.error('❌ Suppliers API Transform Error:', error);
@@ -282,10 +266,7 @@ export const suppliersApi = apiSlice.injectEndpoints({
         body: data,
       }),
       transformResponse: (response: any) => {
-        console.log('Create Supplier Raw Response:', response);
         const data = response.data || response;
-        console.log('Create Supplier Data:', data);
-        
         const supplier = {
           id: data._id || data.id,
           code: data.code,
@@ -333,8 +314,6 @@ export const suppliersApi = apiSlice.injectEndpoints({
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
         } as Supplier;
-        
-        console.log('Create Supplier Transformed:', supplier);
         return supplier;
       },
       invalidatesTags: [{ type: 'Supplier', id: 'LIST' }, 'Supplier'],
@@ -407,7 +386,6 @@ export const suppliersApi = apiSlice.injectEndpoints({
     }),
   }),
 });
-
 export const {
   useGetSuppliersQuery,
   useGetSupplierByIdQuery,
@@ -422,4 +400,4 @@ export const {
   useGetSupplierPerformanceQuery,
   useGetSupplierStatsQuery,
   useToggleSupplierStatusMutation,
-} = suppliersApi;
+} = suppliersApi;

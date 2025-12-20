@@ -1,5 +1,4 @@
 'use client';
-
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useUpdateOrderStatusMutation } from '@/lib/api/endpoints/ordersApi';
@@ -16,19 +15,16 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-
 interface OrderNotificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: any;
 }
-
 export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotificationModalProps) {
   const [updateOrderStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
   const [createPOSOrder] = useCreatePOSOrderMutation();
   const { user } = useAppSelector((state) => state.auth);
   const [hasPlayedSound, setHasPlayedSound] = useState(false);
-
   // Play notification sound when modal opens
   useEffect(() => {
     if (isOpen && order && !hasPlayedSound) {
@@ -37,20 +33,15 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
         // Create a pleasant notification sound (two-tone chime)
         oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
         oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
-        
         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5);
-        
         setHasPlayedSound(true);
       } catch (error) {
         console.error('Failed to play notification sound:', error);
@@ -67,37 +58,30 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
       }
     }
   }, [isOpen, order, hasPlayedSound]);
-
   // Reset sound flag when modal closes
   useEffect(() => {
     if (!isOpen) {
       setHasPlayedSound(false);
     }
   }, [isOpen]);
-
   if (!order) return null;
-
   const handleConfirm = async () => {
     try {
       const orderId = order.id || order._id || order.orderId;
-      
       // First, update the public order status to confirmed
       await updateOrderStatus({
         id: orderId,
         status: 'confirmed',
       }).unwrap();
-
       // If this is a delivery order from public site, also create a POS delivery order
       const type = (order.type || order.orderType || 'delivery').toLowerCase();
       if (type === 'delivery') {
         const publicCustomer = order.customer || {};
         const publicAddress = order.deliveryAddress || {};
-
         const customerName =
           publicCustomer.firstName && publicCustomer.lastName
             ? `${publicCustomer.firstName} ${publicCustomer.lastName}`
             : order.customerName || order.guestName || 'Guest';
-
         // Extract menuItemId properly - handle both populated and non-populated cases
         const items = (order.items || []).map((item: any) => {
           // Try multiple ways to get menuItemId
@@ -115,7 +99,6 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
             notes: item.notes || item.specialInstructions || '',
           };
         }).filter((item: any) => item.menuItemId); // Filter out items without menuItemId
-
         if (items.length === 0) {
           console.error('⚠️ No valid items found for POS order creation');
           toast.error('Failed to create POS order: No valid items found');
@@ -153,11 +136,8 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
               .join('\n'),
             waiterId: user?.id, // assign to current user (owner/manager/waiter)
           };
-
           try {
-            console.log('📦 Creating POS delivery order from public order:', deliveryPayload);
             const posOrderResult = await createPOSOrder(deliveryPayload).unwrap();
-            console.log('✅ POS delivery order created successfully:', posOrderResult);
             toast.success(`Order confirmed and added to delivery queue! Order #${posOrderResult.orderNumber || posOrderResult.id}`);
           } catch (posError: any) {
             console.error('❌ Failed to create POS delivery order from public order:', posError);
@@ -170,14 +150,12 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
         // For non-delivery orders, just confirm
         toast.success(`Order #${order.orderNumber} confirmed`);
       }
-
       onClose();
     } catch (error: any) {
       console.error('❌ Failed to confirm order:', error);
       toast.error(error.data?.message || error.message || 'Failed to confirm order');
     }
   };
-
   const handleReject = async () => {
     try {
       const orderId = order.id || order._id || order.orderId;
@@ -185,14 +163,12 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
         id: orderId,
         status: 'cancelled',
       }).unwrap();
-      
       toast.success(`Order #${order.orderNumber} rejected`);
       onClose();
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to reject order');
     }
   };
-
   const items = order.items || [];
   const orderType = order.type || 'delivery';
   const customerName = order.customer?.firstName && order.customer?.lastName
@@ -200,7 +176,6 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
     : order.customerName || order.guestName || 'Guest';
   const customerPhone = order.customer?.phone;
   const customerEmail = order.customer?.email;
-
   return (
     <Modal
       isOpen={isOpen}
@@ -234,7 +209,6 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
               {orderType}
             </span>
           </div>
-
           <div className="flex items-center gap-2">
             <UserIcon className="w-5 h-5 text-gray-500" />
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -253,7 +227,6 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
               )}
             </div>
           </div>
-
           {order.deliveryAddress && (
             <div className="flex items-start gap-2">
               <MapPinIcon className="w-5 h-5 text-gray-500 mt-0.5" />
@@ -283,7 +256,6 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
               </div>
             </div>
           )}
-
           {order.specialInstructions && (
             <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">
@@ -295,7 +267,6 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
             </div>
           )}
         </div>
-
         {/* Order Items */}
         <div>
           <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
@@ -329,7 +300,6 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
             ))}
           </div>
         </div>
-
         {/* Order Total */}
         <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
           <div className="flex items-center justify-between text-lg font-bold text-gray-900 dark:text-white">
@@ -339,7 +309,6 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
             </span>
           </div>
         </div>
-
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button
@@ -363,5 +332,4 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
       </div>
     </Modal>
   );
-}
-
+}

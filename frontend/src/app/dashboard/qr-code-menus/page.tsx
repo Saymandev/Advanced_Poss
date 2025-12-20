@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -24,14 +23,12 @@ import {
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 const MENU_TYPES = [
   { value: 'full', label: 'Full Menu' },
   { value: 'food', label: 'Food Menu' },
   { value: 'drinks', label: 'Drinks Menu' },
   { value: 'desserts', label: 'Desserts Menu' },
 ];
-
 export default function QRCodesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -49,19 +46,16 @@ export default function QRCodesPage() {
   const [tableFilter, setTableFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-
   // Extract branchId
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
-
   // Form error states
   const [formErrors, setFormErrors] = useState<{
     tableNumber?: string;
     menuType?: string;
   }>({});
-
   // Query parameters
   const queryParams = useMemo(() => {
     const params: any = {};
@@ -74,14 +68,12 @@ export default function QRCodesPage() {
     }
     return params;
   }, [branchId, tableFilter]);
-
   const { data: qrCodesData, isLoading, error, refetch } = useGetQRCodesQuery(queryParams, {
     skip: !branchId,
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
     refetchOnReconnect: true,
   });
-
   // Filter QR codes by type and search
   const filteredQRCodes = useMemo(() => {
     if (!qrCodesData) return [];
@@ -91,23 +83,19 @@ export default function QRCodesPage() {
       return true;
     });
   }, [qrCodesData, typeFilter, searchQuery]);
-
   const { data: tables, isLoading: isLoadingTables } = useGetTablesQuery({ 
     branchId: branchId || undefined 
   }, {
     skip: !branchId,
     refetchOnMountOrArgChange: true,
   });
-
   const [generateQR, { isLoading: isGenerating }] = useGenerateQRCodeMutation();
   const [updateQR, { isLoading: isUpdating }] = useUpdateQRCodeMutation();
   const [deleteQR, { isLoading: isDeleting }] = useDeleteQRCodeMutation();
-
   const [formData, setFormData] = useState({
     tableNumber: '',
     menuType: 'full' as QRCodeMenu['menuType'],
   });
-
   const resetForm = () => {
     setFormData({
       tableNumber: '',
@@ -116,18 +104,14 @@ export default function QRCodesPage() {
     setFormErrors({});
     setSelectedQR(null);
   };
-
   // Validation function
   const validateForm = (): boolean => {
     const errors: { tableNumber?: string; menuType?: string } = {};
-
     // Menu type is always required and has a default, so no validation needed
     // Table number is optional, so no validation needed
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
   const handleCreate = async () => {
     if (!validateForm()) {
       const firstError = Object.values(formErrors)[0];
@@ -136,12 +120,10 @@ export default function QRCodesPage() {
       }
       return;
     }
-
     if (!branchId) {
       toast.error('Branch ID is required');
       return;
     }
-
     try {
       // Parse tableNumber safely - only include if it's a valid positive number
       let tableNumber: number | undefined = undefined;
@@ -151,13 +133,11 @@ export default function QRCodesPage() {
           tableNumber = parsed;
         }
       }
-
       await generateQR({
         branchId: branchId,
         tableNumber: tableNumber,
         menuType: formData.menuType,
       }).unwrap();
-
       toast.success('QR code generated successfully');
       setIsCreateModalOpen(false);
       resetForm();
@@ -167,21 +147,18 @@ export default function QRCodesPage() {
     } catch (error: any) {
       const errorMessage = error?.data?.message || error?.message || 'Failed to generate QR code';
       toast.error(errorMessage);
-      
       // Set field-specific errors if available
       if (error?.data?.errors) {
         setFormErrors(error.data.errors);
       }
     }
   };
-
   const handleToggleActive = async (qr: QRCodeMenu) => {
     try {
       await updateQR({
         id: qr.id,
         data: { isActive: !qr.isActive },
       }).unwrap();
-
       toast.success(`QR code ${qr.isActive ? 'deactivated' : 'activated'} successfully`);
       setTimeout(() => {
         refetch();
@@ -191,15 +168,12 @@ export default function QRCodesPage() {
       toast.error(errorMessage);
     }
   };
-
   const handleDeleteClick = (qr: QRCodeMenu) => {
     setQrToDelete(qr);
     setIsDeleteModalOpen(true);
   };
-
   const handleDeleteConfirm = async () => {
     if (!qrToDelete) return;
-
     try {
       await deleteQR(qrToDelete.id).unwrap();
       toast.success('QR code deleted successfully');
@@ -213,12 +187,10 @@ export default function QRCodesPage() {
       toast.error(errorMessage);
     }
   };
-
   const openViewModal = (qr: QRCodeMenu) => {
     setSelectedQR(qr);
     setIsViewModalOpen(true);
   };
-
   const openEditModal = (qr: QRCodeMenu) => {
     setSelectedQR(qr);
     setEditFormData({
@@ -227,10 +199,8 @@ export default function QRCodesPage() {
     });
     setIsEditModalOpen(true);
   };
-
   const handleEdit = async () => {
     if (!selectedQR) return;
-
     try {
       await updateQR({
         id: selectedQR.id,
@@ -239,7 +209,6 @@ export default function QRCodesPage() {
           isActive: editFormData.isActive,
         },
       }).unwrap();
-
       toast.success('QR code updated successfully');
       setIsEditModalOpen(false);
       setSelectedQR(null);
@@ -251,7 +220,6 @@ export default function QRCodesPage() {
       toast.error(errorMessage);
     }
   };
-
   const getMenuTypeBadge = (type: QRCodeMenu['menuType']) => {
     const configs: Record<string, { variant: 'info' | 'success' | 'warning' | 'danger'; label: string }> = {
       full: { variant: 'info' as const, label: 'Full Menu' },
@@ -259,11 +227,9 @@ export default function QRCodesPage() {
       drinks: { variant: 'info' as const, label: 'Drinks Menu' },
       desserts: { variant: 'warning' as const, label: 'Desserts Menu' },
     };
-
     const config = configs[type] || { variant: 'info' as const, label: 'Menu' };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
-
   const columns = [
     {
       key: 'qrCodeImage',
@@ -382,12 +348,10 @@ export default function QRCodesPage() {
       ),
     },
   ];
-
   const qrCodes = useMemo(() => {
     if (!qrCodesData) return [];
     return Array.isArray(qrCodesData) ? qrCodesData : [];
   }, [qrCodesData]);
-  
   const stats = useMemo(() => {
     return {
       total: qrCodes.length,
@@ -396,7 +360,6 @@ export default function QRCodesPage() {
       avgScans: qrCodes.length ? (qrCodes.reduce((sum, qr) => sum + (qr.scanCount || 0), 0) / qrCodes.length).toFixed(1) : '0',
     };
   }, [qrCodes]);
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -412,7 +375,6 @@ export default function QRCodesPage() {
           Generate QR Code
         </Button>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -426,7 +388,6 @@ export default function QRCodesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -438,7 +399,6 @@ export default function QRCodesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -450,7 +410,6 @@ export default function QRCodesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -463,7 +422,6 @@ export default function QRCodesPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
@@ -527,7 +485,6 @@ export default function QRCodesPage() {
           )}
         </CardContent>
       </Card>
-
       {/* QR Codes Table */}
       <Card>
         <CardHeader>
@@ -551,13 +508,11 @@ export default function QRCodesPage() {
             exportable={true}
             exportFilename="qr-codes"
             onExport={(format, items) => {
-              console.log(`Exporting ${items.length} QR codes as ${format}`);
-            }}
+              }}
             emptyMessage="No QR codes found. Create your first QR code to enable contactless menu access."
           />
         </CardContent>
       </Card>
-
       {/* Create QR Code Modal */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -597,7 +552,6 @@ export default function QRCodesPage() {
               error={formErrors.tableNumber}
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Menu Type *
@@ -614,7 +568,6 @@ export default function QRCodesPage() {
               error={formErrors.menuType}
             />
           </div>
-
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
             <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">How it works</h4>
             <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
@@ -624,13 +577,11 @@ export default function QRCodesPage() {
               <li>• Real-time menu updates</li>
             </ul>
           </div>
-
           {isLoadingTables && (
             <div className="text-sm text-gray-500 dark:text-gray-400">
               Loading available tables...
             </div>
           )}
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -648,7 +599,6 @@ export default function QRCodesPage() {
           </div>
         </div>
       </Modal>
-
       {/* QR Code Details Modal */}
       <Modal
         isOpen={isViewModalOpen}
@@ -686,7 +636,6 @@ export default function QRCodesPage() {
                 </div>
               </div>
             </div>
-
             {/* QR Code Display */}
             <div className="text-center">
               <div className="inline-block p-4 bg-white border-2 border-gray-200 dark:border-gray-700 rounded-lg">
@@ -718,7 +667,6 @@ export default function QRCodesPage() {
                 </div>
               </div>
             </div>
-
             {/* Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -748,7 +696,6 @@ export default function QRCodesPage() {
                   </div>
                 </div>
               </div>
-
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Usage Statistics</h4>
                 <div className="space-y-2 text-sm">
@@ -773,7 +720,6 @@ export default function QRCodesPage() {
                 </div>
               </div>
             </div>
-
             {/* Actions */}
             <div className="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="flex gap-2">
@@ -801,7 +747,6 @@ export default function QRCodesPage() {
                   Download QR
                 </Button>
               </div>
-
               <div className="flex gap-2">
                 <Button
                   variant="secondary"
@@ -824,7 +769,6 @@ export default function QRCodesPage() {
           </div>
         )}
       </Modal>
-
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
@@ -839,7 +783,6 @@ export default function QRCodesPage() {
           <p className="text-gray-600 dark:text-gray-400">
             Are you sure you want to delete this QR code? This action cannot be undone.
           </p>
-
           {qrToDelete && (
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
               <div className="space-y-2 text-sm">
@@ -862,7 +805,6 @@ export default function QRCodesPage() {
               </div>
             </div>
           )}
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -884,7 +826,6 @@ export default function QRCodesPage() {
           </div>
         </div>
       </Modal>
-
       {/* Edit QR Code Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -915,7 +856,6 @@ export default function QRCodesPage() {
                   </div>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Menu Type *
@@ -934,7 +874,6 @@ export default function QRCodesPage() {
                   <li>Backend DTOs: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">backend/src/modules/qr-codes/dto/create-qr-code.dto.ts</code> and <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">update-qr-code.dto.ts</code></li>
                 </ul>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Status
@@ -948,14 +887,12 @@ export default function QRCodesPage() {
                   onChange={(value) => setEditFormData({ ...editFormData, isActive: value === 'true' })}
                 />
               </div>
-
               <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
                 <h4 className="font-medium text-yellow-800 dark:text-yellow-400 mb-2">Note</h4>
                 <p className="text-sm text-yellow-700 dark:text-yellow-300">
                   Changing the menu type will update the QR code URL. Customers will need to scan the updated QR code to see the new menu type.
                 </p>
               </div>
-
               <div className="flex justify-end gap-3 pt-4">
                 <Button
                   variant="secondary"
@@ -977,4 +914,4 @@ export default function QRCodesPage() {
       </Modal>
     </div>
   );
-}
+}

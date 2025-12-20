@@ -11,6 +11,7 @@ import {
   BoltIcon,
   ChartBarIcon,
   CheckCircleIcon,
+  ChevronLeftIcon, ChevronRightIcon,
   CloudArrowUpIcon,
   CreditCardIcon,
   DevicePhoneMobileIcon,
@@ -23,6 +24,128 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+
+// Hero Image Slider Component
+const HeroImageSlider = () => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
+  
+  // Gorgeous restaurant images - using high-quality Unsplash images
+  const images = [
+    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80',
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1920&q=80',
+    'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1920&q=80',
+    'https://images.unsplash.com/photo-1552569973-5ccf61401762?w=1920&q=80',
+    'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=1920&q=80',
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % images.length);
+    }, 5000); // Change image every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [images.length]);
+
+  const goToSlide = (index: number) => {
+    setCurrentIndex(index);
+  };
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+  };
+
+  // Touch handlers for mobile swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe) {
+      goToNext();
+    }
+    if (isRightSwipe) {
+      goToPrevious();
+    }
+  };
+
+  return (
+    <div 
+      className="absolute inset-0 z-0 overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Image Slides */}
+      <div className="relative w-full h-full">
+        {images.map((image, index) => (
+          <div
+            key={index}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+              index === currentIndex ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            {/* Enhanced gradient overlay for better text readability */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80 z-10"></div>
+            <img
+              src={image}
+              alt={`Restaurant ${index + 1}`}
+              className="w-full h-full object-cover scale-105 transition-transform duration-1000"
+              loading={index === 0 ? 'eager' : 'lazy'}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Navigation Arrows - Hidden on mobile, visible on tablet+ */}
+      <button
+        onClick={goToPrevious}
+        className="hidden sm:flex absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-20 bg-white/25 hover:bg-white/40 backdrop-blur-md rounded-full p-2 md:p-3 transition-all duration-300 hover:scale-110 shadow-lg"
+        aria-label="Previous image"
+      >
+        <ChevronLeftIcon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+      </button>
+      <button
+        onClick={goToNext}
+        className="hidden sm:flex absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-20 bg-white/25 hover:bg-white/40 backdrop-blur-md rounded-full p-2 md:p-3 transition-all duration-300 hover:scale-110 shadow-lg"
+        aria-label="Next image"
+      >
+        <ChevronRightIcon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+      </button>
+
+      {/* Dots Indicator - Responsive positioning */}
+      <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+        {images.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => goToSlide(index)}
+            className={`h-1.5 md:h-2 rounded-full transition-all duration-300 ${
+              index === currentIndex
+                ? 'w-6 md:w-8 bg-white shadow-lg'
+                : 'w-1.5 md:w-2 bg-white/60 hover:bg-white/80'
+            }`}
+            aria-label={`Go to slide ${index + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // Feature mapping from feature keys to display information
 const featureMapping: Record<string, { icon: any; title: string; description: string; gradient: string }> = {
@@ -166,12 +289,6 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-black relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-300 dark:bg-primary-900 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-300 dark:bg-secondary-900 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-300 dark:bg-purple-900 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl z-50 border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm">
@@ -212,54 +329,57 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-22 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center relative z-10">
+      <section className="relative pt-24 sm:pt-32 pb-16 sm:pb-22 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center">
+        {/* Image Slider Background */}
+        <HeroImageSlider />
+        
+        <div className="max-w-7xl mx-auto w-full relative z-10">
+          <div className="text-center">
             {/* Badge */}
             {!isLoadingStats && activeCompaniesCount > 0 && (
-              <div className="inline-flex items-center gap-2 px-4 py-2 mb-8 rounded-full bg-gradient-to-r from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 border border-primary-200 dark:border-primary-800 animate-fade-in">
-                <StarIcon className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm font-semibold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 mb-6 sm:mb-8 rounded-full bg-white/25 backdrop-blur-md border border-white/40 animate-fade-in shadow-xl">
+                <StarIcon className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-300" />
+                <span className="text-xs sm:text-sm font-semibold text-white">
                   Trusted by {activeCompaniesCount >= 1000 ? `${(activeCompaniesCount / 1000).toFixed(1)}K+` : `${activeCompaniesCount}+`} Restaurants
                 </span>
               </div>
             )}
 
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold text-gray-900 dark:text-white mb-6 leading-tight">
-              <span className="block mb-2">Modern POS System</span>
-              <span className="block bg-gradient-to-r from-primary-600 via-secondary-600 to-primary-600 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-extrabold text-white mb-4 sm:mb-6 leading-tight drop-shadow-2xl px-2">
+              <span className="block mb-1 sm:mb-2">Modern POS System</span>
+              <span className="block bg-gradient-to-r from-yellow-300 via-orange-300 to-yellow-300 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient drop-shadow-lg">
                 for Smart Restaurants
               </span>
             </h1>
-            <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 dark:text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed font-light">
+            <p className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl text-white/95 mb-8 sm:mb-12 max-w-4xl mx-auto leading-relaxed font-light drop-shadow-lg px-4">
               Streamline your restaurant operations with our powerful, intuitive, and feature-rich point of sale system. 
-              <span className="block mt-2 text-lg md:text-xl text-gray-500 dark:text-gray-400">
+              <span className="block mt-2 text-sm sm:text-base md:text-lg lg:text-xl text-white/85">
                 Everything you need to run your restaurant efficiently, all in one place.
               </span>
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link href="/auth/register" className="group">
-                <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 transform hover:scale-105">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
+              <Link href="/auth/register" className="group w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 transform hover:scale-105">
                   Start Free Trial
-                  <ArrowRightIcon className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRightIcon className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Link href="/auth/login" className="group">
-                <Button size="lg" variant="secondary" className="w-full sm:w-auto text-lg px-8 py-6 border-2 hover:border-primary-500 dark:hover:border-primary-400 transition-all duration-300">
-                  <PlayIcon className="w-5 h-5 mr-2" />
+              <Link href="/auth/login" className="group w-full sm:w-auto">
+                <Button size="lg" variant="secondary" className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 border-2 border-white/30 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white hover:border-white/50 transition-all duration-300">
+                  <PlayIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Watch Demo
                 </Button>
               </Link>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-24">
-              <div className="group relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-200/50 dark:border-gray-700/50 hover:border-primary-300 dark:hover:border-primary-700 hover:-translate-y-2">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary-50 to-transparent dark:from-primary-900/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            {/* Stats - Responsive grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-12 sm:mt-16 md:mt-24 px-4">
+              <div className="group relative bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/40 hover:border-white/60 hover:-translate-y-1 sm:hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary-50/50 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
-                  <div className="text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-3">
+                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2 sm:mb-3">
                     {isLoadingStats ? (
-                      <span className="inline-block w-20 h-12 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></span>
+                      <span className="inline-block w-16 sm:w-20 h-8 sm:h-12 bg-gray-200 animate-pulse rounded"></span>
                     ) : statsData?.activeCompanies ? (
                       statsData.activeCompanies >= 1000
                         ? `${(statsData.activeCompanies / 1000).toFixed(1)}K+`
@@ -268,36 +388,36 @@ export default function LandingPage() {
                       '0+'
                     )}
                   </div>
-                  <div className="text-gray-600 dark:text-gray-300 font-medium text-lg">Active Restaurants</div>
+                  <div className="text-gray-700 font-medium text-sm sm:text-base md:text-lg">Active Restaurants</div>
                 </div>
               </div>
-              <div className="group relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-200/50 dark:border-gray-700/50 hover:border-primary-300 dark:hover:border-primary-700 hover:-translate-y-2">
-                <div className="absolute inset-0 bg-gradient-to-br from-secondary-50 to-transparent dark:from-secondary-900/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="group relative bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/40 hover:border-white/60 hover:-translate-y-1 sm:hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-secondary-50/50 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
-                  <div className="text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-secondary-600 to-primary-600 bg-clip-text text-transparent mb-3 flex items-center gap-2 justify-center">
+                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-secondary-600 to-primary-600 bg-clip-text text-transparent mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 justify-center">
                     {isLoadingStats ? (
-                      <span className="inline-block w-20 h-12 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></span>
+                      <span className="inline-block w-16 sm:w-20 h-8 sm:h-12 bg-gray-200 animate-pulse rounded"></span>
                     ) : statsData?.averageRating ? (
                       <>
                         {statsData.averageRating.toFixed(1)}
-                        <StarIcon className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+                        <StarIcon className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-500 fill-yellow-500" />
                       </>
                     ) : (
                       <>
                         4.9
-                        <StarIcon className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+                        <StarIcon className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-500 fill-yellow-500" />
                       </>
                     )}
                   </div>
-                  <div className="text-gray-600 dark:text-gray-300 font-medium text-lg">Average Rating</div>
+                  <div className="text-gray-700 font-medium text-sm sm:text-base md:text-lg">Average Rating</div>
                 </div>
               </div>
-              <div className="group relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-200/50 dark:border-gray-700/50 hover:border-primary-300 dark:hover:border-primary-700 hover:-translate-y-2">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-transparent dark:from-purple-900/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="group relative bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/40 hover:border-white/60 hover:-translate-y-1 sm:hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
-                  <div className="text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-3">
+                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2 sm:mb-3">
                     {isLoadingStats ? (
-                      <span className="inline-block w-20 h-12 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></span>
+                      <span className="inline-block w-16 sm:w-20 h-8 sm:h-12 bg-gray-200 animate-pulse rounded"></span>
                     ) : statsData?.totalCustomers ? (
                       statsData.totalCustomers >= 1000
                         ? `${(statsData.totalCustomers / 1000).toFixed(1)}K+`
@@ -306,7 +426,7 @@ export default function LandingPage() {
                       '0+'
                     )}
                   </div>
-                  <div className="text-gray-600 dark:text-gray-300 font-medium text-lg">Happy Customers</div>
+                  <div className="text-gray-700 font-medium text-sm sm:text-base md:text-lg">Happy Customers</div>
                 </div>
               </div>
             </div>

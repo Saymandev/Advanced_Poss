@@ -71,6 +71,24 @@ export const systemFeedbackApi = apiSlice.injectEndpoints({
           method: 'GET',
         };
       },
+      transformResponse: (response: any) => {
+        // After decryption, response.data is { success: true, data: [...] }
+        // So we need to extract response.data.data (the array)
+        if (response && response.data) {
+          if (Array.isArray(response.data)) {
+            return response.data;
+          } else if (response.data.data && Array.isArray(response.data.data)) {
+            return response.data.data;
+          } else if (response.data.success && response.data.data) {
+            return response.data.data;
+          }
+        }
+        // Fallback: if response is already an array, return it
+        if (Array.isArray(response)) {
+          return response;
+        }
+        return [];
+      },
     }),
 
     getPublicStats: builder.query<PublicStats, void>({

@@ -1,5 +1,4 @@
 'use client';
-
 import { FeatureBasedSubscriptionSelector } from '@/components/subscriptions/FeatureBasedSubscriptionSelector';
 import { PaymentInstructionsModal } from '@/components/subscriptions/PaymentInstructionsModal';
 import { PaymentMethodSelector } from '@/components/subscriptions/PaymentMethodSelector';
@@ -48,48 +47,36 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 export default function SubscriptionsPage() {
   const { user } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || '';
   const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'super_admin';
   const { data: plansData, isLoading: isPlanLoading, error: plansError, refetch: refetchPlans } = useGetSubscriptionPlansQuery({});
-  
   // Normalize plans data - transformResponse handles the normalization
   const plans = useMemo(() => {
     // Debug logging
-    console.log('Plans Query State:', { plansData, isPlanLoading, plansError });
-    
     if (!plansData) {
-      console.log('No plansData available');
       return [];
     }
-    
     // transformResponse returns normalized array or { plans: [...] }
     if (Array.isArray(plansData)) {
-      console.log(`Found ${plansData.length} plans (array format)`);
       return plansData;
     }
-    
     // Handle { plans: [...] } format from transformResponse
     if (plansData && typeof plansData === 'object' && 'plans' in plansData) {
       const plansArray = Array.isArray((plansData as any).plans) ? (plansData as any).plans : [];
-      console.log(`Found ${plansArray.length} plans (object with plans property)`);
       return plansArray;
     }
-    
     // Log unexpected format for debugging
     console.warn('Unexpected plans data format:', plansData);
-    
     return [];
-  }, [plansData, isPlanLoading, plansError]);
+  }, [plansData]);
   // Get company data to use as fallback for subscription info
   // CRITICAL: Company data is the source of truth after Stripe webhook updates
   const { data: companyData, refetch: refetchCompany } = useGetCompanyByIdQuery(companyId, {
     skip: !companyId,
     refetchOnMountOrArgChange: true, // Always refetch to get latest data
   });
-
   const { 
     data: currentSubscription, 
     isFetching: isSubscriptionLoading,
@@ -102,7 +89,6 @@ export default function SubscriptionsPage() {
       refetchOnMountOrArgChange: true,
     },
   );
-
   // Also try to fetch subscription by company (includes inactive ones)
   // This helps when getCurrentSubscription returns 404 but subscription exists
   // Always fetch this, even if currentSubscription exists, because currentSubscription might be stale
@@ -116,55 +102,31 @@ export default function SubscriptionsPage() {
       refetchOnMountOrArgChange: true, // Always refetch when component mounts or companyId changes
     },
   );
-
   // Extract subscription data - handle both wrapped { data: {...} } and direct {...} formats
   const unwrappedCurrentSubscription = (currentSubscription as any)?.data || currentSubscription;
   const unwrappedSubscriptionByCompany = (subscriptionByCompany as any)?.data || subscriptionByCompany;
-  
   // Use subscriptionByCompany if currentSubscription is not available
   const actualSubscription = unwrappedCurrentSubscription || unwrappedSubscriptionByCompany;
-
   // Create subscription object from company data if subscription record doesn't exist
   const subscriptionFromCompany = useMemo(() => {
     // If subscription record exists, use it
     if (actualSubscription) return null;
-    
     // If no company data or no subscription plan, return null
     if (!companyData || !companyData.subscriptionPlan) return null;
-
     // Find plan details to build subscription object
     const plan = plans.find((p: any) => p.name === companyData.subscriptionPlan);
     if (!plan) return null;
-
     // Determine trial status: subscription is trial only if status is 'trial' AND has trialEndDate
     const subscriptionStatus = companyData.subscriptionStatus || 'active';
     const trialEndDateRaw = companyData.trialEndDate;
     const trialEndDate = trialEndDateRaw && trialEndDateRaw !== null && trialEndDateRaw !== 'null'
       ? new Date(trialEndDateRaw).toISOString()
       : null;
-    
-    // DEBUG: Log subscription status
-    console.log('🔍 Subscription Page Debug:', {
-      subscriptionStatus,
-      trialEndDateRaw,
-      trialEndDate,
-      hasTrialEndDate: !!trialEndDate,
-      companyDataKeys: Object.keys(companyData),
-    });
-    
     // Subscription is in trial only if:
     // 1. Status is explicitly 'trial' AND
     // 2. Has a valid trialEndDate (not null, not undefined, not empty)
     // If status is 'active', it's NOT a trial, regardless of trialEndDate
     const isTrial = subscriptionStatus === 'trial' && trialEndDate !== null;
-    
-    console.log('📊 Trial Status Calculation:', {
-      subscriptionStatus,
-      isTrial,
-      trialEndDateExists: !!trialEndDate,
-      finalIsTrial: isTrial,
-    });
-
     return {
       id: 'company-subscription',
       companyId: companyData.id,
@@ -193,61 +155,25 @@ export default function SubscriptionsPage() {
       updatedAt: companyData.updatedAt,
     };
   }, [actualSubscription, companyData, plans]);
-
   // Use subscription from company if subscription record doesn't exist
   // Also ensure isTrial is correctly computed from actual subscription data
   let effectiveSubscription = actualSubscription || subscriptionFromCompany;
-  
   // CRITICAL: Always prefer companyData for plan info (most up-to-date after Stripe webhook)
   // This ensures we show the correct plan even if subscription record is stale
   if (companyData && companyData.subscriptionPlan && plans.length > 0) {
     const companyPlan = companyData.subscriptionPlan;
-    
-    // DEBUG: Log company data to see what plan it has
-    console.log('🔍 Company Data Check:', {
-      companyPlan,
-      companyStatus: companyData.subscriptionStatus,
-      companyNextBilling: (companyData as any).nextBillingDate,
-      companySubscriptionEnd: (companyData as any).subscriptionEndDate,
-      availablePlans: plans.map((p: any) => ({ name: p.name, displayName: p.displayName })),
-    });
-    
     // Find the plan from company data
     const plan = plans.find((p: any) => p.name === companyPlan);
-    
     if (plan) {
-      // Check if subscription plan matches company plan
-      const subPlanKey = actualSubscription 
-        ? ((actualSubscription as any).planKey || (actualSubscription as any).plan?.name || (actualSubscription as any).plan)
-        : null;
-      
       // Always use company plan (source of truth after Stripe webhook)
-      // Log the comparison
-      console.log('📊 Plan Comparison:', {
-        subscriptionPlan: subPlanKey,
-        companyPlan: companyPlan,
-        subscriptionId: actualSubscription?.id,
-        willUseCompanyPlan: true, // Always use company plan
-      });
-      
-      if (subPlanKey && subPlanKey !== companyPlan) {
-        console.log('⚠️ Plan mismatch detected - using company data:', {
-          subscriptionPlan: subPlanKey,
-          companyPlan: companyPlan,
-          subscriptionId: actualSubscription?.id,
-        });
-      }
-      
       // Override subscription plan with company plan (always use company as source of truth)
       // CRITICAL: Use company's nextBillingDate and subscriptionEndDate (updated by webhook)
       const subscriptionPeriodEnd = (companyData as any).subscriptionEndDate 
         ? new Date((companyData as any).subscriptionEndDate).toISOString()
         : (actualSubscription as any)?.currentPeriodEnd;
-      
       const subscriptionNextBilling = (companyData as any).nextBillingDate
         ? new Date((companyData as any).nextBillingDate).toISOString()
         : (actualSubscription as any)?.nextBillingDate;
-      
       // CRITICAL: If nextBillingDate is in the past or equals trialEndDate, use currentPeriodEnd instead
       // This fixes the issue where nextBillingDate is stuck at trial end date
       let correctedNextBilling = subscriptionNextBilling;
@@ -257,23 +183,13 @@ export default function SubscriptionsPage() {
           ? new Date((actualSubscription as any).trialEndDate)
           : null;
         const now = new Date();
-        
         // If nextBillingDate is in the past, or equals trial end date, use currentPeriodEnd
         const isPast = nextBillingDate < now;
         const equalsTrialEnd = trialEndDate && Math.abs(nextBillingDate.getTime() - trialEndDate.getTime()) < 1000;
-        
         if (isPast || equalsTrialEnd) {
-          console.log('⚠️ nextBillingDate is invalid - using currentPeriodEnd:', {
-            nextBillingDate: subscriptionNextBilling,
-            currentPeriodEnd: subscriptionPeriodEnd,
-            trialEndDate: trialEndDate?.toISOString(),
-            isPast,
-            equalsTrialEnd,
-          });
           correctedNextBilling = subscriptionPeriodEnd;
         }
       }
-      
       effectiveSubscription = {
         ...(actualSubscription || {}),
         plan: {
@@ -297,59 +213,28 @@ export default function SubscriptionsPage() {
           isTrial: false,
         }),
       };
-      
-      console.log('✅ Using company plan as source of truth:', {
-        companyPlan,
-        effectivePlan: effectiveSubscription.plan?.name,
-        effectivePrice: effectiveSubscription.price,
-        nextBillingDate: effectiveSubscription.nextBillingDate,
-        currentPeriodEnd: effectiveSubscription.currentPeriodEnd,
-      });
-    }
+      }
   }
-  
   // If we have actual subscription, ensure isTrial is correct based on status and trialEndDate
   if (actualSubscription) {
     const sub = actualSubscription as any;
     const subscriptionStatus = sub.status || 'active';
     const hasTrialEndDate = sub.trialEndDate || sub.trialEnd;
-    
-    // DEBUG: Log actual subscription data
-    console.log('🔍 Actual Subscription Debug:', {
-      status: subscriptionStatus,
-      hasTrialEndDate,
-      trialEndDate: sub.trialEndDate,
-      trialEnd: sub.trialEnd,
-      isTrialField: sub.isTrial,
-      planKey: sub.planKey || sub.plan?.name || sub.plan,
-      companyPlan: companyData?.subscriptionPlan,
-      allKeys: Object.keys(sub),
-    });
-    
     // Subscription is trial ONLY if:
     // 1. Status is explicitly 'trial' AND
     // 2. Has a valid trialEndDate
     // If status is 'active', it's NOT a trial, regardless of trialEndDate
     const computedIsTrial = subscriptionStatus === 'trial' && hasTrialEndDate !== null && hasTrialEndDate !== undefined;
-    
-    console.log('📊 Computed Trial Status:', {
-      subscriptionStatus,
-      computedIsTrial,
-      hasTrialEndDate: !!hasTrialEndDate,
-    });
-    
     effectiveSubscription = {
       ...effectiveSubscription,
       isTrial: computedIsTrial,
       status: subscriptionStatus,
     };
   }
-  
   // Final check: if companyData shows active status, override isTrial to false
   if (companyData) {
     const companyStatus = companyData.subscriptionStatus;
     if (companyStatus === 'active') {
-      console.log('✅ Company status is active - forcing isTrial to false');
       effectiveSubscription = {
         ...effectiveSubscription,
         isTrial: false,
@@ -368,13 +253,11 @@ export default function SubscriptionsPage() {
     },
     { skip: !companyId },
   );
-  
   const [createSubscription, { isLoading: isCreatingFeatureSubscription }] = useCreateSubscriptionMutation();
   const [updateSubscription] = useUpdateSubscriptionMutation();
   const [cancelSubscription, { isLoading: isCancelling }] = useCancelSubscriptionMutation();
   const [reactivateSubscription, { isLoading: isReactivating }] = useReactivateSubscriptionMutation();
   const [_createCheckoutSession, { isLoading: isUpdating }] = useCreateCheckoutSessionMutation();
-
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -385,29 +268,23 @@ export default function SubscriptionsPage() {
   const [_selectedPaymentMethod, setSelectedPaymentMethod] = useState<SubscriptionPaymentMethod | null>(null);
   const [initializePayment, { isLoading: isInitializingPayment }] = useInitializeSubscriptionPaymentMutation();
   const [manualActivate, { isLoading: isActivating }] = useManualActivateSubscriptionMutation();
-
   // Auto-refresh + finalize plan when returning from checkout (Stripe)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('session_id');
     const checkoutSuccess = urlParams.get('checkout') === 'success';
     const genericSuccess = urlParams.get('success') === 'true';
     const hasSuccess = sessionId || checkoutSuccess || genericSuccess;
-    
     if (!hasSuccess) return;
-
     const finalizePendingPlan = async (subscriptionId?: string) => {
       try {
         const raw = window.localStorage.getItem('pendingPlanChange');
         if (!raw) return;
         const pending = JSON.parse(raw);
         if (!pending?.planId) return;
-
         const subId = subscriptionId || pending.subscriptionId;
         if (!subId) return;
-
         toast.loading('Applying plan change...', { id: 'pending-plan' });
         await updateSubscription({
           id: subId,
@@ -425,19 +302,14 @@ export default function SubscriptionsPage() {
         toast.error(err?.data?.message || 'Failed to apply plan change after checkout');
       }
     };
-
-    console.log('🔄 Refreshing subscription data after checkout/success...');
     refetchCompany();
     refetchCurrentSubscription();
     refetchSubscriptionByCompany();
-
     // Clear the URL parameters after refetching
     const newUrl = window.location.pathname;
     window.history.replaceState({}, '', newUrl);
-
     // Show success message
     toast.success('Payment successful. Finalizing your plan change...');
-
     // Apply pending plan after a short delay to ensure data is available
     setTimeout(() => {
       finalizePendingPlan(effectiveSubscription?.id);
@@ -455,95 +327,67 @@ export default function SubscriptionsPage() {
     refetchSubscriptionByCompany,
     updateSubscription,
   ]);
-  
   // View mode: 'plans' or 'features'
   const [viewMode, setViewMode] = useState<'plans' | 'features'>('plans');
-  
   // Feature-based subscription state
   const [selectedSubscriptionFeatures, setSelectedSubscriptionFeatures] = useState<string[]>([]);
   const [featureBillingCycle, setFeatureBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [featureSubscriptionPrice, setFeatureSubscriptionPrice] = useState<number>(0);
   const [isFeatureSubscriptionModalOpen, setIsFeatureSubscriptionModalOpen] = useState(false);
-  
   // Super Admin: selected company for feature-based subscription
   const [selectedCompanyForSubscription, setSelectedCompanyForSubscription] = useState<string>('');
   const { data: companiesData } = useGetCompaniesQuery({}, { skip: !isSuperAdmin });
-  
   const companies = useMemo(() => {
     if (!companiesData) return [];
     if (Array.isArray(companiesData)) return companiesData;
     return companiesData.companies || [];
   }, [companiesData]);
-  
   // Real-time trial countdown
   const [currentTime, setCurrentTime] = useState(new Date());
-  
   useEffect(() => {
     if (!effectiveSubscription?.isTrial || !effectiveSubscription?.trialEnd) return;
-    
     const interval = setInterval(() => {
       setCurrentTime(new Date());
     }, 60000); // Update every minute
-    
     return () => clearInterval(interval);
   }, [effectiveSubscription?.isTrial, effectiveSubscription?.trialEnd]);
-
   // Calculate trial time remaining
   const trialTimeRemaining = useMemo(() => {
     if (!effectiveSubscription?.trialEnd || !effectiveSubscription?.isTrial) return null;
-    
     const now = currentTime.getTime();
     const trialEnd = new Date(effectiveSubscription.trialEnd).getTime();
     const remaining = trialEnd - now;
-    
     if (remaining <= 0) return null;
-    
     const hours = Math.floor(remaining / (1000 * 60 * 60));
     const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
     const days = Math.floor(hours / 24);
     const remainingHours = hours % 24;
-    
     return { days, hours: remainingHours, minutes, totalHours: hours };
   }, [effectiveSubscription, currentTime]);
-
   const handleUpgrade = () => {
-    console.log('🔵 handleUpgrade called', { selectedPlan, effectiveSubscription });
-    
     if (!selectedPlan) {
       toast.error('Please select a plan');
       return;
     }
-
     // For new companies without subscription, allow them to proceed
     if (!effectiveSubscription) {
-      console.log('🔵 New company - no subscription, proceeding to payment method selection');
       setIsUpgradeModalOpen(false);
       setTimeout(() => {
         setIsPaymentMethodModalOpen(true);
       }, 100);
       return;
     }
-
     // Check if user is in trial mode and wants to pay for the same plan
     const isTrialMode = effectiveSubscription?.isTrial || 
                         effectiveSubscription?.status === 'trial' ||
                         companyData?.subscriptionStatus === 'trial';
-    
     const currentPlanId = effectiveSubscription?.plan?.id;
     const isSamePlan = currentPlanId && selectedPlan.id === currentPlanId;
-    
     // If user is in trial mode and selecting the same plan, allow them to pay for it
     if (isSamePlan && !isTrialMode) {
       toast.error('You are already on this plan');
       return;
     }
-
-    console.log('🔵 Opening payment method selector modal', { 
-      selectedPlanPrice: selectedPlan.price, 
-      selectedPlanCurrency: selectedPlan.currency,
-      selectedPlanName: selectedPlan.name 
-    });
-    
     // Close upgrade modal and open payment method selector
     setIsUpgradeModalOpen(false);
     // Small delay to ensure modal closes before opening new one
@@ -551,27 +395,14 @@ export default function SubscriptionsPage() {
       setIsPaymentMethodModalOpen(true);
     }, 100);
   };
-
   const handlePaymentMethodSelected = async (method: SubscriptionPaymentMethod) => {
-    console.log('🔵 handlePaymentMethodSelected called', { method, selectedPlan, companyId });
-    
     if (!selectedPlan || !companyId) {
       toast.error('Missing plan or company information');
       return;
     }
-
     setSelectedPaymentMethod(method);
-
     try {
       toast.loading('Initializing payment...', { id: 'payment-init' });
-
-      console.log('🔵 Calling initializePayment with:', {
-        companyId,
-        planName: selectedPlan.name,
-        paymentGateway: method.gateway,
-        billingCycle: 'monthly',
-      });
-
       // Initialize payment based on selected method
       const paymentResponse = await initializePayment({
         companyId,
@@ -579,15 +410,11 @@ export default function SubscriptionsPage() {
         paymentGateway: method.gateway,
         billingCycle: 'monthly',
       }).unwrap();
-
-      console.log('🔵 Payment response received:', paymentResponse);
-
       toast.dismiss('payment-init');
-
       // Handle different payment gateway responses
+      // transformResponse should have already unwrapped the data
       if (paymentResponse.url) {
         // Redirect to payment URL (Stripe, PayPal, Google Pay, etc.)
-        console.log('🔵 Redirecting to payment URL:', paymentResponse.url);
         // Persist pending plan change so we can finalize after returning from checkout
         try {
           window.localStorage.setItem(
@@ -605,7 +432,6 @@ export default function SubscriptionsPage() {
         window.location.href = paymentResponse.url;
       } else if (paymentResponse.requiresManualVerification && paymentResponse.instructions) {
         // For mobile wallets (bKash, Nagad) with manual verification, show instructions modal
-        console.log('🔵 Showing payment instructions modal:', paymentResponse.instructions);
         setPaymentInstructions(paymentResponse.instructions);
         setPaymentGateway(paymentResponse.gateway);
         setIsPaymentMethodModalOpen(false);
@@ -615,13 +441,12 @@ export default function SubscriptionsPage() {
         });
       } else if (paymentResponse.clientSecret) {
         // For payment methods that require client secret (future implementation)
-        console.log('🔵 Payment requires client secret:', paymentResponse.clientSecret);
         toast.error('This payment method requires additional setup. Please contact support.');
       } else {
         console.error('🔴 Payment initialization failed - no URL, clientSecret, or requiresManualVerification');
-        toast.error('Payment initialization failed - no payment URL received');
+        console.error('🔴 Full response:', paymentResponse);
+        toast.error('Payment initialization failed - no payment URL received. Please check console for details.');
       }
-
       // Only close modals if we're redirecting (not showing instructions)
       if (paymentResponse.url) {
         setIsPaymentMethodModalOpen(false);
@@ -633,15 +458,12 @@ export default function SubscriptionsPage() {
       toast.error(error?.data?.message || error?.message || 'Failed to initialize payment');
     }
   };
-
   const handleManualActivation = async () => {
     const targetCompanyId = isSuperAdmin ? (selectedCompanyForSubscription || companyId) : companyId;
-    
     if (!targetCompanyId || !selectedPlan) {
       toast.error('Please select a company and plan');
       return;
     }
-
     try {
       toast.loading('Activating subscription...', { id: 'manual-activate' });
       await manualActivate({
@@ -666,30 +488,25 @@ export default function SubscriptionsPage() {
       toast.error(error?.data?.message || 'Failed to activate subscription');
     }
   };
-
   const handleCreateFeatureSubscription = async () => {
     if (!selectedSubscriptionFeatures || selectedSubscriptionFeatures.length === 0) {
       toast.error('Please select at least one feature');
       return;
     }
-
     let targetCompanyId: string;
     let targetCompanyEmail: string;
     let targetCompanyName: string;
-
     if (isSuperAdmin) {
       // Super Admin: Use selected company
       if (!selectedCompanyForSubscription) {
         toast.error('Please select a company');
         return;
       }
-      
       const selectedCompany = companies.find((c: any) => String(c._id || c.id) === String(selectedCompanyForSubscription));
       if (!selectedCompany) {
         toast.error('Selected company not found');
         return;
       }
-      
       targetCompanyId = (selectedCompany as any)._id || selectedCompany.id;
       targetCompanyEmail = selectedCompany.email || '';
       targetCompanyName = selectedCompany.name || '';
@@ -699,12 +516,10 @@ export default function SubscriptionsPage() {
         toast.error('Company information not found');
         return;
       }
-      
       targetCompanyId = companyId;
       targetCompanyEmail = user?.email || companyData.email || '';
       targetCompanyName = companyData.name || '';
     }
-
     try {
       await createSubscription({
         companyId: targetCompanyId,
@@ -713,17 +528,14 @@ export default function SubscriptionsPage() {
         email: targetCompanyEmail,
         companyName: targetCompanyName,
       }).unwrap();
-
       toast.success('Feature-based subscription created successfully!');
       setIsFeatureSubscriptionModalOpen(false);
       setSelectedSubscriptionFeatures([]);
       setSelectedCompanyForSubscription('');
       setFeatureBillingCycle('monthly');
-      
       if (!isSuperAdmin) {
         setViewMode('plans');
       }
-      
       // Refetch subscription data
       if (!isSuperAdmin) {
         refetchCurrentSubscription();
@@ -734,32 +546,27 @@ export default function SubscriptionsPage() {
       toast.error(error?.data?.message || error?.message || 'Failed to create subscription. Please try again.');
     }
   };
-
   const handleCancel = async () => {
     if (!currentSubscription) {
       toast.error('Subscription record not found. Cannot cancel subscription.');
       return;
     }
-
     try {
       await cancelSubscription({
         id: currentSubscription.id,
         cancelAtPeriodEnd: true,
       }).unwrap();
-
       toast.success('Subscription will be cancelled at the end of the billing period');
       setIsCancelModalOpen(false);
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to cancel subscription');
     }
   };
-
   const handleReactivate = async () => {
     if (!actualSubscription) {
       toast.error('Subscription record not found. Cannot reactivate subscription.');
       return;
     }
-
     try {
       await reactivateSubscription(actualSubscription.id).unwrap();
       toast.success('Subscription reactivated successfully!');
@@ -767,7 +574,6 @@ export default function SubscriptionsPage() {
       toast.error(error?.data?.message || 'Failed to reactivate subscription');
     }
   };
-
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'success' | 'danger' | 'warning'> = {
       active: 'success',
@@ -779,7 +585,6 @@ export default function SubscriptionsPage() {
     };
     return variants[status] || 'success';
   };
-
   const billingColumns = [
     {
       key: 'createdAt',
@@ -823,17 +628,14 @@ export default function SubscriptionsPage() {
         ),
     },
   ];
-
   const getUsagePercentage = (used: number, limit: number) => {
     return Math.min((used / limit) * 100, 100);
   };
-
   const getUsageColor = (percentage: number) => {
     if (percentage >= 90) return 'text-red-600 dark:text-red-400';
     if (percentage >= 75) return 'text-yellow-600 dark:text-yellow-400';
     return 'text-green-600 dark:text-green-400';
   };
-
   // SUPER ADMIN data/hooks (always declared, conditionally used in render)
   const { data: subsData, isFetching: isSubsLoading, refetch: refetchAllSubscriptions } = useGetAllSubscriptionsQuery(
     { limit: 100 },
@@ -843,16 +645,13 @@ export default function SubscriptionsPage() {
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'basic' | 'features' | 'limits'>('basic');
-
   const [createPlan, { isLoading: isCreatingPlan }] = useCreateSubscriptionPlanMutation();
   const [updatePlan, { isLoading: isUpdatingPlan }] = useUpdateSubscriptionPlanMutation();
   const [deletePlan, { isLoading: isDeletingPlan }] = useDeleteSubscriptionPlanMutation();
-
   // Fetch plan with features when editing
   const { data: planWithFeatures } = useGetPlanWithFeaturesQuery(editingPlan?.id || '', {
     skip: !editingPlan?.id || !isPlanModalOpen,
   });
-
   // Load features when editing plan
   useEffect(() => {
     if (editingPlan && isPlanModalOpen) {
@@ -866,30 +665,25 @@ export default function SubscriptionsPage() {
       setActiveTab('basic');
     }
   }, [editingPlan, isPlanModalOpen, planWithFeatures]);
-  
   // Flatten subscription data for table/export (avoid nested objects as cell values)
   const flattenedSubscriptions = useMemo(() => {
     const source = subsData?.subscriptions || [];
     if (!Array.isArray(source)) return [];
-    
     return source.map((sub: any) => {
       // Safely extract company name and email from populated companyId
       // Backend populates companyId with { name, email, _id } when using .populate('companyId', 'name email')
       let companyName = 'Unknown Company';
       let companyEmail = '';
       let companyId = '';
-      
       // Check if companyId is populated (object with name/email) or just an ID
       if (sub.companyId) {
         if (typeof sub.companyId === 'object' && sub.companyId !== null) {
           // Populated company object from backend: { _id, name, email }
           // Handle both _id (ObjectId) and id (string) formats
           companyId = sub.companyId._id?.toString() || sub.companyId.id?.toString() || String(sub.companyId._id || sub.companyId.id || '');
-          
           // Extract name and email from populated object
           companyName = sub.companyId.name || 'Unknown Company';
           companyEmail = sub.companyId.email || '';
-          
           // If name is missing but we have an ID, try to get from other fields
           if (!companyName || companyName === 'Unknown Company') {
             // Check if there's a company object nested differently
@@ -903,7 +697,6 @@ export default function SubscriptionsPage() {
           companyId = String(sub.companyId);
         }
       }
-      
       // Fallback: check sub.company field if companyId wasn't populated
       if ((!companyName || companyName === 'Unknown Company') && sub.company) {
         if (typeof sub.company === 'string') {
@@ -916,23 +709,19 @@ export default function SubscriptionsPage() {
           }
         }
       }
-      
       // Use companyId as fallback for email if email is empty
       if (!companyEmail && companyId) {
         companyEmail = companyId;
       }
-      
       // Check if company data is populated (can be in companyId or company field)
       const companyData = (sub.companyId && typeof sub.companyId === 'object' && sub.companyId.name)
         ? sub.companyId
         : (sub.company && typeof sub.company === 'object' && sub.company.name)
         ? sub.company
         : null;
-      
       // Safely extract plan key
       // CRITICAL: Use company's subscriptionPlan as source of truth (updated by Stripe webhook)
       let planKey = 'N/A';
-      
       // First, check company data (source of truth after Stripe webhook)
       if (companyData && companyData.subscriptionPlan) {
         planKey = String(companyData.subscriptionPlan);
@@ -945,32 +734,26 @@ export default function SubscriptionsPage() {
           planKey = String(sub.plan);
         }
       }
-      
       // Determine correct status: check if subscription has active status or if company status is active
       // If company status is 'active', subscription should show as 'active', not 'trial'
       let displayStatus = String(sub.status || '');
-      
       // Extract company subscription data if populated
       let companyNextBilling: string | undefined;
       let companySubscriptionEnd: string | undefined;
       let companyStatus: string | undefined;
-      
       if (companyData) {
         companyStatus = companyData.subscriptionStatus;
         // If company status is 'active', override subscription status to 'active'
         if (companyStatus === 'active' && displayStatus === 'trial') {
           displayStatus = 'active';
         }
-        
         // CRITICAL: Use company data for dates (source of truth after Stripe webhook)
         companyNextBilling = companyData.nextBillingDate;
         companySubscriptionEnd = companyData.subscriptionEndDate;
       }
-      
       // Calculate correct expiration date
       // Priority: company nextBillingDate > company subscriptionEndDate > subscription currentPeriodEnd > subscription nextBillingDate
       let expirationDate: string | undefined;
-      
       // First, try company data (most up-to-date after webhook)
       if (companyNextBilling) {
         expirationDate = companyNextBilling;
@@ -983,19 +766,15 @@ export default function SubscriptionsPage() {
         const nextBillingDate = new Date(sub.nextBillingDate);
         const trialEndDate = sub.trialEndDate ? new Date(sub.trialEndDate) : null;
         const now = new Date();
-        
         // If nextBillingDate is in the past or equals trial end date, it's invalid
         const isPast = nextBillingDate < now;
         const equalsTrialEnd = trialEndDate && Math.abs(nextBillingDate.getTime() - trialEndDate.getTime()) < 1000;
-        
         if (!isPast && !equalsTrialEnd) {
           expirationDate = sub.nextBillingDate;
         }
       }
-      
       // Fallback to currentPeriodEnd if we still don't have a valid date
       const nextBilling = expirationDate || sub.currentPeriodEnd;
-      
       // Create a clean object with ONLY primitive string values
       const flattened: Record<string, string> = {
         id: String(sub.id || ''),
@@ -1006,7 +785,6 @@ export default function SubscriptionsPage() {
         status: displayStatus,
         currentPeriodEnd: nextBilling ? String(nextBilling) : 'N/A',
       };
-      
       // Final safety check: remove any object values that might have slipped through
       Object.keys(flattened).forEach(key => {
         const value = flattened[key];
@@ -1014,14 +792,11 @@ export default function SubscriptionsPage() {
           flattened[key] = '[Object]';
         }
       });
-      
       return flattened;
     });
   }, [subsData]);
-
   // SUPER ADMIN VIEW: system-wide subscription + plan management
   if (isSuperAdmin) {
-
     const subscriptionColumns = [
       {
         key: 'companyName',
@@ -1043,11 +818,9 @@ export default function SubscriptionsPage() {
             : (typeof row.companyId === 'object'
                 ? String(row.companyId?._id || row.companyId?.id || '')
                 : String(row.companyId || ''));
-          
           const displayEmail = companyEmail || companyId || 'N/A';
           const displayName = companyName || 'Unknown Company';
           const initial = displayName.charAt(0).toUpperCase();
-          
           return (
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-semibold">
@@ -1073,7 +846,6 @@ export default function SubscriptionsPage() {
           const planName = row.planKey || value || 'N/A';
           const plan = plans.find((p: any) => p.name === planName);
           const displayName = plan?.displayName || planName;
-          
           return (
             <span className="capitalize font-semibold">
               {displayName !== 'N/A' ? displayName.toUpperCase() : 'N/A'}
@@ -1097,7 +869,6 @@ export default function SubscriptionsPage() {
           value ? formatDateTime(value).split(',')[0] : 'N/A',
       },
     ];
-
     const planColumns = [
       {
         key: 'displayName',
@@ -1179,23 +950,18 @@ export default function SubscriptionsPage() {
         ),
       },
     ];
-
     const handleSavePlan = async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
-      
       const isUpdate = !!editingPlan?.id;
-      
       // Base payload - different for create vs update
       // Note: Currency is handled globally in Settings, not per plan
       const payload: any = {};
-      
       // Always include displayName and description (text fields)
       const displayName = (formData.get('displayName') as string)?.trim();
       const description = (formData.get('description') as string)?.trim();
       if (displayName) payload.displayName = displayName;
       if (description) payload.description = description;
-      
       if (isUpdate) {
         // For updates: Only include fields that have actual values (not empty/0)
         // This prevents overwriting existing data with empty values
@@ -1206,7 +972,6 @@ export default function SubscriptionsPage() {
             payload.price = price;
           }
         }
-        
         const trialPeriodValue = formData.get('trialPeriod') as string;
         if (trialPeriodValue && trialPeriodValue.trim() !== '') {
           const trialPeriod = Number(trialPeriodValue);
@@ -1214,13 +979,11 @@ export default function SubscriptionsPage() {
             payload.trialPeriod = trialPeriod;
           }
         }
-        
         // Always include isActive if checkbox exists (user explicitly sets it)
         const isActiveCheckbox = formData.get('isActive');
         if (isActiveCheckbox !== null) {
           payload.isActive = isActiveCheckbox === 'on';
         }
-        
         const billingCycle = (formData.get('billingCycle') as string)?.trim();
         if (billingCycle) {
           payload.billingCycle = billingCycle;
@@ -1233,12 +996,10 @@ export default function SubscriptionsPage() {
         payload.trialPeriod = Number(formData.get('trialPeriod') || 0);
         payload.isActive = formData.get('isActive') === 'on';
       }
-
       // Include enabledFeatureKeys if features are selected
       if (selectedFeatures.length > 0) {
         payload.enabledFeatureKeys = selectedFeatures;
       }
-
       // Collect limits data from form
       const limits: any = {};
       const limitFields = [
@@ -1260,7 +1021,6 @@ export default function SubscriptionsPage() {
         'customDomainEnabled',
         'prioritySupportEnabled',
       ];
-
       // Process numeric limit fields
       for (const field of limitFields) {
         const value = formData.get(`limits.${field}`) as string;
@@ -1271,7 +1031,6 @@ export default function SubscriptionsPage() {
           }
         }
       }
-
       // Process boolean limit fields
       for (const field of limitBooleanFields) {
         const checkbox = formData.get(`limits.${field}`);
@@ -1279,12 +1038,10 @@ export default function SubscriptionsPage() {
           limits[field] = checkbox === 'on';
         }
       }
-
       // Only include limits if at least one field was set
       if (Object.keys(limits).length > 0) {
         payload.limits = limits;
       }
-
       try {
         if (isUpdate) {
           await updatePlan({ id: editingPlan.id, data: payload }).unwrap();
@@ -1305,7 +1062,6 @@ export default function SubscriptionsPage() {
         toast.error(err?.data?.message || 'Failed to save plan');
       }
     };
-
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -1321,7 +1077,6 @@ export default function SubscriptionsPage() {
             </div>
           </div>
         </div>
-
         {/* System-wide subscriptions */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -1329,10 +1084,8 @@ export default function SubscriptionsPage() {
             <Button
               variant="primary"
               onClick={() => {
-                console.log('Create Feature-Based Subscription button clicked');
                 setIsFeatureSubscriptionModalOpen(true);
-                console.log('Modal state should be set to true');
-              }}
+                }}
             >
               Create Feature-Based Subscription
             </Button>
@@ -1348,7 +1101,6 @@ export default function SubscriptionsPage() {
             />
           </CardContent>
         </Card>
-
         {/* Plan Management */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -1386,7 +1138,6 @@ export default function SubscriptionsPage() {
             />
           </CardContent>
         </Card>
-
         {/* Create / Edit Plan Modal */}
         <Modal
           isOpen={isPlanModalOpen}
@@ -1437,7 +1188,6 @@ export default function SubscriptionsPage() {
               </button>
             </nav>
           </div>
-
           <form onSubmit={handleSavePlan} className="space-y-4">
             {activeTab === 'basic' && (
               <div className="grid grid-cols-1 gap-4">
@@ -1536,7 +1286,6 @@ export default function SubscriptionsPage() {
                 </div>
               </div>
             )}
-
             {activeTab === 'features' && (
               <div>
                 <PlanFeatureSelector
@@ -1545,7 +1294,6 @@ export default function SubscriptionsPage() {
                 />
               </div>
             )}
-
             {activeTab === 'limits' && (
               <div className="space-y-6">
                 <div>
@@ -1661,7 +1409,6 @@ export default function SubscriptionsPage() {
                     </div>
                   </div>
                 </div>
-
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                     Public Ordering Limits
@@ -1699,7 +1446,6 @@ export default function SubscriptionsPage() {
                     </div>
                   </div>
                 </div>
-
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                     Review System Limits
@@ -1752,7 +1498,6 @@ export default function SubscriptionsPage() {
                     </div>
                   </div>
                 </div>
-
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                     Additional Features
@@ -1807,7 +1552,6 @@ export default function SubscriptionsPage() {
                 </div>
               </div>
             )}
-
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 type="button"
@@ -1840,7 +1584,6 @@ export default function SubscriptionsPage() {
             </div>
           </form>
         </Modal>
-
         {/* Feature-Based Subscription Creation Modal - Super Admin */}
         <Modal
           isOpen={isFeatureSubscriptionModalOpen}
@@ -1872,7 +1615,6 @@ export default function SubscriptionsPage() {
                 ))}
               </select>
             </div>
-
             {selectedCompanyForSubscription && (
               <>
                 <FeatureBasedSubscriptionSelector
@@ -1884,7 +1626,6 @@ export default function SubscriptionsPage() {
                 />
               </>
             )}
-
             {selectedSubscriptionFeatures.length > 0 && selectedCompanyForSubscription && (
               <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button
@@ -1916,7 +1657,6 @@ export default function SubscriptionsPage() {
       </div>
     );
   }
-
   if (!companyId) {
     return (
       <div className="flex items-center justify-center h-96 text-center">
@@ -1931,7 +1671,6 @@ export default function SubscriptionsPage() {
       </div>
     );
   }
-
   // Only show loading if plans are loading OR if we're loading subscription AND don't have company data yet
   // Once we have company data, we can build subscription from it even if subscription query is still loading
   if (isPlanLoading || (isSubscriptionLoading && !companyData && !effectiveSubscription)) {
@@ -1942,7 +1681,6 @@ export default function SubscriptionsPage() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1953,7 +1691,6 @@ export default function SubscriptionsPage() {
           </p>
         </div>
       </div>
-
       {/* Current Plan */}
       {effectiveSubscription && effectiveSubscription.plan && (
         <Card className="border-2 border-primary-500 bg-gradient-to-br from-primary-50 to-white dark:from-primary-900/20 dark:to-gray-900">
@@ -2073,7 +1810,6 @@ export default function SubscriptionsPage() {
                 </div>
               </div>
             )}
-            
             {/* Cancellation Notice */}
             {effectiveSubscription.cancelAtPeriodEnd && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
@@ -2104,7 +1840,6 @@ export default function SubscriptionsPage() {
                     // Use nextBillingDate if valid, otherwise use currentPeriodEnd
                     const nextBilling = (effectiveSubscription as any).nextBillingDate;
                     const periodEnd = effectiveSubscription.currentPeriodEnd;
-                    
                     // If nextBillingDate exists and is in the future, use it
                     if (nextBilling) {
                       const nextBillingDate = new Date(nextBilling);
@@ -2113,12 +1848,10 @@ export default function SubscriptionsPage() {
                         return formatDateTime(nextBilling).split(',')[0];
                       }
                     }
-                    
                     // Otherwise use currentPeriodEnd
                     if (periodEnd) {
                       return formatDateTime(periodEnd).split(',')[0];
                     }
-                    
                     return 'N/A';
                   })()}
                 </p>
@@ -2142,12 +1875,10 @@ export default function SubscriptionsPage() {
                 </p>
               </div>
             </div>
-
             {/* Usage Stats */}
             {usageStats && (
               <div className="space-y-3 mt-6">
                 <h3 className="font-semibold text-gray-900 dark:text-white">Usage Statistics</h3>
-                
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Branches</span>
@@ -2162,7 +1893,6 @@ export default function SubscriptionsPage() {
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Users</span>
@@ -2177,7 +1907,6 @@ export default function SubscriptionsPage() {
                     />
                   </div>
                 </div>
-
                 {effectiveSubscription.plan?.limits?.storageGB && (
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -2196,7 +1925,6 @@ export default function SubscriptionsPage() {
                 )}
               </div>
             )}
-
             {/* Plan Features */}
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Plan Features</h4>
@@ -2209,7 +1937,6 @@ export default function SubscriptionsPage() {
                 ))}
               </div>
             </div>
-
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               {effectiveSubscription.status === 'active' && !effectiveSubscription.cancelAtPeriodEnd && (
@@ -2239,7 +1966,6 @@ export default function SubscriptionsPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Billing History */}
       {billingHistory && billingHistory.history && billingHistory.history.length > 0 && (
         <Card>
@@ -2258,7 +1984,6 @@ export default function SubscriptionsPage() {
           </CardContent>
         </Card>
       )}
-
       {/* View Mode Toggle - Only for non-Super Admin users */}
       {!isSuperAdmin && (
         <Card className="mb-6">
@@ -2292,7 +2017,6 @@ export default function SubscriptionsPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Feature-Based Subscription View */}
       {!isSuperAdmin && viewMode === 'features' && (
         <div id="custom-features" className="mb-6">
@@ -2311,7 +2035,6 @@ export default function SubscriptionsPage() {
                 onBillingCycleChange={setFeatureBillingCycle}
                 onPriceCalculated={setFeatureSubscriptionPrice}
               />
-              
               {selectedSubscriptionFeatures.length > 0 && (
                 <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                   <Button
@@ -2329,7 +2052,6 @@ export default function SubscriptionsPage() {
           </Card>
         </div>
       )}
-
       {/* Available Plans */}
       <div id="available-plans" className={!isSuperAdmin && viewMode === 'features' ? 'hidden' : ''}>
         <div className="flex items-center justify-between mb-6">
@@ -2386,7 +2108,6 @@ export default function SubscriptionsPage() {
                   </span>
                 </div>
               )}
-              
               <CardContent className="p-6 space-y-6">
                 <div className="text-center">
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{plan.displayName || plan.name}</h3>
@@ -2398,7 +2119,6 @@ export default function SubscriptionsPage() {
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{plan.description}</p>
                 </div>
-
                 <div className="space-y-3">
                   <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <CheckCircleIcon className="w-5 h-5 text-green-500" />
@@ -2453,7 +2173,6 @@ export default function SubscriptionsPage() {
                     )}
                   </div>
                 </div>
-
                 <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
                   <h4 className="font-semibold text-gray-900 dark:text-white text-sm mb-2">Plan Limits</h4>
                   <div className="flex justify-between text-sm">
@@ -2481,12 +2200,9 @@ export default function SubscriptionsPage() {
                     </div>
                   )}
                 </div>
-
                 {currentSubscription?.plan?.id !== plan.id && (
                   <Button
                     onClick={() => {
-                      console.log('Selected plan:', plan);
-                      console.log('Current subscription:', currentSubscription);
                       setSelectedPlan(plan);
                       setIsUpgradeModalOpen(true);
                     }}
@@ -2508,7 +2224,6 @@ export default function SubscriptionsPage() {
           ))}
         </div>
       </div>
-
       {/* Plan Features Comparison */}
       {plans.length > 0 && (
         <Card>
@@ -2550,7 +2265,6 @@ export default function SubscriptionsPage() {
                       </td>
                     ))}
                   </tr>
-                  
                   {/* Trial Period */}
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Trial Period</td>
@@ -2560,14 +2274,12 @@ export default function SubscriptionsPage() {
                       </td>
                     ))}
                   </tr>
-
                   {/* Feature Flags */}
                   <tr className="border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <td colSpan={plans.length + 1} className="py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Core Features
                     </td>
                   </tr>
-                  
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">POS & Ordering</td>
                     {plans.map((plan: any) => (
@@ -2580,7 +2292,6 @@ export default function SubscriptionsPage() {
                       </td>
                     ))}
                   </tr>
-                  
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Inventory Management</td>
                     {plans.map((plan: any) => (
@@ -2593,7 +2304,6 @@ export default function SubscriptionsPage() {
                       </td>
                     ))}
                   </tr>
-                  
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Customer CRM</td>
                     {plans.map((plan: any) => (
@@ -2606,7 +2316,6 @@ export default function SubscriptionsPage() {
                       </td>
                     ))}
                   </tr>
-                  
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Accounting & Reports</td>
                     {plans.map((plan: any) => (
@@ -2619,7 +2328,6 @@ export default function SubscriptionsPage() {
                       </td>
                     ))}
                   </tr>
-                  
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">AI Insights</td>
                     {plans.map((plan: any) => (
@@ -2632,7 +2340,6 @@ export default function SubscriptionsPage() {
                       </td>
                     ))}
                   </tr>
-                  
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Multi-Branch Support</td>
                     {plans.map((plan: any) => (
@@ -2645,14 +2352,12 @@ export default function SubscriptionsPage() {
                       </td>
                     ))}
                   </tr>
-
                   {/* Limits Section */}
                   <tr className="border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <td colSpan={plans.length + 1} className="py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Limits
                     </td>
                   </tr>
-                  
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Branches</td>
                     {plans.map((plan: any) => {
@@ -2664,7 +2369,6 @@ export default function SubscriptionsPage() {
                       );
                     })}
                   </tr>
-                  
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Users</td>
                     {plans.map((plan: any) => {
@@ -2676,7 +2380,6 @@ export default function SubscriptionsPage() {
                       );
                     })}
                   </tr>
-                  
                   {plans.some((p: any) => p.limits?.storageGB) && (
                     <tr className="border-b border-gray-100 dark:border-gray-800">
                       <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Storage</td>
@@ -2687,7 +2390,6 @@ export default function SubscriptionsPage() {
                       ))}
                     </tr>
                   )}
-                  
                   {plans.some((p: any) => p.limits?.maxTables) && (
                     <tr className="border-b border-gray-100 dark:border-gray-800">
                       <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Tables</td>
@@ -2698,7 +2400,6 @@ export default function SubscriptionsPage() {
                       ))}
                     </tr>
                   )}
-                  
                   {plans.some((p: any) => p.limits?.maxMenuItems) && (
                     <tr className="border-b border-gray-100 dark:border-gray-800">
                       <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Menu Items</td>
@@ -2715,28 +2416,16 @@ export default function SubscriptionsPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Payment Method Selector Modal */}
       {isPaymentMethodModalOpen && selectedPlan && (() => {
         // Get the actual plan from the plans array to ensure we have the latest price
         const actualPlan = plans.find((p: any) => p.id === selectedPlan.id || p.name === selectedPlan.name) || selectedPlan;
         const planPrice = actualPlan.price || selectedPlan.price || 0;
         const planCurrency = actualPlan.currency || selectedPlan.currency || 'BDT';
-        
-        console.log('🔵 PaymentMethodSelector rendering:', { 
-          selectedPlanId: selectedPlan.id,
-          selectedPlanName: selectedPlan.name,
-          selectedPlanPrice: selectedPlan.price,
-          actualPlanPrice: actualPlan.price,
-          finalPrice: planPrice,
-          currency: planCurrency
-        });
-        
         return (
           <PaymentMethodSelector
             isOpen={isPaymentMethodModalOpen}
             onClose={() => {
-              console.log('🔵 PaymentMethodSelector onClose called');
               setIsPaymentMethodModalOpen(false);
             }}
             onSelect={handlePaymentMethodSelected}
@@ -2746,7 +2435,6 @@ export default function SubscriptionsPage() {
           />
         );
       })()}
-
       {/* Payment Instructions Modal */}
       {paymentInstructions && (
         <PaymentInstructionsModal
@@ -2771,7 +2459,6 @@ export default function SubscriptionsPage() {
           }}
         />
       )}
-
       {/* Upgrade Modal */}
       <Modal
         isOpen={isUpgradeModalOpen}
@@ -2783,11 +2470,6 @@ export default function SubscriptionsPage() {
         size="lg"
       >
         {(() => {
-          console.log('Modal state - selectedPlan:', selectedPlan);
-          console.log('Modal state - effectiveSubscription:', effectiveSubscription);
-          console.log('Modal state - currentSubscription:', currentSubscription);
-          console.log('Modal state - subscriptionFromCompany:', subscriptionFromCompany);
-          
           if (!selectedPlan) {
             return (
               <div className="py-8 text-center">
@@ -2795,7 +2477,6 @@ export default function SubscriptionsPage() {
               </div>
             );
           }
-          
           // Check if we're still loading subscription data
           if (isSubscriptionLoading && !effectiveSubscription) {
             return (
@@ -2805,7 +2486,6 @@ export default function SubscriptionsPage() {
               </div>
             );
           }
-          
           // For new companies without subscription, show create subscription UI
           if (!effectiveSubscription) {
             return (
@@ -2815,7 +2495,6 @@ export default function SubscriptionsPage() {
                     You're about to create a new subscription with the <strong>{selectedPlan.displayName || selectedPlan.name}</strong> plan.
                   </p>
                 </div>
-
                 {/* Selected Plan Details */}
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                   <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Selected Plan</h4>
@@ -2831,7 +2510,6 @@ export default function SubscriptionsPage() {
                     </p>
                   )}
                 </div>
-
                 <div className="flex gap-3 pt-4 border-t">
                   <Button variant="secondary" onClick={() => setIsUpgradeModalOpen(false)} className="flex-1">
                     Cancel
@@ -2843,7 +2521,6 @@ export default function SubscriptionsPage() {
               </div>
             );
           }
-          
           return (
           <div className="space-y-6">
             <div>
@@ -2855,7 +2532,6 @@ export default function SubscriptionsPage() {
                 } your subscription plan?
               </p>
             </div>
-
             {/* Plan Comparison */}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -2877,7 +2553,6 @@ export default function SubscriptionsPage() {
                 </p>
               </div>
             </div>
-
             {/* Price Difference */}
             {selectedPlan?.price !== undefined && effectiveSubscription?.plan?.price !== undefined && selectedPlan.price !== effectiveSubscription.plan.price && (
               <div className={`p-4 rounded-lg ${selectedPlan.price > (effectiveSubscription.plan?.price || 0) ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'}`}>
@@ -2896,7 +2571,6 @@ export default function SubscriptionsPage() {
                 </p>
               </div>
             )}
-
             {/* Features Comparison */}
             <div className="space-y-2">
               <h4 className="font-semibold text-gray-900 dark:text-white">What's Included:</h4>
@@ -2915,14 +2589,12 @@ export default function SubscriptionsPage() {
                 )}
               </div>
             </div>
-
             <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 <CreditCardIcon className="w-4 h-4 inline mr-2" />
                 Your billing will be updated immediately. Changes take effect right away.
               </p>
             </div>
-
             {/* Super Admin: Manual Activation */}
             {isSuperAdmin && (
               <div className="space-y-4">
@@ -2950,7 +2622,6 @@ export default function SubscriptionsPage() {
                 </div>
               </div>
             )}
-
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
@@ -2990,7 +2661,6 @@ export default function SubscriptionsPage() {
           );
         })()}
       </Modal>
-
       {/* Cancel Subscription Modal */}
       <Modal
         isOpen={isCancelModalOpen}
@@ -3003,7 +2673,6 @@ export default function SubscriptionsPage() {
             <p className="text-gray-600 dark:text-gray-400">
               Are you sure you want to cancel your subscription?
             </p>
-
             {!currentSubscription && subscriptionFromCompany && (
               <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-800 dark:text-red-200">
@@ -3011,7 +2680,6 @@ export default function SubscriptionsPage() {
                 </p>
               </div>
             )}
-
             {currentSubscription && (
               <>
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
@@ -3023,7 +2691,6 @@ export default function SubscriptionsPage() {
                     You will continue to have access to all features until then. You can reactivate your subscription at any time before the cancellation date.
                   </p>
                 </div>
-
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-gray-600 dark:text-gray-400">Current Plan:</span>
@@ -3038,7 +2705,6 @@ export default function SubscriptionsPage() {
                 </div>
               </>
             )}
-
             <div className="flex gap-3">
               <Button
                 variant="secondary"
@@ -3068,7 +2734,6 @@ export default function SubscriptionsPage() {
           </div>
         )}
       </Modal>
-
       {/* Feature-Based Subscription Creation Modal */}
       <Modal
         isOpen={isFeatureSubscriptionModalOpen}
@@ -3102,7 +2767,6 @@ export default function SubscriptionsPage() {
                 ))}
               </select>
             </div>
-
             {selectedCompanyForSubscription && (
               <>
                 <FeatureBasedSubscriptionSelector
@@ -3114,7 +2778,6 @@ export default function SubscriptionsPage() {
                 />
               </>
             )}
-
             {selectedSubscriptionFeatures.length > 0 && selectedCompanyForSubscription && (
               <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button
@@ -3150,7 +2813,6 @@ export default function SubscriptionsPage() {
                 Are you sure you want to create a custom subscription with the selected features?
               </p>
             </div>
-
             {/* Subscription Summary */}
             <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border-2 border-primary-500">
             <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Subscription Summary</h4>
@@ -3175,7 +2837,6 @@ export default function SubscriptionsPage() {
               </div>
             </div>
             </div>
-
             {/* Selected Features List */}
             {selectedSubscriptionFeatures.length > 0 && (
               <div className="space-y-2">
@@ -3190,14 +2851,12 @@ export default function SubscriptionsPage() {
                 </div>
               </div>
             )}
-
             <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 <CreditCardIcon className="w-4 h-4 inline mr-2" />
                 Your custom subscription will be created immediately with the selected features.
               </p>
             </div>
-
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"

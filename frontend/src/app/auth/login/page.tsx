@@ -161,19 +161,9 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <Link href="/auth/super-admin">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full h-11 bg-gray-700/50 hover:bg-gray-700 border border-gray-600 text-white"
-                >
-                  Super Admin Login
-                </Button>
-              </Link>
-            </div>
+           
 
-            <div className="text-center pt-4 border-t border-gray-700/50">
+            <div className="text-center  border-gray-700/50">
               <p className="text-gray-400 text-sm">
                 Don't have an account?{' '}
                 <Link href="/auth/register" className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
@@ -187,8 +177,8 @@ export default function LoginPage() {
           <div className="px-8 pb-6">
             <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-4">
               <p className="text-xs text-primary-300 font-medium mb-1">Demo Account</p>
-              <p className="text-xs text-gray-400">Email: test@pizzapalace.com</p>
-              <p className="text-xs text-gray-400">PIN: 123456</p>
+              <p className="text-xs text-gray-400">Email: demo@restaurant.com</p>
+              <p className="text-xs text-gray-400">PIN: 1234</p>
             </div>
           </div>
         </Card>

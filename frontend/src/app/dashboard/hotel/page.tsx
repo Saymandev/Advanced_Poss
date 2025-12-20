@@ -26,11 +26,19 @@ export default function HotelDashboardPage() {
 
   const formatCurrency = useFormatCurrency();
 
-  const branchId =
+  // Extract branchId and ensure it's a string
+  const branchIdRaw =
     (user as any)?.branchId ||
     (companyContext as any)?.branchId ||
     (companyContext as any)?.branches?.[0]?._id ||
     (companyContext as any)?.branches?.[0]?.id;
+  
+  // Convert to string if it's an ObjectId object
+  const branchId = branchIdRaw 
+    ? (typeof branchIdRaw === 'string' 
+        ? branchIdRaw 
+        : (branchIdRaw.toString ? branchIdRaw.toString() : String(branchIdRaw)))
+    : undefined;
 
   const { data: roomStats } = useGetRoomStatsQuery(branchId || '', {
     skip: !branchId,

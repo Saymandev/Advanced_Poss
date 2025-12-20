@@ -24,12 +24,13 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 const countries = [
-  { value: 'USA', label: 'United States' },
+  { value: 'BD', label: 'Bangladesh' },
+  { value: 'US', label: 'United States' },
   { value: 'UK', label: 'United Kingdom' },
   { value: 'CA', label: 'Canada' },
-  { value: 'AU', label: 'Australia' },
-  { value: 'BD', label: 'Bangladesh' },
   { value: 'IN', label: 'India' },
+  { value: 'AU', label: 'Australia' },
+  
 ];
 
 const businessTypes = [

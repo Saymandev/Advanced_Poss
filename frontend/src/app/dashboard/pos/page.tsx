@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Calculator } from '@/components/ui/Calculator';
@@ -70,13 +69,11 @@ import {
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 interface ModifierSelection {
   group: string;
   option: string;
   priceModifier: number;
 }
-
 interface ModifierChoice {
   group: string;
   options: Array<{
@@ -84,12 +81,10 @@ interface ModifierChoice {
     price: number;
   }>;
 }
-
 interface AddonSelection {
   name: string;
   price: number;
 }
-
 interface CartItem {
   id: string;
   menuItemId: string;
@@ -104,7 +99,6 @@ interface CartItem {
   addonSelections?: AddonSelection[];
   selectionChoices?: ModifierChoice[];
 }
-
 interface OrderSummary {
   subtotal: number;
   tax: number;
@@ -113,19 +107,15 @@ interface OrderSummary {
   deliveryFee: number;
   discount: number;
 }
-
 type OrderType = 'dine-in' | 'delivery' | 'takeaway' | 'room-booking' | 'room-service';
-
 // Order type options - room booking will be conditionally added based on feature access
 const BASE_ORDER_TYPE_OPTIONS = [
   { value: 'dine-in', label: 'Dine-In', icon: HomeModernIcon },
   { value: 'delivery', label: 'Delivery', icon: TruckIcon },
   { value: 'takeaway', label: 'Takeaway', icon: ShoppingBagIcon },
 ] as const;
-
 const ROOM_BOOKING_OPTION = { value: 'room-booking', label: 'Room Booking', icon: BuildingOfficeIcon } as const;
 const ROOM_SERVICE_OPTION = { value: 'room-service', label: 'Room Service', icon: BuildingOfficeIcon } as const;
-
 // Order type labels - will be used dynamically
 const getOrderTypeLabel = (orderType: OrderType): string => {
   const labels: Record<OrderType, string> = {
@@ -137,26 +127,22 @@ const getOrderTypeLabel = (orderType: OrderType): string => {
   };
   return labels[orderType] || orderType;
 };
-
 const ORDER_STATUS_LABELS: Record<'pending' | 'paid' | 'cancelled', string> = {
   pending: 'Pending',
   paid: 'Paid',
   cancelled: 'Cancelled',
 };
-
 const ORDER_STATUS_STYLES: Record<'pending' | 'paid' | 'cancelled', string> = {
   pending: 'bg-amber-500/10 text-amber-200 border border-amber-500/30',
   paid: 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30',
   cancelled: 'bg-rose-500/10 text-rose-200 border border-rose-500/30',
 };
-
 const ORDER_STATUS_FILTERS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'pending', label: 'Pending' },
   { value: 'paid', label: 'Paid' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const;
-
 interface DeliveryDetailsState {
   [key: string]: string;
   contactName: string;
@@ -169,7 +155,6 @@ interface DeliveryDetailsState {
   instructions: string;
   assignedDriver: string;
 }
-
 interface TakeawayDetailsState {
   [key: string]: string;
   contactName: string;
@@ -177,7 +162,6 @@ interface TakeawayDetailsState {
   instructions: string;
   assignedDriver: string;
 }
-
 const createDefaultDeliveryDetails = (): DeliveryDetailsState => ({
   contactName: '',
   contactPhone: '',
@@ -189,14 +173,12 @@ const createDefaultDeliveryDetails = (): DeliveryDetailsState => ({
   instructions: '',
   assignedDriver: '',
 });
-
 const createDefaultTakeawayDetails = (): TakeawayDetailsState => ({
   contactName: '',
   contactPhone: '',
   instructions: '',
   assignedDriver: '',
 });
-
 const sanitizeDetails = <T extends Record<string, string>>(details: T): Partial<T> => {
   const sanitized: Partial<T> = {};
   Object.entries(details).forEach(([key, value]) => {
@@ -209,20 +191,17 @@ const sanitizeDetails = <T extends Record<string, string>>(details: T): Partial<
   });
   return sanitized;
 };
-
 type ModifierConfig = {
   quantity: number;
   variantSelections: Record<string, string>;
   selectionChoices: Record<string, string[]>;
   addonSelections: Record<string, boolean>;
 };
-
 type SplitPaymentRow = {
   id: string;
   method: string; // Payment method code from API
   amount: string;
 };
-
 interface PaymentSuccessState {
   orderId: string;
   orderNumber?: string;
@@ -231,7 +210,6 @@ interface PaymentSuccessState {
   summary: string;
   breakdown?: Array<{ method: string; amount: number }>;
 };
-
 const generateClientId = () => {
   const cryptoRef: any = (globalThis as any)?.crypto;
   if (cryptoRef && typeof cryptoRef.randomUUID === 'function') {
@@ -239,17 +217,14 @@ const generateClientId = () => {
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 };
-
 export default function POSPage() {
   const dispatch = useAppDispatch();
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const formatCurrency = useFormatCurrency(); // Use hook to get reactive currency formatting
   const isOwnerOrManager =
     user?.role === 'owner' || user?.role === 'super_admin';
-  
   // Check if user has access to booking management feature (for room booking / room service)
   const { hasAccess: hasBookingAccess } = useFeatureAccess('booking-management');
-  
   // Build order type options based on feature access
   const ORDER_TYPE_OPTIONS = useMemo(() => {
     if (hasBookingAccess) {
@@ -257,14 +232,12 @@ export default function POSPage() {
     }
     return BASE_ORDER_TYPE_OPTIONS;
   }, [hasBookingAccess]);
-  
   const {
     data: activeWorkPeriod,
     isLoading: workPeriodLoading,
   } = useGetCurrentWorkPeriodQuery(undefined, {
     skip: isOwnerOrManager,
   });
-  
   // Load from localStorage on mount
   const [orderType, setOrderType] = useState<OrderType>(() => {
     if (typeof window !== 'undefined') {
@@ -281,7 +254,6 @@ export default function POSPage() {
     }
     return 'dine-in';
   });
-  
   // Reset orderType to 'dine-in' if user loses access to hotel features and it's currently selected
   useEffect(() => {
     if ((orderType === 'room-booking' || orderType === 'room-service') && hasBookingAccess === false) {
@@ -322,51 +294,39 @@ export default function POSPage() {
     }
     return '';
   });
-
   // Fetch customer details for loyalty points
   const { data: selectedCustomer } = useGetCustomerByIdQuery(selectedCustomerId, {
     skip: !selectedCustomerId,
   });
-
   // Calculate cart subtotal (before discounts) for loyalty redemption
   const cartSubtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   }, [cart]);
-
   // Calculate loyalty redemption based on cart subtotal
   const loyaltyRedemption = useMemo(() => {
     if (!selectedCustomer || !selectedCustomerId) {
       return { pointsRedeemed: 0, discount: 0 };
     }
-
     const MIN_ORDER_AMOUNT = 1000; // Minimum order amount in TK
     const POINTS_PER_DISCOUNT = 2000; // 2000 points = 20 TK discount
     const DISCOUNT_AMOUNT = 20; // 20 TK discount per 2000 points
-
     const availablePoints = selectedCustomer.loyaltyPoints || 0;
-
     // Check if order meets minimum amount requirement
     if (cartSubtotal < MIN_ORDER_AMOUNT) {
       return { pointsRedeemed: 0, discount: 0 };
     }
-
     // Calculate how many discount blocks can be applied
     const discountBlocks = Math.floor(availablePoints / POINTS_PER_DISCOUNT);
-
     if (discountBlocks > 0) {
       // Apply maximum discount blocks (can be limited by order total)
       const maxDiscount = discountBlocks * DISCOUNT_AMOUNT;
-      
       // Discount cannot exceed cart subtotal
       const discount = Math.min(maxDiscount, cartSubtotal);
-      
       // Calculate points to redeem (in full blocks of 2000)
       const blocksToRedeem = Math.floor(discount / DISCOUNT_AMOUNT);
       const pointsRedeemed = blocksToRedeem * POINTS_PER_DISCOUNT;
-
       return { pointsRedeemed, discount };
     }
-
     return { pointsRedeemed: 0, discount: 0 };
   }, [selectedCustomer, selectedCustomerId, cartSubtotal]);
   const [deliveryDetails, setDeliveryDetails] = useState<DeliveryDetailsState>(() => {
@@ -438,7 +398,6 @@ export default function POSPage() {
     selectionChoices: Record<string, string[]>;
     addonSelections: Record<string, boolean>;
   } | null>(null);
-  
   // Room booking state
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [checkInDate, setCheckInDate] = useState<string>(() => {
@@ -465,12 +424,10 @@ export default function POSPage() {
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const [queueDetailId, setQueueDetailId] = useState<string | null>(null);
   const [queueActionOrderId, setQueueActionOrderId] = useState<string | null>(null);
-  
   // Payment modal for pending orders
   const [isPendingOrderPaymentModalOpen, setIsPendingOrderPaymentModalOpen] = useState(false);
   const [pendingOrderPaymentMethod, setPendingOrderPaymentMethod] = useState<string>('cash');
   const [pendingOrderPaymentReceived, setPendingOrderPaymentReceived] = useState<string>('0');
-
   // Delivery zones for POS (branch-based)
   // Use same branch resolution logic as Bookings page so POS + Bookings see the same branch
   const currentBranchId =
@@ -479,7 +436,6 @@ export default function POSPage() {
     || (companyContext as any)?.branches?.[0]?._id
     || (companyContext as any)?.branches?.[0]?.id
     || '';
-
   const currentCompanyId =
     (user as any)?.companyId
     || (companyContext as any)?.companyId
@@ -488,13 +444,11 @@ export default function POSPage() {
     { branchId: currentBranchId },
     { skip: !currentBranchId }
   );
-
   // Payment methods for POS (branch-based, includes system + company + branch methods)
   const { data: paymentMethods = [], isLoading: paymentMethodsLoading } = useGetPaymentMethodsByBranchQuery(
     { companyId: currentCompanyId, branchId: currentBranchId },
     { skip: !currentCompanyId || !currentBranchId }
   );
-
   const resetDeliveryDetails = useCallback(() => {
     const defaults = createDefaultDeliveryDetails();
     setDeliveryDetails(defaults);
@@ -504,7 +458,6 @@ export default function POSPage() {
       localStorage.removeItem('pos_deliveryFee');
     }
   }, []);
-
   const resetTakeawayDetails = useCallback(() => {
     const defaults = createDefaultTakeawayDetails();
     setTakeawayDetails(defaults);
@@ -512,7 +465,6 @@ export default function POSPage() {
       localStorage.removeItem('pos_takeawayDetails');
     }
   }, []);
-
   const requiresTable = orderType === 'dine-in';
   const requiresDeliveryDetails = orderType === 'delivery';
   const requiresTakeawayDetails = orderType === 'takeaway';
@@ -521,14 +473,12 @@ export default function POSPage() {
   const orderTypeLabel = ORDER_TYPE_OPTIONS.find(option => option.value === orderType)?.label ?? 'Dine-In';
   const activeOrderTypeOption = useMemo(() => ORDER_TYPE_OPTIONS.find(option => option.value === orderType), [orderType, ORDER_TYPE_OPTIONS]);
   const ActiveOrderIcon = activeOrderTypeOption?.icon ?? HomeModernIcon;
-  
   // Room booking queries
   const { data: roomsData, isLoading: roomsLoading } = useGetRoomsQuery(
     { branchId: currentBranchId, status: 'available' },
     { skip: !currentBranchId || !requiresRoomBooking }
   );
   const [createBooking] = useCreateBookingMutation();
-  
   const rooms = useMemo(() => {
     if (!roomsData) return [];
     const response = roomsData as any;
@@ -537,7 +487,6 @@ export default function POSPage() {
     if (response.data) return Array.isArray(response.data) ? response.data : response.data.rooms || [];
     return [];
   }, [roomsData]);
-
   // Room service bookings - confirmed or checked-in bookings for current branch
   const {
     data: roomServiceBookingsResponse,
@@ -546,36 +495,30 @@ export default function POSPage() {
     { branchId: currentBranchId },
     { skip: !currentBranchId || !requiresRoomService },
   );
-
   const roomServiceBookings: Booking[] = useMemo(() => {
     if (!roomServiceBookingsResponse) return [];
     const response = roomServiceBookingsResponse as any;
     let items: Booking[] = [];
-
     if (Array.isArray(response.bookings)) items = response.bookings;
     else if (Array.isArray(response)) items = response;
     else if (response.data && Array.isArray(response.data.bookings)) {
       items = response.data.bookings;
     }
-
     // Only allow room service for confirmed or checked-in bookings
     return items.filter(
       (b: Booking) => b.status === 'confirmed' || b.status === 'checked_in',
     );
   }, [roomServiceBookingsResponse]);
-
   const selectedRoomServiceBooking = useMemo(
     () => roomServiceBookings.find((b) => b.id === roomServiceBookingId) || null,
     [roomServiceBookings, roomServiceBookingId],
   );
-
   // Auto-select the first available booking for room service when none is selected
   useEffect(() => {
     if (orderType === 'room-service' && !roomServiceBookingId && roomServiceBookings.length > 0) {
       setRoomServiceBookingId(roomServiceBookings[0].id);
     }
   }, [orderType, roomServiceBookingId, roomServiceBookings]);
-
   const deliveryFeeValue = useMemo(() => {
     if (!requiresDeliveryDetails) {
       return 0;
@@ -586,20 +529,17 @@ export default function POSPage() {
     }
     return parsed;
   }, [deliveryFee, requiresDeliveryDetails]);
-
   const deliveryIsValid = !requiresDeliveryDetails
     || (
       deliveryDetails.addressLine1.trim() !== ''
       && deliveryDetails.city.trim() !== ''
       && deliveryDetails.contactPhone.trim() !== ''
     );
-
   const takeawayIsValid = !requiresTakeawayDetails
     || (
       takeawayDetails.contactName.trim() !== ''
       && takeawayDetails.contactPhone.trim() !== ''
     );
-
   const roomBookingIsValid = !requiresRoomBooking || (
     selectedRoomId !== '' &&
     checkInDate !== '' &&
@@ -607,15 +547,12 @@ export default function POSPage() {
     new Date(checkOutDate) > new Date(checkInDate) &&
     numberOfGuests > 0
   );
-
   const roomServiceIsValid = !requiresRoomService || roomServiceBookingId !== '';
-  
   const checkoutBlocked = (requiresTable && !selectedTable)
     || (requiresDeliveryDetails && !deliveryIsValid)
     || (requiresTakeawayDetails && !takeawayIsValid)
     || (requiresRoomBooking && !roomBookingIsValid)
     || (requiresRoomService && !roomServiceIsValid);
-
   const missingDeliveryFields = useMemo(() => {
     if (!requiresDeliveryDetails) return [] as string[];
     const missing: string[] = [];
@@ -625,7 +562,6 @@ export default function POSPage() {
     if (!deliveryDetails.city.trim()) missing.push('city');
     return missing;
   }, [requiresDeliveryDetails, deliveryDetails]);
-
   const missingTakeawayFields = useMemo(() => {
     if (!requiresTakeawayDetails) return [] as string[];
     const missing: string[] = [];
@@ -633,45 +569,32 @@ export default function POSPage() {
     if (!takeawayDetails.contactPhone.trim()) missing.push('contact phone');
     return missing;
   }, [requiresTakeawayDetails, takeawayDetails]);
-
   // Socket.IO for real-time updates
   const { socket, isConnected } = useSocket();
-
   // API calls
   // Note: branchId is extracted from JWT token in backend, no need to pass it
   const { data: tablesData, isLoading: tablesLoading, error: _tablesError, refetch: refetchTables } = useGetAvailableTablesQuery();
-
   // Listen for table status changes via Socket.IO
   useEffect(() => {
     if (!socket || !isConnected) {
-      console.log('🔌 Socket not ready:', { socket: !!socket, isConnected });
       return;
     }
-
-    console.log('✅ Setting up table status listeners');
-
     const handleTableStatusChanged = (data: any) => {
-      console.log('📢 Table status changed event received:', data);
       // Refetch tables when status changes
       refetchTables();
     };
-
     socket.on('table:status-changed', handleTableStatusChanged);
     socket.on('table:available', handleTableStatusChanged);
     socket.on('table:occupied', handleTableStatusChanged);
-
     return () => {
-      console.log('🧹 Cleaning up table status listeners');
       socket.off('table:status-changed', handleTableStatusChanged);
       socket.off('table:available', handleTableStatusChanged);
       socket.off('table:occupied', handleTableStatusChanged);
     };
   }, [socket, isConnected, refetchTables]);
-
   const { data: categoriesData } = useGetCategoriesQuery({
     branchId: user?.branchId || undefined,
   });
-
   // Fetch all menu items (no category filter) so we can do client-side filtering
   // This provides better UX with instant filtering
   const { data: menuItemsData, isLoading: menuItemsLoading } = useGetPOSMenuItemsQuery({
@@ -680,15 +603,12 @@ export default function POSPage() {
     search: undefined, // Search is done client-side for better UX
     isAvailable: true,
   });
-  
   // Get POS settings for tax rate
   const { data: posSettings } = useGetPOSSettingsQuery({
     branchId: user?.branchId || undefined,
   });
-  
   // Use nullish coalescing (??) instead of || to allow 0 as a valid tax rate
   const taxRate = posSettings?.taxRate ?? 10; // Default 10% only if undefined/null
-  
   // Payment mode: 'pay-first' = pay before creating order, 'pay-later' = create order then pay
   const [paymentMode, setPaymentMode] = useState<'pay-first' | 'pay-later'>(() => {
     if (typeof window !== 'undefined') {
@@ -699,7 +619,6 @@ export default function POSPage() {
     }
     return (posSettings?.defaultPaymentMode as 'pay-first' | 'pay-later') || 'pay-later';
   });
-  
   // Sync payment mode with settings when they load (only if user hasn't set a preference)
   useEffect(() => {
     if (posSettings?.defaultPaymentMode && typeof window !== 'undefined') {
@@ -711,32 +630,26 @@ export default function POSPage() {
       }
     }
   }, [posSettings?.defaultPaymentMode]);
-  
   // Save payment mode preference when user changes it
   useEffect(() => {
     if (typeof window !== 'undefined' && paymentMode) {
       localStorage.setItem('pos_paymentMode', paymentMode);
     }
   }, [paymentMode]);
-  
   // Extract tables array from response (already transformed by API)
   const tables = useMemo(() => {
     if (!tablesData) return [];
-    
     // Response is already transformed by API transformResponse
     // Format: Array<{id, number, capacity, status, ...}>
     return Array.isArray(tablesData) ? tablesData : [];
   }, [tablesData]);
-
   const activeTable = useMemo(() => {
     return tables.find((t: any) => t.id === selectedTable);
   }, [tables, selectedTable]);
-  
   // Extract categories array from response (already transformed by API)
   const categories = useMemo(() => {
     return categoriesData?.categories || [];
   }, [categoriesData]);
-
   const [createOrder] = useCreatePOSOrderMutation();
   const [processPayment] = useProcessPaymentMutation();
   const [printReceipt] = usePrintReceiptMutation();
@@ -765,28 +678,22 @@ export default function POSPage() {
       limit: queueTab === 'active' ? 25 : 50,
       page: 1,
     };
-
     if (user?.branchId) {
       params.branchId = user.branchId;
     }
-
     if (queueTab === 'active') {
       params.status = 'pending';
     } else if (queueStatusFilter !== 'all') {
       params.status = queueStatusFilter;
     }
-
     if (queueOrderTypeFilter !== 'all') {
       params.orderType = queueOrderTypeFilter;
     }
-
     if (queueSearchTerm) {
       params.search = queueSearchTerm;
     }
-
     return params;
   }, [queueTab, queueStatusFilter, queueOrderTypeFilter, queueSearchTerm, user?.branchId]);
-
   const {
     data: queueData,
     isFetching: queueLoading,
@@ -794,11 +701,9 @@ export default function POSPage() {
   } = useGetPOSOrdersQuery(queueQueryParams, {
     skip: !user,
   });
-
   const { data: queueDetailData, isFetching: queueDetailLoading } = useGetPOSOrderQuery(queueDetailId as string, {
     skip: !queueDetailId,
   });
-
   const [cancelOrder] = useCancelPOSOrderMutation();
   const queueOrders = useMemo(() => {
     if (queueData?.orders && Array.isArray(queueData.orders)) {
@@ -818,7 +723,6 @@ export default function POSPage() {
       return sum;
     }, 0);
   }, [queueOrders]);
-
   const createOrderWithRetry = useCallback(
     async (payload: CreatePOSOrderRequest, attempts = 2): Promise<any> => {
       try {
@@ -834,12 +738,10 @@ export default function POSPage() {
     },
     [createOrder]
   );
-
   const branchId = (user as any)?.branchId || 
                    (user as any)?.branch?.id || 
                    (user as any)?.branch?._id;
   const companyId = (user as any)?.companyId || (companyContext as any)?.companyId;
-
   const { data: staffData, isLoading: staffLoading, error: staffError } = useGetStaffQuery(
     { 
       companyId: companyId || undefined,
@@ -852,7 +754,6 @@ export default function POSPage() {
       refetchOnMountOrArgChange: false 
     }
   );
-
   const [triggerCustomerSearch, { data: customerSearchResults, isFetching: isCustomerSearchLoading }]
     = useLazySearchCustomersQuery();
   const resolvedCustomerResults = useMemo(() => {
@@ -863,39 +764,32 @@ export default function POSPage() {
     }
     return [] as any[];
   }, [customerSearchResults]);
-
   // Fetch waiter active orders count for busy indicator
   const { data: waiterActiveOrdersCount = {} } = useGetWaiterActiveOrdersCountQuery(undefined, {
     skip: !branchId,
     pollingInterval: 60000, // Refresh every 60 seconds (reduced from 30s to reduce load)
   });
-
   const waiterOptions = useMemo<Array<{ id: string; name: string; activeOrdersCount: number }>>(() => {
     const staffList = staffData?.staff || [];
     const currentBranchId = user?.branchId || branchId;
-    
     return staffList
       .filter((staffMember: any) => {
         // CRITICAL: Only show employees with "waiter" role (or "server" as alias)
         const role = (staffMember.role || '').toLowerCase();
         const isWaiter = role === 'waiter' || role === 'server';
-        
         if (!isWaiter) {
           return false; // Only waiter/server roles allowed
         }
-        
         // CRITICAL: Filter by branch assignment - only show waiters assigned to current branch
         const staffBranchId = staffMember.branchId || (staffMember.branch as any)?.id;
         const isAssignedToBranch = currentBranchId && staffBranchId && 
           (staffBranchId.toString() === currentBranchId.toString() || 
            staffBranchId === currentBranchId);
-        
         return isAssignedToBranch;
       })
       .map((staffMember: any) => {
         const waiterId = staffMember.id;
         const activeOrdersCount = waiterActiveOrdersCount[waiterId] || 0;
-        
         return {
           id: waiterId,
           name:
@@ -906,23 +800,19 @@ export default function POSPage() {
         };
       });
   }, [staffData, user?.branchId, branchId, waiterActiveOrdersCount]);
-
   const selectedWaiterName = useMemo(() => {
     return waiterOptions.find((option) => option.id === selectedWaiterId)?.name || '';
   }, [waiterOptions, selectedWaiterId]);
-
   useEffect(() => {
     if (!selectedWaiterId && waiterOptions.length > 0) {
       setSelectedWaiterId(waiterOptions[0].id);
     }
   }, [selectedWaiterId, waiterOptions]);
-
   // Extract menu items array from response (already transformed by API)
   const menuItemsArray = useMemo(() => {
     // Response is already transformed by API transformResponse
     return Array.isArray(menuItemsData) ? menuItemsData : [];
   }, [menuItemsData]);
-
   const menuItemNameById = useMemo(() => {
     const map = new Map<string, { name?: string; price?: number }>();
     if (Array.isArray(menuItemsArray)) {
@@ -934,13 +824,10 @@ export default function POSPage() {
     }
     return map;
   }, [menuItemsArray]);
-
   // Filter menu items based on search and category (client-side filter for better UX)
   const filteredMenuItems = useMemo(() => {
     if (!Array.isArray(menuItemsArray)) return [];
-    
     let filtered = menuItemsArray;
-    
     // Filter by category if not 'all'
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(item => {
@@ -948,7 +835,6 @@ export default function POSPage() {
         return categoryId === selectedCategory || item.category?.name === selectedCategory;
       });
     }
-    
     // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(item =>
@@ -956,30 +842,37 @@ export default function POSPage() {
         item.description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
     return filtered;
   }, [menuItemsArray, searchQuery, selectedCategory]);
-
   const getItemDiscountAmount = useCallback(
     (item: CartItem) => {
       const entry = itemDiscounts[item.id];
       if (!entry) return 0;
-
       const lineSubtotal = item.price * item.quantity;
       const raw = parseFloat(entry.value || '0');
       if (!Number.isFinite(raw) || raw <= 0) {
         return 0;
       }
-
       if (entry.type === 'percent') {
         return Math.min(lineSubtotal, (lineSubtotal * raw) / 100);
       }
-
       return Math.min(lineSubtotal, raw);
     },
     [itemDiscounts]
   );
-
+  // Calculate room booking total if room booking is selected
+  const roomBookingTotal = useMemo(() => {
+    if (orderType !== 'room-booking' || !selectedRoomId || !checkInDate || !checkOutDate) {
+      return 0;
+    }
+    const selectedRoom = rooms.find((r: any) => r.id === selectedRoomId);
+    if (!selectedRoom) return 0;
+    const checkIn = new Date(checkInDate);
+    const checkOut = new Date(checkOutDate);
+    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+    const roomRate = selectedRoom.basePrice || 0;
+    return roomRate * nights;
+  }, [orderType, selectedRoomId, checkInDate, checkOutDate, rooms]);
   const orderSummary: OrderSummary = useMemo(() => {
     const base = cart.reduce(
       (acc, item) => {
@@ -991,32 +884,30 @@ export default function POSPage() {
       },
       { subtotal: 0, itemCount: 0 }
     );
-
+    // Add room booking total to subtotal if it's a room booking
+    const baseSubtotal = base.subtotal + (orderType === 'room-booking' ? roomBookingTotal : 0);
     let discountAmount = 0;
     if (discountMode === 'full') {
       const parsed = parseFloat(discountValue || '0');
       if (Number.isFinite(parsed) && parsed > 0) {
         discountAmount =
           discountType === 'percent'
-            ? Math.min(base.subtotal, (base.subtotal * parsed) / 100)
-            : Math.min(base.subtotal, parsed);
+            ? Math.min(baseSubtotal, (baseSubtotal * parsed) / 100)
+            : Math.min(baseSubtotal, parsed);
       }
     } else {
-      // Item-wise discounts
+      // Item-wise discounts (only apply to cart items, not room booking)
       discountAmount = cart.reduce((sum, item) => sum + getItemDiscountAmount(item), 0);
       discountAmount = Math.min(discountAmount, base.subtotal);
     }
-
     // Add loyalty discount
     const loyaltyDiscount = loyaltyRedemption.discount || 0;
     const totalDiscount = discountAmount + loyaltyDiscount;
-
-    const taxableSubtotal = Math.max(base.subtotal - totalDiscount, 0);
+    const taxableSubtotal = Math.max(baseSubtotal - totalDiscount, 0);
     const taxAmount = (taxableSubtotal * taxRate) / 100;
     const total = taxableSubtotal + taxAmount + deliveryFeeValue;
-
     return {
-      subtotal: base.subtotal,
+      subtotal: baseSubtotal,
       discount: totalDiscount,
       tax: taxAmount,
       total,
@@ -1032,8 +923,9 @@ export default function POSPage() {
     discountValue,
     getItemDiscountAmount,
     loyaltyRedemption.discount,
+    orderType,
+    roomBookingTotal,
   ]);
-
   // Initialize payment method when payment methods load
   useEffect(() => {
     if (paymentMethods.length > 0 && !fullPaymentMethod) {
@@ -1041,7 +933,6 @@ export default function POSPage() {
       setFullPaymentMethod(firstMethod);
     }
   }, [paymentMethods, fullPaymentMethod]);
-
   useEffect(() => {
     const formattedTotal = orderSummary.total.toFixed(2);
     setFullPaymentReceived(formattedTotal);
@@ -1053,14 +944,12 @@ export default function POSPage() {
       return prev;
     });
   }, [orderSummary.total, paymentMethods]);
-
   // Save to localStorage whenever cart, selectedTable, or customerInfo changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('pos_cart', JSON.stringify(cart));
     }
   }, [cart]);
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (selectedTable) {
@@ -1070,7 +959,6 @@ export default function POSPage() {
       }
     }
   }, [selectedTable]);
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const hasCustomerInfo = customerInfo.name || customerInfo.phone || customerInfo.email;
@@ -1083,7 +971,6 @@ export default function POSPage() {
       }
     }
   }, [customerInfo]);
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (selectedCustomerId) {
@@ -1093,13 +980,11 @@ export default function POSPage() {
       }
     }
   }, [selectedCustomerId]);
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('pos_orderType', orderType);
     }
   }, [orderType]);
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (hasStartedOrder) {
@@ -1109,7 +994,6 @@ export default function POSPage() {
       }
     }
   }, [hasStartedOrder]);
-
   useEffect(() => {
     if (orderType === 'dine-in') {
       if (selectedTable) {
@@ -1119,7 +1003,6 @@ export default function POSPage() {
       }
     }
   }, [orderType, selectedTable]);
-
   // Save delivery details to encrypted storage
   useEffect(() => {
     if (typeof window !== 'undefined' && orderType === 'delivery') {
@@ -1133,7 +1016,6 @@ export default function POSPage() {
       }
     }
   }, [deliveryDetails, deliveryFee, orderType]);
-
   // Save takeaway details to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined' && orderType === 'takeaway') {
@@ -1145,12 +1027,10 @@ export default function POSPage() {
       }
     }
   }, [takeawayDetails, orderType]);
-
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
-
     const hasDeliveryDetails = Object.values(deliveryDetails).some((value) => value.trim() !== '');
     if (hasDeliveryDetails) {
       // Encrypt delivery PII with 24-hour TTL
@@ -1159,7 +1039,6 @@ export default function POSPage() {
     } else {
       removeEncryptedItem('pos_deliveryDetails');
     }
-
     const parsedFee = parseFloat(deliveryFee);
     if (!Number.isNaN(parsedFee) && parsedFee > 0) {
       localStorage.setItem('pos_deliveryFee', deliveryFee);
@@ -1167,12 +1046,10 @@ export default function POSPage() {
       localStorage.removeItem('pos_deliveryFee');
     }
   }, [deliveryDetails, deliveryFee]);
-
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
-
     const hasTakeawayDetails = Object.values(takeawayDetails).some((value) => value.trim() !== '');
     if (hasTakeawayDetails) {
       localStorage.setItem('pos_takeawayDetails', JSON.stringify(takeawayDetails));
@@ -1180,7 +1057,6 @@ export default function POSPage() {
       localStorage.removeItem('pos_takeawayDetails');
     }
   }, [takeawayDetails]);
-
   useEffect(() => {
     if (!isCustomerLookupOpen) {
       return;
@@ -1199,25 +1075,20 @@ export default function POSPage() {
     }, 250);
     return () => window.clearTimeout(handle);
   }, [customerSearchTerm, isCustomerLookupOpen, triggerCustomerSearch, user, companyContext]);
-
   useEffect(() => {
     const handle = window.setTimeout(() => {
       setQueueSearchTerm(queueSearchInput.trim());
     }, 300);
-
     return () => window.clearTimeout(handle);
   }, [queueSearchInput]);
-
   useEffect(() => {
     if (queueTab === 'active' && queueStatusFilter !== 'pending') {
       setQueueStatusFilter('pending');
     }
-
     if (queueTab === 'history' && queueStatusFilter === 'pending') {
       setQueueStatusFilter('all');
     }
   }, [queueTab, queueStatusFilter]);
-
   const buildItemNotes = useCallback((item: CartItem) => {
     const segments: string[] = [];
     if (item.modifiersNote) {
@@ -1228,19 +1099,16 @@ export default function POSPage() {
     }
     return segments.length > 0 ? segments.join('\n') : undefined;
   }, []);
-
   const hasMenuItemModifiers = useCallback((menuItem: any) => {
     const hasVariants = Array.isArray(menuItem?.variants) && menuItem.variants.length > 0;
     const hasAddons = Array.isArray(menuItem?.addons) && menuItem.addons.some((addon: any) => addon?.isAvailable !== false);
     const hasSelections = Array.isArray(menuItem?.selections) && menuItem.selections.length > 0;
     return hasVariants || hasAddons || hasSelections;
   }, []);
-    
   const getDefaultModifierConfig = useCallback((menuItem: any): ModifierConfig => {
     const variantSelections: Record<string, string> = {};
     const selectionChoices: Record<string, string[]> = {};
     const addonSelections: Record<string, boolean> = {};
-
     if (Array.isArray(menuItem?.variants)) {
       menuItem.variants.forEach((variant: any) => {
         if (!variant?.name || !Array.isArray(variant.options) || variant.options.length === 0) {
@@ -1252,7 +1120,6 @@ export default function POSPage() {
         }
       });
     }
-
     if (Array.isArray(menuItem?.selections)) {
       menuItem.selections.forEach((selection: any) => {
         if (!selection?.name || !Array.isArray(selection.options) || selection.options.length === 0) {
@@ -1266,7 +1133,6 @@ export default function POSPage() {
         }
       });
     }
-
     if (Array.isArray(menuItem?.addons)) {
       menuItem.addons.forEach((addon: any) => {
         if (!addon?.name) return;
@@ -1277,7 +1143,6 @@ export default function POSPage() {
         addonSelections[addon.name] = false;
       });
     }
-
     return {
       quantity: 1,
       variantSelections,
@@ -1285,7 +1150,6 @@ export default function POSPage() {
       addonSelections,
     };
   }, []);
-
   const buildCartItemFromMenuItem = useCallback((menuItem: any, overrides?: Partial<ModifierConfig>): CartItem => {
     const defaults = getDefaultModifierConfig(menuItem);
     const config: ModifierConfig = {
@@ -1294,15 +1158,12 @@ export default function POSPage() {
       selectionChoices: { ...defaults.selectionChoices, ...(overrides?.selectionChoices ?? {}) },
       addonSelections: { ...defaults.addonSelections, ...(overrides?.addonSelections ?? {}) },
     };
-
     const basePrice = Number(menuItem?.price) || 0;
     let unitPrice = basePrice;
-
     const variantSelections: ModifierSelection[] = [];
     const addonSelections: AddonSelection[] = [];
     const selectionChoices: ModifierChoice[] = [];
     const summaryParts: string[] = [];
-
     if (Array.isArray(menuItem?.variants)) {
       menuItem.variants.forEach((variant: any) => {
         if (!variant?.name || !Array.isArray(variant.options) || variant.options.length === 0) {
@@ -1326,7 +1187,6 @@ export default function POSPage() {
         summaryParts.push(label);
       });
     }
-
     if (Array.isArray(menuItem?.selections)) {
       menuItem.selections.forEach((selection: any) => {
         if (!selection?.name || !Array.isArray(selection.options) || selection.options.length === 0) {
@@ -1335,7 +1195,6 @@ export default function POSPage() {
         const chosen = config.selectionChoices[selection.name] ?? [];
         const normalized = Array.isArray(chosen) ? chosen : [chosen];
         const applied: ModifierChoice['options'] = [];
-
         normalized.forEach((choiceName) => {
           if (!choiceName) return;
           const option = selection.options.find((opt: any) => opt?.name === choiceName);
@@ -1344,7 +1203,6 @@ export default function POSPage() {
           unitPrice += priceToAdd;
           applied.push({ name: option.name, price: priceToAdd });
         });
-
         if (applied.length > 0) {
           selectionChoices.push({
             group: selection.name,
@@ -1357,7 +1215,6 @@ export default function POSPage() {
         }
       });
     }
-
     if (Array.isArray(menuItem?.addons)) {
       const chosenAddons = menuItem.addons.filter((addon: any) => {
         if (!addon?.name || addon?.isAvailable === false) return false;
@@ -1374,7 +1231,6 @@ export default function POSPage() {
         summaryParts.push(`Add-ons: ${addonLabels.join(', ')}`);
       }
     }
-
     return {
       id: overrides && 'id' in overrides && overrides.id ? String((overrides as any).id) : generateClientId(),
             menuItemId: menuItem.id,
@@ -1389,22 +1245,18 @@ export default function POSPage() {
       selectionChoices: selectionChoices.length > 0 ? selectionChoices : undefined,
     };
   }, [getDefaultModifierConfig, formatCurrency]);
-
   const areModifiersEqual = useCallback((first: CartItem, second: CartItem) => {
     if (first.menuItemId !== second.menuItemId) {
       return false;
     }
-
     const serializeVariants = (item: CartItem) =>
       JSON.stringify((item.variantSelections || [])
         .map((entry) => `${entry.group}:${entry.option}`)
         .sort());
-
     const serializeAddons = (item: CartItem) =>
       JSON.stringify((item.addonSelections || [])
         .map((entry) => entry.name)
         .sort());
-
     const serializeChoices = (item: CartItem) =>
       JSON.stringify((item.selectionChoices || [])
         .map((entry) => ({
@@ -1412,7 +1264,6 @@ export default function POSPage() {
           options: entry.options.map((option) => option.name).sort(),
         }))
         .sort((a, b) => a.group.localeCompare(b.group)));
-
     return (
       serializeVariants(first) === serializeVariants(second) &&
       serializeAddons(first) === serializeAddons(second) &&
@@ -1420,7 +1271,6 @@ export default function POSPage() {
       (first.modifiersNote || '') === (second.modifiersNote || '')
     );
   }, []);
-
   const appendCartItem = useCallback((newItem: CartItem, silent = false) => {
     setCart((prev) => {
       const existingIndex = prev.findIndex((item) => areModifiersEqual(item, newItem));
@@ -1439,20 +1289,16 @@ export default function POSPage() {
     }
     setHasStartedOrder(true);
   }, [areModifiersEqual]);
-
   const addMultiPaymentRow = useCallback(() => {
     const firstMethod = paymentMethods.find(m => m.allowsPartialPayment !== false)?.code || paymentMethods[0]?.code || 'cash';
     setMultiPayments((prev) => [...prev, { id: generateClientId(), method: firstMethod, amount: '0' }]);
   }, [paymentMethods]);
-
   const updateMultiPaymentRow = useCallback((id: string, patch: Partial<{ method: string; amount: string }>) => {
     setMultiPayments((prev) => prev.map((payment) => (payment.id === id ? { ...payment, ...patch } : payment)));
   }, []);
-
   const removeMultiPaymentRow = useCallback((id: string) => {
     setMultiPayments((prev) => prev.filter((payment) => payment.id !== id));
   }, []);
-
   const applyCustomerSelection = useCallback((customer: any) => {
     if (!customer) {
       return;
@@ -1467,7 +1313,6 @@ export default function POSPage() {
       'Customer';
     const phone = customer.phoneNumber || customer.phone || '';
     const email = customer.email || '';
-
     setCustomerInfo({
       name: composedName,
       phone,
@@ -1477,15 +1322,12 @@ export default function POSPage() {
     setIsCustomerLookupOpen(false);
     toast.success(`Linked customer ${composedName}`);
   }, []);
-
   const clearCustomerSelection = useCallback(() => {
     setSelectedCustomerId('');
     setCustomerInfo({ name: '', phone: '', email: '' });
     toast.success('Customer cleared');
   }, []);
-
   const closeModifierEditor = useCallback(() => setModifierEditor(null), []);
-
   const handleModifierConfirm = useCallback(() => {
     if (!modifierEditor) {
       return;
@@ -1494,7 +1336,6 @@ export default function POSPage() {
     appendCartItem(cartItem);
     setModifierEditor(null);
   }, [appendCartItem, buildCartItemFromMenuItem, modifierEditor]);
-
   // Cart functions
   const addToCart = useCallback((menuItem: any) => {
     if (hasMenuItemModifiers(menuItem)) {
@@ -1508,11 +1349,9 @@ export default function POSPage() {
       });
       return;
     }
-
     const cartItem = buildCartItemFromMenuItem(menuItem, { quantity: 1 });
     appendCartItem(cartItem);
   }, [appendCartItem, buildCartItemFromMenuItem, getDefaultModifierConfig, hasMenuItemModifiers]);
-
   const updateQuantity = (itemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(itemId);
@@ -1522,13 +1361,11 @@ export default function POSPage() {
       ));
     }
   };
-
   const updateItemNote = useCallback((itemId: string, note: string) => {
     setCart((prev) =>
       prev.map((item) => (item.id === itemId ? { ...item, notes: note.trim() || undefined } : item))
     );
   }, []);
-
   const removeFromCart = (itemId: string) => {
     setCart(cart.filter(item => item.id !== itemId));
     setItemDiscounts((prev) => {
@@ -1539,7 +1376,6 @@ export default function POSPage() {
     });
     toast.success('Item removed from cart');
   };
-
   const updateItemDiscountEntry = useCallback(
     (itemId: string, nextValue: { type: 'percent' | 'amount'; value: string }) => {
       setItemDiscounts((prev) => ({
@@ -1549,7 +1385,6 @@ export default function POSPage() {
     },
     []
   );
-
   const clearCart = useCallback(() => {
     setCart([]);
     setItemDiscounts({});
@@ -1569,13 +1404,11 @@ export default function POSPage() {
     }
     toast.success('Cart cleared');
   }, []);
-
   const resetFilters = () => {
     setSelectedCategory('all');
     setSearchQuery('');
     toast.success('Filters reset');
   };
-
   const handleOrderTypeChange = useCallback(
     (type: OrderType) => {
       setOrderType(type);
@@ -1589,26 +1422,19 @@ export default function POSPage() {
     },
     [selectedTable, selectedRoomId]
   );
-
   const [occupiedTableModal, setOccupiedTableModal] = useState<{ tableId: string; orderDetails: any } | null>(null);
-  
   // Context menu state for table quick actions
   const [contextMenu, setContextMenu] = useState<{ tableId: string; x: number; y: number } | null>(null);
   const [notifiedTables, setNotifiedTables] = useState<Set<string>>(new Set()); // Track tables we've already notified
-  
   const [updateTableStatus] = useUpdateTableStatusMutation();
-
   // Show notification for tables paid > 15 minutes using Socket.IO events
   // Instead of polling with setInterval, we listen for payment events and set timeouts
   useEffect(() => {
     if (!socket || !isConnected) return;
-
     // Store active timeouts to clean them up
     const activeTimeouts = new Map<string, NodeJS.Timeout>();
-
     const showReleaseNotification = (tableId: string, tableNumber: string) => {
       if (notifiedTables.has(tableId)) return; // Already notified
-
       toast(
         (t) => (
           <div className="flex items-center gap-3">
@@ -1656,58 +1482,44 @@ export default function POSPage() {
       );
       setNotifiedTables(prev => new Set(prev).add(tableId));
     };
-
     // Listen for payment received events
     const handlePaymentReceived = (data: any) => {
       const order = data.order || data;
       const tableId = order.tableId?.toString() || order.tableId;
-      
       if (!tableId) return;
-
       // Find table number from current tables data
       const table = tables?.find((t: any) => t.id === tableId);
       if (!table) return;
-
       // Clear any existing timeout for this table
       const existingTimeout = activeTimeouts.get(tableId);
       if (existingTimeout) {
         clearTimeout(existingTimeout);
       }
-
       // Set timeout to show notification after 15 minutes
       const timeout = setTimeout(() => {
         showReleaseNotification(tableId, table.number || table.tableNumber || 'Unknown');
         activeTimeouts.delete(tableId);
       }, 15 * 60 * 1000); // 15 minutes
-
       activeTimeouts.set(tableId, timeout);
-      console.log(`⏰ Scheduled release notification for table ${tableId} in 15 minutes`);
-    };
-
+      };
     // Also check existing paid tables on mount (one-time check for tables already paid)
     const checkExistingPaidTables = () => {
       if (!tables || tables.length === 0) return;
-      
       const now = new Date();
       const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
-
       tables.forEach((table: any) => {
         if (table.status !== 'occupied' || !table.orderDetails) return;
-        
         const orderStatus = table.orderDetails.orderStatus 
           || table.orderDetails.status 
           || table.orderDetails.allOrders?.[0]?.status 
           || 'pending';
-        
         if (orderStatus === 'paid') {
           const paymentTime = table.orderDetails.completedAt 
             || table.orderDetails.allOrders?.[0]?.completedAt
             || table.orderDetails.paidAt;
-          
           if (paymentTime) {
             const paidAt = new Date(paymentTime);
             const timeSincePayment = now.getTime() - paidAt.getTime();
-            
             if (paidAt < fifteenMinutesAgo && !notifiedTables.has(table.id)) {
               // Already past 15 minutes, show immediately
               showReleaseNotification(table.id, table.number || table.tableNumber || 'Unknown');
@@ -1724,7 +1536,6 @@ export default function POSPage() {
         }
       });
     };
-
     // Listen to Socket.IO events
     socket.on('order:payment-received', handlePaymentReceived);
     socket.on('table:payment-received', handlePaymentReceived);
@@ -1734,10 +1545,8 @@ export default function POSPage() {
         handlePaymentReceived(data.order);
       }
     });
-
     // Check existing paid tables on mount
     checkExistingPaidTables();
-
     // Cleanup
     return () => {
       socket.off('order:payment-received', handlePaymentReceived);
@@ -1748,7 +1557,6 @@ export default function POSPage() {
       activeTimeouts.clear();
     };
   }, [socket, isConnected, tables, notifiedTables, updateTableStatus, refetchTables]);
-
   // Close context menu when clicking outside
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
@@ -1757,7 +1565,6 @@ export default function POSPage() {
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [contextMenu]);
-
   const handleTableSelection = useCallback(
     (tableId: string) => {
       if (!tableId) {
@@ -1765,70 +1572,56 @@ export default function POSPage() {
         setHasStartedOrder(false);
         return;
       }
-
       const table = tables.find((entry: any) => entry.id === tableId);
-      
       // If table has an order (pending or paid), show modal with options
       if (table?.orderDetails) {
         setOccupiedTableModal({ tableId, orderDetails: table.orderDetails });
         return;
       }
-
       // If table is reserved, show error
       if (table?.status === 'reserved') {
         toast.error('This table is reserved. Please choose another table.');
         return;
       }
-
       setSelectedTable(tableId);
       setHasStartedOrder(true);
     },
     [tables]
   );
-
   const handleResumeOrder = useCallback(async () => {
     if (!occupiedTableModal) return;
-    
     // Try to get orderId from multiple sources
     const orderId = occupiedTableModal.orderDetails?.currentOrderId 
       || occupiedTableModal.orderDetails?.allOrders?.[0]?.id
       || tables.find((t: any) => t.id === occupiedTableModal.tableId)?.orderDetails?.currentOrderId;
-    
     if (!orderId) {
       toast.error('Order ID not found. Please try selecting the table again.');
       return;
     }
-
     try {
       // Fetch order using RTK Query - get the order data from the API
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const apiUrl = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
-      
       const orderResponse = await fetch(`${apiUrl}/pos/orders/${orderId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
       });
-      
       if (!orderResponse.ok) {
         const errorData = await orderResponse.json().catch(() => ({}));
         throw new Error(errorData.message || 'Failed to fetch order');
       }
-
       const orderData = await orderResponse.json();
       const order = orderData.data || orderData;
-      
       if (!order || !order.items) {
         throw new Error('Invalid order data received');
       }
-
       // Check if order is paid - don't allow editing paid orders
       if (order.status === 'paid') {
         toast.error('Cannot edit a paid order. Please create a new order or process a refund.');
         return;
       }
-
       // Load order items into cart
       if (order.items && Array.isArray(order.items)) {
         const cartItems: CartItem[] = [];
@@ -1840,7 +1633,6 @@ export default function POSPage() {
             mi.id === item.menuItemId ||
             mi._id === item.menuItemId
           );
-          
           cartItems.push({
             id: generateClientId(),
             menuItemId: menuItemId,
@@ -1854,7 +1646,6 @@ export default function POSPage() {
         }
         setCart(cartItems);
       }
-
       // Set table and guest count
       setSelectedTable(occupiedTableModal.tableId);
       if (order.guestCount) {
@@ -1872,7 +1663,6 @@ export default function POSPage() {
       toast.error(error?.message || 'Failed to load order. Please try again.');
     }
   }, [occupiedTableModal, menuItemsArray, tables]);
-
   const handleStartNewOrderOnTable = useCallback(() => {
     if (!occupiedTableModal) return;
     const table = tables.find((t: any) => t.id === occupiedTableModal.tableId);
@@ -1887,17 +1677,14 @@ export default function POSPage() {
       toast.error('No remaining seats available on this table');
     }
   }, [occupiedTableModal, tables, guestCount]);
-
   const handleCancelOccupiedOrder = useCallback(async () => {
     if (!occupiedTableModal?.orderDetails?.currentOrderId) return;
-    
     if (typeof window !== 'undefined') {
       const confirmed = window.confirm('Are you sure you want to cancel this order? This will free up the table.');
       if (!confirmed) {
         return;
       }
     }
-
     try {
       // Cancel order with reason
       const orderId = occupiedTableModal.orderDetails.currentOrderId;
@@ -1914,7 +1701,6 @@ export default function POSPage() {
       toast.error(error?.data?.message || 'Failed to cancel order');
     }
   }, [occupiedTableModal, cancelOrder, refetchTables, refetchQueue]);
-
   // Order functions
   const handleCreateOrder = useCallback(async () => {
     // In pay-first mode, orders cannot be created without payment
@@ -1923,19 +1709,16 @@ export default function POSPage() {
       setIsPaymentModalOpen(true); // Open payment modal instead
       return;
     }
-
     const requiresTable = orderType === 'dine-in';
     const isDelivery = orderType === 'delivery';
     const isTakeaway = orderType === 'takeaway';
     const isRoomBooking = orderType === 'room-booking';
     const isRoomService = orderType === 'room-service';
-
     // For room bookings we only go through the dedicated booking flow
     if (isRoomBooking) {
       toast.error('For room bookings, please use the Room Booking flow instead of Create Order.');
       return;
     }
-
     // For room service pending charges we require a linked booking
     let roomServiceBookingIdToUse = roomServiceBookingId;
     if (isRoomService && !roomServiceBookingIdToUse && roomServiceBookings.length > 0) {
@@ -1949,7 +1732,6 @@ export default function POSPage() {
     const roomServiceBookingForOrder = isRoomService
       ? roomServiceBookings.find((b) => b.id === roomServiceBookingIdToUse) || roomServiceBookings[0]
       : null;
-
     try {
       const deliveryPayload = isDelivery
         ? (sanitizeDetails(deliveryDetails) as CreatePOSOrderRequest['deliveryDetails'])
@@ -1957,7 +1739,6 @@ export default function POSPage() {
       const takeawayPayload = isTakeaway
         ? (sanitizeDetails(takeawayDetails) as CreatePOSOrderRequest['takeawayDetails'])
         : undefined;
-
       const noteSegments: string[] = [];
       if (orderNotes.trim()) {
         noteSegments.push(orderNotes.trim());
@@ -1977,10 +1758,8 @@ export default function POSPage() {
           noteSegments.push('Item-wise discounts applied.');
         }
       }
-
       const orderTypeForBackend: CreatePOSOrderRequest['orderType'] =
         isRoomService ? 'room_service' : (orderType as 'dine-in' | 'delivery' | 'takeaway');
-
       const orderData: CreatePOSOrderRequest = {
         orderType: orderTypeForBackend,
         ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
@@ -2023,7 +1802,6 @@ export default function POSPage() {
           ? { customerId: selectedCustomerId }
           : {}),
       };
-
       const orderResponse = await createOrderWithRetry(orderData);
       const order = (orderResponse as any).data || orderResponse;
       toast.success(`Order created successfully! Order #${order.orderNumber || order.id}`);
@@ -2082,19 +1860,16 @@ export default function POSPage() {
     paymentMode,
     clearCart,
   ]);
-
   const handlePayment = async () => {
     const requiresTable = orderType === 'dine-in';
     const isDelivery = orderType === 'delivery';
     const isTakeaway = orderType === 'takeaway';
     const isRoomBooking = orderType === 'room-booking';
     const isRoomService = orderType === 'room-service';
-
     if (requiresTable && !selectedTable) {
       toast.error('Please select a table for dine-in orders');
       return;
     }
- 
     if (isDelivery) {
       const hasAddress = deliveryDetails.addressLine1.trim() && deliveryDetails.city.trim();
       const hasPhone = deliveryDetails.contactPhone.trim();
@@ -2103,7 +1878,6 @@ export default function POSPage() {
         return;
       }
     }
- 
     if (isTakeaway) {
       const hasContact = takeawayDetails.contactName.trim() && takeawayDetails.contactPhone.trim();
       if (!hasContact) {
@@ -2111,7 +1885,6 @@ export default function POSPage() {
         return;
       }
     }
-    
     if (isRoomBooking) {
       if (!selectedRoomId) {
         toast.error('Please select a room for booking');
@@ -2138,18 +1911,15 @@ export default function POSPage() {
         return;
       }
     }
-
     if (!isRoomBooking && cart.length === 0) {
       toast.error('Cart is empty');
       return;
     }
-
     const totalDue = Number(orderSummary.total.toFixed(2));
     if (!Number.isFinite(totalDue) || totalDue <= 0) {
       toast.error('Total due must be greater than zero before processing payment');
       return;
     }
- 
     try {
       const deliveryPayload = isDelivery
         ? (sanitizeDetails(deliveryDetails) as CreatePOSOrderRequest['deliveryDetails'])
@@ -2157,16 +1927,13 @@ export default function POSPage() {
       const takeawayPayload = isTakeaway
         ? (sanitizeDetails(takeawayDetails) as CreatePOSOrderRequest['takeawayDetails'])
         : undefined;
- 
       const paymentNotes: string[] = [];
       let paymentMethodForBackend: 'cash' | 'card' | 'split' = 'cash';
       let transactionReference: string | undefined;
       let changeDue = 0;
       let paymentBreakdown: Array<{ method: string; amount: number }> = [];
- 
       // For room service in pay-later mode, we don't take payment now.
       const skipFullPaymentValidation = isRoomService && paymentMode === 'pay-later';
-
       if (paymentTab === 'full' && !skipFullPaymentValidation) {
         const received = parseFloat(fullPaymentReceived || '0');
         if (!Number.isFinite(received) || received <= 0) {
@@ -2179,7 +1946,6 @@ export default function POSPage() {
           toast.error('Received amount is less than the total due');
           return;
         }
- 
         paymentMethodForBackend = 'cash'; // Backend expects 'cash', 'card', or 'split' - we'll use paymentBreakdown for actual method
         paymentBreakdown = [{ method: fullPaymentMethod, amount: totalDue }];
         const methodName = selectedMethod?.displayName || selectedMethod?.name || fullPaymentMethod;
@@ -2203,7 +1969,6 @@ export default function POSPage() {
           toast.error('The split payments do not cover the total due yet');
           return;
         }
- 
         paymentMethodForBackend = 'split';
         paymentBreakdown = activeRows.map((row) => ({
           method: row.method,
@@ -2216,7 +1981,6 @@ export default function POSPage() {
         transactionReference = activeRows
           .map((row) => `${row.method}:${(parseFloat(row.amount || '0') || 0).toFixed(2)}`)
           .join('|');
- 
         const cashPortion = activeRows
           .filter((row) => row.method === 'cash')
           .reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
@@ -2225,7 +1989,6 @@ export default function POSPage() {
           paymentNotes.push(`Change due: ${formatCurrency(changeDue)}`);
         }
       }
- 
       const noteSegments: string[] = [];
       if (orderNotes.trim()) {
         noteSegments.push(orderNotes.trim());
@@ -2250,7 +2013,6 @@ export default function POSPage() {
         }
       }
       noteSegments.push(...paymentNotes);
- 
       // Handle room booking separately
       if (isRoomBooking) {
         const selectedRoom = rooms.find((r: any) => r.id === selectedRoomId);
@@ -2258,16 +2020,43 @@ export default function POSPage() {
           toast.error('Selected room not found');
           return;
         }
-        
         const checkIn = new Date(checkInDate);
         const checkOut = new Date(checkOutDate);
         const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
         const roomRate = selectedRoom.basePrice || 0;
         const totalRoomCharges = roomRate * nights;
-        
         // Calculate booking total (room charges + tax/service if applicable)
         const bookingTotal = totalRoomCharges; // You can add tax/service charge here if needed
-        
+        // Calculate actual payment received
+        let actualDepositAmount = 0;
+        if (paymentMode === 'pay-first') {
+          if (paymentTab === 'full') {
+            // For full payment, use the amount received (may be partial)
+            const received = parseFloat(fullPaymentReceived || '0');
+            actualDepositAmount = Number.isFinite(received) && received > 0 ? received : bookingTotal;
+          } else {
+            // For split payment, sum all payment rows
+            const totalReceived = multiPayments.reduce(
+              (sum, row) => sum + (parseFloat(row.amount || '0') || 0),
+              0
+            );
+            actualDepositAmount = totalReceived > 0 ? totalReceived : bookingTotal;
+          }
+        } else {
+          // Pay-later mode: no deposit
+          actualDepositAmount = 0;
+        }
+        // Determine payment status
+        let paymentStatus: 'paid' | 'partial' | 'pending' = 'pending';
+        if (paymentMode === 'pay-first') {
+          if (actualDepositAmount >= bookingTotal) {
+            paymentStatus = 'paid';
+          } else if (actualDepositAmount > 0) {
+            paymentStatus = 'partial';
+          } else {
+            paymentStatus = 'pending';
+          }
+        }
         try {
           const bookingData = {
             branchId: currentBranchId,
@@ -2280,36 +2069,32 @@ export default function POSPage() {
             checkInDate: checkInDate,
             checkOutDate: checkOutDate,
             roomRate: roomRate,
-            paymentStatus: paymentMode === 'pay-first' ? 'paid' as const : 'pending' as const,
-            paymentMethod: fullPaymentMethod,
-            depositAmount: paymentMode === 'pay-first' ? bookingTotal : undefined,
+            paymentStatus: paymentStatus,
+            paymentMethod: paymentTab === 'full' ? fullPaymentMethod : 'split',
+            depositAmount: actualDepositAmount > 0 ? actualDepositAmount : undefined,
             specialRequests: specialRequests || undefined,
             notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
           };
-          
           const bookingResponse = await createBooking(bookingData).unwrap();
           const booking = (bookingResponse as any).data || bookingResponse;
           const bookingId = booking.id || booking._id;
           const bookingNumber = booking.bookingNumber || booking.booking_number || bookingId;
-          
-          // Process payment if in pay-later mode
-          if (paymentMode === 'pay-later') {
-            // Note: Booking payment processing would need to be implemented in the backend
-            // For now, we'll just mark it as paid if payment was received
-            toast.success('Booking created. Payment processing for bookings will be handled separately.');
-          }
-          
           setCurrentOrderId(bookingId);
           setPaymentSuccessOrder({
             orderId: bookingId,
             orderNumber: bookingNumber,
-            totalPaid: bookingTotal,
+            totalPaid: actualDepositAmount,
             changeDue: changeDue > 0 ? changeDue : undefined,
             summary: `Room Booking: ${selectedRoom.roomNumber} | ${nights} night(s) | ${paymentNotes.join(' | ')}`,
             breakdown: paymentBreakdown,
           });
-          toast.success('Room booking created successfully');
-          
+          if (paymentStatus === 'paid') {
+            toast.success('Room booking created and fully paid');
+          } else if (paymentStatus === 'partial') {
+            toast.success(`Room booking created with partial payment of ${formatCurrency(actualDepositAmount)}`);
+          } else {
+            toast.success('Room booking created (payment pending)');
+          }
           // Reset form
           setSelectedRoomId('');
           setCheckInDate(new Date().toISOString().split('T')[0]);
@@ -2322,29 +2107,24 @@ export default function POSPage() {
           setHasStartedOrder(false);
           setIsPaymentModalOpen(false);
           setIsCartModalOpen(false);
-          
           return;
         } catch (error: any) {
           toast.error(error?.data?.message || 'Failed to create booking');
           return;
         }
       }
- 
       // At this point, isRoomBooking is false (we returned early if true)
       if (isRoomBooking) {
         return;
       }
-
       // Determine the actual payment method to store in order
       // For full payment, use the actual method code (bkash, nagad, etc.)
       // For split payment, use the primary method or 'split' with breakdown
       const actualPaymentMethod = paymentTab === 'full' 
         ? fullPaymentMethod  // Store actual method code (bkash, nagad, cash, etc.)
         : paymentMethodForBackend; // For split, keep as 'split'
-
       const orderTypeForBackend: CreatePOSOrderRequest['orderType'] =
         isRoomService ? 'room_service' : (orderType as 'dine-in' | 'delivery' | 'takeaway');
-
       const orderData: CreatePOSOrderRequest = {
         orderType: orderTypeForBackend,
         ...(requiresTable && selectedTable ? { tableId: selectedTable } : {}),
@@ -2391,12 +2171,10 @@ export default function POSPage() {
           ? { customerId: selectedCustomerId }
           : {}),
       };
-
       const orderResponse = await createOrderWithRetry(orderData);
       const order = (orderResponse as any).data || orderResponse;
       const orderId = order.id || order._id;
       const orderNumber = order.orderNumber || order.order_number || orderId;
-      
       // Only process payment separately if order was created as 'pending' (pay-later mode)
       // In pay-first mode, order is already created as 'paid', so we don't need to process payment again.
       // For room service in pay-later mode, we intentionally do NOT process payment here so that
@@ -2409,7 +2187,6 @@ export default function POSPage() {
           transactionId: transactionReference,
         }).unwrap();
       }
-
       setCurrentOrderId(orderId);
       setPaymentSuccessOrder({
           orderId,
@@ -2429,7 +2206,6 @@ export default function POSPage() {
       setTimeout(() => {
         refetchTables(); // Refetch tables to update status after payment
       }, 1000);
-      
       clearCart();
       if (requiresTable) {
         setSelectedTable('');
@@ -2457,7 +2233,6 @@ export default function POSPage() {
       toast.error(error?.data?.message || 'Failed to process payment');
     }
   };
-
   const handlePrintReceipt = async (orderId: string, usePDF = false) => {
     try {
       if (usePDF) {
@@ -2478,7 +2253,6 @@ export default function POSPage() {
       toast.error('Failed to print receipt. Please try again.');
     }
   };
-
   const handleDownloadReceiptPDF = async (orderId: string) => {
     try {
       const blob = await downloadReceiptPDF(orderId).unwrap();
@@ -2496,7 +2270,6 @@ export default function POSPage() {
       toast.error('Failed to download receipt PDF. Please try again.');
     }
   };
-
   const handleViewReceipt = useCallback(
     (orderId: string) => {
       if (!orderId) {
@@ -2509,26 +2282,21 @@ export default function POSPage() {
     },
     []
   );
-
   useEffect(() => {
     if (isReceiptModalOpen && currentOrderId) {
       refetchReceipt();
     }
   }, [isReceiptModalOpen, currentOrderId, refetchReceipt]);
-
   const handleQueueRefresh = useCallback(() => {
     refetchQueue();
   }, [refetchQueue]);
-
   const handleQueueViewDetails = useCallback((orderId: string) => {
     setQueueDetailId(orderId);
   }, []);
-
   const resolveOrderId = useCallback((order: any) => {
     if (!order) return '';
     return order.id || order._id || '';
   }, []);
-
   const handleQueueCancel = useCallback(
     async (orderId: string) => {
       if (typeof window !== 'undefined') {
@@ -2537,7 +2305,6 @@ export default function POSPage() {
           return;
         }
       }
-
       try {
         setQueueActionOrderId(orderId);
         await cancelOrder({ id: orderId, reason: 'Cancelled from queue' }).unwrap();
@@ -2555,18 +2322,15 @@ export default function POSPage() {
     },
     [cancelOrder, queueDetailId, refetchQueue]
   );
-
   const getTableStatus = (table: any) => {
     if (table.status === 'reserved') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 border-2 border-yellow-500/50';
     if (table.status === 'available') return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border-2 border-green-500/50';
-    
     // For occupied tables, check order status for visual indicators
     if (table.status === 'occupied' && table.orderDetails) {
       const orderStatus = table.orderDetails.orderStatus 
         || table.orderDetails.status 
         || table.orderDetails.allOrders?.[0]?.status 
         || 'pending';
-      
       if (orderStatus === 'paid') {
         // In pay-first mode: Paid orders mean customer is still using table (orange/yellow)
         // In pay-later mode: Paid orders mean table is ready to release (green)
@@ -2581,22 +2345,18 @@ export default function POSPage() {
         return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 border-2 border-red-500/50';
       }
     }
-    
     // Default for occupied without order details
     return 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 border-2 border-orange-500/50';
   };
-
   const getTableStatusText = (table: any) => {
     if (table.status === 'reserved') return 'Reserved';
     if (table.status === 'available') return 'Available';
-    
     // For occupied tables, show payment status
     if (table.status === 'occupied' && table.orderDetails) {
       const orderStatus = table.orderDetails.orderStatus 
         || table.orderDetails.status 
         || table.orderDetails.allOrders?.[0]?.status 
         || 'pending';
-      
       if (orderStatus === 'paid') {
         // In pay-first mode, paid orders mean customer is still using the table
         // In pay-later mode, paid orders mean table is ready to release
@@ -2609,10 +2369,8 @@ export default function POSPage() {
         return 'Needs Attention';
       }
     }
-    
     return 'Occupied';
   };
-
   const isOrderingActive = useMemo(() => {
     if (orderType === 'dine-in') {
       return hasStartedOrder && Boolean(selectedTable);
@@ -2624,7 +2382,6 @@ export default function POSPage() {
     }
     return hasStartedOrder;
   }, [orderType, hasStartedOrder, selectedTable]);
-
   const modifierPreview = useMemo(() => {
     if (!modifierEditor) return null;
     const previewItem = buildCartItemFromMenuItem(modifierEditor.item, {
@@ -2634,7 +2391,6 @@ export default function POSPage() {
     } as Partial<ModifierConfig> & { id: string });
     return previewItem;
   }, [buildCartItemFromMenuItem, modifierEditor]);
-
   const quickCashSuggestions = useMemo(() => {
     if (orderSummary.total <= 0) {
       return [] as number[];
@@ -2651,7 +2407,6 @@ export default function POSPage() {
       .map((value) => Number(value.toFixed(2)))
       .sort((a, b) => a - b);
   }, [orderSummary.total]);
-
   const fullPaymentChange = useMemo(() => {
     if (paymentTab !== 'full' || fullPaymentMethod !== 'cash') {
       return 0;
@@ -2662,7 +2417,6 @@ export default function POSPage() {
     }
     return Math.max(0, received - orderSummary.total);
   }, [fullPaymentMethod, fullPaymentReceived, orderSummary.total, paymentTab]);
-
   const splitTotals = useMemo(() => {
     const applied = multiPayments.reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
     return {
@@ -2670,7 +2424,6 @@ export default function POSPage() {
       remaining: Number((orderSummary.total - applied).toFixed(2)),
     };
   }, [multiPayments, orderSummary.total]);
-
   const receiptErrorMessage = useMemo(() => {
     if (!receiptErrorDetails || typeof receiptErrorDetails !== 'object') {
       return '';
@@ -2681,8 +2434,6 @@ export default function POSPage() {
     }
     return '';
   }, [receiptErrorDetails]);
-
- 
   const renderPreOrderView = () => {
     if (orderType === 'dine-in') {
       return (
@@ -2707,29 +2458,24 @@ export default function POSPage() {
                     || table.orderDetails?.allOrders?.[0]?.status 
                     || 'pending';
                   const isPaid = orderStatus === 'paid' && table.status === 'occupied';
-                  
                   const handleContextMenu = (e: React.MouseEvent) => {
                     e.preventDefault();
                     if (isPaid) {
                       setContextMenu({ tableId: table.id, x: e.clientX, y: e.clientY });
                     }
                   };
-                  
                   const handleTouchStart = (e: React.TouchEvent) => {
                     if (!isPaid) return;
                     const touch = e.touches[0];
                     const timer = setTimeout(() => {
                       setContextMenu({ tableId: table.id, x: touch.clientX, y: touch.clientY });
                     }, 500);
-                    
                     const handleTouchEnd = () => {
                       clearTimeout(timer);
                       document.removeEventListener('touchend', handleTouchEnd);
                     };
-                    
                     document.addEventListener('touchend', handleTouchEnd, { once: true });
                   };
-                  
                   return (
                     <div key={table.id} className="relative">
                       <button
@@ -2765,13 +2511,11 @@ export default function POSPage() {
                         <Badge className={`${statusClass} border border-white/10`}>
                           {getTableStatusText(table)}
                         </Badge>
-                        
                         {/* Always show capacity */}
                         <div className="flex items-center justify-between text-xs pt-1">
                           <span className="text-slate-400">Capacity:</span>
                           <span className="font-semibold text-slate-300">{table.capacity || 0} seats</span>
                         </div>
-
                         {hasOrderDetails ? (
                           <div className="space-y-2 text-xs pt-2 border-t border-slate-800">
                             {/* Order Status - Only show for pending orders (paid orders don't show orderDetails) */}
@@ -2783,19 +2527,16 @@ export default function POSPage() {
                                 </Badge>
                               </div>
                             )}
-                            
                             {/* Token/Order Number */}
                             <div className="flex items-center justify-between text-slate-300">
                               <span className="text-slate-400">Token:</span>
                               <span className="font-semibold">{table.orderDetails.tokenNumber || table.orderDetails.orderNumber}</span>
                             </div>
-                            
                             {/* Amount */}
                             <div className="flex items-center justify-between text-slate-300">
                               <span className="text-slate-400">Amount:</span>
                               <span className="font-semibold text-emerald-400">{formatCurrency(table.orderDetails.totalAmount || 0)}</span>
                             </div>
-                            
                             {/* Waiter - Always show if available */}
                             {table.orderDetails.waiterName && (
                               <div className="flex items-center justify-between text-slate-300">
@@ -2803,7 +2544,6 @@ export default function POSPage() {
                                 <span className="font-semibold text-sky-300">{table.orderDetails.waiterName}</span>
                               </div>
                             )}
-                            
                             {/* Used Seats */}
                             {table.orderDetails.usedSeats !== undefined && (
                               <div className="flex items-center justify-between text-slate-300">
@@ -2811,7 +2551,6 @@ export default function POSPage() {
                                 <span className="font-semibold">{table.orderDetails.usedSeats} / {table.capacity || 0}</span>
                               </div>
                             )}
-                            
                             {/* Remaining Seats - Show prominently */}
                             {table.orderDetails.remainingSeats !== undefined && (
                               <div className={`flex items-center justify-between mt-2 pt-2 border-t ${
@@ -2835,7 +2574,6 @@ export default function POSPage() {
                                 </span>
                               </div>
                             )}
-                            
                             {/* Hold Count */}
                             {table.orderDetails.holdCount > 0 && (
                               <div className="flex items-center justify-between text-orange-300 mt-1">
@@ -2922,14 +2660,12 @@ export default function POSPage() {
         </div>
       );
     }
-
     // For room-booking and room-service, show the main ordering workspace directly
     // (no delivery/takeaway pre-order card). The UI for these modes already lives
     // inside renderOrderingWorkspace.
     if (orderType === 'room-booking' || orderType === 'room-service') {
       return null;
     }
-
     const isDelivery = orderType === 'delivery';
     const IconComponent = isDelivery ? TruckIcon : ShoppingBagIcon;
     const label = isDelivery ? 'Create Delivery Order' : 'Create Takeaway Order';
@@ -2937,7 +2673,6 @@ export default function POSPage() {
       orderType === 'delivery'
         ? 'Capture customer address, driver assignment, and delivery fee details.'
         : 'Collect pickup contact info and prep instructions before adding items.';
-
     return (
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <button
@@ -2955,7 +2690,6 @@ export default function POSPage() {
       </div>
     );
   };
-
   const renderOrderingWorkspace = () => (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       <div className="bg-gray-50 dark:bg-slate-900/80 backdrop-blur border-b border-gray-200 dark:border-slate-800 px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
@@ -3020,7 +2754,6 @@ export default function POSPage() {
                 <span className="hidden sm:inline">Open Order Cart</span>
                 <span className="sm:hidden">Cart</span>
               </Button>
-              
               {/* Payment Mode Toggle - In the middle */}
               <div className="flex items-center gap-1 sm:gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-2 sm:px-3 py-1.5 sm:py-2 relative overflow-visible">
                 <span className="text-xs font-medium text-gray-600 dark:text-slate-400 whitespace-nowrap hidden sm:inline">
@@ -3058,11 +2791,14 @@ export default function POSPage() {
                   </div>
                 </div>
               </div>
-              
               <Button
                 variant="primary"
                 onClick={() => setIsPaymentModalOpen(true)}
-                disabled={(orderType !== 'room-booking' && cart.length === 0) || checkoutBlocked}
+                disabled={
+                  (orderType !== 'room-booking' && orderType !== 'room-service' && cart.length === 0) 
+                  || (orderType === 'room-booking' && checkoutBlocked)
+                  || (orderType !== 'room-booking' && checkoutBlocked)
+                }
                 className="flex items-center gap-1 sm:gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 flex-1 sm:flex-initial"
               >
                 <CreditCardIcon className="h-4 w-4" />
@@ -3078,7 +2814,6 @@ export default function POSPage() {
           </div>
         </div>
       </div>
-
       <div className="flex-1 overflow-y-auto p-2 sm:p-4 min-h-0">
         {/* Room service booking summary */}
         {requiresRoomService && selectedRoomServiceBooking && (
@@ -3142,7 +2877,6 @@ export default function POSPage() {
             </div>
           </div>
         )}
-
         {requiresRoomBooking ? (
           <div className="space-y-6">
             {/* Date Selection */}
@@ -3172,7 +2906,6 @@ export default function POSPage() {
                 />
               </div>
             </div>
-            
             {/* Number of Guests */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300">
@@ -3186,7 +2919,6 @@ export default function POSPage() {
                 className="w-full max-w-xs"
               />
             </div>
-            
             {/* Room Selection */}
             <div>
               <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-slate-300">
@@ -3211,7 +2943,6 @@ export default function POSPage() {
                       ? Math.ceil((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / (1000 * 60 * 60 * 24))
                       : 1;
                     const totalPrice = (room.basePrice || 0) * nights;
-                    
                     return (
                       <Card
                         key={room.id}
@@ -3268,7 +2999,6 @@ export default function POSPage() {
                 </div>
               )}
             </div>
-            
             {/* Customer Information */}
             <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
               <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-slate-100">
@@ -3313,7 +3043,6 @@ export default function POSPage() {
                 </div>
               </div>
             </div>
-            
             {/* Special Requests */}
             {selectedRoomId && (
               <div>
@@ -3362,7 +3091,6 @@ export default function POSPage() {
                     ) : (
                       <div className="text-4xl">🍽️</div>
                     )}
-
                     {/* Stock overlay in the middle of the image */}
                     {(item.isOutOfStock || item.isLowStock) && (
                       <div
@@ -3438,11 +3166,8 @@ export default function POSPage() {
           </div>
         )}
       </div>
-
-      
     </div>
   );
-
   const renderQueuePanel = () => {
     if (isQueueCollapsed) {
       return (
@@ -3455,7 +3180,6 @@ export default function POSPage() {
           >
             <ClipboardDocumentListIcon className="h-6 w-6" />
           </button>
-          
           {/* Desktop: Side collapsed panel */}
           <aside className="hidden md:flex md:w-16 md:flex-col md:items-center md:justify-center border-l border-gray-200 dark:border-slate-900/50 bg-white dark:bg-slate-950/60">
             <Button
@@ -3470,7 +3194,6 @@ export default function POSPage() {
         </>
       );
     }
-
     return (
       <>
         <div
@@ -3516,7 +3239,6 @@ export default function POSPage() {
               </Button>
             </div>
           </div>
-
           <div className="border-b border-slate-900/70 px-4 py-3 space-y-3">
             <div className="flex items-center gap-2">
               {(['active', 'history'] as const).map((tab) => {
@@ -3538,7 +3260,6 @@ export default function POSPage() {
                 );
               })}
             </div>
-
             <div className="grid gap-2">
               <div className="flex items-center gap-2">
                 <label className="text-xs uppercase tracking-[0.3em] text-slate-500">Type</label>
@@ -3555,7 +3276,6 @@ export default function POSPage() {
                   ))}
                 </select>
               </div>
-
               {queueTab === 'history' && (
                 <div className="flex items-center gap-2">
                   <label className="text-xs uppercase tracking-[0.3em] text-slate-500">Status</label>
@@ -3572,7 +3292,6 @@ export default function POSPage() {
                   </select>
                 </div>
               )}
-
               <div className="relative">
                 <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <Input
@@ -3588,7 +3307,6 @@ export default function POSPage() {
               </div>
             </div>
           </div>
-
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {queueLoading ? (
               [...Array(5)].map((_, index) => (
@@ -3736,7 +3454,6 @@ export default function POSPage() {
       </>
     );
   };
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -3744,7 +3461,6 @@ export default function POSPage() {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return;
       }
-
       switch (event.key) {
         case 'F1':
           event.preventDefault();
@@ -3788,12 +3504,9 @@ export default function POSPage() {
           break;
       }
     };
-
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [cart.length, selectedTable, showKeyboardShortcuts, handleCreateOrder, requiresTable, checkoutBlocked, paymentMode, setIsPaymentModalOpen, clearCart]);
-
-
   return (
     !isOwnerOrManager && !workPeriodLoading && !activeWorkPeriod ? (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -3975,14 +3688,12 @@ export default function POSPage() {
           </div>
         </div>
       </div>
-
       <div className="flex flex-1 overflow-hidden flex-col lg:flex-row min-h-0">
         <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
           {isOrderingActive ? renderOrderingWorkspace() : renderPreOrderView()}
         </div>
         {renderQueuePanel()}
       </div>
-
       {/* Order Cart Modal */}
       <Modal
         isOpen={isCartModalOpen}
@@ -4029,7 +3740,6 @@ export default function POSPage() {
                         const remainingSeats = table.orderDetails?.remainingSeats ?? table.capacity ?? 0;
                         const isFullyOccupied = remainingSeats === 0 && table.status === 'occupied';
                         const isReserved = table.status === 'reserved';
-                        
                         return (
                           <option 
                             key={table.id} 
@@ -4245,7 +3955,6 @@ export default function POSPage() {
                 </div>
               )}
           </div>
-
           {/* Delivery Details Section */}
           {orderType === 'delivery' && (
             <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
@@ -4311,7 +4020,6 @@ export default function POSPage() {
                           ...deliveryDetails,
                           ...(zoneId ? { zoneId } : {}),
                         } as any);
-                        
                         if (selectedZone) {
                           const fee = selectedZone.deliveryCharge ?? 0;
                           const feeStr = fee.toString();
@@ -4375,7 +4083,6 @@ export default function POSPage() {
               )}
             </div>
           )}
-
           {/* Takeaway Details Section */}
           {orderType === 'takeaway' && (
             <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
@@ -4416,7 +4123,6 @@ export default function POSPage() {
             </div>
           )}
         </div>
-
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-slate-100">Items in Cart</h3>
             <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-850 bg-slate-950/70">
@@ -4502,7 +4208,6 @@ export default function POSPage() {
             )}
             </div>
           </div>
-
           <div className="space-y-3 rounded-xl border border-slate-850 bg-slate-950/70 p-4">
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <span className="font-semibold text-slate-100">Discount</span>
@@ -4564,7 +4269,6 @@ export default function POSPage() {
                 </div>
             )}
               </div>
-
               <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-100">Order Notes</label>
             <textarea
@@ -4574,7 +4278,6 @@ export default function POSPage() {
               className="w-full min-h-[100px] rounded-xl border border-slate-850 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-600/40"
             />
           </div>
-
           <div className="rounded-xl border border-slate-850 bg-slate-950/75 p-4 space-y-2 text-sm">
             <div className="flex items-center justify-between text-slate-300">
               <span>Subtotal</span>
@@ -4601,7 +4304,6 @@ export default function POSPage() {
               <span>{formatCurrency(orderSummary.total)}</span>
             </div>
           </div>
-
           {/* Payment Method Selection - Quick Access */}
           <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -4658,7 +4360,6 @@ export default function POSPage() {
               </div>
             )}
           </div>
-
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-slate-500">
               {selectedWaiterName ? `Assigned waiter: ${selectedWaiterName}` : 'Waiter not set'}
@@ -4681,12 +4382,29 @@ export default function POSPage() {
                   <CurrencyDollarIcon className="h-4 w-4" />
                   Calculator
                 </Button>
-                {paymentMode === 'pay-later' && !requiresRoomBooking && (
+                {paymentMode === 'pay-later' && (
                   <Button 
                     variant="secondary" 
                     onClick={handleCreateOrder} 
-                    disabled={checkoutBlocked || cart.length === 0}
-                    title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : ''}
+                    disabled={
+                      checkoutBlocked 
+                      || (orderType !== 'room-booking' && cart.length === 0)
+                      || (orderType === 'room-booking' && !roomBookingIsValid)
+                    }
+                    title={
+                      checkoutBlocked 
+                        ? (requiresTable && !selectedTable ? 'Select a table first' 
+                          : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` 
+                          : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` 
+                          : requiresRoomService && !roomServiceIsValid ? 'Select a booking/room for room service' 
+                          : requiresRoomBooking && !roomBookingIsValid ? 'Complete room booking details (select room, dates, and guest info)' 
+                          : '') 
+                        : (orderType === 'room-booking' && !roomBookingIsValid) 
+                          ? 'Complete room booking details' 
+                          : (orderType !== 'room-booking' && cart.length === 0) 
+                            ? 'Add items to cart first' 
+                            : ''
+                    }
                   >
                     <ClockIcon className="mr-2 h-4 w-4" />
                     Create Order
@@ -4704,9 +4422,14 @@ export default function POSPage() {
                       handlePayment();
                     }
                   }}
-                  disabled={checkoutBlocked || cart.length === 0}
+                  disabled={
+                    (orderType !== 'room-booking' && orderType !== 'room-service' && cart.length === 0) 
+                    || (orderType === 'room-booking' && checkoutBlocked)
+                    || (orderType === 'room-service' && checkoutBlocked)
+                    || (orderType !== 'room-booking' && orderType !== 'room-service' && checkoutBlocked)
+                  }
                   className="bg-emerald-600 hover:bg-emerald-500"
-                  title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : '') : cart.length === 0 ? 'Add items to cart first' : paymentMode === 'pay-first' ? 'Pay-first mode: Payment required before order creation' : ''}
+                  title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : requiresRoomService && !roomServiceIsValid ? 'Select a booking/room for room service' : requiresRoomBooking && !roomBookingIsValid ? 'Complete room booking details' : '') : (orderType === 'room-booking' || orderType === 'room-service') ? '' : cart.length === 0 ? 'Add items to cart first' : paymentMode === 'pay-first' ? 'Pay-first mode: Payment required before order creation' : ''}
                 >
                   <CreditCardIcon className="mr-2 h-4 w-4" />
                   {paymentMode === 'pay-first' ? 'Checkout' : 'Checkout'}
@@ -4716,7 +4439,6 @@ export default function POSPage() {
           </div>
         </div>
       </Modal>
-
       {/* Item Discount Modal */}
       <Modal
         isOpen={isItemDiscountModalOpen}
@@ -4776,7 +4498,6 @@ export default function POSPage() {
           )}
         </div>
       </Modal>
-
       {/* Item Note Modal */}
       <Modal
         isOpen={Boolean(noteEditor)}
@@ -4808,7 +4529,6 @@ export default function POSPage() {
           </div>
         )}
       </Modal>
-
       {/* Customer Lookup Modal */}
       <Modal
         isOpen={isCustomerLookupOpen}
@@ -4826,7 +4546,6 @@ export default function POSPage() {
               className="bg-slate-950/70 border-slate-850 text-slate-100"
             />
           </div>
-
           {customerSearchTerm.trim().length < 2 ? (
             <p className="text-sm text-slate-400">
               Enter at least two characters to search your customer list.
@@ -4871,7 +4590,6 @@ export default function POSPage() {
           )}
         </div>
       </Modal>
-
       {/* Payment Modal */}
       <Modal
         isOpen={isPaymentModalOpen}
@@ -4898,7 +4616,6 @@ export default function POSPage() {
               Split Tender
               </Button>
           </div>
-
           {paymentTab === 'full' ? (
             <div className="space-y-4">
               <div>
@@ -5062,7 +4779,6 @@ export default function POSPage() {
               </div>
             </div>
           )}
-
           <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4 space-y-2 text-sm">
             <div className="flex items-center justify-between text-slate-300">
               <span>Subtotal</span>
@@ -5089,7 +4805,6 @@ export default function POSPage() {
               <span>{formatCurrency(orderSummary.total)}</span>
             </div>
           </div>
-
           <div className="flex justify-between gap-2">
             <Button
               variant="secondary"
@@ -5116,7 +4831,6 @@ export default function POSPage() {
           </div>
         </div>
       </Modal>
-
       {/* Keyboard Shortcuts Modal */}
       <Modal
         isOpen={showKeyboardShortcuts}
@@ -5176,7 +4890,6 @@ export default function POSPage() {
           </div>
         </div>
       </Modal>
-
       {/* Order Detail Modal */}
       <Modal
         isOpen={Boolean(queueDetailId)}
@@ -5191,7 +4904,6 @@ export default function POSPage() {
             const detailId = resolveOrderId(queueDetail);
             const statusKey = (queueDetail.status as 'pending' | 'paid' | 'cancelled') || 'pending';
             const canActOnOrder = Boolean(detailId);
-
             return (
               <div className="space-y-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -5207,7 +4919,6 @@ export default function POSPage() {
                     {ORDER_STATUS_LABELS[statusKey] || queueDetail.status}
                   </Badge>
                 </div>
-
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Order Type</p>
@@ -5235,7 +4946,6 @@ export default function POSPage() {
                     </div>
                   )}
                 </div>
-
                 <div>
                   <h4 className="text-sm font-semibold text-slate-200 uppercase tracking-[0.25em]">Items</h4>
                   <div className="mt-3 space-y-3">
@@ -5279,14 +4989,12 @@ export default function POSPage() {
                     )}
                   </div>
                 </div>
-
                 {queueDetail.notes && (
                   <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3 text-sm text-slate-200">
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Order Notes</p>
                     <p className="whitespace-pre-line">{queueDetail.notes}</p>
                   </div>
                 )}
-
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="space-y-1 text-sm text-slate-300">
                     <div className="flex items-center gap-2">
@@ -5337,7 +5045,6 @@ export default function POSPage() {
           <div className="py-10 text-center text-slate-400">Order details unavailable.</div>
         )}
       </Modal>
-
       {/* Receipt Modal - Higher z-index to appear above payment success modal */}
       <Modal
         isOpen={isReceiptModalOpen}
@@ -5388,7 +5095,6 @@ export default function POSPage() {
               <p>No receipt content available for this order.</p>
             </div>
           )}
-
           <div className="flex flex-wrap gap-2 justify-center">
             <Button
               onClick={() => handlePrintReceipt(currentOrderId, false)}
@@ -5415,7 +5121,6 @@ export default function POSPage() {
               Download PDF
             </Button>
           </div>
-
           {printers && Array.isArray(printers) && printers.length > 0 && (
             <div className="border-t pt-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -5437,7 +5142,6 @@ export default function POSPage() {
           )}
         </div>
       </Modal>
-
       {/* Modifier Modal */}
       <Modal
         isOpen={Boolean(modifierEditor)}
@@ -5469,7 +5173,6 @@ export default function POSPage() {
                 />
               </div>
             </div>
-
             {Array.isArray(modifierEditor.item?.variants) && modifierEditor.item.variants.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-slate-100">Variants</h3>
@@ -5518,7 +5221,6 @@ export default function POSPage() {
                 ))}
               </div>
             )}
-
             {Array.isArray(modifierEditor.item?.selections) && modifierEditor.item.selections.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-slate-100">Selections</h3>
@@ -5588,7 +5290,6 @@ export default function POSPage() {
                 })}
               </div>
             )}
-
             {Array.isArray(modifierEditor.item?.addons) && modifierEditor.item.addons.some((addon: any) => addon?.isAvailable !== false) && (
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-slate-100">Add-ons</h3>
@@ -5630,7 +5331,6 @@ export default function POSPage() {
                 </div>
               </div>
             )}
-
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={closeModifierEditor}>
                 Cancel
@@ -5642,7 +5342,6 @@ export default function POSPage() {
           </div>
         )}
       </Modal>
-
       {/* Occupied Table Modal */}
       <Modal
         isOpen={Boolean(occupiedTableModal)}
@@ -5657,7 +5356,6 @@ export default function POSPage() {
                 This table has an active order. Choose an action below:
               </p>
             </div>
-            
             {occupiedTableModal.orderDetails && (
               <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -5689,7 +5387,6 @@ export default function POSPage() {
                         : orderStatus === 'cancelled'
                         ? 'bg-rose-500/10 text-rose-200 border border-rose-500/30'
                         : 'bg-slate-500/10 text-slate-200 border border-slate-500/30';
-                      
                       return (
                         <Badge className={badgeClass}>
                           {statusLabel}
@@ -5724,7 +5421,6 @@ export default function POSPage() {
                 </div>
               </div>
             )}
-
             <div className="flex flex-col gap-2">
               {(() => {
                 const orderDetails = occupiedTableModal.orderDetails;
@@ -5845,7 +5541,6 @@ export default function POSPage() {
           </div>
         )}
       </Modal>
-
       {/* Payment Success Modal */}
       <Modal
         isOpen={Boolean(paymentSuccessOrder)}
@@ -5864,7 +5559,6 @@ export default function POSPage() {
                 {paymentSuccessOrder.summary || 'Payment recorded successfully.'}
               </p>
             </div>
-
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Total Paid</p>
@@ -5881,7 +5575,6 @@ export default function POSPage() {
                 </div>
               )}
             </div>
-
             {paymentSuccessOrder.breakdown && paymentSuccessOrder.breakdown.length > 0 && (
               <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4 space-y-2">
                 <p className="text-sm font-semibold text-slate-100">Payment Breakdown</p>
@@ -5895,7 +5588,6 @@ export default function POSPage() {
                 </div>
               </div>
             )}
-
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 variant="secondary"
@@ -5939,7 +5631,6 @@ export default function POSPage() {
           </div>
         )}
       </Modal>
-
       {/* Payment Modal for Pending Orders */}
       <Modal
         isOpen={isPendingOrderPaymentModalOpen}
@@ -5957,7 +5648,6 @@ export default function POSPage() {
                 </span>
               </div>
             </div>
-
             <div className="space-y-3">
               <label className="block text-sm font-semibold text-slate-200">Payment Method</label>
               <div className="grid grid-cols-2 gap-2">
@@ -5977,7 +5667,6 @@ export default function POSPage() {
                 ))}
               </div>
             </div>
-
             {pendingOrderPaymentMethod === 'cash' && (
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-200">Amount Received</label>
@@ -5997,7 +5686,6 @@ export default function POSPage() {
                 )}
               </div>
             )}
-
             <div className="flex gap-2 pt-4">
               <Button
                 variant="secondary"
@@ -6012,25 +5700,21 @@ export default function POSPage() {
                   try {
                     const orderAmount = occupiedTableModal.orderDetails.totalAmount || 0;
                     const received = parseFloat(pendingOrderPaymentReceived || '0');
-                    
                     if (pendingOrderPaymentMethod === 'cash' && received < orderAmount) {
                       toast.error('Amount received must be at least the order amount');
                       return;
                     }
-
                     // Map payment method code to backend expected format
                     // Backend accepts 'cash', 'card', or 'split', but we use paymentBreakdown for actual method
                     const backendMethod = pendingOrderPaymentMethod === 'cash' ? 'cash' : 
                                          pendingOrderPaymentMethod === 'card' || pendingOrderPaymentMethod.includes('CARD') ? 'card' : 
                                          'split';
-                    
                     await processPayment({
                       orderId: occupiedTableModal.orderDetails.currentOrderId,
                       amount: orderAmount,
                       method: backendMethod,
                       transactionId: undefined,
                     }).unwrap();
-
                     toast.success('Payment processed successfully');
                     setIsPendingOrderPaymentModalOpen(false);
                     setOccupiedTableModal(null);
@@ -6049,7 +5733,6 @@ export default function POSPage() {
           </div>
         )}
       </Modal>
-
       {/* Calculator Modal */}
       <Calculator
         isOpen={isCalculatorOpen}
@@ -6058,4 +5741,4 @@ export default function POSPage() {
     </div>
     )
   );
-}
+}

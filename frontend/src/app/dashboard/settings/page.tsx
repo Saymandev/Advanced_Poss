@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -60,7 +59,6 @@ import {
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-
 interface TaxSetting {
   id: string;
   name: string;
@@ -70,7 +68,6 @@ interface TaxSetting {
   appliesTo: 'all' | 'food' | 'beverage' | 'alcohol';
   companyId: string;
 }
-
 interface ServiceChargeSetting {
   id: string;
   name: string;
@@ -79,19 +76,14 @@ interface ServiceChargeSetting {
   appliesTo: 'all' | 'dine_in' | 'takeout' | 'delivery';
   companyId: string;
 }
-
 export default function SettingsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  
   // Redirect if user doesn't have settings feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('settings');
-  
   const isSuperAdmin = user?.role === 'super_admin';
-  
   // For Super Admin: Use selected company from state, or fallback to companyContext/user
   // For regular users: Use their companyId
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
-  
   // Get companies list for Super Admin selector
   const { data: companiesData } = useGetCompaniesQuery({}, { skip: !isSuperAdmin });
   const companies = useMemo(() => {
@@ -99,13 +91,11 @@ export default function SettingsPage() {
     if (Array.isArray(companiesData)) return companiesData;
     return companiesData.companies || [];
   }, [companiesData, isSuperAdmin]);
-  
   // Determine the actual companyId to use
   const companyId = isSuperAdmin 
     ? (selectedCompanyId || companyContext?.companyId || '')
     : (companyContext?.companyId || user?.companyId || '');
   const branchId = user?.branchId || '';
-  
   // Clear stale companyContext for Super Admin on mount
   useEffect(() => {
     if (isSuperAdmin && companyContext?.companyId && !selectedCompanyId) {
@@ -119,7 +109,6 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   // General Settings
   const { data: companySettings } = useGetCompanySettingsQuery(
     companyId, 
@@ -127,7 +116,6 @@ export default function SettingsPage() {
   );
   const [updateCompanySettings] = useUpdateCompanySettingsMutation();
   const [uploadCompanyLogo, { isLoading: isUploadingLogo }] = useUploadCompanyLogoMutation();
-
   // Get categories for dynamic tax appliesTo options
   const { data: categoriesData } = useGetCategoriesQuery(
     { companyId, branchId },
@@ -137,7 +125,6 @@ export default function SettingsPage() {
     if (!categoriesData) return [];
     return categoriesData.categories || [];
   }, [categoriesData]);
-
   // Get unique category types from categories for tax appliesTo options
   const categoryTypeOptions = useMemo(() => {
     const predefined = [
@@ -146,7 +133,6 @@ export default function SettingsPage() {
       { value: 'beverage', label: 'Beverages Only' },
       { value: 'alcohol', label: 'Alcohol Only' },
     ];
-    
     // Get unique types from categories
     const categoryTypes = new Set<string>();
     categories.forEach((cat: any) => {
@@ -154,11 +140,9 @@ export default function SettingsPage() {
         categoryTypes.add(cat.type);
       }
     });
-    
     // Add category types that aren't already in predefined list
     const predefinedMap = new Map(predefined.map(opt => [opt.value, opt]));
     const combined = [...predefined];
-    
     categoryTypes.forEach((type) => {
       if (!predefinedMap.has(type)) {
         combined.push({
@@ -167,27 +151,22 @@ export default function SettingsPage() {
         });
       }
     });
-    
     return combined;
   }, [categories]);
-
   // Get company data to access slug
   const { data: company, refetch: refetchCompany } = useGetCompanyByIdQuery(companyId, {
     skip: !companyId,
   });
-
   // Get subscription to check for customDomainEnabled feature
   const { data: subscription } = useGetSubscriptionByCompanyQuery(
     { companyId },
     { skip: !companyId }
   );
-
   // Check if custom domain feature is enabled (plan.limits or subscription.limits)
   const isCustomDomainEnabled =
     (subscription as any)?.limits?.customDomainEnabled ??
     (subscription?.plan?.limits as any)?.customDomainEnabled ??
     false;
-
   // Get branches for the company
   const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(
     { companyId, limit: 100 },
@@ -195,7 +174,6 @@ export default function SettingsPage() {
   );
   const branches = branchesData?.branches || [];
   const currentBranch = branches.find(b => b.id === branchId);
-  
   // Auto-refetch branches if slug is missing (backend will auto-generate it)
   useEffect(() => {
     if (currentBranch && !currentBranch.slug && company?.slug) {
@@ -205,32 +183,16 @@ export default function SettingsPage() {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [currentBranch?.slug, company?.slug, refetchBranches]);
-
+  }, [currentBranch?.slug, company?.slug, refetchBranches]); // eslint-disable-line react-hooks/exhaustive-deps
   // Debug: Log branch and company data
   useEffect(() => {
     if (currentBranch) {
-      console.log('🔍 Current Branch Data:', {
-        id: currentBranch.id,
-        name: currentBranch.name,
-        slug: currentBranch.slug,
-        hasSlug: !!currentBranch.slug,
-        publicUrl: currentBranch.publicUrl,
-      });
-    }
+      }
     if (company) {
-      console.log('🔍 Company Data:', {
-        id: company.id,
-        name: company.name,
-        slug: company.slug,
-        hasSlug: !!company.slug,
-      });
-    }
+      }
   }, [currentBranch, company]);
-
   // Update branch public URL mutation
   const [updateBranchPublicUrl] = useUpdateBranchPublicUrlMutation();
-
   // Helper function to generate public URL from slugs or custom domain
   const generatePublicUrl = (companySlug?: string, branchSlug?: string): string | null => {
     // If custom domain is verified, use it instead of slug-based URLs
@@ -241,7 +203,6 @@ export default function SettingsPage() {
       }
       return `${protocol}${company.customDomain}`;
     }
-    
     // Fallback to slug-based URLs
     if (!companySlug) return null;
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -250,10 +211,8 @@ export default function SettingsPage() {
     }
     return `${baseUrl}/${companySlug}`;
   };
-
   // Generate company-level public URL (fallback)
   const companyPublicUrl = generatePublicUrl(company?.slug);
-
   // Generate branch public URL from slugs if not stored
   const getBranchPublicUrl = (branch: typeof currentBranch): string | null => {
     if (branch?.publicUrl) {
@@ -265,7 +224,6 @@ export default function SettingsPage() {
     }
     return null;
   };
-
   const copyPublicUrl = (url: string) => {
     if (!url) {
       toast.error('Public URL not available.');
@@ -277,7 +235,6 @@ export default function SettingsPage() {
       toast.error('Failed to copy URL');
     });
   };
-
   const handleUpdateBranchUrl = async (branchId: string, newUrl: string) => {
     if (!newUrl.trim()) {
       toast.error('Public URL cannot be empty');
@@ -291,7 +248,6 @@ export default function SettingsPage() {
       toast.error(error?.data?.message || 'Failed to update branch URL');
     }
   };
-
   // Tax Settings
   const { data: taxSettings = [] } = useGetTaxSettingsQuery(
     companyId, 
@@ -300,7 +256,6 @@ export default function SettingsPage() {
   const [createTaxSetting] = useCreateTaxSettingMutation();
   const [updateTaxSetting] = useUpdateTaxSettingMutation();
   const [deleteTaxSetting] = useDeleteTaxSettingMutation();
-
   // Service Charge Settings
   const { data: serviceChargeSettings = [] } = useGetServiceChargeSettingsQuery(
     companyId, 
@@ -309,14 +264,12 @@ export default function SettingsPage() {
   const [createServiceChargeSetting] = useCreateServiceChargeSettingMutation();
   const [updateServiceChargeSetting] = useUpdateServiceChargeSettingMutation();
   const [deleteServiceChargeSetting] = useDeleteServiceChargeSettingMutation();
-
   // Invoice Settings
   const { data: invoiceSettings } = useGetInvoiceSettingsQuery(
     companyId, 
     { skip: !companyId }
   );
   const [updateInvoiceSettings] = useUpdateInvoiceSettingsMutation();
-
   // Payment Methods
   const { data: paymentMethods = [], isLoading: paymentMethodsLoading, refetch: refetchPaymentMethods } = useGetPaymentMethodsByCompanyQuery(
     companyId,
@@ -324,7 +277,7 @@ export default function SettingsPage() {
   );
   const [createPaymentMethod, { isLoading: isCreatingPaymentMethod }] = useCreatePaymentMethodMutation();
   const [updatePaymentMethod, { isLoading: isUpdatingPaymentMethod }] = useUpdatePaymentMethodMutation();
-  const [deletePaymentMethod, { isLoading: isDeletingPaymentMethod }] = useDeletePaymentMethodMutation();
+  const [deletePaymentMethod, { isLoading: _isDeletingPaymentMethod }] = useDeletePaymentMethodMutation();
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
   const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentMethodForm, setPaymentMethodForm] = useState({
@@ -343,13 +296,11 @@ export default function SettingsPage() {
     allowsPartialPayment: false,
     allowsChangeDue: true,
   });
-
   // Modal states
   const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
   const [isServiceChargeModalOpen, setIsServiceChargeModalOpen] = useState(false);
   const [editingTax, setEditingTax] = useState<TaxSetting | null>(null);
   const [editingServiceCharge, setEditingServiceCharge] = useState<ServiceChargeSetting | null>(null);
-
   // Form states
   const [taxForm, setTaxForm] = useState({
     name: '',
@@ -358,14 +309,12 @@ export default function SettingsPage() {
     isActive: true,
     appliesTo: 'all' as 'all' | 'food' | 'beverage' | 'alcohol',
   });
-
   const [serviceChargeForm, setServiceChargeForm] = useState({
     name: '',
     rate: 0,
     isActive: true,
     appliesTo: 'all' as 'all' | 'dine_in' | 'takeout' | 'delivery',
   });
-
   const resetTaxForm = () => {
     setTaxForm({
       name: '',
@@ -376,7 +325,6 @@ export default function SettingsPage() {
     });
     setEditingTax(null);
   };
-
   const resetServiceChargeForm = () => {
     setServiceChargeForm({
       name: '',
@@ -386,14 +334,12 @@ export default function SettingsPage() {
     });
     setEditingServiceCharge(null);
   };
-
   // Sync companyId in payment method form
   useEffect(() => {
     if (companyId) {
       setPaymentMethodForm(prev => ({ ...prev, companyId }));
     }
   }, [companyId]);
-
   const handleCreateTax = async () => {
     if (!taxForm.name.trim()) {
       toast.error('Tax name is required');
@@ -407,7 +353,6 @@ export default function SettingsPage() {
       toast.error('Company ID is required');
       return;
     }
-
     try {
       await createTaxSetting({
         ...taxForm,
@@ -420,10 +365,8 @@ export default function SettingsPage() {
       toast.error(error.data?.message || 'Failed to create tax setting');
     }
   };
-
   const handleUpdateTax = async () => {
     if (!editingTax) return;
-
     try {
       await updateTaxSetting({
         id: editingTax.id,
@@ -436,10 +379,8 @@ export default function SettingsPage() {
       toast.error(error.data?.message || 'Failed to update tax setting');
     }
   };
-
   const handleDeleteTax = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
-
     try {
       await deleteTaxSetting(id).unwrap();
       toast.success('Tax setting deleted successfully');
@@ -447,7 +388,6 @@ export default function SettingsPage() {
       toast.error(error.data?.message || 'Failed to delete tax setting');
     }
   };
-
   const handleCreateServiceCharge = async () => {
     if (!serviceChargeForm.name.trim()) {
       toast.error('Service charge name is required');
@@ -461,7 +401,6 @@ export default function SettingsPage() {
       toast.error('Company ID is required');
       return;
     }
-
     try {
       await createServiceChargeSetting({
         ...serviceChargeForm,
@@ -474,10 +413,8 @@ export default function SettingsPage() {
       toast.error(error.data?.message || 'Failed to create service charge setting');
     }
   };
-
   const handleUpdateServiceCharge = async () => {
     if (!editingServiceCharge) return;
-
     try {
       await updateServiceChargeSetting({
         id: editingServiceCharge.id,
@@ -490,10 +427,8 @@ export default function SettingsPage() {
       toast.error(error.data?.message || 'Failed to update service charge setting');
     }
   };
-
   const handleDeleteServiceCharge = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
-
     try {
       await deleteServiceChargeSetting(id).unwrap();
       toast.success('Service charge setting deleted successfully');
@@ -501,7 +436,6 @@ export default function SettingsPage() {
       toast.error(error.data?.message || 'Failed to delete service charge setting');
     }
   };
-
   const editTax = (tax: TaxSetting) => {
     setEditingTax(tax);
     setTaxForm({
@@ -513,7 +447,6 @@ export default function SettingsPage() {
     });
     setIsTaxModalOpen(true);
   };
-
   const editServiceCharge = (serviceCharge: ServiceChargeSetting) => {
     setEditingServiceCharge(serviceCharge);
     setServiceChargeForm({
@@ -524,14 +457,12 @@ export default function SettingsPage() {
     });
     setIsServiceChargeModalOpen(true);
   };
-
   const updateInvoiceForm = (updates: Partial<InvoiceSettings>) => {
     setInvoiceForm((prev: Partial<InvoiceSettings>) => ({
       ...prev,
       ...updates,
     }));
   };
-
   const tabs = [
     { id: 'general', label: 'General', icon: CogIcon },
     { id: 'taxes', label: 'Tax Settings', icon: ReceiptPercentIcon },
@@ -541,15 +472,12 @@ export default function SettingsPage() {
     // Only show custom domain tab if feature is enabled in subscription
     ...(isCustomDomainEnabled ? [{ id: 'custom-domain' as const, label: 'Custom Domain', icon: GlobeAltIcon }] : []),
   ];
-
   const normalizedTaxSettings = Array.isArray(taxSettings)
     ? taxSettings
     : (taxSettings as any)?.items || [];
-
   const normalizedServiceCharges = Array.isArray(serviceChargeSettings)
     ? serviceChargeSettings
     : (serviceChargeSettings as any)?.items || [];
-
   useEffect(() => {
     if (invoiceSettings) {
       setInvoiceForm({
@@ -566,15 +494,8 @@ export default function SettingsPage() {
       });
     }
   }, [invoiceSettings]);
-
   useEffect(() => {
-    console.log('Company logo useEffect:', {
-      hasCompany: !!company,
-      hasLogo: !!company?.logo,
-      logoValue: company?.logo?.substring(0, 50) + '...' || 'null',
-      companyKeys: company ? Object.keys(company) : [],
-    });
-
+    // Debug logging removed
     if (company?.logo) {
       // Cloudinary URLs are already full HTTPS URLs, no need to modify
       // Legacy local uploads starting with /uploads/ need base URL prepended
@@ -585,67 +506,49 @@ export default function SettingsPage() {
         logoUrl = `${baseUrl}${logoUrl}`;
       }
       // Cloudinary URLs (https://res.cloudinary.com/...) are used as-is
-      console.log('Setting logo preview:', logoUrl.substring(0, 50) + '...');
       setLogoPreview(logoUrl);
     } else {
       // Clear preview if no logo
-      console.log('No logo found, clearing preview');
       setLogoPreview(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company?.logo]);
-
   const handleLogoUpload = async () => {
     if (!logoFile) {
       toast.error('Please select a logo file');
       return;
     }
-
     // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(logoFile.type)) {
       toast.error('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
       return;
     }
-
     // Validate file size (max 5MB)
     if (logoFile.size > 5 * 1024 * 1024) {
       toast.error('Logo file size must be less than 5MB');
       return;
     }
-
     try {
       const result = await uploadCompanyLogo(logoFile).unwrap();
-      console.log('Logo upload successful, result:', result);
       toast.success('Logo uploaded successfully');
-      
       // Set logo preview immediately with the returned URL
       if (result.logoUrl) {
-        console.log('Setting logo preview immediately:', result.logoUrl.substring(0, 50) + '...');
         setLogoPreview(result.logoUrl);
       }
-      
       // Clear the file input
       setLogoFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      
       // Refetch company data after a short delay to ensure database is updated
       setTimeout(async () => {
         try {
-          console.log('Refetching company data...');
-          const refetchedData = await refetchCompany();
-          console.log('Company refetched:', {
-            hasData: !!refetchedData.data,
-            hasLogo: !!refetchedData.data?.logo,
-            logoValue: refetchedData.data?.logo?.substring(0, 50) + '...' || 'null',
-          });
+          await refetchCompany();
         } catch (refetchError) {
           console.error('Error refetching company:', refetchError);
         }
       }, 1000);
-      
       // Update invoice settings logo URL if available
       if (invoiceForm.showLogo && result.logoUrl) {
         await updateInvoiceSettings({
@@ -666,7 +569,6 @@ export default function SettingsPage() {
       }
     }
   };
-
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -693,7 +595,6 @@ export default function SettingsPage() {
       setLogoFile(null);
     }
   };
-
   const handleRemoveLogo = async () => {
     try {
       // You might want to add a delete logo endpoint
@@ -704,7 +605,6 @@ export default function SettingsPage() {
       toast.error('Failed to remove logo');
     }
   };
-
   // Show company selector for Super Admin if no company selected
   if (isSuperAdmin && !companyId) {
     return (
@@ -715,7 +615,6 @@ export default function SettingsPage() {
             Configure restaurant settings and preferences
           </p>
         </div>
-        
         <Card>
           <CardHeader>
             <CardTitle>Select Company</CardTitle>
@@ -750,7 +649,6 @@ export default function SettingsPage() {
       </div>
     );
   }
-  
   // Show message for non-Super Admin users without company
   if (!companyId) {
     return (
@@ -766,7 +664,6 @@ export default function SettingsPage() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -801,7 +698,6 @@ export default function SettingsPage() {
           </p>
         </div>
       </div>
-
       {/* Tabs */}
       <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="-mb-px flex space-x-8">
@@ -824,7 +720,6 @@ export default function SettingsPage() {
           })}
         </nav>
       </div>
-
       {/* Tab Content */}
       {activeTab === 'general' && (
         <div className="space-y-6">
@@ -939,7 +834,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           )}
-
                 {/* All Branches Public URLs (Super Admin Only) */}
                 {isSuperAdmin && branches.length > 0 && (
             <Card>
@@ -1045,7 +939,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
                 )}
-
                 {/* Company-level URL (Fallback) */}
                 {!currentBranch && companyPublicUrl && (
             <Card>
@@ -1098,7 +991,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
                 )}
-
                 {/* Company Logo Upload */}
                 <Card>
             <CardHeader>
@@ -1112,6 +1004,7 @@ export default function SettingsPage() {
                 {logoPreview && (
                   <div className="relative">
                     {logoPreview.startsWith('data:') || logoPreview.startsWith('http') ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={logoPreview}
                         alt="Company Logo"
@@ -1172,7 +1065,6 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1212,7 +1104,6 @@ export default function SettingsPage() {
                   disabled={!companyId}
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Timezone
@@ -1245,7 +1136,6 @@ export default function SettingsPage() {
                   disabled={!companyId}
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Date Format
@@ -1271,7 +1161,6 @@ export default function SettingsPage() {
                   disabled={!companyId}
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Time Format
@@ -1301,7 +1190,6 @@ export default function SettingsPage() {
         </Card>
         </div>
       )}
-
       {activeTab === 'taxes' && (
         <div className="space-y-6">
           <Card>
@@ -1364,7 +1252,6 @@ export default function SettingsPage() {
           </Card>
         </div>
       )}
-
       {activeTab === 'service-charges' && (
         <div className="space-y-6">
           <Card>
@@ -1427,7 +1314,6 @@ export default function SettingsPage() {
           </Card>
         </div>
       )}
-
       {activeTab === 'invoice' && (
         <Card>
           <CardHeader>
@@ -1462,7 +1348,6 @@ export default function SettingsPage() {
                   placeholder="INV"
                 />
               </div>
-
               <div>
                 <Input
                   label="Next Invoice Number"
@@ -1495,7 +1380,6 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Invoice Options</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1525,7 +1409,6 @@ export default function SettingsPage() {
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">Show company logo</span>
                 </label>
-
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -1549,7 +1432,6 @@ export default function SettingsPage() {
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">Show company address</span>
                 </label>
-
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -1573,7 +1455,6 @@ export default function SettingsPage() {
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">Show phone number</span>
                 </label>
-
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -1599,7 +1480,6 @@ export default function SettingsPage() {
                 </label>
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Footer Text
@@ -1626,7 +1506,6 @@ export default function SettingsPage() {
                 placeholder="Thank you for your business!"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Terms and Conditions
@@ -1656,7 +1535,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Payment Methods Tab */}
       {activeTab === 'payment-methods' && (
         <Card>
@@ -1799,7 +1677,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Tax Modal */}
       <Modal
         isOpen={isTaxModalOpen}
@@ -1818,7 +1695,6 @@ export default function SettingsPage() {
             placeholder="e.g., Sales Tax"
             required
           />
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1833,7 +1709,6 @@ export default function SettingsPage() {
                 onChange={(value) => setTaxForm({ ...taxForm, type: value as 'percentage' | 'fixed' })}
               />
             </div>
-
             <Input
               label={taxForm.type === 'percentage' ? 'Rate (%)' : 'Fixed Amount'}
               type="number"
@@ -1843,7 +1718,6 @@ export default function SettingsPage() {
               required
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Applies To
@@ -1854,7 +1728,6 @@ export default function SettingsPage() {
               onChange={(value) => setTaxForm({ ...taxForm, appliesTo: value as any })}
             />
           </div>
-
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -1867,7 +1740,6 @@ export default function SettingsPage() {
               Active
             </label>
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -1884,7 +1756,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </Modal>
-
       {/* Service Charge Modal */}
       <Modal
         isOpen={isServiceChargeModalOpen}
@@ -1903,7 +1774,6 @@ export default function SettingsPage() {
             placeholder="e.g., Service Charge"
             required
           />
-
           <Input
             label="Rate (%)"
             type="number"
@@ -1912,7 +1782,6 @@ export default function SettingsPage() {
             onChange={(e) => setServiceChargeForm({ ...serviceChargeForm, rate: parseFloat(e.target.value) || 0 })}
             required
           />
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Applies To
@@ -1928,7 +1797,6 @@ export default function SettingsPage() {
               onChange={(value) => setServiceChargeForm({ ...serviceChargeForm, appliesTo: value as any })}
             />
           </div>
-
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -1941,7 +1809,6 @@ export default function SettingsPage() {
               Active
             </label>
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -1958,7 +1825,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </Modal>
-
       {/* Payment Method Modal */}
       <Modal
         isOpen={isPaymentMethodModalOpen}
@@ -2124,7 +1990,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </Modal>
-
       {/* Custom Domain Tab */}
       {activeTab === 'custom-domain' && (
         <CustomDomainSection companyId={companyId} />
@@ -2132,7 +1997,6 @@ export default function SettingsPage() {
     </div>
   );
 }
-
 // Custom Domain Component - defined after main component
 function CustomDomainSection({ companyId }: { companyId: string }) {
   const { data: domainInfo, refetch: refetchDomainInfo } = useGetCustomDomainInfoQuery(companyId, {
@@ -2143,13 +2007,11 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
   const [removeDomain, { isLoading: isRemoving }] = useRemoveCustomDomainMutation();
   const [domainInput, setDomainInput] = useState('');
   const [verificationToken, setVerificationToken] = useState('');
-
   const handleAddDomain = async () => {
     if (!domainInput.trim()) {
       toast.error('Please enter a domain');
       return;
     }
-
     try {
       await addDomain({ companyId, domain: domainInput.trim() }).unwrap();
       toast.success('Domain added! Please verify it by adding the DNS record.');
@@ -2159,13 +2021,11 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
       toast.error(error?.data?.message || 'Failed to add domain');
     }
   };
-
   const handleVerifyDomain = async () => {
     if (!verificationToken.trim()) {
       toast.error('Please enter the verification token');
       return;
     }
-
     try {
       await verifyDomain({ companyId, token: verificationToken.trim() }).unwrap();
       toast.success('Domain verified successfully!');
@@ -2175,12 +2035,10 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
       toast.error(error?.data?.message || 'Failed to verify domain');
     }
   };
-
   const handleRemoveDomain = async () => {
     if (!confirm('Are you sure you want to remove this custom domain?')) {
       return;
     }
-
     try {
       await removeDomain(companyId).unwrap();
       toast.success('Custom domain removed');
@@ -2189,12 +2047,10 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
       toast.error(error?.data?.message || 'Failed to remove domain');
     }
   };
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
   };
-
   return (
     <div className="space-y-6">
       <Card>
@@ -2214,7 +2070,6 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
               This feature requires a premium or enterprise subscription plan.
             </p>
           </div>
-
           {domainInfo?.domain ? (
             <div className="space-y-4">
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
@@ -2233,7 +2088,6 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
                   </p>
                 )}
               </div>
-
               {!domainInfo.verified && domainInfo.dnsInstructions && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                   <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-3">
@@ -2273,7 +2127,6 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
                   </p>
                 </div>
               )}
-
               {!domainInfo.verified && (
                 <div className="space-y-3">
                   <div>
@@ -2300,7 +2153,6 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
                   </Button>
                 </div>
               )}
-
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button
                   variant="secondary"

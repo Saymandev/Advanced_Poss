@@ -142,7 +142,7 @@ export default function CompanyLandingPage() {
                   </p>
                 )}
               </div>
-              <nav className="flex gap-2 sm:gap-4 mt-2 sm:mt-0">
+              <nav className="flex gap-2 sm:gap-4 mt-2 sm:mt-0 flex-wrap">
                 <Link href={`/${companySlug}/about`}>
                   <Button variant="ghost" size="sm">About</Button>
                 </Link>
@@ -152,6 +152,13 @@ export default function CompanyLandingPage() {
                 <Link href={`/${companySlug}/gallery`}>
                   <Button variant="ghost" size="sm">Gallery</Button>
                 </Link>
+                {branches.length > 0 && branches[0]?.slug && (
+                  <Link href={`/${companySlug}/${branches[0].slug}/rooms`}>
+                    <Button variant="ghost" size="sm" className="text-primary-600 dark:text-primary-400 font-semibold">
+                      Book a Room
+                    </Button>
+                  </Link>
+                )}
               </nav>
             </div>
           </div>
@@ -288,21 +295,42 @@ export default function CompanyLandingPage() {
                       )}
                     </div>
 
-                    <Button
-                      onClick={() => handleBranchSelect(branch.slug)}
-                      className="w-full font-semibold"
-                      disabled={!branch.slug || !branch.isActive}
-                      size="lg"
-                    >
-                      {branch.isActive ? (
-                        <>
-                          View Menu
-                          <span className="ml-2">→</span>
-                        </>
-                      ) : (
-                        'Currently Closed'
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        onClick={() => handleBranchSelect(branch.slug)}
+                        className="w-full font-semibold"
+                        disabled={!branch.slug || !branch.isActive}
+                        size="lg"
+                      >
+                        {branch.isActive ? (
+                          <>
+                            View Menu
+                            <span className="ml-2">→</span>
+                          </>
+                        ) : (
+                          'Currently Closed'
+                        )}
+                      </Button>
+                      {branch.isActive && branch.slug && (
+                        <div className="flex gap-2">
+                          <Link href={`/${companySlug}/${branch.slug}/shop`} className="flex-1">
+                            <Button variant="secondary" size="sm" className="w-full">
+                              Shop
+                            </Button>
+                          </Link>
+                          <Link href={`/${companySlug}/${branch.slug}/rooms`} className="flex-1">
+                            <Button variant="secondary" size="sm" className="w-full">
+                              Rooms
+                            </Button>
+                          </Link>
+                          <Link href={`/${companySlug}/${branch.slug}/book`} className="flex-1">
+                            <Button variant="secondary" size="sm" className="w-full">
+                              Book
+                            </Button>
+                          </Link>
+                        </div>
                       )}
-                    </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -11,7 +10,6 @@ import {
 } from '@/lib/api/endpoints/subscriptionPaymentsApi';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
-
 interface PaymentMethodSelectorProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,7 +18,6 @@ interface PaymentMethodSelectorProps {
   currency: string;
   country?: string;
 }
-
 export function PaymentMethodSelector({
   isOpen,
   onClose,
@@ -33,33 +30,26 @@ export function PaymentMethodSelector({
     country: country || 'BD',
     currency: currency || 'BDT',
   });
-
   // Auto-select default payment method (Stripe) when modal opens
   const defaultMethod = paymentMethods?.find((method) => method.isDefault) || paymentMethods?.[0];
   const [selectedMethod, setSelectedMethod] = useState<SubscriptionPaymentMethod | null>(null);
-
   // Update selected method when payment methods load or modal opens
   useEffect(() => {
     if (isOpen && defaultMethod && !selectedMethod) {
       setSelectedMethod(defaultMethod);
     }
   }, [isOpen, defaultMethod, selectedMethod]);
-
   const handleSelect = (method: SubscriptionPaymentMethod) => {
     setSelectedMethod(method);
   };
-
   const handleConfirm = () => {
-    console.log('🔵 PaymentMethodSelector handleConfirm called', { selectedMethod });
     if (selectedMethod) {
-      console.log('🔵 Calling onSelect with method:', selectedMethod);
       onSelect(selectedMethod);
       onClose();
     } else {
       console.error('🔴 No payment method selected');
     }
   };
-
   // Group payment methods by type
   const groupedMethods = paymentMethods?.reduce((acc, method) => {
     const type = method.type;
@@ -69,7 +59,6 @@ export function PaymentMethodSelector({
     acc[type].push(method);
     return acc;
   }, {} as Record<string, SubscriptionPaymentMethod[]>) || {};
-
   const getMethodIcon = (gateway: PaymentGateway) => {
     switch (gateway) {
       case PaymentGateway.STRIPE:
@@ -92,13 +81,10 @@ export function PaymentMethodSelector({
         return '💳';
     }
   };
-
   useEffect(() => {
     if (isOpen) {
-      console.log('🔵 PaymentMethodSelector opened', { paymentMethods, defaultMethod, selectedMethod });
-    }
+      }
   }, [isOpen, paymentMethods, defaultMethod, selectedMethod]);
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Select Payment Method" size="lg">
       <div className="space-y-6">
@@ -107,7 +93,6 @@ export function PaymentMethodSelector({
             Amount: <span className="font-semibold text-lg">{currency} {amount.toFixed(2)}</span>
           </p>
         </div>
-
         {isLoading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
@@ -162,7 +147,6 @@ export function PaymentMethodSelector({
                 </div>
               </div>
             )}
-
             {/* Digital Wallets */}
             {groupedMethods['digital_wallet'] && groupedMethods['digital_wallet'].length > 0 && (
               <div>
@@ -210,7 +194,6 @@ export function PaymentMethodSelector({
                 </div>
               </div>
             )}
-
             {/* Mobile Wallets (Bangladesh) */}
             {groupedMethods['mobile_wallet'] && groupedMethods['mobile_wallet'].length > 0 && (
               <div>
@@ -260,7 +243,6 @@ export function PaymentMethodSelector({
             )}
           </div>
         )}
-
         <div className="flex gap-3 pt-4 border-t">
           <Button variant="secondary" onClick={onClose} className="flex-1">
             Cancel
@@ -276,5 +258,4 @@ export function PaymentMethodSelector({
       </div>
     </Modal>
   );
-}
-
+}

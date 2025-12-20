@@ -1,5 +1,4 @@
 import { apiSlice } from '../apiSlice';
-
 export interface InventoryItem {
   id: string;
   name: string;
@@ -40,7 +39,6 @@ export interface InventoryItem {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface CreateInventoryItemRequest {
   companyId: string;
   branchId?: string;
@@ -63,11 +61,9 @@ export interface CreateInventoryItemRequest {
   tags?: string[];
   notes?: string;
 }
-
 export interface UpdateInventoryItemRequest extends Partial<CreateInventoryItemRequest> {
   id: string;
 }
-
 export interface StockAdjustment {
   id: string;
   inventoryItemId: string;
@@ -78,13 +74,11 @@ export interface StockAdjustment {
   performedBy: string;
   createdAt: string;
 }
-
 export interface CreateStockAdjustmentRequest {
   type: 'add' | 'remove' | 'set' | 'wastage';
   quantity: number;
   reason?: string;
 }
-
 export interface Supplier {
   id: string;
   name: string;
@@ -104,7 +98,6 @@ export interface Supplier {
   createdAt: string;
   updatedAt: string;
 }
-
 export const inventoryApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getInventoryItems: builder.query<{ items: InventoryItem[]; total: number }, any>({
@@ -125,9 +118,7 @@ export const inventoryApi = apiSlice.injectEndpoints({
           }
           return payload;
         };
-
         const normalizedResponse = unwrapData(response);
-
         let items = [];
         let total = 0;
         if (Array.isArray(normalizedResponse)) {
@@ -141,14 +132,6 @@ export const inventoryApi = apiSlice.injectEndpoints({
           }
           total = normalizedResponse.total ?? items.length ?? 0;
         }
-
-        console.log('🔍 Ingredients transformResponse:', {
-          response,
-          normalized: normalizedResponse,
-          itemsCount: items.length,
-          total,
-        });
-
         return {
           items: items.map((ingredient: any) => ({
             id: ingredient._id || ingredient.id,
@@ -261,7 +244,6 @@ export const inventoryApi = apiSlice.injectEndpoints({
         if (data.barcode !== undefined) body.barcode = data.barcode;
         if (data.tags !== undefined) body.tags = data.tags;
         if (data.notes !== undefined) body.notes = data.notes;
-        
         return {
           url: `/ingredients/${id}`,
           method: 'PATCH',
@@ -359,7 +341,6 @@ export const inventoryApi = apiSlice.injectEndpoints({
     }),
   }),
 });
-
 export const {
   useGetInventoryItemsQuery,
   useGetInventoryItemByIdQuery,
@@ -375,4 +356,4 @@ export const {
   useCreateSupplierMutation,
   useUpdateSupplierMutation,
   useDeleteSupplierMutation,
-} = inventoryApi;
+} = inventoryApi;

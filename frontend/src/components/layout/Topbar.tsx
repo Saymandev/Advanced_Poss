@@ -1,5 +1,4 @@
 'use client';
-
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { NotificationBell } from '@/components/ui/NotificationBell';
@@ -19,7 +18,6 @@ import { useTheme } from 'next-themes';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-
 export function Topbar() {
   const { user, companyContext: _companyContext } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
@@ -28,11 +26,9 @@ export function Topbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const urlSearch = searchParams.get('search') || '';
-  
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
   // Sync search input with URL when on order-history page
   useEffect(() => {
     if (pathname === '/dashboard/order-history') {
@@ -41,7 +37,6 @@ export function Topbar() {
       setSearchQuery('');
     }
   }, [pathname, urlSearch]);
-
   const handleLogout = async () => {
     try {
       // Call logout API to clear httpOnly cookies on server
@@ -56,42 +51,33 @@ export function Topbar() {
         // Ignore errors - cookies will be cleared by backend
       } catch (error) {
         // Ignore logout API errors - we'll clear local state anyway
-        console.log('Logout API call failed (token may already be invalid):', error);
       }
     } catch (error) {
       // Ignore errors
     }
-    
     // Clear auth state from Redux
     dispatch(logout());
-    
     // Clear all localStorage (tokens are cleared by backend via httpOnly cookies)
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     localStorage.removeItem('companyContext');
-    
     // Clear RTK Query cache
     dispatch(apiSlice.util.resetApiState());
-
     toast.success('Logged out successfully');
     router.push('/auth/login');
   };
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    
     // Navigate to order history page with search query
     router.push(`/dashboard/order-history?search=${encodeURIComponent(searchQuery.trim())}`);
     setIsSearchModalOpen(false);
     // Don't clear searchQuery - let it sync from URL
   };
-
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
   };
-
   // Focus search input when modal opens
   useEffect(() => {
     if (isSearchModalOpen && searchInputRef.current) {
@@ -100,8 +86,6 @@ export function Topbar() {
       }, 100);
     }
   }, [isSearchModalOpen]);
-
-
   return (
     <>
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 w-full">
@@ -124,7 +108,6 @@ export function Topbar() {
                   />
                 </div>
               </form>
-
               {/* Mobile Search Button */}
               <Button
                 variant="ghost"
@@ -136,7 +119,6 @@ export function Topbar() {
                 <MagnifyingGlassIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </Button>
             </div>
-
           {/* Right side - User menu and notifications */}
           <div className="flex items-center gap-4">
             {/* Theme toggle */}
@@ -152,10 +134,8 @@ export function Topbar() {
                 <MoonIcon className="h-4 w-4" />
               )}
             </Button>
-
             {/* Notifications */}
             <NotificationBell />
-
             {/* User menu */}
             <div className="relative group">
               <Button
@@ -199,7 +179,6 @@ export function Topbar() {
                   </p>
                 </div>
               </Button>
-
               {/* Dropdown menu */}
               <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                 <div className="py-1">
@@ -232,7 +211,6 @@ export function Topbar() {
         </div>
       </div>
     </header>
-
     {/* Mobile Search Modal */}
     <Modal
       isOpen={isSearchModalOpen}

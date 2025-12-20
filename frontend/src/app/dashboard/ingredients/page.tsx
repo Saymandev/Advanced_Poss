@@ -687,12 +687,12 @@ export default function IngredientsPage() {
 
         <Card>
           <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Value</p>
-                <p className="text-3xl font-bold text-purple-600">{formatCurrency(stats.totalValue)}</p>
+                <p className="text-3xl font-bold text-purple-600 break-words">{formatCurrency(stats.totalValue)}</p>
               </div>
-              <ArchiveBoxIcon className="w-8 h-8 text-purple-600" />
+              <ArchiveBoxIcon className="w-8 h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>

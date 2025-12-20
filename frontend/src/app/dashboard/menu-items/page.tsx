@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -27,7 +26,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 interface MenuItem {
   id: string;
   name: string;
@@ -52,15 +50,10 @@ interface MenuItem {
   createdAt: string;
   updatedAt: string;
 }
-
-
-
 export default function MenuItemsPage() {
   const { companyContext, user } = useAppSelector((state) => state.auth);
-  
   // Redirect if user doesn't have menu-management feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('menu-management');
-  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -73,17 +66,14 @@ export default function MenuItemsPage() {
   const [availabilityFilter, setAvailabilityFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setCommittedSearch(searchQuery);
       setCurrentPage(1); // Reset to first page on search
     }, 500);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
-  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -112,22 +102,17 @@ export default function MenuItemsPage() {
       fat: 0,
     },
   });
-
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
   // Fetch real menu items from API - try multiple ways to get branchId
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
-  
-
   // Get companyId for query (same as categories page)
   const companyId = (user as any)?.companyId || 
                    (companyContext as any)?.companyId || 
                    (companyContext as any)?._id ||
                    (companyContext as any)?.id;
-
   // Build API query parameters
   const queryParams = useMemo(() => {
     const params: any = {
@@ -135,45 +120,36 @@ export default function MenuItemsPage() {
       page: currentPage,
       limit: itemsPerPage,
     };
-    
     // Always include companyId to ensure proper filtering
     if (companyId) {
       params.companyId = companyId;
     }
-    
     // Add search if provided
     if (committedSearch) {
       params.search = committedSearch;
     }
-    
     // Add category filter if not 'all'
     if (categoryFilter !== 'all') {
       params.categoryId = categoryFilter;
     }
-    
     // Add availability filter if not 'all'
     if (availabilityFilter !== 'all') {
       params.isAvailable = availabilityFilter === 'available';
     }
-    
     return params;
   }, [branchId, companyId, currentPage, itemsPerPage, committedSearch, categoryFilter, availabilityFilter]);
-
   const { data: menuItemsResponse, isLoading, error, refetch } = useGetMenuItemsQuery(
     queryParams,
     { skip: !branchId }
   );
-  
   // Get stats - fetch all items for accurate stats (without filters)
   const { data: statsResponse } = useGetMenuItemsQuery(
     { branchId, companyId, limit: 1000 },
     { skip: !branchId }
   );
-
   // Fetch ratings for menu items - declare before stats calculation
   const [getMenuItemsRatings] = useGetMenuItemsRatingsMutation();
   const [menuItemsRatings, setMenuItemsRatings] = useState<Record<string, { averageRating: number; totalReviews: number }>>({});
-
   // Calculate stats from real API data
   const stats = useMemo(() => {
     const statsItems = (statsResponse as any)?.menuItems || [];
@@ -183,7 +159,6 @@ export default function MenuItemsPage() {
     const avgPrepTime = total > 0 
       ? Math.round(statsItems.reduce((sum: number, item: any) => sum + (item.preparationTime || 0), 0) / total)
       : 0;
-    
     // Calculate average rating from real review data
     let avgPopularity = 0;
     if (total > 0 && Object.keys(menuItemsRatings).length > 0) {
@@ -193,12 +168,10 @@ export default function MenuItemsPage() {
           return rating > 0 ? rating : null;
         })
         .filter((rating: number | null) => rating !== null) as number[];
-      
       if (ratingsWithValues.length > 0) {
         avgPopularity = Number((ratingsWithValues.reduce((sum, rating) => sum + rating, 0) / ratingsWithValues.length).toFixed(1));
       }
     }
-    
     return {
       total,
       available,
@@ -207,54 +180,44 @@ export default function MenuItemsPage() {
       avgPopularity,
     };
   }, [statsResponse, menuItemsRatings]);
-  
   // Use the same query as categories page to ensure consistency
   // This shows the same categories that appear on /dashboard/categories
   const { data: categoriesResponse, isLoading: isLoadingCategories, isFetching: isFetchingCategories } = useGetCategoriesQuery(
     { branchId, companyId },
     { skip: !branchId && !companyId, refetchOnMountOrArgChange: true }
   );
-  
   // Fetch ingredients for the ingredient selector - ensure we have companyId or branchId
   const { data: ingredientsResponse, isLoading: isLoadingIngredients } = useGetInventoryItemsQuery(
     { companyId: companyId || undefined, branchId: branchId || undefined, limit: 1000 },
     { skip: !companyId && !branchId } // Don't skip if we have at least one
   );
-  
   const availableIngredients = useMemo(() => {
     // During initial load, ingredientsResponse will be undefined - that's normal
     if (!ingredientsResponse) {
       return [];
     }
-    
     const items = ingredientsResponse.items || (Array.isArray(ingredientsResponse) ? ingredientsResponse : []);
     if (!Array.isArray(items)) {
       console.warn('📦 Ingredients items is not an array:', items);
       return [];
     }
-    
     const mapped = items.map((ing: any) => ({
       id: String(ing.id || ing._id || ''),
       name: String(ing.name || ''),
       unit: String(ing.unit || 'pcs'),
     })).filter((ing: any) => ing && ing.id && ing.name && ing.id !== 'undefined'); // Filter out invalid entries
-    
     // Only log when ingredients are actually loaded (not during initial undefined state)
     if (mapped.length > 0) {
-      console.log('📦 Available ingredients:', mapped.length);
-    }
+      }
     return mapped;
   }, [ingredientsResponse]);
-  
   const categories = useMemo(() => {
     // useGetCategoriesQuery returns { categories: Category[], total: number }
     if (!categoriesResponse) {
       return [];
     }
-    
     // Extract categories array from response (same structure as categories page)
     const cats = categoriesResponse.categories || [];
-    
     return cats
       .filter((cat: any) => cat && cat.id && cat.name) // Filter out invalid entries
       .map((cat: any) => ({
@@ -262,26 +225,20 @@ export default function MenuItemsPage() {
         name: String(cat.name),
       }));
   }, [categoriesResponse]);
-  
-
   const [toggleAvailability] = useToggleAvailabilityMutation();
   const [createMenuItem, { isLoading: isCreating }] = useCreateMenuItemMutation();
   const [updateMenuItem, { isLoading: isUpdating }] = useUpdateMenuItemMutation();
   const [deleteMenuItem, { isLoading: isDeleting }] = useDeleteMenuItemMutation();
   const [uploadImages] = useUploadMenuImagesMutation();
-
   // Transform API response to local format (already transformed by API)
   const menuItems = useMemo(() => {
     if (!menuItemsResponse) return [];
-    
     // Response is already transformed by API transformResponse to { menuItems: [], total, page, limit }
     const items = (menuItemsResponse as any)?.menuItems || [];
-    
     if (!Array.isArray(items)) {
       console.warn('⚠️ Menu items is not an array:', items);
       return [];
     }
-    
     return items.map((item: any) => {
       // Extract category name - API should provide it as a string, but handle both formats as fallback
       let categoryName = 'Uncategorized';
@@ -293,7 +250,6 @@ export default function MenuItemsPage() {
           categoryName = item.category.name || item.categoryId?.name || 'Uncategorized';
         }
       }
-      
       // Extract subcategory name - handle both object and string formats
       let subcategoryName = undefined;
       if (item.subcategory) {
@@ -303,7 +259,6 @@ export default function MenuItemsPage() {
           subcategoryName = item.subcategory.name;
         }
       }
-      
       // Extract categoryId - prefer string ID, fallback to extracting from object
       let categoryIdValue = item.categoryId;
       if (!categoryIdValue) {
@@ -319,13 +274,11 @@ export default function MenuItemsPage() {
         categoryIdValue = categoryIdValue._id || categoryIdValue.id;
       }
       categoryIdValue = categoryIdValue ? String(categoryIdValue) : '';
-      
       // Handle ingredients - convert objects to display format if needed
       let ingredientsArray: any[] = [];
       if (item.ingredients && Array.isArray(item.ingredients)) {
         ingredientsArray = item.ingredients;
       }
-      
       return {
         id: item.id,
         name: item.name,
@@ -353,7 +306,6 @@ export default function MenuItemsPage() {
       };
     });
   }, [menuItemsResponse]);
-
   // Fetch ratings for menu items (including stats items)
   useEffect(() => {
     const statsItems = (statsResponse as any)?.menuItems || [];
@@ -362,7 +314,6 @@ export default function MenuItemsPage() {
       ...statsItems.map((item: any) => item.id),
     ].filter(Boolean);
     const uniqueMenuItemIds = Array.from(new Set(allMenuItemIds));
-
     if (uniqueMenuItemIds.length > 0 && branchId) {
       getMenuItemsRatings({
         menuItemIds: uniqueMenuItemIds,
@@ -379,25 +330,20 @@ export default function MenuItemsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menuItems, statsResponse, branchId, companyContext]);
-  
   // Extract total from API response (already transformed)
   const totalItems = useMemo(() => {
     return (menuItemsResponse as any)?.total || menuItems.length;
   }, [menuItemsResponse, menuItems.length]);
-
   // Populate form when editing
   useEffect(() => {
     if (isEditModalOpen && selectedMenuItem) {
       const itemData = selectedMenuItem as any;
-      
       // Extract categoryId - handle both string and object formats
       let categoryIdValue = itemData.categoryId || '';
-      
       // Ensure categoryId is a string
       if (categoryIdValue && typeof categoryIdValue !== 'string') {
         categoryIdValue = String(categoryIdValue);
       }
-      
       // If categoryId is still not available or doesn't match any category, try to find it from categories array
       if (!categoryIdValue || !categories.find((cat: any) => String(cat.id) === String(categoryIdValue))) {
         // Try to find by category name
@@ -412,12 +358,10 @@ export default function MenuItemsPage() {
         });
         categoryIdValue = matchingCategory ? String(matchingCategory.id) : (categories[0] ? String(categories[0].id) : '');
       }
-      
       // Final fallback: ensure we have a valid categoryId
       if (!categoryIdValue && categories.length > 0 && categories[0]) {
         categoryIdValue = String(categories[0].id);
       }
-      
       // Convert ingredients from objects to structured format
       let ingredientsArray: Array<{ ingredientId: string; quantity: number; unit: string }> = [];
       if (itemData.ingredients && Array.isArray(itemData.ingredients)) {
@@ -434,7 +378,6 @@ export default function MenuItemsPage() {
                 ingredientId = ing.ingredientId;
               }
             }
-            
             // Only return if we have a valid ingredientId
             if (ingredientId) {
               return {
@@ -448,7 +391,6 @@ export default function MenuItemsPage() {
           return null;
         }).filter((ing: any) => ing !== null && ing.ingredientId) as Array<{ ingredientId: string; quantity: number; unit: string }>;
       }
-      
       setFormData({
         name: itemData.name || '',
         description: itemData.description || '',
@@ -472,7 +414,6 @@ export default function MenuItemsPage() {
       });
     }
   }, [isEditModalOpen, selectedMenuItem, categories]);
-
   // Reset form when modal closes
   useEffect(() => {
     if (!isCreateModalOpen && !isEditModalOpen) {
@@ -499,10 +440,8 @@ export default function MenuItemsPage() {
       });
     }
   }, [isCreateModalOpen, isEditModalOpen, categories]);
-
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-
     if (!formData.name.trim()) {
       errors.name = 'Menu item name is required';
     } else if (formData.name.trim().length < 2) {
@@ -510,27 +449,22 @@ export default function MenuItemsPage() {
     } else if (formData.name.trim().length > 100) {
       errors.name = 'Menu item name must be less than 100 characters';
     }
-
     if (!formData.categoryId) {
       errors.categoryId = 'Please select a category';
     }
-
     if (!formData.price || formData.price <= 0) {
       errors.price = 'Price must be greater than 0';
     } else if (formData.price > 10000) {
       errors.price = 'Price cannot exceed 10,000';
     }
-
     if (formData.preparationTime < 0) {
       errors.preparationTime = 'Preparation time cannot be negative';
     } else if (formData.preparationTime > 480) {
       errors.preparationTime = 'Preparation time cannot exceed 480 minutes (8 hours)';
     }
-
     if (formData.description && formData.description.length > 500) {
       errors.description = 'Description must be less than 500 characters';
     }
-
     // Validate nutritional info if provided
     if (formData.nutritionalInfo.calories < 0) {
       errors.nutritionalInfo_calories = 'Calories cannot be negative';
@@ -544,7 +478,6 @@ export default function MenuItemsPage() {
     if (formData.nutritionalInfo.fat < 0) {
       errors.nutritionalInfo_fat = 'Fat cannot be negative';
     }
-
     // Validate ingredients
     formData.ingredients.forEach((ing, index) => {
       if (!ing.ingredientId) {
@@ -557,11 +490,9 @@ export default function MenuItemsPage() {
         errors[`ingredient_${index}_unit`] = 'Unit is required';
       }
     });
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
   const clearFormError = (field: string) => {
     setFormErrors((prev) => {
       const next = { ...prev };
@@ -569,21 +500,17 @@ export default function MenuItemsPage() {
       return next;
     });
   };
-
   const handleCreateMenuItem = async () => {
     if (!validateForm()) {
       toast.error('Please fix the errors in the form');
       return;
     }
-
     if (!branchId) {
       toast.error('Branch ID is missing');
       return;
     }
-
     try {
       const companyId = (companyContext as any)?.companyId || (user as any)?.companyId;
-      
       // Map form data to backend DTO structure
       const payload: any = {
         companyId,
@@ -598,7 +525,6 @@ export default function MenuItemsPage() {
         images: formData.images.filter(Boolean).length > 0 ? formData.images.filter(Boolean) : undefined,
         tags: formData.tags.length > 0 ? formData.tags : undefined,
       };
-
       // Handle ingredients - backend expects array of {ingredientId, quantity, unit}
       // Filter out ingredients without ingredientId
       const validIngredients = formData.ingredients.filter(ing => ing.ingredientId && ing.quantity > 0);
@@ -608,11 +534,9 @@ export default function MenuItemsPage() {
         // Empty ingredients array - clear existing ingredients
         payload.ingredients = [];
       }
-      
       // Use the trackInventory value from form (user can enable/disable manually)
       // If trackInventory is enabled but no ingredients, it will be ignored by backend
       payload.trackInventory = formData.trackInventory && validIngredients.length > 0;
-
       // Add nutrition object if any nutritional info is provided
       if (formData.nutritionalInfo && (
         formData.nutritionalInfo.calories > 0 ||
@@ -633,20 +557,16 @@ export default function MenuItemsPage() {
           allergens: formData.allergens,
         };
       }
-
       // Add variants if provided
       if (formData.variants.length > 0) {
         payload.variants = formData.variants.filter(v => v.name && v.options.length > 0);
       }
-
       // Add selections if provided
       if (formData.selections.length > 0) {
         payload.selections = formData.selections.filter(s => s.name && s.options.length > 0);
       }
-
       await createMenuItem(payload).unwrap();
       toast.success('Menu item created successfully');
-      
       // Reset form to default state
       setFormData({
         name: '',
@@ -671,13 +591,11 @@ export default function MenuItemsPage() {
       });
       setFormErrors({});
       setIsCreateModalOpen(false);
-      
       // Refetch menu items to show the new item
       await refetch();
     } catch (error: any) {
       const errorMessage = error?.data?.message || error?.message || 'Failed to create menu item';
       toast.error(errorMessage);
-      
       // Set form-level error if it's a validation error
       if (error?.data?.errors) {
         const apiErrors: Record<string, string> = {};
@@ -688,18 +606,15 @@ export default function MenuItemsPage() {
       }
     }
   };
-
   const handleUpdateMenuItem = async () => {
     if (!selectedMenuItem?.id) {
       toast.error('Menu item not selected');
       return;
     }
-
     if (!validateForm()) {
       toast.error('Please fix the errors in the form');
       return;
     }
-
     try {
       // Map form data to backend DTO structure
       const payload: any = {
@@ -713,7 +628,6 @@ export default function MenuItemsPage() {
         images: formData.images.filter(Boolean).length > 0 ? formData.images.filter(Boolean) : undefined,
         tags: formData.tags.length > 0 ? formData.tags : undefined,
       };
-
       // Add nutrition object if any nutritional info is provided
       if (formData.nutritionalInfo && (
         formData.nutritionalInfo.calories > 0 ||
@@ -733,7 +647,6 @@ export default function MenuItemsPage() {
           allergens: formData.allergens,
         };
       }
-
       // Handle ingredients - backend expects array of {ingredientId, quantity, unit}
       // Filter out ingredients without ingredientId
       const validIngredients = formData.ingredients.filter(ing => ing.ingredientId && ing.quantity > 0);
@@ -743,25 +656,21 @@ export default function MenuItemsPage() {
         // Empty ingredients array - clear existing ingredients
         payload.ingredients = [];
       }
-      
       // Use the trackInventory value from form (user can enable/disable manually)
       // If trackInventory is enabled but no ingredients, it will be ignored by backend
       payload.trackInventory = formData.trackInventory && validIngredients.length > 0;
-
       // Add variants if provided
       if (formData.variants.length > 0) {
         payload.variants = formData.variants.filter(v => v.name && v.options.length > 0);
       } else {
         payload.variants = []; // Clear variants if empty
       }
-
       // Add selections if provided
       if (formData.selections.length > 0) {
         payload.selections = formData.selections.filter(s => s.name && s.options.length > 0);
       } else {
         payload.selections = []; // Clear selections if empty
       }
-
       await updateMenuItem(payload).unwrap();
       toast.success('Menu item updated successfully');
       setIsEditModalOpen(false);
@@ -771,7 +680,6 @@ export default function MenuItemsPage() {
     } catch (error: any) {
       const errorMessage = error?.data?.message || error?.message || 'Failed to update menu item';
       toast.error(errorMessage);
-      
       // Set form-level error if it's a validation error
       if (error?.data?.errors) {
         const apiErrors: Record<string, string> = {};
@@ -782,10 +690,8 @@ export default function MenuItemsPage() {
       }
     }
   };
-
   const handleDeleteMenuItem = async () => {
     if (!itemToDelete) return;
-
     try {
       await deleteMenuItem(itemToDelete).unwrap();
       toast.success('Menu item deleted successfully');
@@ -796,16 +702,13 @@ export default function MenuItemsPage() {
       toast.error(error?.data?.message || 'Failed to delete menu item');
     }
   };
-
   const handleDeleteClick = (itemId: string) => {
     setItemToDelete(itemId);
     setIsDeleteModalOpen(true);
   };
-
   const handleAvailabilityToggle = async (itemId: string) => {
     const item = menuItems.find((i: MenuItem) => i.id === itemId);
     if (!item) return;
-    
     try {
       await toggleAvailability({ id: itemId, isAvailable: !item.isAvailable }).unwrap();
       toast.success('Menu item availability updated');
@@ -815,24 +718,20 @@ export default function MenuItemsPage() {
       toast.error('Failed to update availability');
     }
   };
-
   const openEditModal = (item: MenuItem) => {
     setSelectedMenuItem(item);
     setIsEditModalOpen(true);
   };
-
   const openViewModal = (item: MenuItem) => {
     setSelectedMenuItem(item);
     setIsViewModalOpen(true);
   };
-  
   const addIngredient = () => {
     setFormData({
       ...formData,
       ingredients: [...formData.ingredients, { ingredientId: '', quantity: 0, unit: 'pcs' }],
     });
   };
-  
   const updateIngredient = (index: number, field: 'ingredientId' | 'quantity' | 'unit', value: string | number) => {
     setFormData((prev) => {
       const newIngredients = [...prev.ingredients];
@@ -846,47 +745,38 @@ export default function MenuItemsPage() {
       return { ...prev, ingredients: newIngredients };
     });
   };
-  
   const removeIngredient = (index: number) => {
     setFormData({
       ...formData,
       ingredients: formData.ingredients.filter((_, i) => i !== index),
     });
   };
-  
   const addTag = (tag: string) => {
     if (tag && !formData.tags.includes(tag)) {
       setFormData({ ...formData, tags: [...formData.tags, tag] });
     }
   };
-  
   const removeTag = (tag: string) => {
     setFormData({ ...formData, tags: formData.tags.filter(t => t !== tag) });
   };
-  
   const addAllergen = (allergen: string) => {
     if (allergen && !formData.allergens.includes(allergen)) {
       setFormData({ ...formData, allergens: [...formData.allergens, allergen] });
     }
   };
-  
   const removeAllergen = (allergen: string) => {
     setFormData({ ...formData, allergens: formData.allergens.filter(a => a !== allergen) });
   };
-
   // Image upload handlers - Upload to Cloudinary
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    
     if (imageFiles.length === 0) {
       toast.error('Please upload only image files');
       e.target.value = '';
       return;
     }
-
     // Check file sizes (10MB limit per image)
     const maxSizeMB = 10;
     const oversizedFiles = imageFiles.filter((file) => file.size > maxSizeMB * 1024 * 1024);
@@ -895,17 +785,14 @@ export default function MenuItemsPage() {
       e.target.value = '';
       return;
     }
-
     try {
       // Create FormData for multipart upload
       const uploadFormData = new FormData();
       imageFiles.forEach((file) => {
         uploadFormData.append('images', file);
       });
-
       // Upload to Cloudinary via backend
       const result = await uploadImages(uploadFormData).unwrap();
-
       if (result.success && result.images && result.images.length > 0) {
         // Store Cloudinary URLs instead of base64
         const imageUrls = result.images.map((img) => img.url);
@@ -913,7 +800,6 @@ export default function MenuItemsPage() {
           ...prev,
           images: [...prev.images, ...imageUrls],
         }));
-        
         toast.success(`Successfully uploaded ${result.images.length} image(s) to Cloudinary`);
       } else {
         toast.error('Failed to upload images');
@@ -922,18 +808,15 @@ export default function MenuItemsPage() {
       console.error('Error uploading images:', error);
       toast.error(error?.data?.message || error?.message || 'Failed to upload images to Cloudinary');
     }
-    
     // Reset input to allow uploading the same file again
     e.target.value = '';
   };
-
   const removeImage = (index: number) => {
     setFormData({
       ...formData,
       images: formData.images.filter((_, i) => i !== index),
     });
   };
-
   // Selections handlers (for customization options like Size, Toppings, etc.)
   const addSelection = () => {
     setFormData({
@@ -945,7 +828,6 @@ export default function MenuItemsPage() {
       }],
     });
   };
-
   const updateSelection = (index: number, field: 'name' | 'type', value: string) => {
     const newSelections = [...formData.selections];
     newSelections[index] = {
@@ -954,20 +836,17 @@ export default function MenuItemsPage() {
     };
     setFormData({ ...formData, selections: newSelections });
   };
-
   const removeSelection = (index: number) => {
     setFormData({
       ...formData,
       selections: formData.selections.filter((_, i) => i !== index),
     });
   };
-
   const addSelectionOption = (selectionIndex: number) => {
     const newSelections = [...formData.selections];
     newSelections[selectionIndex].options.push({ name: '', price: 0 });
     setFormData({ ...formData, selections: newSelections });
   };
-
   const updateSelectionOption = (selectionIndex: number, optionIndex: number, field: 'name' | 'price', value: string | number) => {
     const newSelections = [...formData.selections];
     newSelections[selectionIndex].options[optionIndex] = {
@@ -976,13 +855,11 @@ export default function MenuItemsPage() {
     };
     setFormData({ ...formData, selections: newSelections });
   };
-
   const removeSelectionOption = (selectionIndex: number, optionIndex: number) => {
     const newSelections = [...formData.selections];
     newSelections[selectionIndex].options = newSelections[selectionIndex].options.filter((_, i) => i !== optionIndex);
     setFormData({ ...formData, selections: newSelections });
   };
-
   // Variants handlers (for size variants like Small, Medium, Large)
   const addVariant = () => {
     setFormData({
@@ -993,7 +870,6 @@ export default function MenuItemsPage() {
       }],
     });
   };
-
   const updateVariant = (index: number, field: 'name', value: string) => {
     const newVariants = [...formData.variants];
     newVariants[index] = {
@@ -1002,20 +878,17 @@ export default function MenuItemsPage() {
     };
     setFormData({ ...formData, variants: newVariants });
   };
-
   const removeVariant = (index: number) => {
     setFormData({
       ...formData,
       variants: formData.variants.filter((_, i) => i !== index),
     });
   };
-
   const addVariantOption = (variantIndex: number) => {
     const newVariants = [...formData.variants];
     newVariants[variantIndex].options.push({ name: '', priceModifier: 0 });
     setFormData({ ...formData, variants: newVariants });
   };
-
   const updateVariantOption = (variantIndex: number, optionIndex: number, field: 'name' | 'priceModifier', value: string | number) => {
     const newVariants = [...formData.variants];
     newVariants[variantIndex].options[optionIndex] = {
@@ -1024,13 +897,11 @@ export default function MenuItemsPage() {
     };
     setFormData({ ...formData, variants: newVariants });
   };
-
   const removeVariantOption = (variantIndex: number, optionIndex: number) => {
     const newVariants = [...formData.variants];
     newVariants[variantIndex].options = newVariants[variantIndex].options.filter((_, i) => i !== optionIndex);
     setFormData({ ...formData, variants: newVariants });
   };
-
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
       <span
@@ -1041,7 +912,6 @@ export default function MenuItemsPage() {
       </span>
     ));
   };
-
   const columns = [
     {
       key: 'name',
@@ -1167,26 +1037,21 @@ export default function MenuItemsPage() {
       ),
     },
   ];
-
   // Filter menu items based on client-side filters (for display)
   const filteredMenuItems = useMemo(() => {
     let filtered = menuItems;
-
     // Category filter is handled by API, but we can add client-side filtering as fallback
     if (categoryFilter !== 'all') {
       filtered = filtered.filter((item: MenuItem) => item.categoryId === categoryFilter);
     }
-
     // Availability filter is handled by API, but we can add client-side filtering as fallback
     if (availabilityFilter !== 'all') {
       filtered = filtered.filter((item: MenuItem) => 
         availabilityFilter === 'available' ? item.isAvailable : !item.isAvailable
       );
     }
-
     return filtered;
   }, [menuItems, categoryFilter, availabilityFilter]);
-
   // Error state
   if (error) {
     return (
@@ -1216,7 +1081,6 @@ export default function MenuItemsPage() {
       </div>
     );
   }
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -1235,7 +1099,6 @@ export default function MenuItemsPage() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1252,7 +1115,6 @@ export default function MenuItemsPage() {
               // Bulk create menu items
               let successCount = 0;
               let errorCount = 0;
-
               for (const item of data) {
                 try {
                   // Find category by name if categoryId is not provided
@@ -1263,11 +1125,9 @@ export default function MenuItemsPage() {
                     );
                     categoryId = category?.id;
                   }
-
                   if (!categoryId && categories.length > 0) {
                     categoryId = categories[0].id; // Fallback to first category
                   }
-
                   const payload: any = {
                     companyId: companyId?.toString(),
                     name: item.name || item['Menu Item'],
@@ -1277,11 +1137,9 @@ export default function MenuItemsPage() {
                     preparationTime: parseInt(item.preparationTime || item['Prep Time (min)'] || 0),
                     isAvailable: item.isAvailable !== false && item.Status !== 'Unavailable',
                   };
-
                   if (branchId) {
                     payload.branchId = branchId.toString();
                   }
-
                   await createMenuItem(payload).unwrap();
                   successCount++;
                 } catch (error: any) {
@@ -1289,7 +1147,6 @@ export default function MenuItemsPage() {
                   errorCount++;
                 }
               }
-
               if (successCount > 0) {
                 toast.success(`Successfully imported ${successCount} menu items`);
                 await refetch();
@@ -1315,7 +1172,6 @@ export default function MenuItemsPage() {
           </Button>
         </div>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
         <Card>
@@ -1329,7 +1185,6 @@ export default function MenuItemsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between gap-3">
@@ -1341,7 +1196,6 @@ export default function MenuItemsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between gap-3">
@@ -1353,7 +1207,6 @@ export default function MenuItemsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between gap-3">
@@ -1365,7 +1218,6 @@ export default function MenuItemsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1380,27 +1232,10 @@ export default function MenuItemsPage() {
                   </p>
                 )}
               </div>
-              <div className="flex flex-col items-center shrink-0">
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <span
-                      key={star}
-                      className={`text-lg md:text-xl lg:text-2xl ${
-                        star <= Math.round(stats.avgPopularity)
-                          ? 'text-yellow-400'
-                          : 'text-gray-300 dark:text-gray-600'
-                      }`}
-                    >
-                      ⭐
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
@@ -1444,7 +1279,6 @@ export default function MenuItemsPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Menu Items Table */}
       <DataTable
         data={filteredMenuItems}
@@ -1487,7 +1321,6 @@ export default function MenuItemsPage() {
         }}
         emptyMessage={isLoading ? 'Loading menu items...' : error ? 'Error loading menu items. Please try again.' : 'No menu items found.'}
       />
-
       {/* Menu Item Details Modal */}
       <Modal
         isOpen={isViewModalOpen}
@@ -1524,7 +1357,6 @@ export default function MenuItemsPage() {
                     </Badge>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-4 mt-4">
                   <div className="flex items-center gap-1">
                     <ClockIcon className="w-4 h-4 text-gray-400" />
@@ -1554,7 +1386,6 @@ export default function MenuItemsPage() {
                 </div>
               </div>
             </div>
-
             {/* Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Ingredients */}
@@ -1576,7 +1407,6 @@ export default function MenuItemsPage() {
                       } else {
                         ingredientName = 'Unknown';
                       }
-                      
                       return (
                         <Badge key={index} variant="secondary">
                           {ingredientName}
@@ -1586,7 +1416,6 @@ export default function MenuItemsPage() {
                   </div>
                 </div>
               )}
-
               {/* Allergens */}
               {selectedMenuItem.allergens && (
                 <div>
@@ -1600,14 +1429,12 @@ export default function MenuItemsPage() {
                   </div>
                 </div>
               )}
-
               {/* Nutritional Info */}
               {(() => {
                 const nutrition = selectedMenuItem.nutritionalInfo;
                 if (!nutrition) return null;
                 const hasNutrition = (nutrition.calories || 0) > 0 || (nutrition.protein || 0) > 0 || (nutrition.carbs || 0) > 0 || (nutrition.fat || 0) > 0;
                 if (!hasNutrition) return null;
-                
                 return (
                   <div>
                     <h4 className="font-medium text-gray-900 dark:text-white mb-3">Nutritional Information</h4>
@@ -1648,7 +1475,6 @@ export default function MenuItemsPage() {
                   </div>
                 );
               })()}
-
               {/* Tags */}
               {selectedMenuItem.tags && (
                 <div>
@@ -1663,7 +1489,6 @@ export default function MenuItemsPage() {
                 </div>
               )}
             </div>
-
             {/* Timestamps */}
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -1672,7 +1497,6 @@ export default function MenuItemsPage() {
                 Last updated: {formatDateTime(selectedMenuItem.updatedAt)}
               </div>
             </div>
-
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
@@ -1691,7 +1515,6 @@ export default function MenuItemsPage() {
           </div>
         )}
       </Modal>
-
       {/* Create/Edit Menu Item Modal */}
       <Modal
         isOpen={isCreateModalOpen || isEditModalOpen}
@@ -1757,7 +1580,6 @@ export default function MenuItemsPage() {
               )}
             </div>
           </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Description
@@ -1778,7 +1600,6 @@ export default function MenuItemsPage() {
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.description}</p>
               )}
             </div>
-
           {/* Image Upload Section */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1815,7 +1636,6 @@ export default function MenuItemsPage() {
             </label>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload one or more images for this menu item</p>
           </div>
-
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1882,7 +1702,6 @@ export default function MenuItemsPage() {
               </span>
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Ingredients
@@ -1977,7 +1796,6 @@ export default function MenuItemsPage() {
               </Button>
             </div>
           </div>
-
           {/* Variants Section (Size variants like Small, Medium, Large) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -2050,7 +1868,6 @@ export default function MenuItemsPage() {
               </Button>
             </div>
           </div>
-
           {/* Selections Section (Customization options like Toppings, Extras) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -2151,7 +1968,6 @@ export default function MenuItemsPage() {
               </Button>
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Allergens
@@ -2181,7 +1997,6 @@ export default function MenuItemsPage() {
               className="mt-2"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Tags
@@ -2211,7 +2026,6 @@ export default function MenuItemsPage() {
               className="mt-2"
             />
           </div>
-
           <div className="grid grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -2270,7 +2084,6 @@ export default function MenuItemsPage() {
               />
             </div>
           </div>
-
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
@@ -2292,7 +2105,6 @@ export default function MenuItemsPage() {
           </div>
         </div>
       </Modal>
-
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
@@ -2329,4 +2141,4 @@ export default function MenuItemsPage() {
       </Modal>
     </div>
   );
-}
+}

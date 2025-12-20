@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -25,7 +24,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-
 export default function PurchaseOrdersPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -40,19 +38,16 @@ export default function PurchaseOrdersPage() {
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-
   const companyId =
     (user as any)?.companyId ||
     (companyContext as any)?.companyId ||
     (companyContext as any)?._id ||
     (companyContext as any)?.id;
-
   const branchId =
     (user as any)?.branchId ||
     (companyContext as any)?.branchId ||
     (companyContext as any)?.branches?.[0]?._id ||
     (companyContext as any)?.branches?.[0]?.id;
-
   const { data: ordersData, isLoading, refetch } = useGetPurchaseOrdersQuery({
     companyId: companyId || undefined,
     branchId: branchId || undefined,
@@ -62,18 +57,15 @@ export default function PurchaseOrdersPage() {
     page: currentPage,
     limit: itemsPerPage,
   }, { skip: !companyId });
-
   const { data: suppliers } = useGetSuppliersQuery({ companyId: companyId || undefined });
   const { data: ingredients } = useGetInventoryItemsQuery({
     companyId: companyId || undefined,
     branchId: branchId || undefined,
   }, { skip: !companyId });
-
   const [createOrder] = useCreatePurchaseOrderMutation();
   const [approveOrder] = useApprovePurchaseOrderMutation();
   const [receiveOrder] = useReceivePurchaseOrderMutation();
   const [cancelOrder] = useCancelPurchaseOrderMutation();
-
   const [formData, setFormData] = useState<CreatePurchaseOrderRequest>({
     companyId: companyId || '',
     branchId: branchId || undefined,
@@ -82,14 +74,12 @@ export default function PurchaseOrdersPage() {
     notes: '',
     items: [],
   });
-
   const [newItem, setNewItem] = useState({
     ingredientId: '',
     quantity: 0,
     unitPrice: 0,
     notes: '',
   });
-
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
@@ -97,7 +87,6 @@ export default function PurchaseOrdersPage() {
       branchId: branchId || prev.branchId,
     }));
   }, [companyId, branchId]);
-
   const resetForm = () => {
     setFormData({
       companyId: companyId || '',
@@ -114,18 +103,15 @@ export default function PurchaseOrdersPage() {
       notes: '',
     });
   };
-
   const addItem = () => {
     if (!newItem.ingredientId || newItem.quantity <= 0 || newItem.unitPrice <= 0) {
       toast.error('Please fill in all item fields');
       return;
     }
-
     setFormData({
       ...formData,
       items: [...formData.items, { ...newItem }],
     });
-
     setNewItem({
       ingredientId: '',
       quantity: 0,
@@ -133,25 +119,21 @@ export default function PurchaseOrdersPage() {
       notes: '',
     });
   };
-
   const removeItem = (index: number) => {
     setFormData({
       ...formData,
       items: formData.items.filter((_, i) => i !== index),
     });
   };
-
   const handleCreate = async () => {
     if (!formData.companyId) {
       toast.error('Company context is missing. Please refresh the page.');
       return;
     }
-
     if (!formData.supplierId || formData.items.length === 0) {
       toast.error('Please select a supplier and add at least one item');
       return;
     }
-
     try {
       await createOrder({
         ...formData,
@@ -167,10 +149,8 @@ export default function PurchaseOrdersPage() {
       toast.error(error.data?.message || 'Failed to create purchase order');
     }
   };
-
   const handleApprove = async (approvedBy: string, notes?: string) => {
     if (!selectedOrder) return;
-
     try {
       await approveOrder({
         id: selectedOrder.id,
@@ -184,10 +164,8 @@ export default function PurchaseOrdersPage() {
       toast.error(error.data?.message || 'Failed to approve purchase order');
     }
   };
-
   const handleReceive = async (receivedItems: Array<{ itemId: string; receivedQuantity: number }>) => {
     if (!selectedOrder) return;
-
     try {
       await receiveOrder({
         id: selectedOrder.id,
@@ -202,10 +180,8 @@ export default function PurchaseOrdersPage() {
       toast.error(error.data?.message || 'Failed to receive purchase order');
     }
   };
-
   const handleCancel = async (reason: string) => {
     if (!selectedOrder) return;
-
     try {
       await cancelOrder({
         id: selectedOrder.id,
@@ -219,12 +195,10 @@ export default function PurchaseOrdersPage() {
       toast.error(error.data?.message || 'Failed to cancel purchase order');
     }
   };
-
   const openViewModal = (order: PurchaseOrder) => {
     setSelectedOrder(order);
     setIsViewModalOpen(true);
   };
-
   const getStatusBadge = (status: PurchaseOrder['status']) => {
     const variants = {
       draft: 'secondary',
@@ -234,10 +208,8 @@ export default function PurchaseOrdersPage() {
       received: 'success',
       cancelled: 'danger',
     } as const;
-
     return <Badge variant={variants[status]}>{status}</Badge>;
   };
-
   const columns = [
     {
       key: 'orderNumber',
@@ -360,7 +332,6 @@ export default function PurchaseOrdersPage() {
       ),
     },
   ];
-
   const stats = {
     total: ordersData?.total || 0,
     pending: ordersData?.orders?.filter(o => o.status === 'pending').length || 0,
@@ -368,7 +339,6 @@ export default function PurchaseOrdersPage() {
     received: ordersData?.orders?.filter(o => o.status === 'received').length || 0,
     totalValue: ordersData?.orders?.reduce((sum, order) => sum + order.totalAmount, 0) || 0,
   };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -384,20 +354,17 @@ export default function PurchaseOrdersPage() {
             onImport={async (data, _result) => {
               let successCount = 0;
               let errorCount = 0;
-
               for (const item of data) {
                 try {
                   if (!companyId) {
                     toast.error('Company context is missing. Please refresh the page.');
                     return;
                   }
-
                   // Parse items from CSV (format: "Ingredient Name:Quantity:Price" separated by semicolons)
                   const items: any[] = [];
                   if (item.items || item.Items) {
                     const itemsStr = item.items || item.Items;
                     const itemList = itemsStr.split(';').map((i: string) => i.trim()).filter(Boolean);
-                    
                     for (const itemStr of itemList) {
                       const parts = itemStr.split(':');
                       if (parts.length >= 2) {
@@ -407,7 +374,6 @@ export default function PurchaseOrdersPage() {
                         const ingredient = ingredientList.find((ing: any) => 
                           ing.name.toLowerCase() === ingredientName.toLowerCase()
                         );
-                        
                         if (ingredient) {
                           items.push({
                             ingredientId: ingredient.id || ingredient._id,
@@ -419,12 +385,10 @@ export default function PurchaseOrdersPage() {
                       }
                     }
                   }
-
                   if (items.length === 0) {
                     errorCount++;
                     continue;
                   }
-
                   // Find supplier by name
                   let supplierId = item.supplierId || item['Supplier ID'];
                   if (!supplierId && (item.supplier || item.Supplier)) {
@@ -435,12 +399,10 @@ export default function PurchaseOrdersPage() {
                     );
                     supplierId = supplier?.id || supplier?._id;
                   }
-
                   if (!supplierId) {
                     errorCount++;
                     continue;
                   }
-
                   const payload: CreatePurchaseOrderRequest = {
                     companyId,
                     branchId: branchId || undefined,
@@ -449,7 +411,6 @@ export default function PurchaseOrdersPage() {
                     notes: item.notes || item.Notes || undefined,
                     items,
                   };
-
                   await createOrder(payload).unwrap();
                   successCount++;
                 } catch (error: any) {
@@ -457,7 +418,6 @@ export default function PurchaseOrdersPage() {
                   errorCount++;
                 }
               }
-
               if (successCount > 0) {
                 toast.success(`Successfully imported ${successCount} purchase orders`);
                 await refetch();
@@ -481,7 +441,6 @@ export default function PurchaseOrdersPage() {
           </Button>
         </div>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
@@ -495,7 +454,6 @@ export default function PurchaseOrdersPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -507,7 +465,6 @@ export default function PurchaseOrdersPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -519,7 +476,6 @@ export default function PurchaseOrdersPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -531,20 +487,18 @@ export default function PurchaseOrdersPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Value</p>
-                <p className="text-3xl font-bold text-purple-600">{formatCurrency(stats.totalValue)}</p>
+                <p className="text-3xl font-bold text-purple-600 break-words">{formatCurrency(stats.totalValue)}</p>
               </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-purple-600" />
+              <CurrencyDollarIcon className="w-8 h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
@@ -586,7 +540,6 @@ export default function PurchaseOrdersPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Purchase Orders Table */}
       <DataTable
         data={ordersData?.orders || []}
@@ -605,11 +558,9 @@ export default function PurchaseOrdersPage() {
         exportable={true}
         exportFilename="purchase-orders"
         onExport={(format, items) => {
-          console.log(`Exporting ${items.length} purchase orders as ${format}`);
-        }}
+          }}
         emptyMessage="No purchase orders found."
       />
-
       {/* Create Purchase Order Modal */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -636,11 +587,9 @@ export default function PurchaseOrdersPage() {
               onChange={(e) => setFormData({ ...formData, expectedDeliveryDate: e.target.value })}
             />
           </div>
-
           {/* Add Items Section */}
           <div>
             <h3 className="font-medium text-gray-900 dark:text-white mb-4">Order Items</h3>
-
             {/* Add New Item */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <Select
@@ -668,7 +617,6 @@ export default function PurchaseOrdersPage() {
                 </Button>
               </div>
             </div>
-
             {/* Items List */}
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {formData.items.map((item, index) => {
@@ -700,7 +648,6 @@ export default function PurchaseOrdersPage() {
                 );
               })}
             </div>
-
             {formData.items.length > 0 && (
               <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="flex justify-between items-center">
@@ -712,7 +659,6 @@ export default function PurchaseOrdersPage() {
               </div>
             )}
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Notes (Optional)
@@ -725,7 +671,6 @@ export default function PurchaseOrdersPage() {
               placeholder="Additional notes for this purchase order..."
             />
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -742,7 +687,6 @@ export default function PurchaseOrdersPage() {
           </div>
         </div>
       </Modal>
-
       {/* Order Details Modal */}
       <Modal
         isOpen={isViewModalOpen}
@@ -782,7 +726,6 @@ export default function PurchaseOrdersPage() {
                   </div>
                 </div>
               </div>
-
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white mb-2">Supplier Details</h3>
                 <div className="space-y-2 text-sm">
@@ -807,7 +750,6 @@ export default function PurchaseOrdersPage() {
                   </div>
                 </div>
               </div>
-
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white mb-2">Order Summary</h3>
                 <div className="space-y-2 text-sm">
@@ -842,7 +784,6 @@ export default function PurchaseOrdersPage() {
                 </div>
               </div>
             </div>
-
             {/* Order Items */}
             <div>
               <h3 className="font-medium text-gray-900 dark:text-white mb-4">Order Items</h3>
@@ -877,7 +818,6 @@ export default function PurchaseOrdersPage() {
                 ))}
               </div>
             </div>
-
             {/* Notes */}
             {selectedOrder.notes && (
               <div>
@@ -887,7 +827,6 @@ export default function PurchaseOrdersPage() {
                 </p>
               </div>
             )}
-
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
@@ -925,7 +864,6 @@ export default function PurchaseOrdersPage() {
           </div>
         )}
       </Modal>
-
       {/* Approve Order Modal */}
       <Modal
         isOpen={isApproveModalOpen}
@@ -940,7 +878,6 @@ export default function PurchaseOrdersPage() {
           <p className="text-gray-600 dark:text-gray-400">
             Are you sure you want to approve this purchase order?
           </p>
-
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
             <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">Order Summary</h4>
             <div className="text-sm space-y-1">
@@ -962,7 +899,6 @@ export default function PurchaseOrdersPage() {
               </div>
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Approval Notes (Optional)
@@ -973,7 +909,6 @@ export default function PurchaseOrdersPage() {
               placeholder="Add any approval notes..."
             />
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -993,7 +928,6 @@ export default function PurchaseOrdersPage() {
           </div>
         </div>
       </Modal>
-
       {/* Receive Order Modal */}
       <Modal
         isOpen={isReceiveModalOpen}
@@ -1009,7 +943,6 @@ export default function PurchaseOrdersPage() {
           <p className="text-gray-600 dark:text-gray-400">
             Update received quantities for each item in this purchase order.
           </p>
-
           <div className="space-y-4">
             {selectedOrder?.items.map((item) => (
               <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -1039,7 +972,6 @@ export default function PurchaseOrdersPage() {
               </div>
             ))}
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -1066,7 +998,6 @@ export default function PurchaseOrdersPage() {
           </div>
         </div>
       </Modal>
-
       {/* Cancel Order Modal */}
       <Modal
         isOpen={isCancelModalOpen}
@@ -1081,7 +1012,6 @@ export default function PurchaseOrdersPage() {
           <p className="text-gray-600 dark:text-gray-400">
             Are you sure you want to cancel this purchase order? This action cannot be undone.
           </p>
-
           <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
             <h4 className="font-medium text-red-800 dark:text-red-400 mb-2">Order Details</h4>
             <div className="text-sm space-y-1">
@@ -1099,7 +1029,6 @@ export default function PurchaseOrdersPage() {
               </div>
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Cancellation Reason (Required)
@@ -1111,7 +1040,6 @@ export default function PurchaseOrdersPage() {
               placeholder="Please provide a reason for cancellation..."
             />
           </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -1141,4 +1069,4 @@ export default function PurchaseOrdersPage() {
       </Modal>
     </div>
   );
-}
+}

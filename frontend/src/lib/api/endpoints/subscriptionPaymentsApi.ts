@@ -1,5 +1,4 @@
 import { apiSlice } from '../apiSlice';
-
 export enum PaymentGateway {
   STRIPE = 'stripe',
   PAYPAL = 'paypal',
@@ -11,7 +10,6 @@ export enum PaymentGateway {
   UPAY = 'upay',
   MANUAL = 'manual',
 }
-
 export enum PaymentMethodType {
   CARD = 'card',
   DIGITAL_WALLET = 'digital_wallet',
@@ -19,7 +17,6 @@ export enum PaymentMethodType {
   BANK_TRANSFER = 'bank_transfer',
   MANUAL = 'manual',
 }
-
 export interface SubscriptionPaymentMethod {
   id: string;
   gateway: PaymentGateway;
@@ -44,7 +41,6 @@ export interface SubscriptionPaymentMethod {
     [key: string]: any;
   };
 }
-
 export interface InitializePaymentRequest {
   companyId: string;
   planName: string;
@@ -57,7 +53,6 @@ export interface InitializePaymentRequest {
   };
   billingCycle?: string;
 }
-
 export interface InitializePaymentResponse {
   gateway: PaymentGateway;
   sessionId?: string;
@@ -75,14 +70,12 @@ export interface InitializePaymentResponse {
   paymentReference?: string;
   requiresManualVerification?: boolean;
 }
-
 export interface ManualActivationRequest {
   companyId: string;
   planName: string;
   billingCycle?: string;
   notes?: string;
 }
-
 export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Get available payment methods (public - only active)
@@ -103,9 +96,7 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       },
       providesTags: ['Subscription'],
     }),
-
     // ========== Super Admin Payment Method Management ==========
-
     // Get all payment methods (admin - includes inactive)
     getAllSubscriptionPaymentMethods: builder.query<SubscriptionPaymentMethod[], void>({
       query: () => '/subscription-payments/admin/methods',
@@ -116,7 +107,6 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       },
       providesTags: ['Subscription'],
     }),
-
     // Get payment method by ID
     getSubscriptionPaymentMethodById: builder.query<SubscriptionPaymentMethod, string>({
       query: (id) => `/subscription-payments/admin/methods/${id}`,
@@ -125,7 +115,6 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       },
       providesTags: (result, error, id) => [{ type: 'Subscription', id }],
     }),
-
     // Create payment method
     createSubscriptionPaymentMethod: builder.mutation<
       SubscriptionPaymentMethod,
@@ -138,7 +127,6 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Subscription'],
     }),
-
     // Update payment method
     updateSubscriptionPaymentMethod: builder.mutation<
       SubscriptionPaymentMethod,
@@ -151,7 +139,6 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { id }) => [{ type: 'Subscription', id }, 'Subscription'],
     }),
-
     // Delete payment method
     deleteSubscriptionPaymentMethod: builder.mutation<{ message: string }, string>({
       query: (id) => ({
@@ -160,7 +147,6 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Subscription'],
     }),
-
     // Toggle payment method status
     toggleSubscriptionPaymentMethodStatus: builder.mutation<SubscriptionPaymentMethod, string>({
       query: (id) => ({
@@ -169,7 +155,6 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, id) => [{ type: 'Subscription', id }, 'Subscription'],
     }),
-
     // Initialize payment
     initializeSubscriptionPayment: builder.mutation<
       InitializePaymentResponse,
@@ -180,9 +165,13 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
         method: 'POST',
         body,
       }),
+      transformResponse: (response: any) => {
+        // Handle response structure: { success: true, data: {...} } or direct response
+        const data = response?.data || response;
+        return data;
+      },
       invalidatesTags: ['Subscription'],
     }),
-
     // Manual activation (Super Admin only)
     manualActivateSubscription: builder.mutation<
       { success: boolean; message: string; company: any },
@@ -195,7 +184,6 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Subscription', 'Company'],
     }),
-
     // Verify payment
     verifySubscriptionPayment: builder.mutation<
       { verified: boolean; paymentId: string; transactionId: string },
@@ -210,7 +198,6 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
     }),
   }),
 });
-
 export interface CreateSubscriptionPaymentMethodDto {
   gateway: PaymentGateway;
   type: PaymentMethodType;
@@ -234,7 +221,6 @@ export interface CreateSubscriptionPaymentMethodDto {
     [key: string]: any;
   };
 }
-
 export const {
   useGetSubscriptionPaymentMethodsQuery,
   useGetAllSubscriptionPaymentMethodsQuery,
@@ -246,5 +232,4 @@ export const {
   useInitializeSubscriptionPaymentMutation,
   useManualActivateSubscriptionMutation,
   useVerifySubscriptionPaymentMutation,
-} = subscriptionPaymentsApi;
-
+} = subscriptionPaymentsApi;

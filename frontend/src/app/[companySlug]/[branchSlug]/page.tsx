@@ -1,17 +1,14 @@
 'use client';
-
 import { useGetBranchBySlugQuery, useGetCompanyBranchesQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import toast from 'react-hot-toast';
-
 export default function BranchLandingPage() {
   const params = useParams();
   const router = useRouter();
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
-
   const { 
     data: company, 
     isLoading: companyLoading, 
@@ -19,7 +16,6 @@ export default function BranchLandingPage() {
   } = useGetCompanyBySlugQuery(companySlug, {
     skip: !companySlug,
   });
-  
   const { 
     data: branch, 
     isLoading: branchLoading,
@@ -28,19 +24,16 @@ export default function BranchLandingPage() {
     { companySlug, branchSlug },
     { skip: !companySlug || !branchSlug }
   );
-
   // Get branches list for error display (only if company exists but branch doesn't)
   const { data: branchesData } = useGetCompanyBranchesQuery(companySlug, {
     skip: !companySlug || companyError || !company,
   });
-
   // Redirect to shop page (main branch page)
   useEffect(() => {
     if (company && branch && !companyLoading && !branchLoading) {
       router.replace(`/${companySlug}/${branchSlug}/shop`);
     }
   }, [company, branch, companyLoading, branchLoading, companySlug, branchSlug, router]);
-
   // Show error toast if API errors occur
   useEffect(() => {
     if (companyError) {
@@ -54,14 +47,11 @@ export default function BranchLandingPage() {
       toast.error(`Branch Error: ${errorMessage}`);
       console.error('Branch error:', branchError);
       console.error('Attempted to load:', { companySlug, branchSlug });
-      
       // If company exists but branch doesn't, try to get list of branches
       if (company && !companyError) {
-        console.log('Company found, but branch not found. Available branches:', company);
-      }
+        }
     }
   }, [companyError, branchError, companySlug, branchSlug, company]);
-
   // Loading state
   if (companyLoading || branchLoading) {
     return (
@@ -73,7 +63,6 @@ export default function BranchLandingPage() {
       </div>
     );
   }
-
   // Error state
   if (companyError || branchError || !company || !branch) {
     const errorMessage = companyError 
@@ -83,7 +72,6 @@ export default function BranchLandingPage() {
       : !company
       ? `Company "${companySlug}" not found`
       : `Branch "${branchSlug}" not found for company "${companySlug}"`;
-    
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
         <div className="max-w-md w-full text-center">
@@ -130,7 +118,6 @@ export default function BranchLandingPage() {
       </div>
     );
   }
-
   // This should not render as we redirect, but just in case
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -140,5 +127,4 @@ export default function BranchLandingPage() {
       </div>
     </div>
   );
-}
-
+}

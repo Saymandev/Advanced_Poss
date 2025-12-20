@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -25,13 +24,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-
 export default function TablesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  
   // Redirect if user doesn't have table-management feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('table-management');
-  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
@@ -39,24 +35,17 @@ export default function TablesPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-
   // Get branchId from multiple sources
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
-
   // WebSocket for real-time table updates
   const { socket, isConnected } = useSocket();
-
   // Track last refetch time to prevent excessive refetches
   const lastRefetchTimeRef = useRef<number>(0);
   const REFETCH_DEBOUNCE_MS = 1000; // Minimum 1 second between refetches
-
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-
-  console.log('🔍 Tables Page - branchId:', branchId, 'user:', user);
-
   const { data: tablesResponse, isLoading, error, refetch } = useGetTablesQuery({
     branchId,
     status: statusFilter === 'all' ? undefined : statusFilter,
@@ -68,21 +57,13 @@ export default function TablesPage() {
     pollingInterval: isConnected ? 300000 : 60000, // 5min when WebSocket connected, 60s fallback
     refetchOnMountOrArgChange: false, // Prevent refetch on every render
   });
-
-  console.log('🔍 Tables Query State:', { isLoading, error, tablesResponse });
-
   // Extract tables from API response
   const tables = useMemo(() => {
     if (!tablesResponse) {
-      console.log('🔍 Tables Response: No data received');
       return [];
     }
-    
     const response = tablesResponse as any;
-    console.log('🔍 Tables API Response:', response);
-    
     let items = [];
-    
     // Handle different response structures
     if (Array.isArray(response)) {
       items = response;
@@ -95,14 +76,9 @@ export default function TablesPage() {
     } else {
       items = response.tables || response.items || [];
     }
-    
-    console.log('🔍 Extracted items:', items);
-    
     if (!Array.isArray(items)) {
-      console.log('⚠️ Items is not an array:', items);
       return [];
     }
-    
     const transformed = items.map((table: any) => ({
       id: table._id || table.id,
       number: table.tableNumber || table.number?.toString() || table.number || '',
@@ -115,30 +91,24 @@ export default function TablesPage() {
       createdAt: table.createdAt || new Date().toISOString(),
       updatedAt: table.updatedAt || new Date().toISOString(),
     }));
-    
-    console.log('🔍 Transformed tables:', transformed);
     return transformed;
   }, [tablesResponse]);
-
   const totalTables = useMemo(() => {
     const response = tablesResponse as any;
     if (response?.data?.total) return response.data.total;
     if (response?.total) return response.total;
     return tables.length;
   }, [tablesResponse, tables.length]);
-
   const [createTable, { isLoading: isCreating }] = useCreateTableMutation();
   const [updateTable, { isLoading: isUpdating }] = useUpdateTableMutation();
   const [deleteTable] = useDeleteTableMutation();
   const [updateTableStatus] = useUpdateTableStatusMutation();
-
   const [formData, setFormData] = useState<any>({
     number: '1',
     capacity: 4,
     location: '',
     status: 'available' as const,
   });
-
   const resetForm = () => {
     setFormData({
       number: '1',
@@ -148,13 +118,11 @@ export default function TablesPage() {
     });
     setSelectedTable(null);
   };
-
   useEffect(() => {
     if (!isCreateModalOpen && !isEditModalOpen && !isViewModalOpen) {
       resetForm();
     }
   }, [isCreateModalOpen, isEditModalOpen, isViewModalOpen]);
-
   // Debounced refetch function for WebSocket events
   const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const handleTableUpdate = useCallback(() => {
@@ -164,26 +132,21 @@ export default function TablesPage() {
       return;
     }
     lastRefetchTimeRef.current = now;
-
     // Clear existing timeout
     if (refetchTimeoutRef.current) {
       clearTimeout(refetchTimeoutRef.current);
     }
-    
     // Debounce to 800ms - batch multiple rapid WebSocket events
     refetchTimeoutRef.current = setTimeout(() => {
       refetch();
     }, 800);
   }, [refetch]);
-
   // WebSocket listeners for real-time table status updates
   useEffect(() => {
     if (!socket || !isConnected || !branchId) return;
-
     socket.on('table:status-changed', handleTableUpdate);
     socket.on('table:available', handleTableUpdate);
     socket.on('table:occupied', handleTableUpdate);
-
     return () => {
       socket.off('table:status-changed', handleTableUpdate);
       socket.off('table:available', handleTableUpdate);
@@ -193,18 +156,15 @@ export default function TablesPage() {
       }
     };
   }, [socket, isConnected, branchId, handleTableUpdate]);
-
   const handleCreate = async () => {
     if (!formData.number || !formData.capacity) {
       toast.error('Table number and capacity are required');
       return;
     }
-
     if (!branchId) {
       toast.error('Branch ID is required. Please ensure you are logged in with a valid branch.');
       return;
     }
-
     try {
       const payload = {
         branchId: branchId.toString(),
@@ -212,7 +172,6 @@ export default function TablesPage() {
         capacity: parseInt(formData.capacity) || 4,
         location: formData.location || undefined,
       };
-      
       await createTable(payload as any).unwrap();
       toast.success('Table created successfully');
       setIsCreateModalOpen(false);
@@ -223,14 +182,12 @@ export default function TablesPage() {
       toast.error(error?.data?.message || error?.message || 'Failed to create table');
     }
   };
-
   const handleEdit = async () => {
     if (!selectedTable) return;
     if (!formData.number || !formData.capacity) {
       toast.error('Table number and capacity are required');
       return;
     }
-
     try {
       // Update table details (excluding status)
       await updateTable({
@@ -239,7 +196,6 @@ export default function TablesPage() {
         capacity: parseInt(formData.capacity) || 4,
         location: formData.location || undefined,
       } as any).unwrap();
-      
       // Update status separately if it changed
       if (formData.status && formData.status !== selectedTable.status) {
         await updateTableStatus({
@@ -247,7 +203,6 @@ export default function TablesPage() {
           status: formData.status,
         }).unwrap();
       }
-      
       toast.success('Table updated successfully');
       refetch();
       setIsEditModalOpen(false);
@@ -256,10 +211,8 @@ export default function TablesPage() {
       toast.error(error?.data?.message || error?.message || 'Failed to update table');
     }
   };
-
   const handleDelete = async (table: Table) => {
     if (!confirm(`Are you sure you want to delete Table ${table.number}?`)) return;
-
     try {
       await deleteTable(table.id).unwrap();
       toast.success('Table deleted successfully');
@@ -268,7 +221,6 @@ export default function TablesPage() {
       toast.error(error.data?.message || 'Failed to delete table');
     }
   };
-
   const handleStatusChange = async (table: Table, status: Table['status']) => {
     try {
       await updateTableStatus({
@@ -280,7 +232,6 @@ export default function TablesPage() {
       toast.error(error?.data?.message || error?.message || 'Failed to update table status');
     }
   };
-
   const openEditModal = (table: Table) => {
     setSelectedTable(table);
     setFormData({
@@ -291,12 +242,10 @@ export default function TablesPage() {
     });
     setIsEditModalOpen(true);
   };
-
   const openViewModal = (table: Table) => {
     setSelectedTable(table);
     setIsViewModalOpen(true);
   };
-
   const getStatusBadge = (status: Table['status']) => {
     const variants: any = {
       available: 'success',
@@ -305,10 +254,8 @@ export default function TablesPage() {
       needs_cleaning: 'info',
       maintenance: 'secondary',
     };
-
     return <Badge variant={variants[status] || 'secondary'}>{status.replace('_', ' ')}</Badge>;
   };
-
   const getStatusIcon = (status: Table['status']) => {
     const icons: any = {
       available: CheckCircleIcon,
@@ -317,11 +264,9 @@ export default function TablesPage() {
       needs_cleaning: ClockIcon,
       maintenance: ClockIcon,
     };
-
     const Icon = icons[status] || CheckCircleIcon;
     return <Icon className="w-4 h-4" />;
   };
-
   const columns = [
     {
       key: 'number',
@@ -466,24 +411,19 @@ export default function TablesPage() {
       ),
     },
   ];
-
   // Filter tables based on search and status
   const filteredTables = useMemo(() => {
     return tables.filter((table: any) => {
       const tableNum = (table.number || '').toString();
       const location = (table.location || '').toLowerCase();
       const searchLower = searchQuery.toLowerCase();
-      
       const matchesSearch = !searchQuery || 
         tableNum.includes(searchLower) ||
         location.includes(searchLower);
-      
       const matchesStatus = statusFilter === 'all' || table.status === statusFilter;
-      
       return matchesSearch && matchesStatus;
     });
   }, [tables, searchQuery, statusFilter]);
-
   const stats = useMemo(() => {
     return {
       total: totalTables,
@@ -493,7 +433,6 @@ export default function TablesPage() {
       cleaning: tables.filter(t => t.status === 'needs_cleaning').length,
     };
   }, [tables, totalTables]);
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -509,21 +448,18 @@ export default function TablesPage() {
             onImport={async (data, _result) => {
               let successCount = 0;
               let errorCount = 0;
-
               for (const item of data) {
                 try {
                   if (!branchId) {
                     toast.error('Branch ID is required. Please ensure you are logged in with a valid branch.');
                     return;
                   }
-
                   const payload = {
                     branchId: branchId.toString(),
                     tableNumber: (item.tableNumber || item['Table Number'] || item.number || item.Number || '').toString(),
                     capacity: parseInt(item.capacity || item.Capacity || 4),
                     location: item.location || item.Location || undefined,
                   };
-                  
                   await createTable(payload as any).unwrap();
                   successCount++;
                 } catch (error: any) {
@@ -531,7 +467,6 @@ export default function TablesPage() {
                   errorCount++;
                 }
               }
-
               if (successCount > 0) {
                 toast.success(`Successfully imported ${successCount} tables`);
                 await refetch();
@@ -554,7 +489,6 @@ export default function TablesPage() {
           </Button>
         </div>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
@@ -568,7 +502,6 @@ export default function TablesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -580,7 +513,6 @@ export default function TablesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -592,7 +524,6 @@ export default function TablesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -604,7 +535,6 @@ export default function TablesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -617,7 +547,6 @@ export default function TablesPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Table Layout Visualization */}
       <Card>
         <CardHeader>
@@ -671,7 +600,6 @@ export default function TablesPage() {
                     </p>
                   </div>
                 </div>
-
                 {table.currentOrderId && (
                   <div className="absolute -top-2 -right-2 w-4 h-4 bg-primary-600 rounded-full flex items-center justify-center">
                     <span className="text-xs text-white font-bold">!</span>
@@ -679,7 +607,6 @@ export default function TablesPage() {
                 )}
               </div>
             ))}
-
             {filteredTables.length === 0 && !isLoading && (
               <div className="col-span-full text-center py-8">
                 <TableCellsIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -691,7 +618,6 @@ export default function TablesPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
@@ -720,7 +646,6 @@ export default function TablesPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Tables Table */}
       <DataTable
         data={filteredTables}
@@ -743,7 +668,6 @@ export default function TablesPage() {
         }}
         emptyMessage="No tables found. Add your first table to get started."
       />
-
       {/* Create Table Modal */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -763,7 +687,6 @@ export default function TablesPage() {
             placeholder="e.g., 1, 2, A1, VIP-1"
             required
           />
-
           <Input
             label="Seating Capacity *"
             type="number"
@@ -773,14 +696,12 @@ export default function TablesPage() {
             max={50}
             required
           />
-
           <Input
             label="Location"
             value={formData.location}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             placeholder="e.g., Indoor, Outdoor, Patio, VIP Section"
           />
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"
@@ -797,7 +718,6 @@ export default function TablesPage() {
           </div>
         </div>
       </Modal>
-
       {/* View Table Modal */}
       <Modal
         isOpen={isViewModalOpen}
@@ -830,7 +750,6 @@ export default function TablesPage() {
                 {getStatusBadge(selectedTable.status)}
               </div>
             </div>
-
             <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -844,7 +763,6 @@ export default function TablesPage() {
                     </span>
                   </div>
                 </div>
-
                 {selectedTable.location && (
                   <div>
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -854,7 +772,6 @@ export default function TablesPage() {
                   </div>
                 )}
               </div>
-
               {selectedTable.currentOrderId && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -865,7 +782,6 @@ export default function TablesPage() {
                   </Badge>
                 </div>
               )}
-
               {selectedTable.reservationId && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -874,7 +790,6 @@ export default function TablesPage() {
                   <Badge variant="warning">Reserved</Badge>
                 </div>
               )}
-
               {selectedTable.qrCode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -885,7 +800,6 @@ export default function TablesPage() {
                   </p>
                 </div>
               )}
-
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -905,7 +819,6 @@ export default function TablesPage() {
                 </div>
               </div>
             </div>
-
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
@@ -928,7 +841,6 @@ export default function TablesPage() {
           </div>
         )}
       </Modal>
-
       {/* Edit Table Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -948,7 +860,6 @@ export default function TablesPage() {
             placeholder="e.g., 1, 2, A1, VIP-1"
             required
           />
-
           <Input
             label="Seating Capacity *"
             type="number"
@@ -958,14 +869,12 @@ export default function TablesPage() {
             max={50}
             required
           />
-
           <Input
             label="Location"
             value={formData.location}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             placeholder="e.g., Indoor, Outdoor, Patio, VIP Section"
           />
-
           {selectedTable && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -984,7 +893,6 @@ export default function TablesPage() {
               />
             </div>
           )}
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="secondary"

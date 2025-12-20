@@ -1,37 +1,28 @@
 'use client';
-
 import { useAppSelector } from '@/lib/store';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { io, Socket } from 'socket.io-client';
 import { useNotifications } from './useNotifications';
-
 // Play LOUD notification sound for waiter order assignments
 const playLoudNotificationSound = () => {
   try {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    
     // Create a loud, attention-grabbing sound (bell/doorbell-like)
     const frequencies = [800, 1000, 1200]; // Three tones for attention
     const duration = 0.3; // 300ms
-    
     frequencies.forEach((freq, index) => {
       setTimeout(() => {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
         oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
         oscillator.type = 'sine';
-        
         // LOUD volume (0.8 = 80% volume for maximum attention)
         gainNode.gain.setValueAtTime(0, audioContext.currentTime);
         gainNode.gain.linearRampToValueAtTime(0.8, audioContext.currentTime + 0.01);
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
-        
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + duration);
       }, index * 100); // Stagger the tones
@@ -43,17 +34,13 @@ const playLoudNotificationSound = () => {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
       oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
       oscillator.type = 'sine';
-      
       gainNode.gain.setValueAtTime(0, audioContext.currentTime);
       gainNode.gain.linearRampToValueAtTime(0.8, audioContext.currentTime + 0.01);
       gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
-      
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.5);
     } catch (fallbackError) {
@@ -61,16 +48,13 @@ const playLoudNotificationSound = () => {
     }
   }
 };
-
 // Get socket URL from environment or default to API URL
 const getBaseUrls = () => {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
   const baseUrl = apiUrl.replace(/\/api\/v1$/, '');
   return { apiUrl, baseUrl };
 };
-
 const { apiUrl: API_URL, baseUrl: SOCKET_URL } = getBaseUrls();
-
 interface UseSocketReturn {
   socket: Socket | null;
   isConnected: boolean;
@@ -81,7 +65,6 @@ interface UseSocketReturn {
   joinTable: (tableId: string) => void;
   leaveTable: (tableId: string) => void;
 }
-
 export const useSocket = (): UseSocketReturn => {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const { addNotification, hydrateNotifications } = useNotifications();
@@ -89,12 +72,10 @@ export const useSocket = (): UseSocketReturn => {
   const [isConnected, setIsConnected] = useState(false);
   const branchIdRef = useRef<string | null>(null);
   const tableIdRef = useRef<string | null>(null);
-  
   // Get user role for filtering notifications
   const userRole = (user as any)?.role?.toLowerCase();
   const isWaiter = userRole === 'waiter' || userRole === 'server';
   const isSuperAdmin = userRole === 'super_admin';
-
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
@@ -102,15 +83,12 @@ export const useSocket = (): UseSocketReturn => {
   const companyId = (user as any)?.companyId || (companyContext as any)?.companyId || (companyContext as any)?._id || (companyContext as any)?.id;
   const userId = (user as any)?.id || (user as any)?._id;
   const features = ((user as any)?.enabledFeatures || (companyContext as any)?.enabledFeatures || []) as string[];
-
   // Initialize socket connection
   useEffect(() => {
     if (!branchId && !isSuperAdmin) return;
-
     const token = typeof window !== 'undefined' 
       ? localStorage.getItem('token') || sessionStorage.getItem('token')
       : null;
-
     const newSocket = io(`${SOCKET_URL}/ws`, {
       transports: ['websocket', 'polling'],
       auth: {
@@ -125,31 +103,24 @@ export const useSocket = (): UseSocketReturn => {
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
     });
-
     newSocket.on('connect', async () => {
-      console.log('✅ Socket.IO connected:', newSocket.id);
       setIsConnected(true);
-      
       // Auto-join branch room
       if (branchId) {
         newSocket.emit('join-branch', { branchId });
         branchIdRef.current = branchId;
       }
-
       // Join role room (for super admin notifications)
       if (userRole) {
         newSocket.emit('join-role', { role: userRole });
       }
-
       // Auto-join user room for personal notifications
       if (userId) {
         const userIdStr = typeof userId === 'string' ? userId : userId.toString();
         newSocket.emit('join-user', { userId: userIdStr });
-        console.log(`✅ Joined user room: ${userIdStr}`);
       } else {
         console.warn('⚠️ No user ID found for joining user room');
       }
-
       // Hydrate notifications from server on connect
       try {
         if (token) {
@@ -159,7 +130,6 @@ export const useSocket = (): UseSocketReturn => {
           if (userRole) params.append('role', userRole);
           if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
           if (features && features.length > 0) params.append('features', features.join(','));
-
           const res = await fetch(`${API_URL}/notifications?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -175,19 +145,14 @@ export const useSocket = (): UseSocketReturn => {
         console.warn('Failed to hydrate notifications from server:', err);
       }
     });
-
     newSocket.on('disconnect', () => {
-      console.log('❌ Socket.IO disconnected');
       setIsConnected(false);
     });
-
     newSocket.on('connect_error', (error) => {
       console.error('Socket.IO connection error:', error);
     });
-
     // Order events
     newSocket.on('order:new', (data: any) => {
-      console.log('📦 New order received:', data);
       // Waiters should NOT get general order:new notifications - they only get order:assigned
       if (!isWaiter) {
         addNotification({
@@ -198,11 +163,9 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
     // Review events
     newSocket.on('system:notification', (data: any) => {
       if (data.type === 'review') {
-        console.log('⭐ New review received:', data);
         addNotification({
           type: 'review',
           title: data.title || 'New Review',
@@ -211,7 +174,6 @@ export const useSocket = (): UseSocketReturn => {
         });
       } else {
         // Handle other system notifications
-        console.log('🔔 System notification:', data);
         addNotification({
           type: data.type || 'info',
           title: data.title || 'Notification',
@@ -220,7 +182,6 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
     // Scoped notifications (company/branch/role/user/features)
     newSocket.on('notification', (data: any) => {
       addNotification({
@@ -230,13 +191,10 @@ export const useSocket = (): UseSocketReturn => {
         data: data?.metadata || data?.data || {},
       });
     });
-
-    newSocket.on('order:updated', (data: any) => {
-      console.log('📦 Order updated:', data);
+    newSocket.on('order:updated', (_data: any) => {
+      // Order updated event handler
     });
-
     newSocket.on('order:status-changed', (data: any) => {
-      console.log('📦 Order status changed:', data);
       // Waiters should only get status changes for their assigned orders
       if (!isWaiter) {
         const statusMessages: Record<string, string> = {
@@ -246,7 +204,6 @@ export const useSocket = (): UseSocketReturn => {
           'completed': 'Order completed',
           'cancelled': 'Order cancelled',
         };
-        
         addNotification({
           type: 'order',
           title: 'Order Status Updated',
@@ -255,9 +212,7 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
     newSocket.on('order:payment-received', (data: any) => {
-      console.log('💳 Payment received:', data);
       // Waiters should NOT get payment notifications
       if (!isWaiter) {
         addNotification({
@@ -268,13 +223,8 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
     // Waiter-specific order assignment notification
     newSocket.on('order:assigned', (data: any) => {
-      console.log('🛎️ [WAITER] Order assigned event received:', data);
-      console.log('🛎️ [WAITER] Current user ID:', (user as any)?.id || (user as any)?._id);
-      console.log('🛎️ [WAITER] Current user role:', userRole);
-      
       const orderNumber = data.orderNumber || data.order?.orderNumber || 'N/A';
       // Extract table number from multiple possible locations
       const tableNumber = data.tableNumber 
@@ -286,9 +236,6 @@ export const useSocket = (): UseSocketReturn => {
       const tableInfo = tableNumber ? `Table #${tableNumber}` : (data.orderType || data.order?.orderType || 'Order');
       const itemsCount = data.items?.length || data.order?.items?.length || 0;
       const notes = data.notes || data.order?.notes || '';
-      
-      console.log('🛎️ [WAITER] Toast data:', { orderNumber, tableInfo, itemsCount, notes });
-      
       // Add to notification system
       addNotification({
         type: 'order',
@@ -305,14 +252,12 @@ export const useSocket = (): UseSocketReturn => {
           order: data.order || data,
         },
       });
-
       // Play LOUD notification sound
       try {
         playLoudNotificationSound();
       } catch (soundError) {
         console.error('🛎️ [WAITER] Failed to play notification sound:', soundError);
       }
-
       // Show automatic toast popup with order details
       // Use setTimeout to ensure toast renders after notification is added
       setTimeout(() => {
@@ -320,12 +265,8 @@ export const useSocket = (): UseSocketReturn => {
           const toastMessage = notes
             ? `🛎️ New Order Assigned!\n${tableInfo} - Order #${orderNumber}\n${itemsCount} item${itemsCount !== 1 ? 's' : ''}\n📝 Note: ${notes}`
             : `🛎️ New Order Assigned!\n${tableInfo} - Order #${orderNumber}\n${itemsCount} item${itemsCount !== 1 ? 's' : ''}`;
-          
-          console.log('🛎️ [WAITER] Showing toast popup:', toastMessage);
-          console.log('🛎️ [WAITER] Toast function available:', typeof toast.success);
-          
           // Create custom toast with prominent close button
-          const toastId = toast.custom(
+          toast.custom(
             (t) => (
               React.createElement('div', {
                 className: t.visible ? 'animate-enter' : 'animate-leave',
@@ -380,17 +321,13 @@ export const useSocket = (): UseSocketReturn => {
               position: 'top-right',
             }
           );
-          
-          console.log('🛎️ [WAITER] Toast popup triggered successfully, ID:', toastId);
-        } catch (toastError) {
+          } catch (toastError) {
           console.error('🛎️ [WAITER] Failed to show toast:', toastError);
         }
       }, 100);
     });
-
     // Kitchen events - waiters should NOT get these
     newSocket.on('kitchen:new-order', (data: any) => {
-      console.log('🍳 Kitchen: New order:', data);
       if (!isWaiter) {
         addNotification({
           type: 'kitchen',
@@ -400,17 +337,13 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
-    newSocket.on('kitchen:order-received', (data: any) => {
-      console.log('🍳 Kitchen: Order received:', data);
+    newSocket.on('kitchen:order-received', (_data: any) => {
+      // Kitchen order received event handler
     });
-
-    newSocket.on('kitchen:order-status-changed', (data: any) => {
-      console.log('🍳 Kitchen: Order status changed:', data);
+    newSocket.on('kitchen:order-status-changed', (_data: any) => {
+      // Kitchen order status changed event handler
     });
-
     newSocket.on('kitchen:item-ready', (data: any) => {
-      console.log('🍳 Kitchen: Item ready:', data);
       // Waiters can get item ready notifications for their orders
       if (!isWaiter) {
         addNotification({
@@ -421,10 +354,8 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
     // Inventory events - waiters should NOT get these
     newSocket.on('inventory:low-stock', (data: any) => {
-      console.log('⚠️ Low stock alert:', data);
       if (!isWaiter) {
         addNotification({
           type: 'system',
@@ -434,9 +365,7 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
     newSocket.on('inventory:out-of-stock', (data: any) => {
-      console.log('🚨 Out of stock alert:', data);
       if (!isWaiter) {
         addNotification({
           type: 'system',
@@ -446,27 +375,21 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
-    newSocket.on('inventory:stock-updated', (data: any) => {
-      console.log('📊 Stock updated:', data);
+    newSocket.on('inventory:stock-updated', (_data: any) => {
+      // Inventory stock updated event handler
     });
-
     // Table events
-    newSocket.on('table:status-changed', (data: any) => {
-      console.log('🪑 Table status changed:', data);
+    newSocket.on('table:status-changed', (_data: any) => {
+      // Table status changed event handler
     });
-
-    newSocket.on('table:order-created', (data: any) => {
-      console.log('🪑 Table order created:', data);
+    newSocket.on('table:order-created', (_data: any) => {
+      // Table order created event handler
     });
-
-    newSocket.on('table:payment-received', (data: any) => {
-      console.log('🪑 Table payment received:', data);
+    newSocket.on('table:payment-received', (_data: any) => {
+      // Table payment received event handler
     });
-
     // System events - waiters should NOT get these
     newSocket.on('system:alert', (data: any) => {
-      console.log('⚠️ System alert:', data);
       if (!isWaiter) {
         addNotification({
           type: 'system',
@@ -476,9 +399,7 @@ export const useSocket = (): UseSocketReturn => {
         });
       }
     });
-
     newSocket.on('system:notification', (data: any) => {
-      console.log('🔔 System notification:', data);
       // Waiters should only get review notifications, not other system notifications
       if (!isWaiter || data.type === 'review') {
         if (data.type === 'review') {
@@ -498,9 +419,7 @@ export const useSocket = (): UseSocketReturn => {
         }
       }
     });
-
     setSocket(newSocket);
-
     return () => {
       if (branchIdRef.current) {
         newSocket.emit('leave-branch', { branchId: branchIdRef.current });
@@ -510,48 +429,41 @@ export const useSocket = (): UseSocketReturn => {
       }
       newSocket.close();
     };
-  }, [branchId, addNotification, user, isWaiter, userRole]);
-
+  }, [branchId, addNotification, user, isWaiter, userRole, companyId, features, hydrateNotifications, isSuperAdmin, userId]);
   const joinBranch = useCallback((branchId: string) => {
     if (socket && socket.connected) {
       socket.emit('join-branch', { branchId });
       branchIdRef.current = branchId;
     }
   }, [socket]);
-
   const leaveBranch = useCallback((branchId: string) => {
     if (socket && socket.connected) {
       socket.emit('leave-branch', { branchId });
       branchIdRef.current = null;
     }
   }, [socket]);
-
   const joinKitchen = useCallback((branchId: string) => {
     if (socket && socket.connected) {
       socket.emit('join-kitchen', { branchId });
     }
   }, [socket]);
-
   const leaveKitchen = useCallback((branchId: string) => {
     if (socket && socket.connected) {
       socket.emit('leave-kitchen', { branchId });
     }
   }, [socket]);
-
   const joinTable = useCallback((tableId: string) => {
     if (socket && socket.connected) {
       socket.emit('join-table', { tableId });
       tableIdRef.current = tableId;
     }
   }, [socket]);
-
   const leaveTable = useCallback((tableId: string) => {
     if (socket && socket.connected) {
       socket.emit('leave-table', { tableId });
       tableIdRef.current = null;
     }
   }, [socket]);
-
   return {
     socket,
     isConnected,
@@ -563,4 +475,3 @@ export const useSocket = (): UseSocketReturn => {
     leaveTable,
   };
 };
-

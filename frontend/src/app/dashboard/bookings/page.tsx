@@ -1,5 +1,4 @@
 'use client';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -23,6 +22,7 @@ import {
 } from '@/lib/api/endpoints/bookingsApi';
 import { useGetRoomsByBranchQuery as useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
 import { useAppSelector } from '@/lib/store';
+import { useSocket } from '@/lib/hooks/useSocket';
 import {
   CheckCircleIcon,
   PencilIcon,
@@ -31,14 +31,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-
 export default function BookingsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const formatCurrency = useFormatCurrency();
   const { currency } = useCurrency();
-  
   useFeatureRedirect('booking-management');
-  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -59,12 +56,11 @@ export default function BookingsPage() {
   });
   const {
     data: latestCheckoutBooking,
+    refetch: refetchCheckoutBooking,
   } = useGetBookingByIdQuery(checkoutBooking?.id || '', {
     skip: !checkoutBooking?.id,
   });
-
   const effectiveCheckoutBooking = latestCheckoutBooking || checkoutBooking;
-
   const checkoutExistingAdditionalTotal = useMemo(() => {
     if (!effectiveCheckoutBooking || !effectiveCheckoutBooking.additionalCharges) return 0;
     return effectiveCheckoutBooking.additionalCharges.reduce(
@@ -72,12 +68,10 @@ export default function BookingsPage() {
       0,
     );
   }, [effectiveCheckoutBooking]);
-
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
-
   const bookingsQueryParams = useMemo(() => {
     const params: { branchId?: string; status?: string } = {};
     if (branchId) {
@@ -88,7 +82,6 @@ export default function BookingsPage() {
     }
     return params;
   }, [branchId, statusFilter]);
-
   const { data: bookingsResponse, isLoading, refetch } = useGetBookingsQuery(
     bookingsQueryParams,
     { 
@@ -96,30 +89,42 @@ export default function BookingsPage() {
       pollingInterval: 60000,
     }
   );
-
+  // Socket.IO for real-time booking updates
+  const { socket, isConnected } = useSocket();
+  // Listen for booking updates via Socket.IO
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+    const handleBookingUpdated = (data: any) => {
+      // If the updated booking is the one we're checking out, refetch it
+      if (checkoutBooking?.id && (data._id === checkoutBooking.id || data.id === checkoutBooking.id)) {
+        refetchCheckoutBooking();
+      }
+      // Also refetch the bookings list to show updated data
+      refetch();
+    };
+    socket.on('booking:updated', handleBookingUpdated);
+    return () => {
+      socket.off('booking:updated', handleBookingUpdated);
+    };
+  }, [socket, isConnected, checkoutBooking?.id, refetchCheckoutBooking, refetch]);
   const { data: rooms } = useGetRoomsQuery(branchId || '', {
     skip: !branchId,
   });
-
   const { data: stats } = useGetBookingStatsQuery(
     { branchId: branchId || '' },
     { skip: !branchId }
   );
-
   const bookings = useMemo(() => {
     if (!bookingsResponse) return [];
     const response = bookingsResponse as any;
-
     // If transformResponse returned { bookings: Booking[]; total: number }
     if (Array.isArray(response.bookings)) {
       return response.bookings as Booking[];
     }
-
     // If transformResponse was bypassed and backend returned an array directly
     if (Array.isArray(response)) {
       return response as Booking[];
     }
-
     // If backend wrapped data inside .data
     if (response.data) {
       if (Array.isArray(response.data.bookings)) {
@@ -129,13 +134,10 @@ export default function BookingsPage() {
         return response.data as Booking[];
       }
     }
-
     return [] as Booking[];
   }, [bookingsResponse]);
-
   const filteredBookings = useMemo(() => {
     if (!bookings || bookings.length === 0) return [];
-    
     return bookings.filter((booking: Booking) => {
       // Search filter - handle empty/null values safely
       const searchLower = searchQuery.toLowerCase();
@@ -143,33 +145,26 @@ export default function BookingsPage() {
         (booking.bookingNumber || '').toLowerCase().includes(searchLower) ||
         (booking.guestName || '').toLowerCase().includes(searchLower) ||
         (booking.roomNumber || '').toLowerCase().includes(searchLower);
-      
       // Status filter
       const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
-      
       return matchesSearch && matchesStatus;
     });
   }, [bookings, searchQuery, statusFilter]);
-
   // Calendar-style view: build next 30 days with bookings per day
   const calendarDays = useMemo(() => {
     if (!bookings || bookings.length === 0) return [];
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const days: {
       date: Date;
       dateStr: string;
       bookings: Booking[];
     }[] = [];
-
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       date.setHours(0, 0, 0, 0);
       const dateStr = date.toISOString().split('T')[0];
-
       const dayBookings = bookings.filter((booking: Booking) => {
         if (!booking.checkInDate || !booking.checkOutDate) return false;
         const checkIn = new Date(booking.checkInDate);
@@ -179,19 +174,15 @@ export default function BookingsPage() {
         // Occupied nights from check-in (inclusive) to check-out (exclusive)
         return date >= checkIn && date < checkOut;
       });
-
       days.push({ date, dateStr, bookings: dayBookings });
     }
-
     return days;
   }, [bookings]);
-
   const [createBooking, { isLoading: isCreating }] = useCreateBookingMutation();
   const [updateBooking, { isLoading: isUpdating }] = useUpdateBookingMutation();
   const [checkIn] = useCheckInMutation();
   const [checkOut] = useCheckOutMutation();
   const [cancelBooking] = useCancelBookingMutation();
-
   const [formData, setFormData] = useState<any>({
     roomId: '',
     guestName: '',
@@ -209,7 +200,6 @@ export default function BookingsPage() {
     paymentStatus: 'pending',
     depositAmount: 0,
   });
-
   const resetForm = () => {
     setFormData({
       roomId: '',
@@ -230,13 +220,11 @@ export default function BookingsPage() {
     });
     setSelectedBooking(null);
   };
-
   useEffect(() => {
     if (!isCreateModalOpen && !isEditModalOpen) {
       resetForm();
     }
   }, [isCreateModalOpen, isEditModalOpen]);
-
   useEffect(() => {
     if (selectedBooking && isEditModalOpen) {
       setFormData({
@@ -258,7 +246,6 @@ export default function BookingsPage() {
       });
     }
   }, [selectedBooking, isEditModalOpen]);
-
   useEffect(() => {
     if (formData.roomId && rooms) {
       const selectedRoom = rooms.find((r) => r.id === formData.roomId);
@@ -270,13 +257,11 @@ export default function BookingsPage() {
       }
     }
   }, [formData.roomId, rooms]);
-
   const handleCreate = async () => {
     if (!formData.roomId || !formData.guestName || !formData.guestPhone || !formData.checkInDate || !formData.checkOutDate) {
       toast.error('Please fill in all required fields');
       return;
     }
-
     try {
       await createBooking({
         branchId: branchId || '',
@@ -291,10 +276,8 @@ export default function BookingsPage() {
       toast.error(error?.data?.message || 'Failed to create booking');
     }
   };
-
   const handleUpdate = async () => {
     if (!selectedBooking) return;
-
     try {
       await updateBooking({
         id: selectedBooking.id,
@@ -309,7 +292,6 @@ export default function BookingsPage() {
       toast.error(error?.data?.message || 'Failed to update booking');
     }
   };
-
   const handleCheckIn = async (id: string) => {
     try {
       await checkIn({ id }).unwrap();
@@ -319,7 +301,6 @@ export default function BookingsPage() {
       toast.error(error?.data?.message || 'Failed to check in');
     }
   };
-
   const openCheckoutModal = (booking: Booking) => {
     setCheckoutBooking(booking);
     setCheckoutForm({
@@ -328,10 +309,8 @@ export default function BookingsPage() {
     });
     setIsCheckoutModalOpen(true);
   };
-
   const handleConfirmCheckOut = async () => {
     if (!checkoutBooking) return;
-
     try {
       await checkOut({
         id: checkoutBooking.id,
@@ -349,7 +328,6 @@ export default function BookingsPage() {
       toast.error(error?.data?.message || 'Failed to check out');
     }
   };
-
   const openCancelModal = (booking: Booking) => {
     setCancelBookingTarget(booking);
     setCancelForm({
@@ -358,10 +336,8 @@ export default function BookingsPage() {
     });
     setIsCancelModalOpen(true);
   };
-
   const handleConfirmCancel = async () => {
     if (!cancelBookingTarget) return;
-
     try {
       await cancelBooking({
         id: cancelBookingTarget.id,
@@ -379,7 +355,6 @@ export default function BookingsPage() {
       toast.error(error?.data?.message || 'Failed to cancel booking');
     }
   };
-
   const handleConfirmBooking = async (booking: Booking) => {
     try {
       await updateBooking({
@@ -394,7 +369,6 @@ export default function BookingsPage() {
       toast.error(error?.data?.message || 'Failed to confirm booking');
     }
   };
-
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' | 'info' | 'default'; label: string }> = {
       pending: { variant: 'warning', label: 'Pending' },
@@ -404,11 +378,9 @@ export default function BookingsPage() {
       cancelled: { variant: 'danger', label: 'Cancelled' },
       no_show: { variant: 'danger', label: 'No Show' },
     };
-
     const config = statusConfig[status] || { variant: 'default', label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
-
   const columns = [
     {
       key: 'bookingNumber',
@@ -513,7 +485,6 @@ export default function BookingsPage() {
       },
     },
   ];
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -552,7 +523,6 @@ export default function BookingsPage() {
           </Button>
         </div>
       </div>
-
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
           <Card>
@@ -609,7 +579,6 @@ export default function BookingsPage() {
           </Card>
         </div>
       )}
-
       {viewMode === 'calendar' && (
         <Card>
           <CardHeader>
@@ -632,7 +601,6 @@ export default function BookingsPage() {
                 const checkedIn = day.bookings.filter(
                   (b) => b.status === 'checked_in'
                 ).length;
-
                 return (
                   <div
                     key={day.dateStr}
@@ -666,7 +634,6 @@ export default function BookingsPage() {
           </CardContent>
         </Card>
       )}
-
       {viewMode === 'list' && (
         <Card>
           <CardHeader>
@@ -726,7 +693,6 @@ export default function BookingsPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Create Modal */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -863,7 +829,6 @@ export default function BookingsPage() {
           </div>
         </div>
       </Modal>
-
       {/* Edit Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -937,7 +902,6 @@ export default function BookingsPage() {
           </div>
         </div>
       </Modal>
-
       {/* Check-Out Modal */}
       <Modal
         isOpen={isCheckoutModalOpen}
@@ -963,7 +927,6 @@ export default function BookingsPage() {
               </p>
             </div>
           )}
-
           {effectiveCheckoutBooking && effectiveCheckoutBooking.additionalCharges && effectiveCheckoutBooking.additionalCharges.length > 0 && (
             <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/40 p-3 space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -989,7 +952,6 @@ export default function BookingsPage() {
               </ul>
             </div>
           )}
-
           <div className="space-y-2">
             <label className="block text-sm font-medium mb-1">
               Additional Charges ({currency})
@@ -1035,7 +997,6 @@ export default function BookingsPage() {
           </div>
         </div>
       </Modal>
-
       {/* Cancel / Refund Modal */}
       <Modal
         isOpen={isCancelModalOpen}
@@ -1109,5 +1070,4 @@ export default function BookingsPage() {
       </Modal>
     </div>
   );
-}
-
+}

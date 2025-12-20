@@ -1,6 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { logout } from '../slices/authSlice';
-
 // Helper to transparently decrypt AES-encrypted API responses
 const decryptIfNeeded = async (response: any) => {
   try {
@@ -8,11 +7,8 @@ const decryptIfNeeded = async (response: any) => {
     if (typeof window === 'undefined' || !window.crypto?.subtle) {
       return response;
     }
-
     if (!response || !response.data) return response;
-
     let body = response.data as any;
-
     // Handle wrapped format: { success: true, data: { encrypted: true, ... } }
     if (
       body &&
@@ -25,7 +21,6 @@ const decryptIfNeeded = async (response: any) => {
     ) {
       body = body.data;
     }
-
     if (
       !body ||
       typeof body !== 'object' ||
@@ -35,13 +30,11 @@ const decryptIfNeeded = async (response: any) => {
     ) {
       return response;
     }
-
     // Decrypt on the client using the Web Crypto API with a shared key.
     // NOTE: For real security you should derive this key per-session or
     //       use TLS only. A hard-coded key only adds light obfuscation.
     const secret =
       'ykg44s8k80wsok80s880w0gw';
-
     const enc = new TextEncoder();
     const keyMaterial = await window.crypto.subtle.importKey(
       'raw',
@@ -50,7 +43,6 @@ const decryptIfNeeded = async (response: any) => {
       false,
       ['deriveKey'],
     );
-
     // Derive a 256-bit key from the secret (must mirror backend derivation)
     const key = await window.crypto.subtle.deriveKey(
       {
@@ -64,26 +56,21 @@ const decryptIfNeeded = async (response: any) => {
       false,
       ['decrypt'],
     );
-
     try {
       const iv = Uint8Array.from(
         atob(body.iv || ''),
         (c) => c.charCodeAt(0),
       );
-
       const cipherBytes = Uint8Array.from(
         atob(body.data || ''),
         (c) => c.charCodeAt(0),
       );
-
       const decryptedBuffer = await window.crypto.subtle.decrypt(
         { name: 'AES-CBC', iv },
         key,
         cipherBytes,
       );
-
       const decoded = new TextDecoder().decode(decryptedBuffer);
-
       // Parse JSON if possible, otherwise keep as string
       let parsed: any;
       try {
@@ -91,7 +78,6 @@ const decryptIfNeeded = async (response: any) => {
       } catch {
         parsed = decoded;
       }
-
       // Replace entire body with decrypted payload so callers see the ORIGINAL
       // response shape from the service (e.g. { success, data: {...} }).
       response.data = parsed;
@@ -99,14 +85,12 @@ const decryptIfNeeded = async (response: any) => {
       console.error('Failed to decrypt API response, returning original:', decryptError);
       return response;
     }
-
     return response;
   } catch (error) {
     console.error('Failed to decrypt API response', error);
     return response;
   }
 };
-
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
   credentials: 'include', // Include cookies in requests (required for httpOnly cookies)
@@ -116,30 +100,24 @@ const baseQuery = fetchBaseQuery({
     return headers;
   },
 });
-
 // Track refresh attempts to prevent multiple simultaneous refreshes
 let isRefreshing = false;
 let refreshPromise: Promise<any> | null = null;
-
 // Wrapper to handle token refresh and subscription expiry errors
 const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
   let result = await baseQuery(args, api, extraOptions);
-
   // Try to decrypt encrypted successful responses
   if (result && !result.error) {
     result = await decryptIfNeeded(result);
   }
-  
   // Handle 401 unauthorized errors (token expired)
   if (result.error && result.error.status === 401) {
     const errorData = result.error.data as any;
     const requestUrl = args?.url || '';
-    
     console.warn('🔴 401 Unauthorized - Attempting token refresh');
     console.warn('Request URL:', requestUrl || args?.toString() || 'Unknown');
     console.warn('Request args:', { url: args?.url, method: args?.method, body: args?.body });
     console.warn('Error data:', errorData);
-    
     // Skip token refresh and redirect for authentication endpoints (login, PIN login, etc.)
     // These endpoints handle their own errors and shouldn't trigger global redirect
     const authEndpoints = [
@@ -150,12 +128,10 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       '/auth/register',
       '/auth/find-company',
     ];
-    
     if (authEndpoints.some(endpoint => requestUrl.includes(endpoint))) {
-      console.log('⚠️ Auth endpoint 401 error - skipping token refresh and redirect (let component handle error)');
+      
       return result; // Return error as-is, let the component handle it
     }
-    
     // Check if it's a subscription expiry error (don't try to refresh token)
     if (errorData?.code === 'SUBSCRIPTION_EXPIRED' || errorData?.code === 'TRIAL_EXPIRED') {
       // Redirect to upgrade page if in browser
@@ -167,7 +143,6 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       }
       return result;
     }
-
     // Don't try to refresh if this is a refresh token request itself
     if (requestUrl === '/auth/refresh' || requestUrl.includes('/auth/refresh')) {
       console.error('❌ Refresh token request failed - logging out');
@@ -177,18 +152,13 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       }
       return result;
     }
-    
     // Refresh token is in httpOnly cookie, so we can attempt refresh
     // (No need to check for refreshToken - it's in cookie)
-    
     // If refresh is already in progress, wait for it
       if (isRefreshing && refreshPromise) {
-        console.log('⏳ Token refresh already in progress, waiting...');
-        console.log('⏳ Current refresh state:', { isRefreshing, hasPromise: !!refreshPromise });
         try {
           await refreshPromise;
           // Retry the original query with new token
-          console.log('🔄 Retrying original request after waiting for refresh...');
           result = await baseQuery(args, api, extraOptions);
           return result;
         } catch (error) {
@@ -196,15 +166,12 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
           return result;
         }
       }
-
       // Atomically check and set refresh flag to prevent race conditions
       if (isRefreshing) {
         // Another request started refresh between our check and now, wait for it
-        console.log('⏳ Refresh started by another request, waiting...');
         if (refreshPromise) {
           try {
             await refreshPromise;
-            console.log('🔄 Retrying original request after waiting for refresh...');
             result = await baseQuery(args, api, extraOptions);
             return result;
           } catch (error) {
@@ -213,19 +180,15 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
           }
         }
       }
-
       // Start refresh process (atomic: check and set)
       isRefreshing = true;
-      console.log('🔄 Attempting to refresh token...');
-      console.log('🔄 Refresh state set:', { isRefreshing, timestamp: new Date().toISOString() });
-      
+     
       refreshPromise = (async () => {
         try {
           // Create a fresh baseQuery without token for refresh call
           const refreshQuery = fetchBaseQuery({
             baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
           });
-
           // Refresh token is in httpOnly cookie, no need to send in body
           let refreshResult = await refreshQuery(
             {
@@ -236,49 +199,34 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
             api,
             extraOptions
           );
-
           // Decrypt refresh response if encrypted
           if (refreshResult && !refreshResult.error) {
             refreshResult = await decryptIfNeeded(refreshResult);
           }
-          
           return refreshResult;
         } finally {
           isRefreshing = false;
           refreshPromise = null;
         }
       })();
-
       try {
         const refreshResult = await refreshPromise;
-
-        console.log('📦 Refresh result structure:', {
-          hasData: !!refreshResult.data,
-          dataType: typeof refreshResult.data,
-          dataKeys: refreshResult.data ? Object.keys(refreshResult.data) : [],
-          fullData: refreshResult.data,
-        });
-
+     
         // Tokens are now in httpOnly cookies, backend sets them automatically
         // Check if refresh was successful (backend returns { success: true })
         const refreshSuccess = refreshResult.data && 
           ((refreshResult.data as any).success === true || 
            (refreshResult.data as any).success === undefined); // undefined means no error
-        
         if (refreshSuccess) {
-          console.log('✅ Token refreshed successfully - new cookies set by backend');
-          
           // Retry the original query (cookies are automatically sent)
-          console.log('🔄 Retrying original request with new cookies...');
-          console.log('🔄 Original request URL:', args?.url || args?.toString() || 'Unknown');
+         
           result = await baseQuery(args, api, extraOptions);
           if (result.error) {
             console.error('❌ Retry failed:', result.error);
             console.error('❌ Retry error status:', result.error.status);
             console.error('❌ Retry error data:', result.error.data);
           } else {
-            console.log('✅ Retry successful');
-          }
+            }
         } else {
           // Refresh failed, logout user
           console.error('❌ Token refresh failed');
@@ -306,10 +254,8 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
         }
       }
   }
-  
   return result;
 };
-
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
@@ -361,4 +307,3 @@ export const apiSlice = createApi({
   ],
   endpoints: () => ({}),
 });
-

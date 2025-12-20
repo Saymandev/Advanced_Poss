@@ -1,5 +1,4 @@
 import { apiSlice } from '../apiSlice';
-
 export interface Branch {
   id: string;
   name: string;
@@ -46,7 +45,6 @@ export interface Branch {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface CreateBranchRequest {
   name: string;
   address: string;
@@ -62,7 +60,6 @@ export interface CreateBranchRequest {
   timezone: string;
   companyId: string;
 }
-
 export interface UpdateBranchRequest {
   name?: string;
   address?: string | {
@@ -89,7 +86,6 @@ export interface UpdateBranchRequest {
   totalTables?: number;
   totalSeats?: number;
 }
-
 export const branchesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getBranches: builder.query<{ branches: Branch[]; total: number }, { 
@@ -106,7 +102,6 @@ export const branchesApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         const data = response.data || response;
         let items = [];
-        
         // Handle array response
         if (Array.isArray(data)) {
           items = data;
@@ -115,7 +110,6 @@ export const branchesApi = apiSlice.injectEndpoints({
         } else if (data.items) {
           items = data.items;
         }
-        
         return {
           branches: items.map((branch: any) => ({
             id: branch._id || branch.id,
@@ -245,20 +239,10 @@ export const branchesApi = apiSlice.injectEndpoints({
     }, string>({
       query: (id) => `/branches/${id}/stats`,
       transformResponse: (response: any) => {
-        console.log('Branch Stats API Response (raw):', response);
+       
         // Handle both wrapped { data: {...} } and direct response
         const data = response.data || response;
         const stats = data.stats || {};
-        console.log('Transformed Branch Stats:', { 
-          response, 
-          data, 
-          stats,
-          'stats.actualTablesCount': stats.actualTablesCount,
-          'stats.actualUsersCount': stats.actualUsersCount,
-          'stats.totalOrders': stats.totalOrders,
-          'stats.todayRevenue': stats.todayRevenue,
-        });
-        
         // Transform the branch object to include manager if populated
         const branch = data.branch || {};
         const transformedBranch = {
@@ -276,7 +260,6 @@ export const branchesApi = apiSlice.injectEndpoints({
           totalTables: branch.totalTables !== undefined ? branch.totalTables : undefined,
           totalSeats: branch.totalSeats !== undefined ? branch.totalSeats : undefined,
         };
-        
         const result = {
           branch: transformedBranch,
           stats: {
@@ -289,14 +272,12 @@ export const branchesApi = apiSlice.injectEndpoints({
             actualUsersCount: stats.actualUsersCount ?? stats.totalStaff ?? 0,
           },
         };
-        console.log('Final transformed result:', result);
         return result;
       },
       providesTags: ['Branch'],
     }),
   }),
 });
-
 export const {
   useGetBranchesQuery,
   useGetBranchByIdQuery,

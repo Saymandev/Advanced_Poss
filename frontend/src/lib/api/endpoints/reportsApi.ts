@@ -1,5 +1,4 @@
 import { apiSlice } from '../apiSlice';
-
 export interface DashboardStats {
   today?: {
     orders: number;
@@ -52,7 +51,6 @@ export interface DashboardStats {
     createdAt: string;
   }>;
 }
-
 export interface SalesAnalytics {
   period: string;
   totalSales: number;
@@ -74,7 +72,6 @@ export interface SalesAnalytics {
     orders: number;
   }>;
 }
-
 export interface InventoryReport {
   totalItems: number;
   lowStockItems: number;
@@ -91,7 +88,6 @@ export interface InventoryReport {
     status: 'in-stock' | 'low-stock' | 'out-of-stock';
   }>;
 }
-
 export interface CustomerReport {
   totalCustomers: number;
   newCustomers: number;
@@ -111,7 +107,6 @@ export interface CustomerReport {
     percentage: number;
   }>;
 }
-
 export interface FinancialSummary {
   period: {
     startDate: string | null;
@@ -141,7 +136,6 @@ export interface FinancialSummary {
     net: number;
   }>;
 }
-
 export const reportsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getDashboard: builder.query<DashboardStats, { branchId?: string; companyId?: string; date?: string }>({
@@ -199,20 +193,8 @@ export const reportsApi = apiSlice.injectEndpoints({
         // After decryptIfNeeded, result.data is the HTTP response body
         // TransformInterceptor wraps as: { success: true, data: <actual response>, timestamp: ... }
         // The actual response from backend is: { period, data: [...], summary: { totalRevenue, totalOrders, averageOrderValue } }
-        
         // Debug: Log the raw response structure
-        console.log('📊 Frontend Transform - Raw Response:', {
-          isArray: Array.isArray(response),
-          type: typeof response,
-          keys: response && typeof response === 'object' && !Array.isArray(response) 
-            ? Object.keys(response).slice(0, 10) 
-            : [],
-          hasSuccess: response?.success,
-          hasData: !!response?.data,
-          hasPeriod: !!response?.period,
-          hasSummary: !!response?.summary,
-        });
-        
+        // Debug logging removed
         // If response is an array, something went wrong
         if (Array.isArray(response)) {
           console.error('❌ Response is an array, expected object');
@@ -226,24 +208,20 @@ export const reportsApi = apiSlice.injectEndpoints({
             salesByHour: [],
           };
         }
-        
         // Extract the actual data from TransformInterceptor wrapper
         let actualData = response;
-        
         // IMPORTANT: Check for period/summary FIRST to avoid extracting the array
         // If response already has period/summary, it's already the data object
         if (response && typeof response === 'object' && !Array.isArray(response) && 
             ('period' in response || 'summary' in response)) {
           // Already the actual data object: { period, data: [...], summary: {...} }
           actualData = response;
-          console.log('📊 Response is already the data object (has period/summary)');
         }
         // Check if response has TransformInterceptor structure: { success: true, data: {...}, timestamp: ... }
         else if (response && typeof response === 'object' && !Array.isArray(response) && 
                  'success' in response && 'data' in response) {
           // TransformInterceptor format: extract the inner data
           actualData = response.data;
-          console.log('📊 Extracted from TransformInterceptor wrapper');
         }
         // Check if response has a data property but no success and no period/summary
         else if (response && typeof response === 'object' && !Array.isArray(response) && 
@@ -254,28 +232,13 @@ export const reportsApi = apiSlice.injectEndpoints({
           if (extracted && typeof extracted === 'object' && !Array.isArray(extracted) &&
               ('period' in extracted || 'summary' in extracted)) {
             actualData = extracted;
-            console.log('📊 Extracted from data property (has period/summary)');
           } else {
             // Keep original response if extracted doesn't have the structure we need
             actualData = response;
-            console.log('📊 Kept original response (extracted data is not the right structure)');
           }
         }
-        
         // Debug logging
-        console.log('📊 Frontend Transform - Extracted Data:', {
-          actualDataType: typeof actualData,
-          isArray: Array.isArray(actualData),
-          actualDataKeys: actualData && typeof actualData === 'object' && !Array.isArray(actualData) 
-            ? Object.keys(actualData) 
-            : [],
-          hasSummary: !!actualData?.summary,
-          period: actualData?.period,
-          summary: actualData?.summary,
-          dataIsArray: Array.isArray(actualData?.data),
-          dataLength: actualData?.data?.length,
-        });
-        
+        // Debug logging removed
         // Validate structure
         if (Array.isArray(actualData) || !actualData || typeof actualData !== 'object') {
           console.error('❌ Invalid response structure after extraction:', {
@@ -293,7 +256,6 @@ export const reportsApi = apiSlice.injectEndpoints({
             salesByHour: [],
           };
         }
-        
         // Backend returns: { period, data: [...], summary: { totalRevenue, totalOrders, averageOrderValue } }
         const transformed = {
           period: actualData.period || 'week',
@@ -308,15 +270,6 @@ export const reportsApi = apiSlice.injectEndpoints({
           salesByCategory: [], // Will be fetched separately
           salesByHour: [], // Will be fetched separately
         };
-        
-        console.log('📊 Frontend Transform - Final Result:', {
-          totalSales: transformed.totalSales,
-          totalOrders: transformed.totalOrders,
-          averageOrderValue: transformed.averageOrderValue,
-          salesByDayLength: transformed.salesByDay.length,
-          period: transformed.period,
-        });
-        
         return transformed;
       },
     }),
@@ -339,7 +292,6 @@ export const reportsApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         // Handle TransformInterceptor wrapper: { success: true, data: [...], timestamp: ... }
         let data = response;
-        
         if (response && typeof response === 'object' && !Array.isArray(response)) {
           if ('success' in response && 'data' in response) {
             // TransformInterceptor format
@@ -349,21 +301,11 @@ export const reportsApi = apiSlice.injectEndpoints({
             data = response.data;
           }
         }
-        
         // Ensure data is an array
         if (!Array.isArray(data)) {
           console.warn('⚠️ getRevenueByCategory: Expected array, got:', typeof data, data);
           return [];
         }
-        
-        console.log('📊 getRevenueByCategory - Transformed:', {
-          count: data.length,
-          categories: data.map((item: any) => ({
-            category: item.categoryId || item.category || 'Unknown',
-            sales: item.revenue || item.sales || 0,
-          })),
-        });
-        
         const transformed = data.map((item: any) => {
           // Backend returns: { categoryId, category, sales, revenue, percentage }
           const result = {
@@ -375,12 +317,6 @@ export const reportsApi = apiSlice.injectEndpoints({
           };
           return result;
         });
-        
-        console.log('📊 getRevenueByCategory - Final Transformed:', {
-          count: transformed.length,
-          items: transformed,
-        });
-        
         return transformed;
       },
     }),
@@ -411,7 +347,6 @@ export const reportsApi = apiSlice.injectEndpoints({
         };
       },
     }),
-    
     getTopSellingItems: builder.query<Array<{
       name: string;
       quantity: number;
@@ -529,7 +464,6 @@ export const reportsApi = apiSlice.injectEndpoints({
     }),
   }),
 });
-
 export const {
   useGetDashboardQuery,
   useGetFinancialSummaryQuery,

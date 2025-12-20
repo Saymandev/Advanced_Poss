@@ -35,6 +35,7 @@ export default function PublicRoomsPage() {
     data: rooms, 
     isLoading: roomsLoading,
     isError: roomsError,
+    error: roomsErrorData,
   } = useGetBranchRoomsQuery(
     { 
       companySlug, 
@@ -42,7 +43,9 @@ export default function PublicRoomsPage() {
       checkInDate: checkInDate || undefined,
       checkOutDate: checkOutDate || undefined,
     },
-    { skip: !companySlug || !branchSlug }
+    { 
+      skip: !companySlug || !branchSlug,
+    }
   );
 
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -52,15 +55,19 @@ export default function PublicRoomsPage() {
   // Show error toast if API errors occur
   useEffect(() => {
     if (companyError) {
-      toast.error('Failed to load company information');
+      const errorMsg = (companyError as any)?.data?.message || 'Failed to load company information';
+      toast.error(errorMsg);
+      console.error('Company error:', companyError);
     }
     if (roomsError) {
-      toast.error('Failed to load rooms');
+      const errorMsg = (roomsErrorData as any)?.data?.message || 'Failed to load rooms. Please try again later.';
+      toast.error(errorMsg);
+      console.error('Rooms error:', roomsErrorData);
     }
-  }, [companyError, roomsError]);
+  }, [companyError, roomsError, roomsErrorData]);
 
   const filteredRooms = useMemo(() => {
-    if (!rooms) return [];
+    if (!rooms || !Array.isArray(rooms)) return [];
     
     return rooms.filter((room) => {
       const matchesSearch = 
