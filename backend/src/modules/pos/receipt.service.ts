@@ -151,10 +151,6 @@ export class ReceiptService {
     let company: any = null; // Store company for later use
     try {
       const branch = await this.branchesService.findOne(order.branchId.toString());
-      // Use branch's publicUrl if available, otherwise fallback to company slug
-      if (branch?.publicUrl) {
-        publicUrl = branch.publicUrl;
-      }
       // Get company for logo and slug
       // branch.companyId might be populated (object) or ObjectId
       let companyIdStr: string | undefined;
@@ -184,27 +180,26 @@ export class ReceiptService {
             if (company?.logo) {
               companyLogo = company.logo;
             }
-            // Generate public URL - prioritize custom domain, then slug-based
-            if (!publicUrl) {
-              if (company?.customDomain && company?.domainVerified) {
-                // Use custom domain
-                const protocol = 'https://';
-                if (branch.slug) {
-                  publicUrl = `${protocol}${company.customDomain}/${branch.slug}`;
-                } else {
-                  publicUrl = `${protocol}${company.customDomain}`;
-                }
-              } else if (company?.slug) {
-                // Fallback to slug-based URL - use company landing page (not branch)
-                // Prioritize APP_URL environment variable
-                const baseUrl =
-                  process.env.APP_URL ||
-                  this.configService.get<string>('frontend.url') ||
-                  process.env.FRONTEND_URL ||
-                  'http://localhost:3000';
-                // Use company landing page URL so customers can select branch
-                publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
+            // Generate public URL - always use current APP_URL, don't use stored branch.publicUrl
+            // Prioritize custom domain, then slug-based
+            if (company?.customDomain && company?.domainVerified) {
+              // Use custom domain
+              const protocol = 'https://';
+              if (branch.slug) {
+                publicUrl = `${protocol}${company.customDomain}/${branch.slug}`;
+              } else {
+                publicUrl = `${protocol}${company.customDomain}`;
               }
+            } else if (company?.slug) {
+              // Fallback to slug-based URL - use company landing page (not branch)
+              // Prioritize APP_URL environment variable
+              const baseUrl =
+                process.env.APP_URL ||
+                this.configService.get<string>('frontend.url') ||
+                process.env.FRONTEND_URL ||
+                'http://localhost:3000';
+              // Use company landing page URL so customers can select branch
+              publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
             }
           } catch (companyError) {
             console.error('Error fetching company for logo:', {
