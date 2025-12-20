@@ -1,6 +1,6 @@
 'use client';
 import { useAppSelector } from '@/lib/store';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { io, Socket } from 'socket.io-client';
 import { useNotifications } from './useNotifications';
@@ -72,19 +72,41 @@ export const useSocket = (): UseSocketReturn => {
   const [isConnected, setIsConnected] = useState(false);
   const branchIdRef = useRef<string | null>(null);
   const tableIdRef = useRef<string | null>(null);
-  // Get user role for filtering notifications
-  const userRole = (user as any)?.role?.toLowerCase();
-  const isWaiter = userRole === 'waiter' || userRole === 'server';
-  const isSuperAdmin = userRole === 'super_admin';
-  const branchId = (user as any)?.branchId || 
-                   (companyContext as any)?.branchId || 
-                   (companyContext as any)?.branches?.[0]?._id ||
-                   (companyContext as any)?.branches?.[0]?.id;
-  const companyId = (user as any)?.companyId || (companyContext as any)?.companyId || (companyContext as any)?._id || (companyContext as any)?.id;
-  const userId = (user as any)?.id || (user as any)?._id;
-  const features = ((user as any)?.enabledFeatures || (companyContext as any)?.enabledFeatures || []) as string[];
+  
+  // Memoize computed values to prevent infinite re-renders
+  const userRole = useMemo(() => (user as any)?.role?.toLowerCase(), [user]);
+  const isWaiter = useMemo(() => userRole === 'waiter' || userRole === 'server', [userRole]);
+  const isSuperAdmin = useMemo(() => userRole === 'super_admin', [userRole]);
+  
+  const branchId = useMemo(() => {
+    return (user as any)?.branchId || 
+           (companyContext as any)?.branchId || 
+           (companyContext as any)?.branches?.[0]?._id ||
+           (companyContext as any)?.branches?.[0]?.id;
+  }, [user, companyContext]);
+  
+  const companyId = useMemo(() => {
+    return (user as any)?.companyId || 
+           (companyContext as any)?.companyId || 
+           (companyContext as any)?._id || 
+           (companyContext as any)?.id;
+  }, [user, companyContext]);
+  
+  const userId = useMemo(() => {
+    return (user as any)?.id || (user as any)?._id;
+  }, [user]);
+  
+  const features = useMemo(() => {
+    const userFeatures = (user as any)?.enabledFeatures || [];
+    const contextFeatures = (companyContext as any)?.enabledFeatures || [];
+    return (userFeatures.length > 0 ? userFeatures : contextFeatures) as string[];
+  }, [user, companyContext]);
   // Initialize socket connection
+  // Only initialize if user is logged in (has user or is super admin with branchId)
   useEffect(() => {
+    // Don't initialize during login flow when there's no user yet
+    if (!user && !isSuperAdmin) return;
+    // Don't initialize if no branchId and not super admin
     if (!branchId && !isSuperAdmin) return;
     const token = typeof window !== 'undefined' 
       ? localStorage.getItem('token') || sessionStorage.getItem('token')
