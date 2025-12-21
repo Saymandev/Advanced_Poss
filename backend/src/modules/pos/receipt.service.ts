@@ -7,6 +7,7 @@ import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
 import { SettingsService } from '../settings/settings.service';
 import { Table, TableDocument } from '../tables/schemas/table.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { PDFGeneratorService } from './pdf-generator.service';
 import { PrinterService, PrintJob } from './printer.service';
 import { POSOrder, POSOrderDocument } from './schemas/pos-order.schema';
@@ -17,6 +18,7 @@ export class ReceiptService {
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
     @InjectModel(Table.name) private tableModel: Model<TableDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private pdfGeneratorService: PDFGeneratorService,
     private printerService: PrinterService,
     private companiesService: CompaniesService,
@@ -344,11 +346,56 @@ export class ReceiptService {
       finalTaxAmount = Math.round(discountedSubtotal * (settings?.taxRate || 0) / 100 * 100) / 100;
       finalServiceChargeAmount = Math.round(discountedSubtotal * (settings?.serviceCharge || 0) / 100 * 100) / 100;
     }
+    // Get waiter name if userId is populated
+    let waiterName = 'Default Waiter';
+    if (order.userId) {
+      const userIdValue = order.userId as any;
+      if (typeof userIdValue === 'object' && userIdValue !== null && userIdValue.name) {
+        waiterName = userIdValue.name || 'Default Waiter';
+      } else {
+        try {
+          const userIdStr = userIdValue?.toString() || (order as any).userId?.toString();
+          if (userIdStr) {
+            const user = await this.userModel.findById(userIdStr).select('firstName lastName name').lean().exec();
+            if (user) {
+              waiterName = (user as any).name || `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() || 'Default Waiter';
+            }
+          }
+        } catch (error) {
+          console.warn('Could not fetch waiter name:', error);
+        }
+      }
+    }
+    // Get branch and company info for restaurant details
+    let restaurantName = company?.name || 'Restaurant';
+    let restaurantAddress = '';
+    let restaurantPhone = '';
+    let restaurantWifi = '';
+    let restaurantWifiPassword = '';
+    try {
+      const branchData = await this.branchesService.findOne(order.branchId.toString());
+      if (branchData) {
+        restaurantName = branchData.name || company?.name || restaurantName;
+        restaurantAddress = branchData.address || company?.address || '';
+        restaurantPhone = branchData.phone || company?.phone || '';
+        // Check for WiFi info in branch or company settings
+        if ((branchData as any).wifi) {
+          restaurantWifi = (branchData as any).wifi;
+        }
+        if ((branchData as any).wifiPassword) {
+          restaurantWifiPassword = (branchData as any).wifiPassword;
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch branch/company details:', error);
+    }
     const receiptData = {
       orderNumber: order.orderNumber,
       orderId: order._id,
       branchId: order.branchId,
       tableNumber: tableNumber,
+      orderType: (order as any).orderType || 'dine-in',
+      waiterName: waiterName,
       customerInfo: order.customerInfo || undefined,
       items: safeItems,
       subtotal: subtotal,
@@ -363,6 +410,12 @@ export class ReceiptService {
       paymentDetails: order.paymentId || undefined,
       createdAt: (order as any)?.createdAt || new Date(),
       completedAt: (order as any)?.completedAt || undefined,
+      // Restaurant info
+      restaurantName: restaurantName,
+      restaurantAddress: restaurantAddress,
+      restaurantPhone: restaurantPhone,
+      restaurantWifi: restaurantWifi,
+      restaurantWifiPassword: restaurantWifiPassword,
       // Company timezone and format settings
       timezone,
       dateFormat,
@@ -564,32 +617,45 @@ export class ReceiptService {
     <div class="header">
         ${receiptData.receiptSettings.showLogo && receiptData.receiptSettings.logoUrl ? 
           `<img src="${receiptData.receiptSettings.logoUrl}" alt="Logo" class="logo">` : ''}
-        <h1>${receiptData.receiptSettings.header}</h1>
+        ${receiptData.receiptSettings.header ? `<div style="font-size: 11px; margin-bottom: 5px; color: #666;">${receiptData.receiptSettings.header}</div>` : ''}
+        <h1>${receiptData.restaurantName || receiptData.receiptSettings.header || 'Restaurant'}</h1>
+        ${receiptData.restaurantAddress ? `<div style="font-size: 10px; margin-top: 5px; color: #333;">${receiptData.restaurantAddress}</div>` : ''}
+        ${receiptData.restaurantPhone ? `<div style="font-size: 10px; margin-top: 3px; color: #333;">Phone: ${receiptData.restaurantPhone}</div>` : ''}
+        ${receiptData.restaurantWifi ? `<div style="font-size: 10px; margin-top: 3px; color: #333;">Wifi: ${receiptData.restaurantWifi}${receiptData.restaurantWifiPassword ? ` Password: ${receiptData.restaurantWifiPassword}` : ''}</div>` : ''}
     </div>
     <div class="order-info">
-        <div><strong>Order #:</strong> ${receiptData.orderNumber}</div>
-        <div><strong>Table #:</strong> ${receiptData.tableNumber}</div>
+        <div><strong>Invoice No:</strong> ${receiptData.orderNumber}</div>
+        <div><strong>Order Type:</strong> ${(receiptData.orderType || 'dine-in').toUpperCase().replace('-', ' ')}</div>
         <div><strong>Date:</strong> ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, receiptData.timeFormat)}</div>
-        ${receiptData.customerInfo?.name ? `<div><strong>Customer:</strong> ${receiptData.customerInfo.name}</div>` : ''}
-        ${receiptData.customerInfo?.phone ? `<div><strong>Phone:</strong> ${receiptData.customerInfo.phone}</div>` : ''}
+        <div><strong>Waiter:</strong> ${receiptData.waiterName || 'Default Waiter'}</div>
+        ${receiptData.tableNumber && receiptData.tableNumber !== 'N/A' ? `<div><strong>Table:</strong> ${receiptData.tableNumber}</div>` : ''}
     </div>
     <div class="items">
-        <div style="font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
-            <span>Item</span>
-            <span style="float: right;">Qty × Price</span>
-        </div>
-        ${receiptData.items.map(item => {
-          const itemPrice = this.formatCurrency(item.price, receiptData.currency);
-          const itemTotal = this.formatCurrency(item.quantity * item.price, receiptData.currency);
-          return `
-            <div class="item">
-                <div class="item-name">${item.name || 'Menu Item'}</div>
-                <div class="item-quantity">${item.quantity} × ${itemPrice}</div>
-                <div class="item-price">${itemTotal}</div>
-            </div>
-            ${item.notes ? `<div style="font-size: 10px; color: #666; margin-left: 10px; margin-bottom: 5px;">Note: ${item.notes}</div>` : ''}
-        `;
-        }).join('')}
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+            <thead>
+                <tr style="border-bottom: 1px dotted #000;">
+                    <th style="text-align: left; padding: 3px 0; font-size: 10px; font-weight: bold;">Item Description</th>
+                    <th style="text-align: center; padding: 3px 0; font-size: 10px; font-weight: bold;">Qty</th>
+                    <th style="text-align: right; padding: 3px 0; font-size: 10px; font-weight: bold;">Price</th>
+                    <th style="text-align: right; padding: 3px 0; font-size: 10px; font-weight: bold;">T.Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${receiptData.items.map(item => {
+                  const itemPrice = this.formatCurrency(item.price, receiptData.currency);
+                  const itemTotal = this.formatCurrency(item.quantity * item.price, receiptData.currency);
+                  return `
+                    <tr style="border-bottom: 1px dotted #ccc;">
+                        <td style="padding: 3px 0; font-size: 10px;">${item.name || 'Menu Item'}</td>
+                        <td style="text-align: center; padding: 3px 0; font-size: 10px;">${item.quantity}</td>
+                        <td style="text-align: right; padding: 3px 0; font-size: 10px;">${itemPrice}</td>
+                        <td style="text-align: right; padding: 3px 0; font-size: 10px; font-weight: bold;">${itemTotal}</td>
+                    </tr>
+                    ${item.notes ? `<tr><td colspan="4" style="padding: 2px 0 5px 0; font-size: 9px; color: #666; font-style: italic;">Note: ${item.notes}</td></tr>` : ''}
+                `;
+                }).join('')}
+            </tbody>
+        </table>
     </div>
     <div class="totals">
         <div class="total-line">
@@ -598,7 +664,7 @@ export class ReceiptService {
         </div>
         ${receiptData.taxRate > 0 ? `
             <div class="total-line">
-                <span>Tax (${receiptData.taxRate}%):</span>
+                <span>VAT ${receiptData.taxRate}%:</span>
                 <span>${this.formatCurrency(receiptData.taxAmount, receiptData.currency)}</span>
             </div>
         ` : ''}
@@ -609,8 +675,8 @@ export class ReceiptService {
             </div>
         ` : ''}
         <div class="total-line final">
-            <span>TOTAL:</span>
-            <span>${this.formatCurrency(receiptData.totalAmount, receiptData.currency)}</span>
+            <span>Total:</span>
+            <span>${receiptData.currency} ${this.formatCurrency(receiptData.totalAmount, receiptData.currency)}</span>
         </div>
     </div>
     ${receiptData.paymentMethod ? `
@@ -625,31 +691,28 @@ export class ReceiptService {
             <strong>Order Notes:</strong> ${receiptData.notes}
         </div>
     ` : ''}
-    ${receiptData.orderReviewUrl && qrCodeImageData ? `
-        <div style="margin-top: 20px; text-align: center; padding: 15px; border-top: 1px solid #ddd;">
-            <div style="font-size: 11px; margin-bottom: 10px; color: #111827;">
-                <strong>Scan to review your order:</strong>
-            </div>
-            <div style="display: flex; justify-content: center; padding: 10px; background: white; border: 2px solid #e5e7eb; border-radius: 5px; margin: 0 auto; width: fit-content;">
-                <img src="${qrCodeImageData}" alt="Order Review QR Code" style="width: 150px; height: 150px;" />
-            </div>
-            <div style="font-size: 9px; margin-top: 8px; color: #666; word-break: break-all;">
-                ${receiptData.orderReviewUrl}
-            </div>
-        </div>
-    ` : ''}
     <div class="footer">
-        <div>${receiptData.receiptSettings.footer}</div>
-        ${receiptData.publicUrl ? `
-        <div style="margin-top: 10px; font-size: 11px; color: #0066cc;">
-            <strong>Visit us online:</strong><br>
-            <a href="${receiptData.publicUrl}" style="color: #0066cc; text-decoration: underline;">
-                ${receiptData.publicUrl}
-            </a>
-        </div>
-        ` : ''}
-        <div style="margin-top: 10px; font-size: 10px;">
-            Generated on ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, receiptData.timeFormat)}
+        <div style="text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px dotted #000;">
+            <div style="font-weight: bold; font-size: 11px; text-decoration: underline; margin-bottom: 10px;">GUEST BILL</div>
+            ${receiptData.orderReviewUrl && qrCodeImageData ? `
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 10px; margin-bottom: 8px; color: #111827;">
+                        Please rate our service of this order.
+                    </div>
+                    <div style="display: flex; justify-content: center; margin-bottom: 8px;">
+                        <img src="${qrCodeImageData}" alt="Order Review QR Code" style="width: 120px; height: 120px;" />
+                    </div>
+                    <div style="font-size: 9px; color: #333; word-break: break-all;">
+                        ${receiptData.orderReviewUrl}
+                    </div>
+                </div>
+            ` : ''}
+            <div style="font-size: 11px; margin-top: 10px; margin-bottom: 8px;">
+                Thank you. Come again.
+            </div>
+            <div style="font-size: 9px; color: #666; margin-top: 10px;">
+                Powered By: <a href="https://infotigo.com/" style="color: #666; text-decoration: none;">https://infotigo.com/</a>
+            </div>
         </div>
     </div>
 </body>

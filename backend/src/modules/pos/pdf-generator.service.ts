@@ -275,16 +275,16 @@ export class PDFGeneratorService {
         }
         
         .item-name {
-            width: 60%;
+            width: 45%;
         }
         
         .item-qty {
-            width: 15%;
+            width: 12%;
             text-align: center;
         }
         
         .item-price {
-            width: 25%;
+            width: 21.5%;
             text-align: right;
         }
         
@@ -344,36 +344,43 @@ export class PDFGeneratorService {
     <div class="receipt-header">
         ${receiptSettings?.showLogo && receiptSettings?.logoUrl ? 
           `<img src="${receiptSettings.logoUrl}" alt="Logo" class="logo">` : ''}
-        <h1>${receiptSettings?.header || 'Restaurant Receipt'}</h1>
+        ${receiptSettings?.header ? `<div style="font-size: 10px; margin-bottom: 5px; color: #666;">${receiptSettings.header}</div>` : ''}
+        <h1>${orderData.restaurantName || receiptSettings?.header || 'Restaurant'}</h1>
+        ${orderData.restaurantAddress ? `<div style="font-size: 9px; margin-top: 5px; color: #333;">${orderData.restaurantAddress}</div>` : ''}
+        ${orderData.restaurantPhone ? `<div style="font-size: 9px; margin-top: 3px; color: #333;">Phone: ${orderData.restaurantPhone}</div>` : ''}
+        ${orderData.restaurantWifi ? `<div style="font-size: 9px; margin-top: 3px; color: #333;">Wifi: ${orderData.restaurantWifi}${orderData.restaurantWifiPassword ? ` Password: ${orderData.restaurantWifiPassword}` : ''}</div>` : ''}
     </div>
 
     <div class="order-info">
-        <div><strong>Order #:</strong> ${orderData.orderNumber}</div>
-        <div><strong>Table #:</strong> ${orderData.tableNumber}</div>
+        <div><strong>Invoice No:</strong> ${orderData.orderNumber}</div>
+        <div><strong>Order Type:</strong> ${((orderData.orderType || 'dine-in').toUpperCase().replace('-', ' '))}</div>
         <div><strong>Date:</strong> ${this.formatReceiptDate(orderData.createdAt, orderData.timezone || 'Asia/Dhaka', orderData.dateFormat || 'DD/MM/YYYY', orderData.timeFormat || '12h')}</div>
-        ${orderData.customerInfo?.name ? `<div><strong>Customer:</strong> ${orderData.customerInfo.name}</div>` : ''}
-        ${orderData.customerInfo?.phone ? `<div><strong>Phone:</strong> ${orderData.customerInfo.phone}</div>` : ''}
+        <div><strong>Waiter:</strong> ${orderData.waiterName || 'Default Waiter'}</div>
+        ${orderData.tableNumber && orderData.tableNumber !== 'N/A' ? `<div><strong>Table:</strong> ${orderData.tableNumber}</div>` : ''}
     </div>
 
     <table class="items-table">
         <thead>
             <tr>
-                <th class="item-name">Item</th>
+                <th class="item-name">Item Description</th>
                 <th class="item-qty">Qty</th>
                 <th class="item-price">Price</th>
+                <th class="item-price">T.Price</th>
             </tr>
         </thead>
         <tbody>
             ${orderData.items.map(item => {
               const currency = orderData.currency || 'BDT';
+              const itemPrice = this.formatCurrency(item.price, currency);
               const itemTotal = this.formatCurrency(item.quantity * item.price, currency);
               return `
                 <tr>
                     <td class="item-name">${item.name || 'Menu Item'}</td>
                     <td class="item-qty">${item.quantity}</td>
+                    <td class="item-price">${itemPrice}</td>
                     <td class="item-price">${itemTotal}</td>
                 </tr>
-                ${item.notes ? `<tr><td colspan="3" class="notes">Note: ${item.notes}</td></tr>` : ''}
+                ${item.notes ? `<tr><td colspan="4" class="notes">Note: ${item.notes}</td></tr>` : ''}
             `;
             }).join('')}
         </tbody>
@@ -392,7 +399,7 @@ export class PDFGeneratorService {
         ` : ''}
         ${orderData.taxRate > 0 ? `
             <div class="total-line">
-                <span>Tax (${orderData.taxRate}%):</span>
+                <span>VAT ${orderData.taxRate}%:</span>
                 <span>${this.formatCurrency(orderData.taxAmount, orderData.currency || 'BDT')}</span>
             </div>
         ` : ''}
@@ -403,8 +410,8 @@ export class PDFGeneratorService {
             </div>
         ` : ''}
         <div class="total-line final">
-            <span>TOTAL:</span>
-            <span>${this.formatCurrency(orderData.totalAmount, orderData.currency || 'BDT')}</span>
+            <span>Total:</span>
+            <span>${orderData.currency || 'BDT'} ${this.formatCurrency(orderData.totalAmount, orderData.currency || 'BDT')}</span>
         </div>
     </div>
 
@@ -423,17 +430,24 @@ export class PDFGeneratorService {
     ` : ''}
 
     <div class="receipt-footer">
-        <div>${receiptSettings?.footer || 'Thank you for your visit!'}</div>
-        ${orderData.publicUrl ? `
-        <div style="margin-top: 8px; font-size: 9px; color: #0066cc;">
-            <strong>Visit us online:</strong><br>
-            <a href="${orderData.publicUrl}" style="color: #0066cc; text-decoration: underline;">
-                ${orderData.publicUrl}
-            </a>
-        </div>
-        ` : ''}
-        <div style="margin-top: 5px; font-size: 8px;">
-            Generated on ${this.formatReceiptDate(orderData.createdAt, orderData.timezone || 'Asia/Dhaka', orderData.dateFormat || 'DD/MM/YYYY', orderData.timeFormat || '12h')}
+        <div style="text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px dotted #000;">
+            <div style="font-weight: bold; font-size: 10px; text-decoration: underline; margin-bottom: 10px;">GUEST BILL</div>
+            ${orderData.orderReviewUrl ? `
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 9px; margin-bottom: 8px; color: #111827;">
+                        Please rate our service of this order.
+                    </div>
+                    <div style="font-size: 8px; color: #333; word-break: break-all;">
+                        ${orderData.orderReviewUrl}
+                    </div>
+                </div>
+            ` : ''}
+            <div style="font-size: 10px; margin-top: 10px; margin-bottom: 8px;">
+                Thank you. Come again.
+            </div>
+            <div style="font-size: 8px; color: #666; margin-top: 10px;">
+                Powered By: <a href="https://infotigo.com/" style="color: #666; text-decoration: none;">https://infotigo.com/</a>
+            </div>
         </div>
     </div>
 </body>
