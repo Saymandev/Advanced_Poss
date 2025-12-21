@@ -43,12 +43,23 @@ export class WebsocketsGateway
     const branchId = auth?.branchId || query?.branchId;
     const companyId = auth?.companyId || query?.companyId;
     const role = (auth?.role || query?.role || '').toLowerCase();
-    const featuresRaw = auth?.features || query?.features;
-    const features = Array.isArray(featuresRaw)
-      ? featuresRaw.map((f: any) => String(f).toLowerCase())
-      : typeof featuresRaw === 'string'
-        ? featuresRaw.split(',').map((f: string) => f.trim().toLowerCase()).filter(Boolean)
-        : [];
+    
+    // Handle features - support array, comma-separated string, or undefined/null
+    const featuresRaw = auth?.features ?? query?.features;
+    let features: string[] = [];
+    if (Array.isArray(featuresRaw)) {
+      // Handle array format (from auth object)
+      features = featuresRaw
+        .map((f: any) => String(f).toLowerCase())
+        .filter((f: string) => f.length > 0);
+    } else if (typeof featuresRaw === 'string' && featuresRaw.trim().length > 0) {
+      // Handle comma-separated string format (from query string)
+      features = featuresRaw
+        .split(',')
+        .map((f: string) => f.trim().toLowerCase())
+        .filter((f: string) => f.length > 0);
+    }
+    // If featuresRaw is null, undefined, empty string, or invalid type, features remains []
     if (userId) {
       this.socketToUser.set(client.id, userId);
       if (!this.userRooms.has(userId)) {
