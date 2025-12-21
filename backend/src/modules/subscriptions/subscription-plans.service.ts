@@ -6,7 +6,8 @@ import { SubscriptionPlan, SubscriptionPlanDocument } from './schemas/subscripti
 import {
   convertLegacyFeaturesToKeys,
   ensureCoreFeatures,
-  normalizeFeatureKeys
+  normalizeFeatureKeys,
+  getFeatureDisplayName
 } from './utils/plan-features.helper';
 
 @Injectable()
@@ -52,16 +53,30 @@ export class SubscriptionPlansService {
     return plan.save();
   }
 
-  async findAll(filterActive?: boolean): Promise<SubscriptionPlan[]> {
+  async findAll(filterActive?: boolean): Promise<any[]> {
     const query: any = {};
     // Only filter by isActive if explicitly provided
     if (filterActive !== undefined) {
       query.isActive = filterActive;
     }
-    return this.subscriptionPlanModel
+    const plans = await this.subscriptionPlanModel
       .find(query)
       .sort({ sortOrder: 1 })
+      .lean()
       .exec();
+    
+    // Add feature names to each plan
+    return plans.map((plan: any) => {
+      // .lean() returns plain objects, so no need for toObject()
+      const planObj = { ...plan };
+      // Map enabledFeatureKeys to feature names
+      if (planObj.enabledFeatureKeys && Array.isArray(planObj.enabledFeatureKeys)) {
+        planObj.featureNames = planObj.enabledFeatureKeys.map((key: string) => 
+          getFeatureDisplayName(key)
+        );
+      }
+      return planObj;
+    });
   }
 
   async findOne(id: string): Promise<SubscriptionPlan> {
