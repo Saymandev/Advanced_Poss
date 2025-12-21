@@ -346,8 +346,8 @@ export class PDFGeneratorService {
           `<img src="${receiptSettings.logoUrl}" alt="Logo" class="logo">` : ''}
         ${receiptSettings?.header ? `<div style="font-size: 10px; margin-bottom: 5px; color: #666;">${receiptSettings.header}</div>` : ''}
         <h1>${orderData.restaurantName || receiptSettings?.header || 'Restaurant'}</h1>
-        ${orderData.restaurantAddress ? `<div style="font-size: 9px; margin-top: 5px; color: #333;">${orderData.restaurantAddress}</div>` : ''}
-        ${orderData.restaurantPhone ? `<div style="font-size: 9px; margin-top: 3px; color: #333;">Phone: ${orderData.restaurantPhone}</div>` : ''}
+        ${orderData.restaurantAddress ? `<div style="font-size: 9px; margin-top: 5px; color: #333; font-weight: 600;">${orderData.restaurantAddress}</div>` : ''}
+        ${orderData.restaurantPhone ? `<div style="font-size: 9px; margin-top: 3px; color: #333; font-weight: 600;">Phone: ${orderData.restaurantPhone}</div>` : ''}
         ${orderData.restaurantWifi ? `<div style="font-size: 9px; margin-top: 3px; color: #333;">Wifi: ${orderData.restaurantWifi}${orderData.restaurantWifiPassword ? ` Password: ${orderData.restaurantWifiPassword}` : ''}</div>` : ''}
     </div>
 
@@ -357,6 +357,9 @@ export class PDFGeneratorService {
         <div><strong>Date:</strong> ${this.formatReceiptDate(orderData.createdAt, orderData.timezone || 'Asia/Dhaka', orderData.dateFormat || 'DD/MM/YYYY', orderData.timeFormat || '12h')}</div>
         <div><strong>Waiter:</strong> ${orderData.waiterName || 'Default Waiter'}</div>
         ${orderData.tableNumber && orderData.tableNumber !== 'N/A' ? `<div><strong>Table:</strong> ${orderData.tableNumber}</div>` : ''}
+        ${orderData.customerInfo?.name ? `<div><strong>Customer:</strong> ${orderData.customerInfo.name}</div>` : ''}
+        ${orderData.customerInfo?.email ? `<div><strong>Email:</strong> ${orderData.customerInfo.email}</div>` : ''}
+        ${orderData.customerInfo?.phone ? `<div><strong>Phone:</strong> ${orderData.customerInfo.phone}</div>` : ''}
     </div>
 
     <table class="items-table">

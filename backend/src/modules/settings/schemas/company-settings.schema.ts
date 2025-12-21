@@ -64,6 +64,39 @@ export class CompanySettings {
     reports: boolean;
     analytics: boolean;
   };
+
+  @Prop({
+    type: {
+      header: { type: String, default: 'Welcome to Our Restaurant' },
+      footer: { type: String, default: 'Thank you for your visit!' },
+      showLogo: { type: Boolean, default: true },
+      logoUrl: { type: String, default: '' },
+      fontSize: { type: Number, default: 12 },
+      paperWidth: { type: Number, default: 80 },
+      wifi: { type: String, default: '' },
+      wifiPassword: { type: String, default: '' },
+    },
+    default: {
+      header: 'Welcome to Our Restaurant',
+      footer: 'Thank you for your visit!',
+      showLogo: true,
+      logoUrl: '',
+      fontSize: 12,
+      paperWidth: 80,
+      wifi: '',
+      wifiPassword: '',
+    },
+  })
+  receiptSettings?: {
+    header: string;
+    footer: string;
+    showLogo: boolean;
+    logoUrl?: string;
+    fontSize?: number;
+    paperWidth?: number;
+    wifi?: string;
+    wifiPassword?: string;
+  };
 }
 
 export const CompanySettingsSchema = SchemaFactory.createForClass(CompanySettings);

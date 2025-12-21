@@ -147,6 +147,8 @@ export class ReceiptService {
     const settings = await this.posSettingsModel
       .findOne({ branchId: order.branchId })
       .exec();
+    // Get company settings as fallback for receipt settings
+    let companySettings: any = null;
     // Get branch and company to find public URL and logo
     let publicUrl: string | undefined;
     let companyLogo: string | undefined;
@@ -247,7 +249,7 @@ export class ReceiptService {
           companyIdStr = branch.companyId.toString();
         }
         if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
-          const companySettings = await this.settingsService.getCompanySettings(companyIdStr);
+          companySettings = await this.settingsService.getCompanySettings(companyIdStr);
           currency = companySettings?.currency || 'BDT';
           timezone = companySettings?.timezone || 'Asia/Dhaka';
           dateFormat = companySettings?.dateFormat || 'DD/MM/YYYY';
@@ -376,13 +378,34 @@ export class ReceiptService {
       const branchData = await this.branchesService.findOne(order.branchId.toString());
       if (branchData) {
         restaurantName = branchData.name || company?.name || restaurantName;
-        restaurantAddress = branchData.address || company?.address || '';
+        // Format address - handle both string and object formats
+        const addressData = branchData.address || company?.address || '';
+        if (typeof addressData === 'object' && addressData !== null) {
+          // If address is an object, format it as a string, excluding _id
+          const addressParts = [];
+          if ((addressData as any).street) addressParts.push((addressData as any).street);
+          if ((addressData as any).city) addressParts.push((addressData as any).city);
+          if ((addressData as any).state) addressParts.push((addressData as any).state);
+          if ((addressData as any).zipCode) addressParts.push((addressData as any).zipCode);
+          if ((addressData as any).country) addressParts.push((addressData as any).country);
+          restaurantAddress = addressParts.join(', ');
+        } else {
+          restaurantAddress = addressData || '';
+        }
         restaurantPhone = branchData.phone || company?.phone || '';
-        // Check for WiFi info in branch or company settings
-        if ((branchData as any).wifi) {
+        // Get WiFi info: branch POS settings > company settings > branch data
+        if (settings?.receiptSettings?.wifi) {
+          restaurantWifi = settings.receiptSettings.wifi;
+        } else if (companySettings?.receiptSettings?.wifi) {
+          restaurantWifi = companySettings.receiptSettings.wifi;
+        } else if ((branchData as any).wifi) {
           restaurantWifi = (branchData as any).wifi;
         }
-        if ((branchData as any).wifiPassword) {
+        if (settings?.receiptSettings?.wifiPassword) {
+          restaurantWifiPassword = settings.receiptSettings.wifiPassword;
+        } else if (companySettings?.receiptSettings?.wifiPassword) {
+          restaurantWifiPassword = companySettings.receiptSettings.wifiPassword;
+        } else if ((branchData as any).wifiPassword) {
           restaurantWifiPassword = (branchData as any).wifiPassword;
         }
       }
@@ -421,10 +444,10 @@ export class ReceiptService {
       dateFormat,
       timeFormat,
       receiptSettings: {
-        header: settings?.receiptSettings?.header || 'Restaurant Receipt',
-        footer: settings?.receiptSettings?.footer || 'Thank you for your visit!',
-        fontSize: settings?.receiptSettings?.fontSize || 12,
-        paperWidth: settings?.receiptSettings?.paperWidth || 80,
+        header: settings?.receiptSettings?.header || companySettings?.receiptSettings?.header || 'Restaurant Receipt',
+        footer: settings?.receiptSettings?.footer || companySettings?.receiptSettings?.footer || 'Thank you for your visit!',
+        fontSize: settings?.receiptSettings?.fontSize || companySettings?.receiptSettings?.fontSize || 12,
+        paperWidth: settings?.receiptSettings?.paperWidth || companySettings?.receiptSettings?.paperWidth || 80,
         // Determine logo URL: use custom logoUrl if provided, otherwise use company logo if showLogo is enabled
         logoUrl: (() => {
           const customLogoUrl = settings?.receiptSettings?.logoUrl;
@@ -619,8 +642,8 @@ export class ReceiptService {
           `<img src="${receiptData.receiptSettings.logoUrl}" alt="Logo" class="logo">` : ''}
         ${receiptData.receiptSettings.header ? `<div style="font-size: 11px; margin-bottom: 5px; color: #666;">${receiptData.receiptSettings.header}</div>` : ''}
         <h1>${receiptData.restaurantName || receiptData.receiptSettings.header || 'Restaurant'}</h1>
-        ${receiptData.restaurantAddress ? `<div style="font-size: 10px; margin-top: 5px; color: #333;">${receiptData.restaurantAddress}</div>` : ''}
-        ${receiptData.restaurantPhone ? `<div style="font-size: 10px; margin-top: 3px; color: #333;">Phone: ${receiptData.restaurantPhone}</div>` : ''}
+        ${receiptData.restaurantAddress ? `<div style="font-size: 10px; margin-top: 5px; color: #333; font-weight: 600;">${receiptData.restaurantAddress}</div>` : ''}
+        ${receiptData.restaurantPhone ? `<div style="font-size: 10px; margin-top: 3px; color: #333; font-weight: 600;">Phone: ${receiptData.restaurantPhone}</div>` : ''}
         ${receiptData.restaurantWifi ? `<div style="font-size: 10px; margin-top: 3px; color: #333;">Wifi: ${receiptData.restaurantWifi}${receiptData.restaurantWifiPassword ? ` Password: ${receiptData.restaurantWifiPassword}` : ''}</div>` : ''}
     </div>
     <div class="order-info">
@@ -629,6 +652,9 @@ export class ReceiptService {
         <div><strong>Date:</strong> ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, receiptData.timeFormat)}</div>
         <div><strong>Waiter:</strong> ${receiptData.waiterName || 'Default Waiter'}</div>
         ${receiptData.tableNumber && receiptData.tableNumber !== 'N/A' ? `<div><strong>Table:</strong> ${receiptData.tableNumber}</div>` : ''}
+        ${receiptData.customerInfo?.name ? `<div><strong>Customer:</strong> ${receiptData.customerInfo.name}</div>` : ''}
+        ${receiptData.customerInfo?.email ? `<div><strong>Email:</strong> ${receiptData.customerInfo.email}</div>` : ''}
+        ${receiptData.customerInfo?.phone ? `<div><strong>Phone:</strong> ${receiptData.customerInfo.phone}</div>` : ''}
     </div>
     <div class="items">
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">

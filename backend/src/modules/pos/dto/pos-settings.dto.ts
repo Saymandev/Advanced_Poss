@@ -29,6 +29,14 @@ export class ReceiptSettingsDto {
   @Min(50)
   @Max(100)
   paperWidth?: number;
+
+  @IsOptional()
+  @IsString()
+  wifi?: string;
+
+  @IsOptional()
+  @IsString()
+  wifiPassword?: string;
 }
 
 export class PrinterSettingsDto {

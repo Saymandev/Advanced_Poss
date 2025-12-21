@@ -10,6 +10,8 @@ export interface ReceiptSettings {
   logoUrl?: string;
   fontSize?: number;
   paperWidth?: number;
+  wifi?: string;
+  wifiPassword?: string;
 }
 
 export interface PrinterSettings {

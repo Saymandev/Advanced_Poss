@@ -56,6 +56,32 @@ export class UpdateCompanySettingsDto {
     reports?: boolean;
     analytics?: boolean;
   };
+
+  @ApiPropertyOptional({
+    example: {
+      header: 'Welcome to Our Restaurant',
+      footer: 'Thank you for your visit!',
+      showLogo: true,
+      logoUrl: '',
+      fontSize: 12,
+      paperWidth: 80,
+      wifi: '',
+      wifiPassword: '',
+    },
+    description: 'Company-wide receipt settings (fallback for branches)',
+  })
+  @IsOptional()
+  @IsObject()
+  receiptSettings?: {
+    header?: string;
+    footer?: string;
+    showLogo?: boolean;
+    logoUrl?: string;
+    fontSize?: number;
+    paperWidth?: number;
+    wifi?: string;
+    wifiPassword?: string;
+  };
 }
 
 export class UpdateCompanySettingsRequestDto extends UpdateCompanySettingsDto {

@@ -3,11 +3,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EmailService } from '../../common/services/email.service';
 import { SmsService } from '../../common/services/sms.service';
+import { BranchesService } from '../branches/branches.service';
 import { BookingsService } from '../bookings/bookings.service';
 import { CustomersService } from '../customers/customers.service';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { KitchenService } from '../kitchen/kitchen.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
+import { SettingsService } from '../settings/settings.service';
+import { ServiceChargeSetting, ServiceChargeSettingDocument } from '../settings/schemas/service-charge-setting.schema';
+import { TaxSetting, TaxSettingDocument } from '../settings/schemas/tax-setting.schema';
 import { TablesService } from '../tables/tables.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
@@ -27,12 +31,16 @@ export class POSService {
     @InjectModel(POSPayment.name) private posPaymentModel: Model<POSPaymentDocument>,
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(TaxSetting.name) private taxSettingModel: Model<TaxSettingDocument>,
+    @InjectModel(ServiceChargeSetting.name) private serviceChargeSettingModel: Model<ServiceChargeSettingDocument>,
     private receiptService: ReceiptService,
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
     private websocketsGateway: WebsocketsGateway,
     private emailService: EmailService,
     private smsService: SmsService,
+    private branchesService: BranchesService,
+    private settingsService: SettingsService,
     @Inject(forwardRef(() => TablesService))
     private tablesService: TablesService,
     @Inject(forwardRef(() => KitchenService))
@@ -994,17 +1002,68 @@ export class POSService {
   async getPOSSettings(branchId: string): Promise<POSSettings> {
     let settings = await this.posSettingsModel.findOne({ branchId: new Types.ObjectId(branchId) }).exec();
     if (!settings) {
-      // Create default settings
+      // Fetch branch to get companyId
+      const branch = await this.branchesService.findOne(branchId);
+      let companyIdStr: string | undefined;
+      if (branch?.companyId) {
+        if (typeof branch.companyId === 'object' && branch.companyId !== null) {
+          companyIdStr = (branch.companyId as any)._id?.toString() || (branch.companyId as any).id?.toString() || branch.companyId.toString();
+        } else {
+          companyIdStr = branch.companyId.toString();
+        }
+      }
+      
+      // Fetch company settings for defaults
+      let companySettings: any = {};
+      let companyTaxRate = 10;
+      let companyServiceChargeRate = 0;
+      let companyCurrency = 'USD';
+      
+      if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
+        try {
+          companySettings = await this.settingsService.getCompanySettings(companyIdStr);
+          companyCurrency = companySettings?.currency || 'USD';
+          
+          // Fetch active tax setting for company
+          const activeTax = await this.taxSettingModel.findOne({
+            companyId: new Types.ObjectId(companyIdStr),
+            isActive: true,
+            appliesTo: 'all',
+          }).exec();
+          if (activeTax && activeTax.type === 'percentage') {
+            companyTaxRate = activeTax.rate;
+          }
+          
+          // Fetch active service charge setting for company
+          const activeServiceCharge = await this.serviceChargeSettingModel.findOne({
+            companyId: new Types.ObjectId(companyIdStr),
+            isActive: true,
+            appliesTo: 'all',
+          }).exec();
+          if (activeServiceCharge) {
+            companyServiceChargeRate = activeServiceCharge.rate;
+          }
+        } catch (error) {
+          // If company settings don't exist or error, use defaults
+        }
+      }
+      
+      // Create default settings, using company settings as fallback
       settings = new this.posSettingsModel({
         branchId: new Types.ObjectId(branchId),
-        taxRate: 10,
-        serviceCharge: 0,
-        currency: 'USD',
+        taxRate: companyTaxRate,
+        serviceCharge: companyServiceChargeRate,
+        currency: companyCurrency,
         defaultPaymentMode: 'pay-later',
         receiptSettings: {
-          header: 'Welcome to Our Restaurant',
-          footer: 'Thank you for your visit!',
-          showLogo: true,
+          header: companySettings?.receiptSettings?.header || 'Welcome to Our Restaurant',
+          footer: companySettings?.receiptSettings?.footer || 'Thank you for your visit!',
+          showLogo: companySettings?.receiptSettings?.showLogo ?? true,
+          logoUrl: companySettings?.receiptSettings?.logoUrl || '',
+          fontSize: companySettings?.receiptSettings?.fontSize || 12,
+          paperWidth: companySettings?.receiptSettings?.paperWidth || 80,
+          wifi: companySettings?.receiptSettings?.wifi || '',
+          wifiPassword: companySettings?.receiptSettings?.wifiPassword || '',
         },
         printerSettings: {
           enabled: false,
