@@ -46,6 +46,17 @@ import {
   YAxis
 } from 'recharts';
 const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
+
+// Custom tooltip formatter that ensures 2 decimal places for currency
+const formatTooltipCurrency = (value: any): string => {
+  if (typeof value === 'number') {
+    // Round to 2 decimal places to avoid floating point issues
+    const rounded = Math.round(value * 100) / 100;
+    return formatCurrency(rounded);
+  }
+  return formatCurrency(Number(value) || 0);
+};
+
 export default function ReportsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   // Redirect if user doesn't have reports feature (auto-redirects to role-specific dashboard)
@@ -604,14 +615,14 @@ export default function ReportsPage() {
         </Card>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Reports & Analytics</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Reports & Analytics</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Comprehensive insights into your restaurant performance
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Select
             options={[
               { value: 'day', label: 'Today' },
@@ -621,11 +632,13 @@ export default function ReportsPage() {
             ]}
             value={selectedPeriod}
             onChange={(value) => setSelectedPeriod(value as typeof selectedPeriod)}
+            className="w-full sm:w-auto"
           />
           <Button
             onClick={handleRefresh}
             variant="secondary"
             disabled={isLoading}
+            className="w-full sm:w-auto text-sm sm:text-base"
           >
             <ArrowPathIcon className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
@@ -634,28 +647,30 @@ export default function ReportsPage() {
             onClick={() => handleExport(activeReport === 'sales' ? 'sales' : 'sales', 'pdf')}
             variant="secondary"
             disabled={isExporting || isLoading}
+            className="w-full sm:w-auto text-sm sm:text-base"
           >
             <ChartBarIcon className="w-4 h-4 mr-2" />
-            {isExporting ? 'Exporting...' : 'Export Report'}
+            <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Export Report'}</span>
+            <span className="sm:hidden">{isExporting ? 'Exporting...' : 'Export'}</span>
           </Button>
         </div>
       </div>
       {/* Report Type Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card 
           className={`cursor-pointer transition-all ${activeReport === 'financial' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('financial')}
         >
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'financial' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                <ChartBarIcon className={`w-6 h-6 ${activeReport === 'financial' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${activeReport === 'financial' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <ChartBarIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${activeReport === 'financial' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
               </div>
-              <div>
-                <h3 className={`font-semibold ${activeReport === 'financial' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+              <div className="min-w-0">
+                <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'financial' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
                   Financial Summary
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Net, sales, expenses
                 </p>
               </div>
@@ -666,16 +681,16 @@ export default function ReportsPage() {
           className={`cursor-pointer transition-all ${activeReport === 'sales' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('sales')}
         >
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'sales' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                <CurrencyDollarIcon className={`w-6 h-6 ${activeReport === 'sales' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${activeReport === 'sales' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <CurrencyDollarIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${activeReport === 'sales' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
               </div>
-              <div>
-                <h3 className={`font-semibold ${activeReport === 'sales' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+              <div className="min-w-0">
+                <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'sales' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
                   Sales Report
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Revenue & orders
                 </p>
               </div>
@@ -686,16 +701,16 @@ export default function ReportsPage() {
           className={`cursor-pointer transition-all ${activeReport === 'wastage' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('wastage')}
         >
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'wastage' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                <TrashIcon className={`w-6 h-6 ${activeReport === 'wastage' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${activeReport === 'wastage' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <TrashIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${activeReport === 'wastage' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
               </div>
-              <div>
-                <h3 className={`font-semibold ${activeReport === 'wastage' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+              <div className="min-w-0">
+                <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'wastage' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
                   Wastage Report
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Inventory losses
                 </p>
               </div>
@@ -706,16 +721,16 @@ export default function ReportsPage() {
           className={`cursor-pointer transition-all ${activeReport === 'food' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('food')}
         >
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'food' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                <CakeIcon className={`w-6 h-6 ${activeReport === 'food' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${activeReport === 'food' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <CakeIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${activeReport === 'food' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
               </div>
-              <div>
-                <h3 className={`font-semibold ${activeReport === 'food' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+              <div className="min-w-0">
+                <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'food' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
                   Food Report
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Menu performance
                 </p>
               </div>
@@ -726,16 +741,16 @@ export default function ReportsPage() {
           className={`cursor-pointer transition-all ${activeReport === 'settlement' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           onClick={() => setActiveReport('settlement')}
         >
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${activeReport === 'settlement' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                <ArrowPathIcon className={`w-6 h-6 ${activeReport === 'settlement' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${activeReport === 'settlement' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <ArrowPathIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${activeReport === 'settlement' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
               </div>
-              <div>
-                <h3 className={`font-semibold ${activeReport === 'settlement' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+              <div className="min-w-0">
+                <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'settlement' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
                   Due Settlement
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Pending payments
                 </p>
               </div>
@@ -746,12 +761,12 @@ export default function ReportsPage() {
       {activeReport === 'financial' && (
         <>
           {/* Financial Summary (Sales vs Expenses vs Purchases) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {financialCards.map((card) => (
               <Card key={card.title} className="border border-gray-200 dark:border-gray-800">
-                <CardContent className="p-5">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{card.title}</p>
-                  <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+                <CardContent className="p-4 sm:p-5">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">{card.title}</p>
+                  <p className={`text-lg sm:text-xl md:text-2xl font-bold ${card.color} truncate`} title={card.value}>{card.value}</p>
                 </CardContent>
               </Card>
             ))}
@@ -771,7 +786,14 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="label" />
                     <YAxis />
-                    <Tooltip />
+                    <Tooltip 
+                      formatter={(value: any) => formatTooltipCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                      }}
+                    />
                     <Line type="monotone" dataKey="sales" name="Sales" stroke="#10b981" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="purchases" name="Purchases" stroke="#3b82f6" strokeWidth={2} dot={false} />
@@ -788,13 +810,13 @@ export default function ReportsPage() {
       {activeReport === 'sales' && (
         <>
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
-                <p className="text-3xl font-bold text-green-600">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Revenue</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600 truncate" title={formatCurrency(salesAnalytics?.totalSales ?? 0)}>
                   {formatCurrency(salesAnalytics?.totalSales ?? 0)}
                 </p>
                 <div className="mt-2">
@@ -802,17 +824,17 @@ export default function ReportsPage() {
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Completed orders only</p>
               </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-green-600" />
+              <CurrencyDollarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Completed Orders</p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {salesAnalytics?.totalOrders ?? 0}
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Completed Orders</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-blue-600 truncate" title={(salesAnalytics?.totalOrders ?? 0).toString()}>
+                  {(salesAnalytics?.totalOrders ?? 0).toLocaleString()}
                 </p>
                 <div className="mt-2">
                   <TrendIndicator value={trends.ordersChange} />
@@ -825,16 +847,24 @@ export default function ReportsPage() {
                     : ''}
                 </p>
               </div>
-              <ShoppingCartIcon className="w-8 h-8 text-blue-600" />
+              <ShoppingCartIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
-                <p className="text-3xl font-bold text-purple-600">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Avg Order Value</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600 truncate" title={formatCurrency((() => {
+                    const totalSales = salesAnalytics?.totalSales || 0;
+                    const totalOrders = salesAnalytics?.totalOrders || 0;
+                    // Calculate if averageOrderValue is 0 or not provided
+                    if (salesAnalytics?.averageOrderValue && salesAnalytics.averageOrderValue > 0) {
+                      return salesAnalytics.averageOrderValue;
+                    }
+                    return totalOrders > 0 ? totalSales / totalOrders : 0;
+                  })())}>
                   {formatCurrency((() => {
                     const totalSales = salesAnalytics?.totalSales || 0;
                     const totalOrders = salesAnalytics?.totalOrders || 0;
@@ -849,24 +879,24 @@ export default function ReportsPage() {
                   <TrendIndicator value={trends.avgOrderValueChange} />
                 </div>
               </div>
-              <ChartBarIcon className="w-8 h-8 text-purple-600" />
+              <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Peak Hours</p>
-                <p className="text-3xl font-bold text-orange-600">{peakHours.text}</p>
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Peak Hours</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-orange-600 truncate" title={peakHours.text}>{peakHours.text}</p>
                 <div className="flex items-center gap-1 mt-2">
                   <ClockIcon className="w-4 h-4 text-orange-600" />
-                  <span className="text-sm text-gray-500">
+                  <span className="text-xs sm:text-sm text-gray-500">
                     {peakHours.orders} {peakHours.isAverage ? 'orders avg' : 'orders'}
                   </span>
                 </div>
               </div>
-              <ClockIcon className="w-8 h-8 text-orange-600" />
+              <ClockIcon className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -890,6 +920,7 @@ export default function ReportsPage() {
                   <XAxis dataKey="name" className="text-sm" />
                   <YAxis className="text-sm" />
                   <Tooltip
+                    formatter={(value: any) => formatTooltipCurrency(value)}
                     contentStyle={{
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '1px solid #e5e7eb',
@@ -936,7 +967,15 @@ export default function ReportsPage() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip 
+                    formatter={(value: any, name: string, props: any) => {
+                      // For pie charts, value is percentage, but we want to show sales amount
+                      if (props.payload && props.payload.sales !== undefined) {
+                        return [formatTooltipCurrency(props.payload.sales), name || 'Sales'];
+                      }
+                      return [formatTooltipCurrency(value), name || 'Value'];
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -966,6 +1005,13 @@ export default function ReportsPage() {
                   <XAxis dataKey="hour" className="text-sm" />
                   <YAxis className="text-sm" />
                   <Tooltip
+                    formatter={(value: any) => {
+                      // For orders, just show the number
+                      if (typeof value === 'number') {
+                        return value.toLocaleString();
+                      }
+                      return value;
+                    }}
                     contentStyle={{
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '1px solid #e5e7eb',
@@ -1031,50 +1077,50 @@ export default function ReportsPage() {
         </Card>
       </div>
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active Orders</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {dashboardData?.active?.orders || 0}
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Active Orders</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600 truncate" title={(dashboardData?.active?.orders || 0).toString()}>
+                  {(dashboardData?.active?.orders || 0).toLocaleString()}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">Currently processing</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">Currently processing</p>
               </div>
-              <ShoppingCartIcon className="w-8 h-8 text-green-600" />
+              <ShoppingCartIcon className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Customers</p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {dashboardData?.customers?.total || 0}
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Customers</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-blue-600 truncate" title={(dashboardData?.customers?.total || 0).toString()}>
+                  {(dashboardData?.customers?.total || 0).toLocaleString()}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
                   {dashboardData?.customers?.active || 0} active
                 </p>
               </div>
-              <UsersIcon className="w-8 h-8 text-blue-600" />
+              <UsersIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Inventory Alerts</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {(dashboardData?.inventory?.lowStock || 0) + (dashboardData?.inventory?.outOfStock || 0)}
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Inventory Alerts</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600 truncate" title={((dashboardData?.inventory?.lowStock || 0) + (dashboardData?.inventory?.outOfStock || 0)).toString()}>
+                  {((dashboardData?.inventory?.lowStock || 0) + (dashboardData?.inventory?.outOfStock || 0)).toLocaleString()}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
                   {dashboardData?.inventory?.lowStock || 0} low, {dashboardData?.inventory?.outOfStock || 0} out
                 </p>
               </div>
-              <ChartBarIcon className="w-8 h-8 text-purple-600" />
+              <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -1085,7 +1131,7 @@ export default function ReportsPage() {
           <CardTitle>Performance Insights</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             {bestDay && (
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Best Performing Day</h4>
@@ -1126,60 +1172,60 @@ export default function ReportsPage() {
       {activeReport === 'wastage' && (
         <div className="space-y-6">
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Wastage</p>
-                    <p className="text-3xl font-bold text-red-600">
-                      {isLoadingWastage ? '...' : wastageReport?.summary?.totalWastageCount || 0}
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Wastage</p>
+                    <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-red-600 truncate" title={(isLoadingWastage ? '...' : wastageReport?.summary?.totalWastageCount || 0).toString()}>
+                      {isLoadingWastage ? '...' : (wastageReport?.summary?.totalWastageCount || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Items wasted</p>
                   </div>
-                  <TrashIcon className="w-12 h-12 text-red-200 dark:text-red-900" />
+                  <TrashIcon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-12 lg:h-12 text-red-200 dark:text-red-900 flex-shrink-0" />
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Quantity</p>
-                    <p className="text-3xl font-bold text-orange-600">
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Quantity</p>
+                    <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-orange-600 truncate" title={(isLoadingWastage ? '...' : wastageReport?.summary?.totalQuantity?.toFixed(2) || '0.00').toString()}>
                       {isLoadingWastage ? '...' : wastageReport?.summary?.totalQuantity?.toFixed(2) || '0.00'}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Units wasted</p>
                   </div>
-                  <ExclamationTriangleIcon className="w-12 h-12 text-orange-200 dark:text-orange-900" />
+                  <ExclamationTriangleIcon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-12 lg:h-12 text-orange-200 dark:text-orange-900 flex-shrink-0" />
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Wastage Value</p>
-                    <p className="text-3xl font-bold text-purple-600">
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Wastage Value</p>
+                    <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-purple-600 truncate" title={isLoadingWastage ? '...' : formatCurrency(wastageReport?.summary?.totalCost || 0)}>
                       {isLoadingWastage ? '...' : formatCurrency(wastageReport?.summary?.totalCost || 0)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Total loss</p>
                   </div>
-                  <CurrencyDollarIcon className="w-12 h-12 text-purple-200 dark:text-purple-900" />
+                  <CurrencyDollarIcon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-12 lg:h-12 text-purple-200 dark:text-purple-900 flex-shrink-0" />
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Avg Wastage Cost</p>
-                    <p className="text-3xl font-bold text-blue-600">
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Avg Wastage Cost</p>
+                    <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-blue-600 truncate" title={isLoadingWastage ? '...' : formatCurrency(wastageReport?.summary?.avgWastageCost || 0)}>
                       {isLoadingWastage ? '...' : formatCurrency(wastageReport?.summary?.avgWastageCost || 0)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Per incident</p>
                   </div>
-                  <ChartBarIcon className="w-12 h-12 text-blue-200 dark:text-blue-900" />
+                  <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-12 lg:h-12 text-blue-200 dark:text-blue-900 flex-shrink-0" />
                 </div>
               </CardContent>
             </Card>
@@ -1230,7 +1276,7 @@ export default function ReportsPage() {
                         />
                         <YAxis />
                         <Tooltip 
-                          formatter={(value: any) => formatCurrency(value)}
+                          formatter={(value: any) => formatTooltipCurrency(value)}
                           contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}
                         />
                         <Bar dataKey="totalCost" fill="#ef4444" radius={[8, 8, 0, 0]}>
@@ -1302,7 +1348,7 @@ export default function ReportsPage() {
                         <XAxis dataKey="date" />
                         <YAxis />
                         <Tooltip 
-                          formatter={(value: any) => formatCurrency(value)}
+                          formatter={(value: any) => formatTooltipCurrency(value)}
                           contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}
                         />
                         <Line 
@@ -1328,34 +1374,40 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                 <Card>
-                  <CardContent className="p-6">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Menu Items</p>
-                    <p className="text-3xl font-bold text-blue-600">
-                      {topItems.length || 0}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Total items</p>
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Menu Items</p>
+                      <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-blue-600 truncate" title={(topItems.length || 0).toString()}>
+                        {(topItems.length || 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Total items</p>
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-6">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Top Seller</p>
-                    <p className="text-xl font-bold text-green-600">
-                      {mostPopularItem?.name || 'N/A'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {mostPopularItem?.orders || 0} orders
-                    </p>
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Top Seller</p>
+                      <p className="text-base sm:text-lg md:text-xl font-bold text-green-600 truncate" title={mostPopularItem?.name || 'N/A'}>
+                        {mostPopularItem?.name || 'N/A'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {mostPopularItem?.orders || 0} orders
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-6">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Food Revenue</p>
-                    <p className="text-3xl font-bold text-purple-600">
-                      {formatCurrency(salesAnalytics?.totalSales || 0)}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Total sales</p>
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Food Revenue</p>
+                      <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600 truncate" title={formatCurrency(salesAnalytics?.totalSales || 0)}>
+                        {formatCurrency(salesAnalytics?.totalSales || 0)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Total sales</p>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -1413,7 +1465,15 @@ export default function ReportsPage() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip 
+                        formatter={(value: any, name: string, props: any) => {
+                          // For pie charts, value is percentage, but we want to show sales amount
+                          if (props.payload && props.payload.sales !== undefined) {
+                            return [formatTooltipCurrency(props.payload.sales), name || 'Sales'];
+                          }
+                          return [formatTooltipCurrency(value), name || 'Value'];
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -1435,34 +1495,40 @@ export default function ReportsPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                   <Card>
-                    <CardContent className="p-6">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Pending Settlements</p>
-                      <p className="text-3xl font-bold text-orange-600">
-                        {dueSettlementsData?.pendingSettlements || 0}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">Unpaid orders</p>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Pending Settlements</p>
+                        <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-orange-600 truncate" title={(dueSettlementsData?.pendingSettlements || 0).toString()}>
+                          {(dueSettlementsData?.pendingSettlements || 0).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Unpaid orders</p>
+                      </div>
                     </CardContent>
                   </Card>
                   <Card>
-                    <CardContent className="p-6">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Total Due Amount</p>
-                      <p className="text-3xl font-bold text-red-600">
-                        {formatCurrency(dueSettlementsData?.totalDueAmount || 0)}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">Outstanding</p>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Due Amount</p>
+                        <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-red-600 truncate" title={formatCurrency(dueSettlementsData?.totalDueAmount || 0)}>
+                          {formatCurrency(dueSettlementsData?.totalDueAmount || 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Outstanding</p>
+                      </div>
                     </CardContent>
                   </Card>
                   <Card>
-                    <CardContent className="p-6">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Settled Today</p>
-                      <p className="text-3xl font-bold text-green-600">
-                        {formatCurrency(dueSettlementsData?.settledTodayAmount || 0)}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {dueSettlementsData?.settledToday || 0} orders paid today
-                      </p>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Settled Today</p>
+                        <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-green-600 truncate" title={formatCurrency(dueSettlementsData?.settledTodayAmount || 0)}>
+                          {formatCurrency(dueSettlementsData?.settledTodayAmount || 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {dueSettlementsData?.settledToday || 0} orders paid today
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>

@@ -457,60 +457,77 @@ export default function WastagePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Wastage Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Wastage Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Track and manage inventory losses, expired items, and waste
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
+        <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+          <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           Record Wastage
         </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Records</p>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{totalWastages}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Records</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={totalWastages.toString()}>
+                {totalWastages.toLocaleString()}
+              </p>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Cost</p>
-            <p className="text-3xl font-bold text-red-600">{formatCurrency(totalCost)}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Cost</p>
+              <p className="text-sm sm:text-base md:text-lg font-bold text-red-600 truncate" title={formatCurrency(totalCost)}>
+                {formatCurrency(totalCost)}
+              </p>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Pending Approval</p>
-            <p className="text-3xl font-bold text-yellow-600">
-              {filteredWastages.filter((w: Wastage) => w.status === 'pending').length}
-            </p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Pending Approval</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={filteredWastages.filter((w: Wastage) => w.status === 'pending').length.toString()}>
+                {filteredWastages.filter((w: Wastage) => w.status === 'pending').length.toLocaleString()}
+              </p>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400">This Month</p>
-            <p className="text-3xl font-bold text-blue-600">
-              {filteredWastages.filter((w: Wastage) => {
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">This Month</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate" title={filteredWastages.filter((w: Wastage) => {
                 const wastageDate = new Date(w.wastageDate);
                 const now = new Date();
                 return wastageDate.getMonth() === now.getMonth() && 
                        wastageDate.getFullYear() === now.getFullYear();
-              }).length}
-            </p>
+              }).length.toString()}>
+                {filteredWastages.filter((w: Wastage) => {
+                  const wastageDate = new Date(w.wastageDate);
+                  const now = new Date();
+                  return wastageDate.getMonth() === now.getMonth() && 
+                         wastageDate.getFullYear() === now.getFullYear();
+                }).length.toLocaleString()}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
             <Input
               placeholder="Search ingredients..."
               value={searchQuery}
@@ -626,7 +643,7 @@ export default function WastagePage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Quantity *
@@ -677,7 +694,7 @@ export default function WastagePage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Batch Number
@@ -712,11 +729,11 @@ export default function WastagePage() {
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="secondary" onClick={() => setIsCreateModalOpen(false)}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4">
+            <Button variant="secondary" onClick={() => setIsCreateModalOpen(false)} className="w-full sm:w-auto text-sm sm:text-base">
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={isCreating}>
+            <Button onClick={handleCreate} disabled={isCreating} className="w-full sm:w-auto text-sm sm:text-base">
               {isCreating ? 'Creating...' : 'Create Wastage'}
             </Button>
           </div>
@@ -752,7 +769,7 @@ export default function WastagePage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Quantity *
@@ -819,7 +836,7 @@ export default function WastagePage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Batch Number
@@ -854,11 +871,11 @@ export default function WastagePage() {
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4">
+            <Button variant="secondary" onClick={() => setIsEditModalOpen(false)} className="w-full sm:w-auto text-sm sm:text-base">
               Cancel
             </Button>
-            <Button onClick={handleEdit} disabled={isUpdating}>
+            <Button onClick={handleEdit} disabled={isUpdating} className="w-full sm:w-auto text-sm sm:text-base">
               {isUpdating ? 'Updating...' : 'Update Wastage'}
             </Button>
           </div>
@@ -874,7 +891,7 @@ export default function WastagePage() {
       >
         {selectedWastage && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Ingredient</p>
                 <p className="text-gray-900 dark:text-white">

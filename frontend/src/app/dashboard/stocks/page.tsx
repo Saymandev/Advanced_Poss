@@ -324,12 +324,13 @@ export default function StocksPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Stock Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Stock Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Monitor inventory levels and stock alerts
           </p>
         </div>
-        <ImportButton
+        <div className="w-full sm:w-auto">
+          <ImportButton
           onImport={async (data, _result) => {
             let successCount = 0;
             let errorCount = 0;
@@ -393,9 +394,10 @@ export default function StocksPage() {
             { key: 'quantity', label: 'Quantity', required: true, type: 'number' },
             { key: 'type', label: 'Type (add/remove)', required: true, type: 'string' },
           ]}
-          filename="stock-adjustments-import-template"
-          variant="secondary"
-        />
+            filename="stock-adjustments-import-template"
+            variant="secondary"
+          />
+        </div>
       </div>
 
       {/* Low Stock Alert Banner */}
@@ -428,63 +430,73 @@ export default function StocksPage() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Items</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
-              </div>
-              <ArchiveBoxIcon className="w-8 h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">In Stock</p>
-                <p className="text-3xl font-bold text-green-600">{stats.inStock}</p>
-              </div>
-              <ArchiveBoxIcon className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Low Stock</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.lowStock}</p>
-              </div>
-              <ExclamationTriangleIcon className="w-8 h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Out of Stock</p>
-                <p className="text-3xl font-bold text-red-600">{stats.outOfStock}</p>
-              </div>
-              <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between gap-4">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Value</p>
-                <p className="text-3xl font-bold text-purple-600 break-words">{formatCurrency(stats.totalValue)}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Items</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <ArchiveBoxIcon className="w-8 h-8 text-purple-600 flex-shrink-0" />
+              <ArchiveBoxIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">In Stock</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={stats.inStock.toString()}>
+                  {stats.inStock.toLocaleString()}
+                </p>
+              </div>
+              <ArchiveBoxIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Low Stock</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={stats.lowStock.toString()}>
+                  {stats.lowStock.toLocaleString()}
+                </p>
+              </div>
+              <ExclamationTriangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Out of Stock</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate" title={stats.outOfStock.toString()}>
+                  {stats.outOfStock.toLocaleString()}
+                </p>
+              </div>
+              <ExclamationTriangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Value</p>
+                <p className="text-sm sm:text-base md:text-lg font-bold text-purple-600 truncate" title={formatCurrency(stats.totalValue)}>
+                  {formatCurrency(stats.totalValue)}
+                </p>
+              </div>
+              <ArchiveBoxIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -492,13 +504,14 @@ export default function StocksPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search ingredients..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -597,7 +610,7 @@ export default function StocksPage() {
             </div>
 
             {/* Stock Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Stock Information</h4>
                 <div className="space-y-2 text-sm">
@@ -719,13 +732,14 @@ export default function StocksPage() {
             )}
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsDetailsModalOpen(false);
                   setSelectedIngredient(null);
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
@@ -734,7 +748,7 @@ export default function StocksPage() {
                   setIsDetailsModalOpen(false);
                   openAdjustStockModal(selectedIngredient, 'add');
                 }}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto text-sm sm:text-base"
               >
                 <PlusIcon className="w-4 h-4 mr-2" />
                 Add Stock
@@ -745,7 +759,7 @@ export default function StocksPage() {
                     setIsDetailsModalOpen(false);
                     openAdjustStockModal(selectedIngredient, 'remove');
                   }}
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-sm sm:text-base"
                 >
                   <MinusIcon className="w-4 h-4 mr-2" />
                   Remove Stock
@@ -825,7 +839,7 @@ export default function StocksPage() {
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -833,13 +847,14 @@ export default function StocksPage() {
                   setAdjustmentQuantity(0);
                   setAdjustmentReason('');
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleAdjustStock}
                 disabled={adjustmentQuantity <= 0 || isAddingStock || isRemovingStock || (adjustmentType === 'remove' && adjustmentQuantity > (selectedIngredient.currentStock || 0))}
-                className={adjustmentType === 'add' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+                className={`w-full sm:w-auto text-sm sm:text-base ${adjustmentType === 'add' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
               >
                 {isAddingStock || isRemovingStock ? 'Processing...' : adjustmentType === 'add' ? 'Add Stock' : 'Remove Stock'}
               </Button>

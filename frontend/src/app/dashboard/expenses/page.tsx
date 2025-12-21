@@ -569,12 +569,12 @@ export default function ExpensesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Expense Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Expense Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Track and manage business expenses
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <ImportButton
             onImport={async (data, _result) => {
               let successCount = 0;
@@ -633,60 +633,68 @@ export default function ExpensesPage() {
             filename="expenses-import-template"
             variant="secondary"
           />
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <PlusIcon className="w-5 h-5 mr-2" />
+          <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
             Add Expense
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Expenses</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <ReceiptRefundIcon className="w-8 h-8 text-blue-600" />
+              <ReceiptRefundIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
-                <p className="text-3xl font-bold text-red-600">{formatCurrency(stats.totalAmount)}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Amount</p>
+                <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-red-600 truncate" title={formatCurrency(stats.totalAmount)}>
+                  {formatCurrency(stats.totalAmount)}
+                </p>
               </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-red-600" />
+              <CurrencyDollarIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-red-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">This Month</p>
-                <p className="text-3xl font-bold text-orange-600">{formatCurrency(stats.thisMonth)}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">This Month</p>
+                <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-orange-600 truncate" title={formatCurrency(stats.thisMonth)}>
+                  {formatCurrency(stats.thisMonth)}
+                </p>
               </div>
-              <CalendarIcon className="w-8 h-8 text-orange-600" />
+              <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-orange-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
-                <p className="text-xs text-gray-500 mt-1">{formatCurrency(stats.pendingAmount)}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Pending</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-yellow-600 truncate" title={stats.pending.toString()}>
+                  {stats.pending.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1 truncate" title={formatCurrency(stats.pendingAmount)}>{formatCurrency(stats.pendingAmount)}</p>
               </div>
-              <ClockIcon className="w-8 h-8 text-yellow-600" />
+              <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-yellow-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -694,13 +702,14 @@ export default function ExpensesPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4 lg:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search expenses..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -712,6 +721,7 @@ export default function ExpensesPage() {
                 value={categoryFilter}
                 onChange={setCategoryFilter}
                 placeholder="Filter by category"
+                className="text-xs sm:text-sm"
               />
             </div>
             <div className="flex gap-2">
@@ -720,14 +730,14 @@ export default function ExpensesPage() {
                 placeholder="Start Date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                className="w-32"
+                className="w-full sm:w-32 text-xs sm:text-sm"
               />
               <Input
                 type="date"
                 placeholder="End Date"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                className="w-32"
+                className="w-full sm:w-32 text-xs sm:text-sm"
               />
             </div>
           </div>
@@ -827,7 +837,7 @@ export default function ExpensesPage() {
             placeholder="Additional details about this expense"
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <Select
                 label="Category *"
@@ -841,6 +851,7 @@ export default function ExpensesPage() {
                 }}
                 placeholder="Select expense category"
                 error={formErrors.category}
+                className="text-sm sm:text-base"
               />
             </div>
             <Input
@@ -849,6 +860,7 @@ export default function ExpensesPage() {
               value={formData.date}
               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               required
+              className="text-sm sm:text-base"
             />
           </div>
 
@@ -868,18 +880,20 @@ export default function ExpensesPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input
               label="Vendor Name"
               value={formData.vendorName}
               onChange={(e) => setFormData({ ...formData, vendorName: e.target.value })}
               placeholder="e.g., ABC Supplies"
+              className="text-sm sm:text-base"
             />
             <Input
               label="Invoice Number"
               value={formData.invoiceNumber}
               onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
               placeholder="e.g., INV-2024-001"
+              className="text-sm sm:text-base"
             />
           </div>
 
@@ -919,17 +933,18 @@ export default function ExpensesPage() {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCreateModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>
+            <Button onClick={handleCreate} className="w-full sm:w-auto text-sm sm:text-base">
               Add Expense
             </Button>
           </div>
@@ -947,7 +962,7 @@ export default function ExpensesPage() {
         className="max-w-3xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <Input
                 label="Title *"
@@ -960,6 +975,7 @@ export default function ExpensesPage() {
                 }}
                 required
                 error={formErrors.title}
+                className="text-sm sm:text-base"
               />
             </div>
             <div>
@@ -978,6 +994,7 @@ export default function ExpensesPage() {
                 }}
                 required
                 error={formErrors.amount}
+                className="text-sm sm:text-base"
               />
             </div>
           </div>
@@ -986,9 +1003,10 @@ export default function ExpensesPage() {
             label="Description"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className="text-sm sm:text-base"
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <Select
                 label="Category *"
@@ -1001,6 +1019,7 @@ export default function ExpensesPage() {
                   }
                 }}
                 error={formErrors.category}
+                className="text-sm sm:text-base"
               />
             </div>
             <Input
@@ -1009,6 +1028,7 @@ export default function ExpensesPage() {
               value={formData.date}
               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               required
+              className="text-sm sm:text-base"
             />
           </div>
 
@@ -1027,16 +1047,18 @@ export default function ExpensesPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input
               label="Vendor Name"
               value={formData.vendorName}
               onChange={(e) => setFormData({ ...formData, vendorName: e.target.value })}
+              className="text-sm sm:text-base"
             />
             <Input
               label="Invoice Number"
               value={formData.invoiceNumber}
               onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+              className="text-sm sm:text-base"
             />
           </div>
 
@@ -1074,17 +1096,18 @@ export default function ExpensesPage() {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsEditModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleEdit}>
+            <Button onClick={handleEdit} className="w-full sm:w-auto text-sm sm:text-base">
               Update Expense
             </Button>
           </div>
@@ -1124,7 +1147,7 @@ export default function ExpensesPage() {
             </div>
 
             {/* Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Expense Information</h4>
                 <div className="space-y-2 text-sm">
@@ -1212,20 +1235,21 @@ export default function ExpensesPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsViewModalOpen(false);
                   setSelectedExpense(null);
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
               <Button onClick={() => {
                 setIsViewModalOpen(false);
                 openEditModal(selectedExpense);
-              }}>
+              }} className="w-full sm:w-auto text-sm sm:text-base">
                 Edit Expense
               </Button>
             </div>

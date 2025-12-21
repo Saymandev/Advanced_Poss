@@ -344,30 +344,31 @@ export default function DeliveriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <TruckIcon className="w-8 h-8 text-blue-600" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <TruckIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 flex-shrink-0" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Delivery Management</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Delivery Management</h1>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 Track delivery orders, assign drivers, and update delivery status.
               </p>
             </div>
           </div>
           {myActiveDeliveriesCount > 0 && (
-            <Badge variant="info" className="text-xs">
+            <Badge variant="info" className="text-xs whitespace-nowrap">
               You have {myActiveDeliveriesCount} active delivery{myActiveDeliveriesCount > 1 ? 'ies' : ''}
             </Badge>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={() => refetch()}>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button variant="secondary" size="sm" onClick={() => refetch()} className="w-full sm:w-auto text-sm">
             Refresh
           </Button>
           <Button
             size="sm"
             onClick={() => setIsZoneModalOpen(true)}
+            className="w-full sm:w-auto text-sm"
           >
             New Delivery Zone
           </Button>
@@ -380,9 +381,9 @@ export default function DeliveriesPage() {
         </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
             <select
-              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2"
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs sm:text-sm px-3 py-2 w-full sm:w-auto"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as DeliveryStatus | '')}
             >
@@ -395,7 +396,7 @@ export default function DeliveriesPage() {
             </select>
 
             <select
-              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2"
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs sm:text-sm px-3 py-2 w-full sm:w-auto"
               value={driverFilter}
               onChange={(e) => setDriverFilter(e.target.value)}
             >
@@ -411,7 +412,7 @@ export default function DeliveriesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by order, customer or address"
-              className="w-full sm:w-64"
+              className="w-full sm:w-64 text-sm sm:text-base"
             />
           </div>
 
@@ -450,13 +451,13 @@ export default function DeliveriesPage() {
               {deliveryZones.map((zone) => (
                 <div
                   key={zone.id}
-                  className="flex items-center justify-between px-4 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/60"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 rounded-md border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/60"
                 >
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-white">
                       {zone.name}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 break-words">
                       Charge: {zone.deliveryCharge.toFixed(2)}{' '}
                       {zone.minimumOrderAmount
                         ? `• Min order: ${zone.minimumOrderAmount.toFixed(2)}`
@@ -466,12 +467,12 @@ export default function DeliveriesPage() {
                         : ''}
                     </p>
                     {zone.description && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 break-words">
                         {zone.description}
                       </p>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-shrink-0">
                     <Button
                       variant="secondary"
                       size="sm"
@@ -486,6 +487,7 @@ export default function DeliveriesPage() {
                         });
                         setIsZoneModalOpen(true);
                       }}
+                      className="text-xs sm:text-sm"
                     >
                       Edit
                     </Button>
@@ -503,6 +505,7 @@ export default function DeliveriesPage() {
                           toast.error(error?.data?.message || 'Failed to delete delivery zone');
                         }
                       }}
+                      className="text-xs sm:text-sm"
                     >
                       Delete
                     </Button>
@@ -517,8 +520,18 @@ export default function DeliveriesPage() {
       {/* Create Delivery Zone Modal */}
       <Modal
         isOpen={isZoneModalOpen}
-        onClose={() => setIsZoneModalOpen(false)}
-        title="Create Delivery Zone"
+        onClose={() => {
+          setIsZoneModalOpen(false);
+          setEditingZone(null);
+          setZoneForm({
+            name: '',
+            description: '',
+            deliveryCharge: '',
+            minimumOrderAmount: '',
+            freeDeliveryAbove: '',
+          });
+        }}
+        title={editingZone ? "Edit Delivery Zone" : "Create Delivery Zone"}
         size="md"
       >
         <div className="space-y-4">
@@ -542,9 +555,9 @@ export default function DeliveriesPage() {
               placeholder="Optional description (e.g. coverage notes)"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Delivery Charge *
               </label>
               <Input
@@ -554,10 +567,11 @@ export default function DeliveriesPage() {
                 value={zoneForm.deliveryCharge}
                 onChange={(e) => setZoneForm({ ...zoneForm, deliveryCharge: e.target.value })}
                 placeholder="0.00"
+                className="text-sm sm:text-base"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Minimum Order Amount
               </label>
               <Input
@@ -567,10 +581,11 @@ export default function DeliveriesPage() {
                 value={zoneForm.minimumOrderAmount}
                 onChange={(e) => setZoneForm({ ...zoneForm, minimumOrderAmount: e.target.value })}
                 placeholder="Optional"
+                className="text-sm sm:text-base"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Free Delivery Above
               </label>
               <Input
@@ -580,22 +595,35 @@ export default function DeliveriesPage() {
                 value={zoneForm.freeDeliveryAbove}
                 onChange={(e) => setZoneForm({ ...zoneForm, freeDeliveryAbove: e.target.value })}
                 placeholder="Optional"
+                className="text-sm sm:text-base"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="ghost"
-              onClick={() => setIsZoneModalOpen(false)}
+              onClick={() => {
+                setIsZoneModalOpen(false);
+                setEditingZone(null);
+                setZoneForm({
+                  name: '',
+                  description: '',
+                  deliveryCharge: '',
+                  minimumOrderAmount: '',
+                  freeDeliveryAbove: '',
+                });
+              }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateZone}
               disabled={isCreatingZone}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
-              {isCreatingZone ? 'Creating...' : 'Create Zone'}
+              {isCreatingZone ? 'Creating...' : editingZone ? 'Update Zone' : 'Create Zone'}
             </Button>
           </div>
         </div>

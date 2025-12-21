@@ -557,17 +557,17 @@ export default function StaffPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Staff Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Staff Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage your restaurant staff and team members
           </p>
           {error && (
-            <p className="text-red-600 dark:text-red-400 text-sm mt-1">
+            <p className="text-red-600 dark:text-red-400 text-xs sm:text-sm mt-1">
               Error loading staff: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <ImportButton
             onImport={async (data, _result) => {
               let successCount = 0;
@@ -624,73 +624,81 @@ export default function StaffPage() {
             filename="staff-import-template"
             variant="secondary"
           />
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <PlusIcon className="w-5 h-5 mr-2" />
+          <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
             Add Staff Member
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Staff</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Staff</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <UsersIcon className="w-8 h-8 text-blue-600" />
+              <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
-                <p className="text-3xl font-bold text-green-600">{stats.active}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Active</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={stats.active.toString()}>
+                  {stats.active.toLocaleString()}
+                </p>
               </div>
-              <UsersIcon className="w-8 h-8 text-green-600" />
+              <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Inactive</p>
-                <p className="text-3xl font-bold text-red-600">{stats.inactive}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Inactive</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate" title={stats.inactive.toString()}>
+                  {stats.inactive.toLocaleString()}
+                </p>
               </div>
-              <UsersIcon className="w-8 h-8 text-red-600" />
+              <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Managers</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.managers}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Managers</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-600 truncate" title={stats.managers.toString()}>
+                  {stats.managers.toLocaleString()}
+                </p>
               </div>
-              <UsersIcon className="w-8 h-8 text-purple-600" />
+              <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Monthly Payroll</p>
-                <p className="text-3xl font-bold text-yellow-600">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Monthly Payroll</p>
+                <p className="text-sm sm:text-base md:text-lg font-bold text-yellow-600 truncate" title={formatCurrency(stats.totalPayroll)}>
                   {formatCurrency(stats.totalPayroll)}
                 </p>
               </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-yellow-600" />
+              <CurrencyDollarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -698,13 +706,14 @@ export default function StaffPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search staff members..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -955,21 +964,22 @@ export default function StaffPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsViewModalOpen(false);
                   setSelectedStaffId('');
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
               <Button onClick={() => {
                 setIsViewModalOpen(false);
                 openEditModal(selectedStaffData);
-              }}>
-                <PencilIcon className="w-4 h-4 mr-2" />
+              }} className="w-full sm:w-auto text-sm sm:text-base">
+                <PencilIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 Edit Staff
               </Button>
             </div>
@@ -989,7 +999,7 @@ export default function StaffPage() {
         className="max-w-4xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Input
                 label="First Name"
@@ -1002,6 +1012,7 @@ export default function StaffPage() {
                 }}
                 required
                 error={formErrors.firstName}
+                className="text-sm sm:text-base"
               />
             </div>
             <div>
@@ -1016,6 +1027,7 @@ export default function StaffPage() {
                 }}
                 required
                 error={formErrors.lastName}
+                className="text-sm sm:text-base"
               />
             </div>
           </div>
@@ -1046,7 +1058,7 @@ export default function StaffPage() {
             error={formErrors.phoneNumber}
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Role"
               options={ROLE_OPTIONS}
@@ -1058,10 +1070,11 @@ export default function StaffPage() {
               value={formData.department || ''}
               onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               placeholder="e.g., Kitchen, Front of House"
+              className="text-sm sm:text-base"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Monthly Salary (Optional)"
               type="number"
@@ -1146,7 +1159,7 @@ export default function StaffPage() {
           {/* Emergency Contact Section */}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <h4 className="font-medium text-gray-900 dark:text-white mb-3">Emergency Contact (Optional)</h4>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Input
                 label="Contact Name"
                 value={formData.emergencyContact?.name || ''}
@@ -1160,6 +1173,7 @@ export default function StaffPage() {
                   } as any,
                 })}
                 placeholder="Name"
+                className="text-sm sm:text-base"
               />
               <Input
                 label="Relationship"
@@ -1174,6 +1188,7 @@ export default function StaffPage() {
                   } as any,
                 })}
                 placeholder="e.g., Spouse, Parent"
+                className="text-sm sm:text-base"
               />
               <Input
                 label="Phone Number"
@@ -1188,6 +1203,7 @@ export default function StaffPage() {
                   } as any,
                 })}
                 placeholder="Phone"
+                className="text-sm sm:text-base"
               />
             </div>
           </div>
@@ -1212,7 +1228,7 @@ export default function StaffPage() {
               placeholder="Street"
               className="mb-2"
             />
-            <div className="grid grid-cols-2 gap-4 mb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
               <Input
                 label="City"
                 value={typeof formData.address === 'object' ? formData.address?.city || '' : ''}
@@ -1228,6 +1244,7 @@ export default function StaffPage() {
                   } as any,
                 })}
                 placeholder="City"
+                className="text-sm sm:text-base"
               />
               <Input
                 label="State"
@@ -1244,9 +1261,10 @@ export default function StaffPage() {
                   } as any,
                 })}
                 placeholder="State"
+                className="text-sm sm:text-base"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="ZIP Code"
                 value={typeof formData.address === 'object' ? formData.address?.zipCode || '' : ''}
@@ -1296,7 +1314,7 @@ export default function StaffPage() {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
@@ -1304,12 +1322,14 @@ export default function StaffPage() {
                 setIsEditModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
             <Button
               onClick={isEditModalOpen ? handleUpdate : handleCreate}
               disabled={isCreating || isUpdating || !formData.firstName || !formData.lastName || !formData.email || (isCreateModalOpen && !formData.password)}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               {isCreating || isUpdating ? 'Saving...' : isEditModalOpen ? 'Update' : 'Add'} Staff Member
             </Button>

@@ -2,27 +2,27 @@
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import {
-  useGetGalleryImagesQuery,
-  useUploadGalleryImageMutation,
-  useUpdateGalleryImageMutation,
-  useDeleteGalleryImageMutation,
   GalleryImage,
+  useDeleteGalleryImageMutation,
+  useGetGalleryImagesQuery,
+  useUpdateGalleryImageMutation,
+  useUploadGalleryImageMutation,
 } from '@/lib/api/endpoints/galleryApi';
 import {
-  PhotoIcon,
-  PlusIcon,
-  PencilIcon,
-  TrashIcon,
+  ArrowUpTrayIcon,
   EyeIcon,
   EyeSlashIcon,
-  ArrowUpTrayIcon,
+  PencilIcon,
+  PhotoIcon,
+  PlusIcon,
+  TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { useState, useRef, useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function GalleryPage() {
@@ -199,44 +199,50 @@ export default function GalleryPage() {
             Manage your company gallery images
           </p>
         </div>
-        <Button onClick={handleOpenUploadModal}>
-          <PlusIcon className="w-5 h-5 mr-2" />
+        <Button onClick={handleOpenUploadModal} className="w-full sm:w-auto text-sm">
+          <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           Upload Image
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Images</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{galleryImages.length}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Images</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={galleryImages.length.toLocaleString()}>
+                  {galleryImages.length.toLocaleString()}
+                </p>
               </div>
-              <PhotoIcon className="w-8 h-8 text-primary-600" />
+              <PhotoIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-primary-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active Images</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{activeImages.length}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Active Images</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={activeImages.length.toLocaleString()}>
+                  {activeImages.length.toLocaleString()}
+                </p>
               </div>
-              <EyeIcon className="w-8 h-8 text-green-600" />
+              <EyeIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Inactive Images</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{inactiveImages.length}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Inactive Images</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={inactiveImages.length.toLocaleString()}>
+                  {inactiveImages.length.toLocaleString()}
+                </p>
               </div>
-              <EyeSlashIcon className="w-8 h-8 text-gray-600" />
+              <EyeSlashIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-gray-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>

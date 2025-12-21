@@ -359,10 +359,10 @@ export default function AIMenuOptimizationPage() {
   if ((optimizationLoading || demandLoading) && (!optimizationData && !demandData)) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Menu Optimization</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">AI Menu Optimization</h1>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
               AI-powered insights to optimize your menu pricing and performance
             </p>
           </div>
@@ -380,10 +380,10 @@ export default function AIMenuOptimizationPage() {
   if (!user?.branchId) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Menu Optimization</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">AI Menu Optimization</h1>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
               AI-powered insights to optimize your menu pricing and performance
             </p>
           </div>
@@ -403,88 +403,99 @@ export default function AIMenuOptimizationPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Menu Optimization</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">AI Menu Optimization</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             AI-powered insights to optimize your menu pricing and performance
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button 
             onClick={() => {
               refetchOptimization();
               refetchDemand();
             }}
             disabled={optimizationLoading || demandLoading}
+            className="w-full sm:w-auto text-sm"
           >
-            <SparklesIcon className="w-5 h-5 mr-2" />
+            <SparklesIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
             {optimizationLoading || demandLoading ? 'Refreshing...' : 'Refresh AI Analysis'}
           </Button>
         </div>
       </div>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Suggestions</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalOptimizations}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Suggestions</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate" title={stats.totalOptimizations.toLocaleString()}>
+                  {stats.totalOptimizations.toLocaleString()}
+                </p>
               </div>
-              <LightBulbIcon className="w-8 h-8 text-blue-600" />
+              <LightBulbIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Price Increases</p>
-                <p className="text-3xl font-bold text-green-600">{stats.priceIncreases}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Price Increases</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600 truncate" title={stats.priceIncreases.toLocaleString()}>
+                  {stats.priceIncreases.toLocaleString()}
+                </p>
               </div>
-              <ArrowTrendingUpIcon className="w-8 h-8 text-green-600" />
+              <ArrowTrendingUpIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Price Decreases</p>
-                <p className="text-3xl font-bold text-red-600">{stats.priceDecreases}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Price Decreases</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-red-600 truncate" title={stats.priceDecreases.toLocaleString()}>
+                  {stats.priceDecreases.toLocaleString()}
+                </p>
               </div>
-              <ArrowTrendingDownIcon className="w-8 h-8 text-red-600" />
+              <ArrowTrendingDownIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-red-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Revenue Impact</p>
-                <p className="text-3xl font-bold text-purple-600">{formatCurrency(stats.totalRevenueImpact)}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Revenue Impact</p>
+                <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-purple-600 truncate" title={formatCurrency(stats.totalRevenueImpact)}>
+                  {formatCurrency(stats.totalRevenueImpact)}
+                </p>
               </div>
-              <ChartBarIcon className="w-8 h-8 text-purple-600" />
+              <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</p>
-                <p className="text-3xl font-bold text-yellow-600">{Math.round(stats.avgConfidence * 100)}%</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Avg Confidence</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-yellow-600 truncate" title={`${Math.round(stats.avgConfidence * 100)}%`}>
+                  {Math.round(stats.avgConfidence * 100)}%
+                </p>
               </div>
-              <SparklesIcon className="w-8 h-8 text-yellow-600" />
+              <SparklesIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-yellow-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
       </div>
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="w-full sm:w-48">
               <Select
                 options={categoryOptions}
@@ -497,7 +508,7 @@ export default function AIMenuOptimizationPage() {
         </CardContent>
       </Card>
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Price Optimization Overview</CardTitle>
@@ -656,32 +667,32 @@ export default function AIMenuOptimizationPage() {
         className="max-w-4xl"
       >
         {selectedSuggestion && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 p-3 sm:p-4">
             {/* Header */}
-            <div className="flex items-start gap-6">
-              <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-                <LightBulbIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+            <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <LightBulbIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary-600 dark:text-primary-400" />
               </div>
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">
                       {selectedSuggestion.itemName}
                     </h3>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
                       {getRecommendationBadge(selectedSuggestion.recommendation)}
-                      <span className={`text-sm font-medium ${getConfidenceColor(selectedSuggestion.confidence)}`}>
+                      <span className={`text-xs sm:text-sm font-medium ${getConfidenceColor(selectedSuggestion.confidence)}`}>
                         {Math.round(selectedSuggestion.confidence * 100)}% confidence
                       </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Current Price</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <div className="text-left sm:text-right">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Current Price</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                       {formatCurrency(selectedSuggestion.currentPrice)}
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Suggested Price</p>
-                    <p className="text-xl font-semibold text-primary-600">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Suggested Price</p>
+                    <p className="text-lg sm:text-xl font-semibold text-primary-600">
                       {formatCurrency(selectedSuggestion.suggestedPrice)}
                     </p>
                   </div>
@@ -689,7 +700,7 @@ export default function AIMenuOptimizationPage() {
               </div>
             </div>
             {/* Analysis Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Current Performance</h4>
                 <div className="space-y-3">
@@ -767,17 +778,18 @@ export default function AIMenuOptimizationPage() {
               </div>
             </div>
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsDetailsModalOpen(false);
                   setSelectedSuggestion(null);
                 }}
+                className="w-full sm:w-auto text-sm"
               >
                 Close
               </Button>
-              <Button onClick={handleApplySuggestion}>
+              <Button onClick={handleApplySuggestion} className="w-full sm:w-auto text-sm">
                 <CheckCircleIcon className="w-4 h-4 mr-2" />
                 Apply Suggestion
               </Button>

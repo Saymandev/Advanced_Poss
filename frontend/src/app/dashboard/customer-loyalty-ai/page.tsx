@@ -323,74 +323,83 @@ export default function CustomerLoyaltyAIPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Customer Loyalty AI</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Customer Loyalty AI</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             AI-powered customer insights and personalized offers
           </p>
         </div>
-        <Button onClick={() => refetch()}>
-          <SparklesIcon className="w-5 h-5 mr-2" />
+        <Button onClick={() => refetch()} className="w-full sm:w-auto text-sm">
+          <SparklesIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           Refresh AI Analysis
         </Button>
       </div>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Customers</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalCustomers}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Customers</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate" title={stats.totalCustomers.toLocaleString()}>
+                  {stats.totalCustomers.toLocaleString()}
+                </p>
               </div>
-              <UsersIcon className="w-8 h-8 text-blue-600" />
+              <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">High Churn Risk</p>
-                <p className="text-3xl font-bold text-red-600">{stats.highChurnRisk}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">High Churn Risk</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-red-600 truncate" title={stats.highChurnRisk.toLocaleString()}>
+                  {stats.highChurnRisk.toLocaleString()}
+                </p>
               </div>
-              <ArrowTrendingDownIcon className="w-8 h-8 text-red-600" />
+              <ArrowTrendingDownIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-red-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Lifetime Value</p>
-                <p className="text-3xl font-bold text-green-600">{formatCurrency(stats.avgLifetimeValue)}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Avg Lifetime Value</p>
+                <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-green-600 truncate" title={formatCurrency(stats.avgLifetimeValue)}>
+                  {formatCurrency(stats.avgLifetimeValue)}
+                </p>
               </div>
-              <ArrowTrendingUpIcon className="w-8 h-8 text-green-600" />
+              <ArrowTrendingUpIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active Offers</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.totalOffers}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Active Offers</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600 truncate" title={stats.totalOffers.toLocaleString()}>
+                  {stats.totalOffers.toLocaleString()}
+                </p>
               </div>
-              <GiftIcon className="w-8 h-8 text-purple-600" />
+              <GiftIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
       </div>
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search customers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -428,7 +437,7 @@ export default function CustomerLoyaltyAIPage() {
             selectable={false}
             exportable={true}
             exportFilename="customer-loyalty-insights"
-            onExport={(format, items) => {
+            onExport={(_format, _items) => {
               }}
             emptyMessage="No customer loyalty insights found. The AI will analyze customer data and provide insights soon."
           />
@@ -445,21 +454,21 @@ export default function CustomerLoyaltyAIPage() {
         className="max-w-4xl"
       >
         {selectedCustomer && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 p-3 sm:p-4">
             {/* Header */}
-            <div className="flex items-start gap-6">
-              <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-                <UserIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+            <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <UserIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary-600 dark:text-primary-400" />
               </div>
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">
                       {selectedCustomer.customerName}
                     </h3>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
                       {getTierBadge(selectedCustomer.currentTier)}
-                      <span className={`text-sm font-medium ${
+                      <span className={`text-xs sm:text-sm font-medium ${
                         selectedCustomer.predictedChurn >= 0.7 ? 'text-red-600' :
                         selectedCustomer.predictedChurn >= 0.4 ? 'text-yellow-600' : 'text-green-600'
                       }`}>
@@ -467,9 +476,9 @@ export default function CustomerLoyaltyAIPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Lifetime Value</p>
-                    <p className="text-2xl font-bold text-green-600">
+                  <div className="text-left sm:text-right">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Lifetime Value</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-600">
                       {formatCurrency(selectedCustomer.lifetimeValue)}
                     </p>
                   </div>
@@ -513,13 +522,14 @@ export default function CustomerLoyaltyAIPage() {
               </div>
             </div>
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsDetailsModalOpen(false);
                   setSelectedCustomer(null);
                 }}
+                className="w-full sm:w-auto text-sm"
               >
                 Close
               </Button>
@@ -528,7 +538,7 @@ export default function CustomerLoyaltyAIPage() {
                   setIsDetailsModalOpen(false);
                   openOffersModal(selectedCustomer);
                 }}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto text-sm"
               >
                 <GiftIcon className="w-4 h-4 mr-2" />
                 Generate Offers
@@ -548,23 +558,23 @@ export default function CustomerLoyaltyAIPage() {
         className="max-w-4xl"
       >
         {selectedCustomer && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 p-3 sm:p-4">
             {/* Header */}
-            <div className="flex items-start gap-6">
-              <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                <GiftIcon className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <GiftIcon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 dark:text-purple-400" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
                   Personalized Offers for {selectedCustomer.customerName}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                   AI-generated offers tailored to this customer's preferences and behavior
                 </p>
               </div>
             </div>
             {/* Offers Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {selectedCustomer.personalizedOffers?.map((offer, index) => (
                 <Card key={index} className="border-2 border-purple-200 dark:border-purple-800">
                   <CardContent className="p-4">
@@ -610,20 +620,21 @@ export default function CustomerLoyaltyAIPage() {
               )}
             </div>
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsOffersModalOpen(false);
                   setSelectedCustomer(null);
                 }}
+                className="w-full sm:w-auto text-sm"
               >
                 Close
               </Button>
               <Button
                 onClick={handleSendAllOffers}
                 disabled={offersLoading || !selectedCustomer?.personalizedOffers?.length}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto text-sm"
               >
                 <GiftIcon className="w-4 h-4 mr-2" />
                 Send All Offers
@@ -634,4 +645,4 @@ export default function CustomerLoyaltyAIPage() {
       </Modal>
     </div>
   );
-}
+}

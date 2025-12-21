@@ -286,53 +286,73 @@ export default function ContactFormsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Contact Forms</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Contact Forms</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             {isSuperAdmin ? 'Manage all contact inquiries' : 'Manage your contact inquiries'}
           </p>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Total</div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total</div>
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toLocaleString()}>
+                {stats.total.toLocaleString()}
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">New</div>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.new}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">New</div>
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400 truncate" title={stats.new.toLocaleString()}>
+                {stats.new.toLocaleString()}
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Read</div>
-            <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.read}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Read</div>
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-600 dark:text-gray-400 truncate" title={stats.read.toLocaleString()}>
+                {stats.read.toLocaleString()}
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Replied</div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.replied}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Replied</div>
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 dark:text-green-400 truncate" title={stats.replied.toLocaleString()}>
+                {stats.replied.toLocaleString()}
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Archived</div>
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.archived}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Archived</div>
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 dark:text-yellow-400 truncate" title={stats.archived.toLocaleString()}>
+                {stats.archived.toLocaleString()}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             {isSuperAdmin && (
               <div className="w-full md:w-64">
                 <Select
@@ -412,9 +432,9 @@ export default function ContactFormsPage() {
         size="lg"
       >
         {selectedForm && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 p-3 sm:p-4">
             {/* Contact Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Name

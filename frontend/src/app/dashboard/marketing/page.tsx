@@ -322,65 +322,73 @@ export default function MarketingPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Marketing Campaigns</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Marketing Campaigns</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Create and manage your marketing campaigns
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
+        <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm">
+          <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           New Campaign
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Campaigns</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Campaigns</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toLocaleString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <MegaphoneIcon className="w-8 h-8 text-blue-600" />
+              <MegaphoneIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
-                <p className="text-3xl font-bold text-green-600">{stats.active}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Active</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600 truncate" title={stats.active.toLocaleString()}>
+                  {stats.active.toLocaleString()}
+                </p>
               </div>
-              <ChartBarIcon className="w-8 h-8 text-green-600" />
+              <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Scheduled</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.scheduled}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Scheduled</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-yellow-600 truncate" title={stats.scheduled.toLocaleString()}>
+                  {stats.scheduled.toLocaleString()}
+                </p>
               </div>
-              <CalendarIcon className="w-8 h-8 text-yellow-600" />
+              <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-yellow-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Completed</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.completed}</p>
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Completed</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600 truncate" title={stats.completed.toLocaleString()}>
+                  {stats.completed.toLocaleString()}
+                </p>
               </div>
-              <GiftIcon className="w-8 h-8 text-purple-600" />
+              <GiftIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -388,8 +396,8 @@ export default function MarketingPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="w-full sm:w-48">
               <Select
                 options={[
@@ -443,25 +451,25 @@ export default function MarketingPage() {
               {filteredCampaigns.map((campaign) => {
                 const campaignId = campaign.id || (campaign as any)._id?.toString() || `campaign-${campaign.name}-${campaign.createdAt}`;
                 return (
-                  <div key={campaignId} className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-                    <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <div key={campaignId} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
                         {campaign.name}
                       </h3>
                       {getStatusBadge(campaign.status)}
                       <div className="flex items-center gap-1 text-gray-500">
                         {getTypeIcon(campaign.type)}
-                        <span className="text-sm capitalize">{campaign.type}</span>
+                        <span className="text-xs sm:text-sm capitalize">{campaign.type}</span>
                       </div>
                     </div>
 
-                    <p className="text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 break-words">
                       {campaign.message}
                     </p>
 
-                    <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                       <span>Target: {campaign.target}</span>
                       {campaign.scheduledDate && (
                         <span>Scheduled: {new Date(campaign.scheduledDate).toLocaleDateString()}</span>
@@ -472,7 +480,7 @@ export default function MarketingPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex flex-wrap items-center gap-2 sm:ml-4 w-full sm:w-auto">
                     {!campaign.sentDate && campaign.status !== 'draft' && (
                       <Button
                         variant="primary"
@@ -522,12 +530,12 @@ export default function MarketingPage() {
 
                 {/* Campaign Stats */}
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center">
                     <div>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={campaign.recipients.toLocaleString()}>
                         {campaign.recipients.toLocaleString()}
                       </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Recipients</p>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Recipients</p>
                       {campaign.sentDate && (
                         <p className="text-xs text-gray-500 mt-1">
                           Sent: {new Date(campaign.sentDate).toLocaleDateString()}
@@ -538,32 +546,32 @@ export default function MarketingPage() {
                       )}
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-green-600">
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate">
                         {campaign.opened ? ((campaign.opened / campaign.recipients) * 100).toFixed(1) : '0.0'}%
                       </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Open Rate</p>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Open Rate</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {campaign.opened || 0} opened
                       </p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-blue-600">
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate">
                         {campaign.clicked 
                           ? campaign.opened 
                             ? ((campaign.clicked / campaign.opened) * 100).toFixed(1)
                             : '0.0'
                           : '0.0'}%
                       </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Click Rate</p>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Click Rate</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {campaign.clicked || 0} clicked
                       </p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-purple-600">
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-600 truncate" title={(campaign.converted || 0).toLocaleString()}>
                         {campaign.converted || 0}
                       </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Conversions</p>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Conversions</p>
                       {campaign.recipients > 0 && (
                         <p className="text-xs text-gray-500 mt-1">
                           {((campaign.converted || 0) / campaign.recipients * 100).toFixed(1)}% rate
@@ -705,17 +713,18 @@ export default function MarketingPage() {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCreateModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>
+            <Button onClick={handleCreate} className="w-full sm:w-auto text-sm">
               Create Campaign
             </Button>
           </div>
@@ -800,17 +809,18 @@ export default function MarketingPage() {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsEditModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm"
             >
               Cancel
             </Button>
-            <Button onClick={handleEdit}>
+            <Button onClick={handleEdit} className="w-full sm:w-auto text-sm">
               Update Campaign
             </Button>
           </div>

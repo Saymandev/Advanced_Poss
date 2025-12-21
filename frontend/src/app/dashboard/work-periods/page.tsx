@@ -390,14 +390,14 @@ export default function WorkPeriodsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Work Periods</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Work Periods</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage cash flow and work period tracking
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <ImportButton
             onImport={async (data, _result) => {
               let successCount = 0;
@@ -435,8 +435,8 @@ export default function WorkPeriodsPage() {
             variant="secondary"
           />
           {!currentOpenPeriod && (
-            <Button onClick={() => setIsOpenModalOpen(true)}>
-              <PlayIcon className="w-5 h-5 mr-2" />
+            <Button onClick={() => setIsOpenModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+              <PlayIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
               Open Work Period
             </Button>
           )}
@@ -466,7 +466,7 @@ export default function WorkPeriodsPage() {
                   setSelectedWorkPeriod(currentOpenPeriod);
                   setIsCloseModalOpen(true);
                 }}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-sm sm:text-base"
               >
                 <StopIcon className="w-4 h-4 mr-2" />
                 Close Period
@@ -477,65 +477,73 @@ export default function WorkPeriodsPage() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Periods</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Periods</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <ClockIcon className="w-8 h-8 text-blue-600" />
+              <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Open</p>
-                <p className="text-3xl font-bold text-green-600">{stats.open}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Open</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600 truncate" title={stats.open.toString()}>
+                  {stats.open.toLocaleString()}
+                </p>
               </div>
-              <PlayIcon className="w-8 h-8 text-green-600" />
+              <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Closed</p>
-                <p className="text-3xl font-bold text-gray-600">{stats.closed}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Closed</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-600 truncate" title={stats.closed.toString()}>
+                  {stats.closed.toLocaleString()}
+                </p>
               </div>
-              <StopIcon className="w-8 h-8 text-gray-600" />
+              <StopIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-gray-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active Periods</p>
-                <p className="text-3xl font-bold text-green-600">{stats.open}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Active Periods</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600 truncate" title={stats.open.toString()}>
+                  {stats.open.toLocaleString()}
+                </p>
               </div>
-              <PlayIcon className="w-8 h-8 text-green-600" />
+              <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
-                <p className="text-3xl font-bold text-purple-600">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Amount</p>
+                <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-purple-600 truncate" title={formatCurrency(data?.workPeriods?.reduce((sum, wp) => sum + (wp.openingBalance || 0), 0) || 0)}>
                   {formatCurrency(data?.workPeriods?.reduce((sum, wp) => sum + (wp.openingBalance || 0), 0) || 0)}
                 </p>
               </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-purple-600" />
+              <CurrencyDollarIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -543,13 +551,14 @@ export default function WorkPeriodsPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4 lg:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search work periods..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -562,6 +571,7 @@ export default function WorkPeriodsPage() {
                 value={statusFilter}
                 onChange={setStatusFilter}
                 placeholder="Filter by status"
+                className="text-xs sm:text-sm"
               />
             </div>
             <div className="flex gap-2">
@@ -570,14 +580,14 @@ export default function WorkPeriodsPage() {
                 placeholder="Start Date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                className="w-32"
+                className="w-full sm:w-32 text-xs sm:text-sm"
               />
               <Input
                 type="date"
                 placeholder="End Date"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                className="w-32"
+                className="w-full sm:w-32 text-xs sm:text-sm"
               />
             </div>
           </div>
@@ -646,17 +656,18 @@ export default function WorkPeriodsPage() {
             required
           />
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsOpenModalOpen(false);
                 resetForms();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleOpen}>
+            <Button onClick={handleOpen} className="w-full sm:w-auto text-sm sm:text-base">
               Open Work Period
             </Button>
           </div>
@@ -736,17 +747,18 @@ export default function WorkPeriodsPage() {
             required
           />
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCloseModalOpen(false);
                 resetForms();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleClose} className="bg-red-600 hover:bg-red-700">
+            <Button onClick={handleClose} className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-sm sm:text-base">
               Close Work Period
             </Button>
           </div>
@@ -766,19 +778,19 @@ export default function WorkPeriodsPage() {
         {selectedWorkPeriod && (
           <div className="space-y-6">
             {/* Header with Serial and Actions */}
-            <div className="flex items-start justify-between border-b border-gray-200 dark:border-gray-700 pb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                   Serial #{selectedWorkPeriod.serial}
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Work Period Range
                 </p>
-                <p className="text-base font-medium text-gray-900 dark:text-white">
+                <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">
                   {formatDateTime(selectedWorkPeriod.startTime)} - {selectedWorkPeriod.endTime ? formatDateTime(selectedWorkPeriod.endTime) : 'Ongoing'}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -829,9 +841,9 @@ export default function WorkPeriodsPage() {
             </div>
 
             {/* Summary Section */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Summary</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 sm:p-4">
+              <h4 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">Summary</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">Opening Balance:</span>
                   <p className="font-semibold text-gray-900 dark:text-white">
@@ -890,7 +902,7 @@ export default function WorkPeriodsPage() {
             </div>
 
             {/* Report Section: Sales Summary and Payment Methods */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               {/* Sales Summary Table */}
               <div>
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Sales Summary</h4>
@@ -969,28 +981,28 @@ export default function WorkPeriodsPage() {
             </div>
 
             {/* Financial Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Opening Balance</p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                <CardContent className="p-3 sm:p-4 text-center">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Opening Balance</p>
+                  <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate" title={formatCurrency(selectedWorkPeriod.openingBalance || 0)}>
                     {formatCurrency(selectedWorkPeriod.openingBalance || 0)}
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Sales</p>
-                  <p className="text-xl font-bold text-green-600">
+                <CardContent className="p-3 sm:p-4 text-center">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Sales</p>
+                  <p className="text-base sm:text-lg md:text-xl font-bold text-green-600 truncate" title={isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.grossSales || 0)}>
                     {isLoadingSalesSummary ? (
-                      <span className="text-sm">Loading...</span>
+                      <span className="text-xs sm:text-sm">Loading...</span>
                     ) : (
                       formatCurrency(salesSummary?.grossSales || 0)
                     )}
                   </p>
                   {salesSummary && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1 truncate">
                       {salesSummary.totalOrders || 0} orders
                     </p>
                   )}
@@ -998,24 +1010,24 @@ export default function WorkPeriodsPage() {
               </Card>
 
               <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Closing Balance</p>
-                  <p className="text-xl font-bold text-blue-600">
+                <CardContent className="p-3 sm:p-4 text-center">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Closing Balance</p>
+                  <p className="text-base sm:text-lg md:text-xl font-bold text-blue-600 truncate" title={formatCurrency(selectedWorkPeriod.closingBalance || 0)}>
                     {formatCurrency(selectedWorkPeriod.closingBalance || 0)}
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Expected Closing</p>
-                  <p className={`text-xl font-bold ${
+                <CardContent className="p-3 sm:p-4 text-center">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Expected Closing</p>
+                  <p className={`text-base sm:text-lg md:text-xl font-bold truncate ${
                     (salesSummary?.grossSales || 0) >= 0
                       ? 'text-green-600'
                       : 'text-red-600'
-                  }`}>
+                  }`} title={isLoadingSalesSummary ? 'Loading...' : formatCurrency((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))}>
                     {isLoadingSalesSummary ? (
-                      <span className="text-sm">Loading...</span>
+                      <span className="text-xs sm:text-sm">Loading...</span>
                     ) : (
                       formatCurrency((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))
                     )}
@@ -1025,7 +1037,7 @@ export default function WorkPeriodsPage() {
             </div>
 
             {/* Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Period Information</h4>
                 <div className="space-y-2 text-sm">
@@ -1219,13 +1231,14 @@ export default function WorkPeriodsPage() {
             )}
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsViewModalOpen(false);
                   setSelectedWorkPeriod(null);
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
@@ -1235,7 +1248,7 @@ export default function WorkPeriodsPage() {
                     setIsViewModalOpen(false);
                     setIsCloseModalOpen(true);
                   }}
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-sm sm:text-base"
                 >
                   Close Period
                 </Button>

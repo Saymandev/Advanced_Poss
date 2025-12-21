@@ -283,7 +283,7 @@ export default function KitchenPage() {
 
   // Calculate elapsed time for orders in HH:MM:SS format
   // Use useMemo to prevent recalculation on every render
-  const getElapsedTime = useCallback((order: any) => {
+  const _getElapsedTime = useCallback((order: any) => {
     if (!order.receivedAt && !order.createdAt) return '00:00:00';
     const startTime = new Date(order.receivedAt || order.createdAt).getTime();
     const now = Date.now(); // Use Date.now() directly instead of state
@@ -533,56 +533,61 @@ export default function KitchenPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Kitchen Display</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Kitchen Display</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Real-time kitchen order management
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            title={soundEnabled ? 'Disable Sound Alerts' : 'Enable Sound Alerts'}
-          >
-            {soundEnabled ? (
-              <SpeakerWaveIcon className="w-4 h-4 mr-2" />
-            ) : (
-              <SpeakerXMarkIcon className="w-4 h-4 mr-2" />
-            )}
-            Sound
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsFullScreen(!isFullScreen)}
-            title={isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen'}
-          >
-            {isFullScreen ? (
-              <ArrowsPointingInIcon className="w-4 h-4 mr-2" />
-            ) : (
-              <ArrowsPointingOutIcon className="w-4 h-4 mr-2" />
-            )}
-            {isFullScreen ? 'Exit' : 'Full Screen'}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => refetchAll()}
-            title="Refresh Orders"
-          >
-            <ArrowPathIcon className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <div className="text-right">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Current Time</p>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              title={soundEnabled ? 'Disable Sound Alerts' : 'Enable Sound Alerts'}
+              className="text-xs sm:text-sm flex-1 sm:flex-none"
+            >
+              {soundEnabled ? (
+                <SpeakerWaveIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              ) : (
+                <SpeakerXMarkIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              )}
+              <span className="hidden sm:inline">Sound</span>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsFullScreen(!isFullScreen)}
+              title={isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen'}
+              className="text-xs sm:text-sm flex-1 sm:flex-none"
+            >
+              {isFullScreen ? (
+                <ArrowsPointingInIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              ) : (
+                <ArrowsPointingOutIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              )}
+              <span className="hidden sm:inline">{isFullScreen ? 'Exit' : 'Full Screen'}</span>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => refetchAll()}
+              title="Refresh Orders"
+              className="text-xs sm:text-sm flex-1 sm:flex-none"
+            >
+              <ArrowPathIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Current Time</p>
+            <p className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
               {currentTime.toLocaleTimeString()}
             </p>
             {(urgentOrders.length > 0 || delayedOrders.length > 0) && (
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex gap-2 flex-wrap">
                 {urgentOrders.length > 0 && (
                   <Badge variant="danger" className="text-xs">
                     {urgentOrders.length} Urgent
@@ -601,17 +606,17 @@ export default function KitchenPage() {
 
       {/* Search and Filters */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                 <Input
                   type="text"
                   placeholder="Search by order number, table, or customer..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-9 sm:pl-10 text-sm sm:text-base"
                 />
               </div>
             </div>
@@ -643,6 +648,7 @@ export default function KitchenPage() {
               size="sm"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+              className="w-full sm:w-auto"
             >
               <ArrowsUpDownIcon className="w-4 h-4" />
             </Button>
@@ -651,16 +657,16 @@ export default function KitchenPage() {
       </Card>
 
       {/* Order Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Pending Orders */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ClockIcon className="w-5 h-5 text-yellow-600" />
-              Pending Orders ({filteredPendingOrders.length})
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <ClockIcon className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 flex-shrink-0" />
+              <span className="truncate">Pending Orders ({filteredPendingOrders.length})</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4">
             {isLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mx-auto"></div>
@@ -675,31 +681,30 @@ export default function KitchenPage() {
               </div>
             ) : (
               filteredPendingOrders.map((order: any) => {
-                const elapsedTime = getElapsedTime(order);
                 const elapsedMinutes = getElapsedMinutes(order);
                 const isUrgent = order.isUrgent || order.priority === 'urgent' || elapsedMinutes > 20;
                 const isDelayed = order.isDelayed || elapsedMinutes > 30;
                 return (
                   <div 
                     key={order.id} 
-                    className={`border rounded-lg p-4 ${
+                    className={`border rounded-lg p-3 sm:p-4 ${
                       isUrgent || isDelayed
                         ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
                         : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
                     }`}
                   >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">
                       Order #{order.orderNumber || order.order_id}
                     </h3>
                     {getPriorityBadge(order.priority)}
                     {order.priority === 'urgent' && (
-                      <FireIcon className="w-5 h-5 text-red-600 animate-pulse" />
+                      <FireIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 animate-pulse flex-shrink-0" />
                     )}
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-left sm:text-right">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
                        order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
@@ -766,7 +771,7 @@ export default function KitchenPage() {
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           {canUpdateOrders && (
                             <>
                               {chefs.length > 0 && (
@@ -782,13 +787,14 @@ export default function KitchenPage() {
                                     }
                                   }}
                                   placeholder={chefs.length > 0 ? "Assign Chef/Cook" : "Assign"}
-                                  className="w-32"
+                                  className="w-full sm:w-32 text-xs sm:text-sm"
                                 />
                               )}
                           {!chefs.length && (
                             <Button
                               size="sm"
                               onClick={() => handleItemStatusChange(order.id, item.id, 'preparing')}
+                              className="text-xs sm:text-sm w-full sm:w-auto"
                             >
                               Start
                             </Button>
@@ -808,7 +814,7 @@ export default function KitchenPage() {
                 )}
 
                 {canUpdateOrders && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     {chefs.length > 0 ? (
                       <Select
                         options={chefs.map((chef) => ({
@@ -822,46 +828,49 @@ export default function KitchenPage() {
                           }
                         }}
                         placeholder="Assign Chef/Cook & Start"
-                        className="flex-1"
+                        className="flex-1 text-xs sm:text-sm"
                       />
                     ) : (
                       <Button
                         onClick={() => handleOrderStatusChange(order.id, 'preparing')}
-                        className="flex-1"
+                        className="flex-1 text-xs sm:text-sm"
                       >
                         Start Preparing
                       </Button>
                     )}
-                    {order.priority !== 'urgent' && !order.isUrgent && (
+                    <div className="flex gap-2">
+                      {order.priority !== 'urgent' && !order.isUrgent && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleMarkUrgent(order.id, true)}
+                          title="Mark as Urgent"
+                          className="text-xs sm:text-sm"
+                        >
+                          <FireIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
+                      )}
+                      {(order.priority === 'urgent' || order.isUrgent) && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleMarkUrgent(order.id, false)}
+                          title="Remove Urgent Status"
+                          className="bg-red-600 hover:bg-red-700 text-xs sm:text-sm"
+                        >
+                          <FireIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
+                      )}
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => handleMarkUrgent(order.id, true)}
-                        title="Mark as Urgent"
+                        onClick={() => handleCancelOrder(order.id)}
+                        className="text-red-600 text-xs sm:text-sm"
+                        title="Cancel Order"
                       >
-                        <FireIcon className="w-4 h-4" />
+                        <XCircleIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
-                    )}
-                    {(order.priority === 'urgent' || order.isUrgent) && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleMarkUrgent(order.id, false)}
-                        title="Remove Urgent Status"
-                        className="bg-red-600 hover:bg-red-700"
-                      >
-                        <FireIcon className="w-4 h-4" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCancelOrder(order.id)}
-                      className="text-red-600"
-                      title="Cancel Order"
-                    >
-                      <XCircleIcon className="w-4 h-4" />
-                    </Button>
+                    </div>
                   </div>
                 )}
                   </div>
@@ -874,12 +883,12 @@ export default function KitchenPage() {
         {/* Preparing Orders */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FireIcon className="w-5 h-5 text-blue-600" />
-              Preparing ({filteredPreparingOrders.length})
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <FireIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
+              <span className="truncate">Preparing ({filteredPreparingOrders.length})</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4">
             {isLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -894,27 +903,26 @@ export default function KitchenPage() {
               </div>
             ) : (
               filteredPreparingOrders.map((order: any) => {
-                const elapsedTime = getElapsedTime(order);
                 const elapsedMinutes = getElapsedMinutes(order);
                 const isUrgent = order.isUrgent || order.priority === 'urgent';
                 return (
                   <div 
                     key={order.id} 
-                    className={`border rounded-lg p-4 ${
+                    className={`border rounded-lg p-3 sm:p-4 ${
                       isUrgent
                         ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
                         : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
                     }`}
                   >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">
                       Order #{order.orderNumber || order.order_id}
                     </h3>
                     {getPriorityBadge(order.priority)}
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-left sm:text-right">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
                        order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
@@ -997,15 +1005,16 @@ export default function KitchenPage() {
                             />
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           {getItemStatusBadge(item.status)}
                           {canUpdateOrders && item.status !== 'ready' && (
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => handleItemStatusChange(order.id, item.id, 'ready')}
+                              className="text-xs sm:text-sm"
                             >
-                              <CheckCircleIcon className="w-4 h-4" />
+                              <CheckCircleIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                             </Button>
                           )}
                         </div>
@@ -1015,36 +1024,39 @@ export default function KitchenPage() {
                 </div>
 
                 {canUpdateOrders && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => handleOrderStatusChange(order.id, 'ready')}
-                      className="flex-1"
+                      className="flex-1 text-xs sm:text-sm"
                     >
                       Mark Ready
                     </Button>
-                    {!isUrgent && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleMarkUrgent(order.id, true)}
-                        title="Mark as Urgent"
-                      >
-                        <FireIcon className="w-4 h-4" />
-                      </Button>
-                    )}
-                    {isUrgent && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleMarkUrgent(order.id, false)}
-                        title="Remove Urgent Status"
-                        className="bg-red-600 hover:bg-red-700"
-                      >
-                        <FireIcon className="w-4 h-4" />
-                      </Button>
-                    )}
+                    <div className="flex gap-2">
+                      {!isUrgent && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleMarkUrgent(order.id, true)}
+                          title="Mark as Urgent"
+                          className="text-xs sm:text-sm"
+                        >
+                          <FireIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
+                      )}
+                      {isUrgent && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleMarkUrgent(order.id, false)}
+                          title="Remove Urgent Status"
+                          className="bg-red-600 hover:bg-red-700 text-xs sm:text-sm"
+                        >
+                          <FireIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
                   </div>
@@ -1057,12 +1069,12 @@ export default function KitchenPage() {
         {/* Ready Orders */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircleIcon className="w-5 h-5 text-green-600" />
-              Ready for Service ({filteredReadyOrders.length})
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+              <span className="truncate">Ready for Service ({filteredReadyOrders.length})</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4">
             {isLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
@@ -1078,16 +1090,16 @@ export default function KitchenPage() {
             ) : (
               filteredReadyOrders.map((order: any) => {
                 return (
-                  <div key={order.id} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                  <div key={order.id} className="border border-green-200 dark:border-green-800 rounded-lg p-3 sm:p-4 bg-green-50 dark:bg-green-900/20">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">
                       Order #{order.orderNumber || order.order_id}
                     </h3>
                     {getPriorityBadge(order.priority)}
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-left sm:text-right">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
                        order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
                     </p>
@@ -1150,7 +1162,7 @@ export default function KitchenPage() {
                 {canUpdateOrders && (
                   <Button
                     onClick={() => handleOrderStatusChange(order.id, 'completed')}
-                    className="w-full"
+                    className="w-full text-xs sm:text-sm"
                   >
                     Mark as Served
                   </Button>
@@ -1165,19 +1177,20 @@ export default function KitchenPage() {
 
       {/* Order Details Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                   Order #{selectedOrder.orderNumber}
                 </h2>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setSelectedOrder(null)}
+                  className="self-start sm:self-auto"
                 >
-                  <XCircleIcon className="w-5 h-5" />
+                  <XCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </Button>
               </div>
 
@@ -1254,14 +1267,18 @@ export default function KitchenPage() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
                 <Button
                   variant="secondary"
                   onClick={() => setSelectedOrder(null)}
+                  className="w-full sm:w-auto text-sm sm:text-base"
                 >
                   Close
                 </Button>
-                <Button onClick={() => handleOrderStatusChange(selectedOrder.id, 'ready')}>
+                <Button 
+                  onClick={() => handleOrderStatusChange(selectedOrder.id, 'ready')}
+                  className="w-full sm:w-auto text-sm sm:text-base"
+                >
                   Mark All Ready
                 </Button>
               </div>

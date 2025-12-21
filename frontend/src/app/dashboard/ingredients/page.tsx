@@ -561,12 +561,12 @@ export default function IngredientsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Inventory Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Inventory Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage your restaurant ingredients and stock levels
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <ImportButton
             onImport={async (data, _result) => {
               let successCount = 0;
@@ -628,71 +628,81 @@ export default function IngredientsPage() {
             filename="ingredients-import-template"
             variant="secondary"
           />
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <PlusIcon className="w-5 h-5 mr-2" />
+          <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
             Add Ingredient
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Items</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
-              </div>
-              <BeakerIcon className="w-8 h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">In Stock</p>
-                <p className="text-3xl font-bold text-green-600">{stats.inStock}</p>
-              </div>
-              <ArchiveBoxIcon className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Low Stock</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.lowStock}</p>
-              </div>
-              <ExclamationTriangleIcon className="w-8 h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Out of Stock</p>
-                <p className="text-3xl font-bold text-red-600">{stats.outOfStock}</p>
-              </div>
-              <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between gap-4">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Value</p>
-                <p className="text-3xl font-bold text-purple-600 break-words">{formatCurrency(stats.totalValue)}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Items</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <ArchiveBoxIcon className="w-8 h-8 text-purple-600 flex-shrink-0" />
+              <BeakerIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">In Stock</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={stats.inStock.toString()}>
+                  {stats.inStock.toLocaleString()}
+                </p>
+              </div>
+              <ArchiveBoxIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Low Stock</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={stats.lowStock.toString()}>
+                  {stats.lowStock.toLocaleString()}
+                </p>
+              </div>
+              <ExclamationTriangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Out of Stock</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate" title={stats.outOfStock.toString()}>
+                  {stats.outOfStock.toLocaleString()}
+                </p>
+              </div>
+              <ExclamationTriangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Value</p>
+                <p className="text-sm sm:text-base md:text-lg font-bold text-purple-600 truncate" title={formatCurrency(stats.totalValue)}>
+                  {formatCurrency(stats.totalValue)}
+                </p>
+              </div>
+              <ArchiveBoxIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -700,13 +710,14 @@ export default function IngredientsPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search ingredients..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -780,7 +791,7 @@ export default function IngredientsPage() {
         className="max-w-2xl"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Ingredient Name"
               value={formData.name}
@@ -814,7 +825,7 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="Current Stock"
               type="number"
@@ -847,7 +858,7 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="Maximum Stock (Optional)"
               type="number"
@@ -870,7 +881,7 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="SKU (Optional)"
               value={formData.sku}
@@ -882,7 +893,7 @@ export default function IngredientsPage() {
               onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Storage Location (Optional)"
               value={formData.storageLocation}
@@ -908,17 +919,18 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCreateModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={isCreating}>
+            <Button onClick={handleCreate} disabled={isCreating} className="w-full sm:w-auto text-sm sm:text-base">
               {isCreating ? 'Creating...' : 'Add Ingredient'}
             </Button>
           </div>
@@ -936,7 +948,7 @@ export default function IngredientsPage() {
         className="max-w-2xl"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Ingredient Name"
               value={formData.name}
@@ -970,7 +982,7 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="Current Stock"
               type="number"
@@ -1003,7 +1015,7 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="Maximum Stock (Optional)"
               type="number"
@@ -1025,7 +1037,7 @@ export default function IngredientsPage() {
               onChange={(e) => setFormData({ ...formData, shelfLife: parseInt(e.target.value) || undefined })}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="SKU (Optional)"
               value={formData.sku}
@@ -1037,7 +1049,7 @@ export default function IngredientsPage() {
               onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Storage Location (Optional)"
               value={formData.storageLocation}
@@ -1111,7 +1123,7 @@ export default function IngredientsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Stock</p>
                 <p className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -1197,10 +1209,11 @@ export default function IngredientsPage() {
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => setIsViewModalOpen(false)}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
@@ -1209,6 +1222,7 @@ export default function IngredientsPage() {
                   setIsViewModalOpen(false);
                   openEditModal(selectedIngredient);
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Edit Ingredient
               </Button>
@@ -1300,17 +1314,18 @@ export default function IngredientsPage() {
               </p>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsAdjustStockModalOpen(false);
                   resetStockAdjustment();
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Cancel
               </Button>
-              <Button onClick={handleAdjustStock}>
+              <Button onClick={handleAdjustStock} className="w-full sm:w-auto text-sm sm:text-base">
                 Adjust Stock
               </Button>
             </div>

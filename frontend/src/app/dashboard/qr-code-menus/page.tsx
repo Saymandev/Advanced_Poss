@@ -11,14 +11,14 @@ import { useGetTablesQuery } from '@/lib/api/endpoints/tablesApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-  ChartBarIcon,
-  EyeIcon,
-  LinkIcon,
-  PencilIcon,
-  PlusIcon,
-  QrCodeIcon,
-  TableCellsIcon,
-  TrashIcon
+    ChartBarIcon,
+    EyeIcon,
+    LinkIcon,
+    PencilIcon,
+    PlusIcon,
+    QrCodeIcon,
+    TableCellsIcon,
+    TrashIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
@@ -363,74 +363,83 @@ export default function QRCodesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">QR Code Menus</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">QR Code Menus</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Contactless menu access for customers
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
+        <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+          <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           Generate QR Code
         </Button>
       </div>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total QR Codes</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total QR Codes</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <QrCodeIcon className="w-8 h-8 text-blue-600" />
+              <QrCodeIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
-                <p className="text-3xl font-bold text-green-600">{stats.active}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Active</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600 truncate" title={stats.active.toString()}>
+                  {stats.active.toLocaleString()}
+                </p>
               </div>
-              <QrCodeIcon className="w-8 h-8 text-green-600" />
+              <QrCodeIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Scans</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.totalScans}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Scans</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600 truncate" title={stats.totalScans.toString()}>
+                  {stats.totalScans.toLocaleString()}
+                </p>
               </div>
-              <ChartBarIcon className="w-8 h-8 text-purple-600" />
+              <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Scans</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.avgScans}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Avg Scans</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-yellow-600 truncate" title={stats.avgScans}>
+                  {stats.avgScans}
+                </p>
               </div>
-              <ChartBarIcon className="w-8 h-8 text-yellow-600" />
+              <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-yellow-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
       </div>
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4 lg:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search by table number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -442,6 +451,7 @@ export default function QRCodesPage() {
                 value={typeFilter}
                 onChange={setTypeFilter}
                 placeholder="Filter by menu type"
+                className="text-xs sm:text-sm"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -461,6 +471,7 @@ export default function QRCodesPage() {
                 onChange={setTableFilter}
                 placeholder="Filter by table"
                 disabled={isLoadingTables}
+                className="text-xs sm:text-sm"
               />
             </div>
             {(typeFilter !== 'all' || tableFilter !== 'all' || searchQuery) && (
@@ -471,6 +482,7 @@ export default function QRCodesPage() {
                   setTableFilter('all');
                   setSearchQuery('');
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Clear Filters
               </Button>
@@ -507,7 +519,7 @@ export default function QRCodesPage() {
             }}
             exportable={true}
             exportFilename="qr-codes"
-            onExport={(format, items) => {
+            onExport={(_format, _items) => {
               }}
             emptyMessage="No QR codes found. Create your first QR code to enable contactless menu access."
           />
@@ -582,7 +594,7 @@ export default function QRCodesPage() {
               Loading available tables...
             </div>
           )}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
@@ -590,10 +602,11 @@ export default function QRCodesPage() {
                 resetForm();
               }}
               disabled={isGenerating}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={isGenerating || isLoadingTables || !branchId}>
+            <Button onClick={handleCreate} disabled={isGenerating || isLoadingTables || !branchId} className="w-full sm:w-auto text-sm sm:text-base">
               {isGenerating ? 'Generating...' : 'Generate QR Code'}
             </Button>
           </div>
@@ -612,26 +625,28 @@ export default function QRCodesPage() {
         {selectedQR && (
           <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-start gap-6">
-              <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                <QrCodeIcon className="w-10 h-10 text-gray-600 dark:text-gray-400" />
+            <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0">
+                <QrCodeIcon className="w-8 h-8 sm:w-10 sm:h-10 text-gray-600 dark:text-gray-400" />
               </div>
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">
                       {selectedQR.tableNumber ? `Table ${selectedQR.tableNumber}` : 'General Menu'}
                     </h3>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
                       {getMenuTypeBadge(selectedQR.menuType)}
                       <Badge variant={selectedQR.isActive ? 'success' : 'danger'}>
                         {selectedQR.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-blue-600">{selectedQR.scanCount}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Scans</p>
+                  <div className="text-left sm:text-right">
+                    <p className="text-xl sm:text-2xl font-bold text-blue-600 truncate" title={selectedQR.scanCount.toString()}>
+                      {selectedQR.scanCount.toLocaleString()}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Scans</p>
                   </div>
                 </div>
               </div>
@@ -668,7 +683,7 @@ export default function QRCodesPage() {
               </div>
             </div>
             {/* Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">QR Code Information</h4>
                 <div className="space-y-2 text-sm">
@@ -721,8 +736,8 @@ export default function QRCodesPage() {
               </div>
             </div>
             {/* Actions */}
-            <div className="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
                   variant="secondary"
                   onClick={() => {
@@ -730,6 +745,7 @@ export default function QRCodesPage() {
                     navigator.clipboard.writeText(selectedQR.url);
                     toast.success('Menu URL copied to clipboard');
                   }}
+                  className="w-full sm:w-auto text-sm sm:text-base"
                 >
                   <LinkIcon className="w-4 h-4 mr-2" />
                   Copy URL
@@ -743,17 +759,19 @@ export default function QRCodesPage() {
                     link.download = `qr-code-table-${selectedQR.tableNumber || 'general'}.png`;
                     link.click();
                   }}
+                  className="w-full sm:w-auto text-sm sm:text-base"
                 >
                   Download QR
                 </Button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
                   variant="secondary"
                   onClick={() => {
                     setIsViewModalOpen(false);
                     setSelectedQR(null);
                   }}
+                  className="w-full sm:w-auto text-sm sm:text-base"
                 >
                   Close
                 </Button>
@@ -761,6 +779,7 @@ export default function QRCodesPage() {
                   onClick={() => handleToggleActive(selectedQR)}
                   variant={selectedQR.isActive ? 'danger' : 'secondary'}
                   disabled={isUpdating}
+                  className="w-full sm:w-auto text-sm sm:text-base"
                 >
                   {isUpdating ? 'Updating...' : (selectedQR.isActive ? 'Disable' : 'Enable')}
                 </Button>
@@ -805,7 +824,7 @@ export default function QRCodesPage() {
               </div>
             </div>
           )}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
@@ -813,6 +832,7 @@ export default function QRCodesPage() {
                 setQrToDelete(null);
               }}
               disabled={isDeleting}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
@@ -820,6 +840,7 @@ export default function QRCodesPage() {
               onClick={handleDeleteConfirm}
               variant="danger"
               disabled={isDeleting}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               {isDeleting ? 'Deleting...' : 'Delete QR Code'}
             </Button>
@@ -893,7 +914,7 @@ export default function QRCodesPage() {
                   Changing the menu type will update the QR code URL. Customers will need to scan the updated QR code to see the new menu type.
                 </p>
               </div>
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
                 <Button
                   variant="secondary"
                   onClick={() => {
@@ -901,10 +922,11 @@ export default function QRCodesPage() {
                     setSelectedQR(null);
                   }}
                   disabled={isUpdating}
+                  className="w-full sm:w-auto text-sm sm:text-base"
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleEdit} disabled={isUpdating}>
+                <Button onClick={handleEdit} disabled={isUpdating} className="w-full sm:w-auto text-sm sm:text-base">
                   {isUpdating ? 'Updating...' : 'Update QR Code'}
                 </Button>
               </div>
@@ -914,4 +936,4 @@ export default function QRCodesPage() {
       </Modal>
     </div>
   );
-}
+}

@@ -557,10 +557,10 @@ export default function BranchesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Branch Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Branch Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage your restaurant branches and locations
             {currentBranchId && data?.branches?.find(b => b.id === currentBranchId) && (
               <span className="ml-2 text-primary-600 dark:text-primary-400 font-medium">
@@ -569,57 +569,57 @@ export default function BranchesPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
+        <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm">
+          <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           Add Branch
         </Button>
       </div>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Branches</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {data?.total || 0}
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Branches</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate" title={(data?.total || 0).toLocaleString()}>
+                  {(data?.total || 0).toLocaleString()}
                 </p>
               </div>
-              <BuildingOfficeIcon className="w-8 h-8 text-primary-600" />
+              <BuildingOfficeIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-primary-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active Branches</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {data?.branches?.filter(b => b.isActive).length || 0}
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Active Branches</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600 truncate" title={(data?.branches?.filter(b => b.isActive).length || 0).toLocaleString()}>
+                  {(data?.branches?.filter(b => b.isActive).length || 0).toLocaleString()}
                 </p>
               </div>
-              <PowerIcon className="w-8 h-8 text-green-600" />
+              <PowerIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Inactive Branches</p>
-                <p className="text-3xl font-bold text-red-600">
-                  {data?.branches?.filter(b => !b.isActive).length || 0}
+          <CardContent className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Inactive Branches</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-red-600 truncate" title={(data?.branches?.filter(b => !b.isActive).length || 0).toLocaleString()}>
+                  {(data?.branches?.filter(b => !b.isActive).length || 0).toLocaleString()}
                 </p>
               </div>
-              <PowerIcon className="w-8 h-8 text-red-600" />
+              <PowerIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-red-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
       </div>
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search branches..."

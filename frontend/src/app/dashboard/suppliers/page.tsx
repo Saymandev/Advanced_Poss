@@ -583,10 +583,10 @@ export default function SuppliersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Supplier Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Supplier Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage your suppliers and vendor relationships
           </p>
           {error && (
@@ -615,7 +615,7 @@ export default function SuppliersPage() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
           <ImportButton
             onImport={async (data, _result) => {
               let successCount = 0;
@@ -674,68 +674,77 @@ export default function SuppliersPage() {
             filename="suppliers-import-template"
             variant="secondary"
           />
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <PlusIcon className="w-5 h-5 mr-2" />
+          <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
             Add Supplier
           </Button>
         </div>
       </div>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Suppliers</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Suppliers</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <TruckIcon className="w-8 h-8 text-blue-600" />
+              <TruckIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Active Suppliers</p>
-                <p className="text-3xl font-bold text-green-600">{stats.active}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Active Suppliers</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={stats.active.toString()}>
+                  {stats.active.toLocaleString()}
+                </p>
               </div>
-              <BuildingOfficeIcon className="w-8 h-8 text-green-600" />
+              <BuildingOfficeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Top Rated</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.topRated}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Top Rated</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={stats.topRated.toString()}>
+                  {stats.topRated.toLocaleString()}
+                </p>
               </div>
-              <StarIcon className="w-8 h-8 text-yellow-600" />
+              <StarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Rating</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.avgRating}⭐</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Avg Rating</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-600 truncate" title={`${stats.avgRating}⭐`}>
+                  {stats.avgRating}⭐
+                </p>
               </div>
-              <StarIcon className="w-8 h-8 text-purple-600" />
+              <StarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
       </div>
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search suppliers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -820,7 +829,7 @@ export default function SuppliersPage() {
         className="max-w-2xl"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Supplier Name"
               value={formData.name}
@@ -889,7 +898,7 @@ export default function SuppliersPage() {
             })}
             required
           />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="City"
               value={formData.address.city}
@@ -935,7 +944,7 @@ export default function SuppliersPage() {
               placeholder="https://supplier.com"
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="Tax ID (Optional)"
               value={formData.taxId}
@@ -1093,17 +1102,18 @@ export default function SuppliersPage() {
               placeholder="Additional notes about this supplier..."
             />
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCreateModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={isCreating}>
+            <Button onClick={handleCreate} disabled={isCreating} className="w-full sm:w-auto text-sm sm:text-base">
               {isCreating ? 'Creating...' : 'Add Supplier'}
             </Button>
           </div>
@@ -1120,7 +1130,7 @@ export default function SuppliersPage() {
         className="max-w-4xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Supplier Name"
               value={formData.name}
@@ -1189,7 +1199,7 @@ export default function SuppliersPage() {
             })}
             required
           />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="City"
               value={formData.address.city}
@@ -1235,7 +1245,7 @@ export default function SuppliersPage() {
               placeholder="https://supplier.com"
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="Tax ID (Optional)"
               value={formData.taxId}
@@ -1452,7 +1462,7 @@ export default function SuppliersPage() {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Contact Information</h4>
                 <div className="space-y-2 text-sm">
@@ -1492,7 +1502,7 @@ export default function SuppliersPage() {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Type</p>
                 <Badge variant="secondary" className="capitalize">{selectedSupplier.type}</Badge>
@@ -1670,10 +1680,11 @@ export default function SuppliersPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">{selectedSupplier.notes}</p>
               </div>
             )}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => setIsViewModalOpen(false)}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
@@ -1682,6 +1693,7 @@ export default function SuppliersPage() {
                   setIsViewModalOpen(false);
                   openEditModal(selectedSupplier);
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 <PencilIcon className="w-4 h-4 mr-2" />
                 Edit Supplier

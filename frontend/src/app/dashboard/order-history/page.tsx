@@ -835,14 +835,14 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Orders Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Orders Management</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
             Manage restaurant orders and transactions
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <ImportButton
             onImport={async (_data, _result) => {
               toast.success('Orders are typically created through the POS system. Import functionality is for reference only.');
@@ -856,9 +856,9 @@ export default function OrdersPage() {
             filename="order-history-import-template"
             variant="secondary"
           />
-          <Button onClick={() => window.open('/dashboard/pos', '_blank')}>
-            <PlusIcon className="w-5 h-5 mr-2" />
-            New Order
+          <Button onClick={() => window.open('/dashboard/pos', '_blank')} className="w-full sm:w-auto">
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+            <span className="text-sm sm:text-base">New Order</span>
           </Button>
         </div>
       </div>
@@ -878,23 +878,23 @@ export default function OrdersPage() {
                     handleSearchSubmit();
                   }
                 }}
-                className="pl-10"
+                className="pl-10 text-sm sm:text-base"
               />
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             </div>
             <div className="flex gap-2">
-              <Button variant="primary" onClick={handleSearchSubmit} disabled={searchTerm.trim() === committedSearch.trim()}>
+              <Button variant="primary" onClick={handleSearchSubmit} disabled={searchTerm.trim() === committedSearch.trim()} className="flex-1 sm:flex-initial text-sm sm:text-base">
                 Search
               </Button>
               {(searchTerm || committedSearch) && (
-                <Button variant="secondary" onClick={handleClearSearch}>
+                <Button variant="secondary" onClick={handleClearSearch} className="flex-1 sm:flex-initial text-sm sm:text-base">
                   Clear
                 </Button>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <Select
               options={[
                 { value: 'all', label: 'All Status' },
@@ -917,14 +917,14 @@ export default function OrdersPage() {
               onChange={(value) => handleOrderTypeFilterChange(value as 'all' | 'dine-in' | 'takeaway' | 'delivery')}
               placeholder="Filter by type"
             />
-            <div className="flex items-center">
+            <div className="flex items-center sm:col-span-2 md:col-span-1">
               <Button
                 variant="secondary"
                 onClick={handleRefresh}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
               >
                 <ArrowPathIcon className="h-4 w-4" />
-                Refresh
+                <span>Refresh</span>
               </Button>
             </div>
           </div>
@@ -941,7 +941,7 @@ export default function OrdersPage() {
                   key={value}
                   variant={activeQuickRange === value ? 'primary' : 'secondary'}
                   onClick={() => handleQuickRange(value)}
-                  className={activeQuickRange === value ? '' : 'bg-slate-900/80 text-slate-100 hover:bg-slate-800/80'}
+                  className={`text-xs sm:text-sm ${activeQuickRange === value ? '' : 'bg-slate-900/80 text-slate-100 hover:bg-slate-800/80'}`}
                 >
                   {label}
                 </Button>
@@ -1029,50 +1029,50 @@ export default function OrdersPage() {
         {selectedOrder && (
           <div className="space-y-6">
             {/* Modal Header with Actions */}
-            <div className="flex items-start justify-between border-b border-gray-200 dark:border-gray-700 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
               <div className="flex items-center gap-3">
-                <DocumentTextIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                <DocumentTextIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 dark:text-gray-400 flex-shrink-0" />
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Order Details</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Order Details</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Token #{selectedOrder.orderNumber.split('-').pop() || selectedOrder.orderNumber}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => setIsQRModalOpen(true)}
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <QrCodeIcon className="w-4 h-4" />
-                  Review QR
+                  <span className="text-sm">Review QR</span>
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => handleKOTPrint(selectedOrder)}
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <PrinterIcon className="w-4 h-4" />
-                  KOT Print
+                  <span className="text-sm">KOT Print</span>
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => handleDeleteOrder(selectedOrder.id)}
                   disabled={isCancelling}
-                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+                  className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
                 >
                   <XCircleIcon className="w-4 h-4" />
-                  {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+                  <span className="text-sm">{isCancelling ? 'Cancelling...' : 'Cancel Order'}</span>
                 </Button>
               </div>
             </div>
 
             {/* Overview and Summary Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Overview Section (Left) */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Overview</h3>
@@ -1293,9 +1293,10 @@ export default function OrdersPage() {
 
             {/* Order Items Table */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order Items</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Order Items</h3>
+              <div className="overflow-x-auto -mx-4 sm:mx-0">
+                <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                  <table className="w-full border-collapse min-w-[800px]">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
                       <th className="text-left py-3 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">Food Items</th>
@@ -1483,7 +1484,8 @@ export default function OrdersPage() {
                       );
                     })()}
                   </tfoot>
-                </table>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

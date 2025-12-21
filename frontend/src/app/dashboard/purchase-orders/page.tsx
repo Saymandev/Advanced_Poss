@@ -342,14 +342,14 @@ export default function PurchaseOrdersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Purchase Orders</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Purchase Orders</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage purchase orders and supplier deliveries
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <ImportButton
             onImport={async (data, _result) => {
               let successCount = 0;
@@ -435,79 +435,90 @@ export default function PurchaseOrdersPage() {
             filename="purchase-orders-import-template"
             variant="secondary"
           />
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <PlusIcon className="w-5 h-5 mr-2" />
+          <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
             Create Order
           </Button>
         </div>
       </div>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
-              </div>
-              <ClipboardDocumentListIcon className="w-8 h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Pending Approval</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
-              </div>
-              <ClockIcon className="w-8 h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Approved</p>
-                <p className="text-3xl font-bold text-blue-600">{stats.approved}</p>
-              </div>
-              <CheckCircleIcon className="w-8 h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Received</p>
-                <p className="text-3xl font-bold text-green-600">{stats.received}</p>
-              </div>
-              <TruckIcon className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between gap-4">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Value</p>
-                <p className="text-3xl font-bold text-purple-600 break-words">{formatCurrency(stats.totalValue)}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Orders</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <CurrencyDollarIcon className="w-8 h-8 text-purple-600 flex-shrink-0" />
+              <ClipboardDocumentListIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Pending Approval</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={stats.pending.toString()}>
+                  {stats.pending.toLocaleString()}
+                </p>
+              </div>
+              <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Approved</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate" title={stats.approved.toString()}>
+                  {stats.approved.toLocaleString()}
+                </p>
+              </div>
+              <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Received</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={stats.received.toString()}>
+                  {stats.received.toLocaleString()}
+                </p>
+              </div>
+              <TruckIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Value</p>
+                <p className="text-sm sm:text-base md:text-lg font-bold text-purple-600 truncate" title={formatCurrency(stats.totalValue)}>
+                  {formatCurrency(stats.totalValue)}
+                </p>
+              </div>
+              <CurrencyDollarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
       </div>
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search purchase orders..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -572,7 +583,7 @@ export default function PurchaseOrdersPage() {
         className="max-w-4xl"
       >
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Supplier"
               options={suppliers?.suppliers?.map(s => ({ value: s.id, label: s.name })) || []}
@@ -591,7 +602,7 @@ export default function PurchaseOrdersPage() {
           <div>
             <h3 className="font-medium text-gray-900 dark:text-white mb-4">Order Items</h3>
             {/* Add New Item */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <Select
                 options={ingredients?.items?.map(i => ({ value: i.id, label: i.name })) || []}
                 value={newItem.ingredientId}
@@ -671,17 +682,18 @@ export default function PurchaseOrdersPage() {
               placeholder="Additional notes for this purchase order..."
             />
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCreateModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>
+            <Button onClick={handleCreate} className="w-full sm:w-auto text-sm sm:text-base">
               Create Purchase Order
             </Button>
           </div>
@@ -700,7 +712,7 @@ export default function PurchaseOrdersPage() {
         {selectedOrder && (
           <div className="space-y-6">
             {/* Order Header */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white mb-2">Order Information</h3>
                 <div className="space-y-2 text-sm">
@@ -828,13 +840,14 @@ export default function PurchaseOrdersPage() {
               </div>
             )}
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsViewModalOpen(false);
                   setSelectedOrder(null);
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
@@ -844,7 +857,7 @@ export default function PurchaseOrdersPage() {
                     setIsViewModalOpen(false);
                     setIsApproveModalOpen(true);
                   }}
-                  className="bg-green-600 hover:bg-green-700"
+                  className="bg-green-600 hover:bg-green-700 w-full sm:w-auto text-sm sm:text-base"
                 >
                   Approve Order
                 </Button>
@@ -855,7 +868,7 @@ export default function PurchaseOrdersPage() {
                     setIsViewModalOpen(false);
                     setIsReceiveModalOpen(true);
                   }}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto text-sm sm:text-base"
                 >
                   Receive Order
                 </Button>
@@ -909,19 +922,20 @@ export default function PurchaseOrdersPage() {
               placeholder="Add any approval notes..."
             />
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsApproveModalOpen(false);
                 setSelectedOrder(null);
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
             <Button
               onClick={() => handleApprove(user?.id || '', 'Approved via system')}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 w-full sm:w-auto text-sm sm:text-base"
             >
               Approve Order
             </Button>
@@ -972,7 +986,7 @@ export default function PurchaseOrdersPage() {
               </div>
             ))}
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
@@ -980,6 +994,7 @@ export default function PurchaseOrdersPage() {
                 setSelectedOrder(null);
                 setReceivedQuantities({});
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
@@ -991,7 +1006,7 @@ export default function PurchaseOrdersPage() {
                 })) || [];
                 handleReceive(receivedItems);
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto text-sm sm:text-base"
             >
               Confirm Receipt
             </Button>
@@ -1040,13 +1055,14 @@ export default function PurchaseOrdersPage() {
               placeholder="Please provide a reason for cancellation..."
             />
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCancelModalOpen(false);
                 setSelectedOrder(null);
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Keep Order
             </Button>
@@ -1060,7 +1076,7 @@ export default function PurchaseOrdersPage() {
                   toast.error('Please provide a cancellation reason');
                 }
               }}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel Order
             </Button>
@@ -1069,4 +1085,4 @@ export default function PurchaseOrdersPage() {
       </Modal>
     </div>
   );
-}
+}

@@ -443,65 +443,73 @@ export default function DigitalReceiptsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Digital Receipts</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Digital Receipts</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage digital receipts and customer communications
           </p>
         </div>
-        <Button onClick={() => setIsGenerateModalOpen(true)}>
-          <DocumentTextIcon className="w-5 h-5 mr-2" />
+        <Button onClick={() => setIsGenerateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+          <DocumentTextIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           Generate Receipt
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Receipts</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Receipts</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <DocumentTextIcon className="w-8 h-8 text-blue-600" />
+              <DocumentTextIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
-                <p className="text-3xl font-bold text-green-600">{formatCurrency(stats.totalRevenue)}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Total Revenue</p>
+                <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-green-600 truncate" title={formatCurrency(stats.totalRevenue)}>
+                  {formatCurrency(stats.totalRevenue)}
+                </p>
               </div>
-              <ReceiptRefundIcon className="w-8 h-8 text-green-600" />
+              <ReceiptRefundIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-green-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Loyalty Points</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.loyaltyPoints}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Loyalty Points</p>
+                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600 truncate" title={stats.loyaltyPoints.toString()}>
+                  {stats.loyaltyPoints.toLocaleString()}
+                </p>
               </div>
-              <ReceiptRefundIcon className="w-8 h-8 text-purple-600" />
+              <ReceiptRefundIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-purple-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
-                <p className="text-3xl font-bold text-yellow-600">{formatCurrency(stats.avgOrderValue)}</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Avg Order Value</p>
+                <p className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-yellow-600 truncate" title={formatCurrency(stats.avgOrderValue)}>
+                  {formatCurrency(stats.avgOrderValue)}
+                </p>
               </div>
-              <ShoppingCartIcon className="w-8 h-8 text-yellow-600" />
+              <ShoppingCartIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-yellow-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -509,29 +517,30 @@ export default function DigitalReceiptsPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4 lg:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search by customer ID or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 type="date"
                 label="Start Date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                className="w-40"
+                className="w-full sm:w-40 text-xs sm:text-sm"
               />
               <Input
                 type="date"
                 label="End Date"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                className="w-40"
+                className="w-full sm:w-40 text-xs sm:text-sm"
               />
               {(dateRange.start || dateRange.end || searchQuery) && (
                 <Button
@@ -540,6 +549,7 @@ export default function DigitalReceiptsPage() {
                     setDateRange({ start: '', end: '' });
                     setSearchQuery('');
                   }}
+                  className="w-full sm:w-auto text-sm sm:text-base"
                 >
                   Clear Filters
                 </Button>
@@ -606,7 +616,7 @@ export default function DigitalReceiptsPage() {
             </div>
 
             {/* Customer Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white mb-2">Customer Information</h3>
                 <div className="space-y-1 text-sm">
@@ -710,7 +720,7 @@ export default function DigitalReceiptsPage() {
             {selectedReceipt.personalizedOffers && selectedReceipt.personalizedOffers.length > 0 && (
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white mb-4">Special Offers for You</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {selectedReceipt.personalizedOffers.map((offer, index) => (
                     <div key={index} className="border border-purple-200 dark:border-purple-800 rounded-lg p-4">
                       <h4 className="font-semibold text-purple-800 dark:text-purple-400 mb-1">
@@ -734,19 +744,21 @@ export default function DigitalReceiptsPage() {
             )}
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsViewModalOpen(false);
                   setSelectedReceipt(null);
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => handleDownloadReceipt(selectedReceipt)}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 <PrinterIcon className="w-4 h-4 mr-2" />
                 Print/Download
@@ -756,7 +768,7 @@ export default function DigitalReceiptsPage() {
                   setIsViewModalOpen(false);
                   openEmailModal(selectedReceipt);
                 }}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto text-sm sm:text-base"
               >
                 <EnvelopeIcon className="w-4 h-4 mr-2" />
                 Email Receipt
@@ -818,7 +830,7 @@ export default function DigitalReceiptsPage() {
             error={formErrors.email?.email}
           />
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
@@ -827,10 +839,11 @@ export default function DigitalReceiptsPage() {
                 setSelectedReceipt(null);
               }}
               disabled={isEmailing}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleEmailReceipt} disabled={isEmailing}>
+            <Button onClick={handleEmailReceipt} disabled={isEmailing} className="w-full sm:w-auto text-sm sm:text-base">
               {isEmailing ? 'Sending...' : 'Send Email'}
             </Button>
           </div>
@@ -969,7 +982,7 @@ export default function DigitalReceiptsPage() {
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
@@ -977,10 +990,11 @@ export default function DigitalReceiptsPage() {
                 resetGenerateForm();
               }}
               disabled={isGenerating}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleGenerateReceipt} disabled={isGenerating || isLoadingOrders}>
+            <Button onClick={handleGenerateReceipt} disabled={isGenerating || isLoadingOrders} className="w-full sm:w-auto text-sm sm:text-base">
               {isGenerating ? 'Generating...' : 'Generate Receipt'}
             </Button>
           </div>

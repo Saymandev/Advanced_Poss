@@ -1064,14 +1064,14 @@ export default function SubscriptionsPage() {
     };
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <BuildingOffice2Icon className="w-8 h-8 text-purple-600" />
+            <BuildingOffice2Icon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 flex-shrink-0" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 System Subscriptions
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                 View and manage subscriptions for all companies
               </p>
             </div>
@@ -1079,13 +1079,14 @@ export default function SubscriptionsPage() {
         </div>
         {/* System-wide subscriptions */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>All Company Subscriptions</CardTitle>
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <CardTitle className="text-lg sm:text-xl">All Company Subscriptions</CardTitle>
             <Button
               variant="primary"
               onClick={() => {
                 setIsFeatureSubscriptionModalOpen(true);
                 }}
+              className="w-full sm:w-auto text-sm"
             >
               Create Feature-Based Subscription
             </Button>
@@ -1103,15 +1104,16 @@ export default function SubscriptionsPage() {
         </Card>
         {/* Plan Management */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
             <div>
-              <CardTitle>Subscription Plans</CardTitle>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <CardTitle className="text-lg sm:text-xl">Subscription Plans</CardTitle>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                 Manage available plans for all companies
               </p>
             </div>
             <Button
               variant="primary"
+              className="w-full sm:w-auto text-sm"
               onClick={() => {
                 setEditingPlan(null);
                 setIsPlanModalOpen(true);
@@ -1685,8 +1687,8 @@ export default function SubscriptionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Subscription & Billing</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Subscription & Billing</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage your subscription plan and billing
           </p>
         </div>

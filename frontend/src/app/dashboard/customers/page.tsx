@@ -589,17 +589,17 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Customer Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Customer Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage your customers and loyalty program
           </p>
           {error && (
-            <p className="text-red-600 dark:text-red-400 text-sm mt-1">
+            <p className="text-red-600 dark:text-red-400 text-xs sm:text-sm mt-1">
               Error loading customers: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <ImportButton
             onImport={async (data, _result) => {
               let successCount = 0;
@@ -644,23 +644,25 @@ export default function CustomersPage() {
             filename="customers-import-template"
             variant="secondary"
           />
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <PlusIcon className="w-5 h-5 mr-2" />
+          <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
             Add Customer
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Customers</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Customers</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={stats.total.toString()}>
+                  {stats.total.toLocaleString()}
+                </p>
               </div>
-              <UsersIcon className="w-8 h-8 text-blue-600" />
+              <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -669,16 +671,16 @@ export default function CustomersPage() {
           const count = stats[tier.value as keyof typeof stats] || 0;
           return (
             <Card key={tier.value}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{tier.label}</p>
-                    <p className={`text-2xl font-bold ${tier.color.replace('bg-', 'text-').replace('-100', '-800').replace('-900/30', '-400')}`}>
-                      {count}
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{tier.label}</p>
+                    <p className={`text-lg sm:text-xl md:text-2xl font-bold truncate ${tier.color.replace('bg-', 'text-').replace('-100', '-800').replace('-900/30', '-400')}`} title={count.toString()}>
+                      {count.toLocaleString()}
                     </p>
                   </div>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${tier.color}`}>
-                    <TrophyIcon className="w-4 h-4" />
+                  <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${tier.color} flex-shrink-0`}>
+                    <TrophyIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                   </div>
                 </div>
               </CardContent>
@@ -696,7 +698,7 @@ export default function CustomersPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {LOYALTY_TIERS.map((tier) => {
               const count = stats[tier.value as keyof typeof stats] || 0;
               const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
@@ -704,16 +706,16 @@ export default function CustomersPage() {
 
               return (
                 <div key={tier.value} className="text-center">
-                  <div className={`w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center ${tier.color}`}>
-                    <TrophyIcon className="w-8 h-8" />
+                  <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full mx-auto mb-2 sm:mb-3 flex items-center justify-center ${tier.color}`}>
+                    <TrophyIcon className="w-6 h-6 sm:w-8 sm:h-8" />
                   </div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                  <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-1">
                     {tier.label}
                   </h3>
-                  <p className="text-2xl font-bold text-primary-600 mb-2">
+                  <p className="text-xl sm:text-2xl font-bold text-primary-600 mb-2">
                     {count}
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
                     {percentage.toFixed(1)}% of customers
                   </p>
                   {nextTier && (
@@ -730,13 +732,14 @@ export default function CustomersPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search customers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="w-full sm:w-48">
@@ -844,17 +847,18 @@ export default function CustomersPage() {
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
           />
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCreateModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={isCreating || !formData.firstName || !formData.lastName || !formData.email}>
+            <Button onClick={handleCreate} disabled={isCreating || !formData.firstName || !formData.lastName || !formData.email} className="w-full sm:w-auto text-sm sm:text-base">
               {isCreating ? 'Creating...' : 'Add Customer'}
             </Button>
           </div>
@@ -903,14 +907,14 @@ export default function CustomersPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
-                      <p className="font-medium text-gray-900 dark:text-white">{selectedCustomer.email}</p>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Email</p>
+                      <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-white break-words">{selectedCustomer.email}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
-                      <p className="font-medium text-gray-900 dark:text-white">{selectedCustomer.phoneNumber || 'Not provided'}</p>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                      <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-white">{selectedCustomer.phoneNumber || 'Not provided'}</p>
                     </div>
                     {selectedCustomer.address && (
                       <div className="col-span-2">
@@ -926,29 +930,29 @@ export default function CustomersPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCustomer.totalOrders || 0}</p>
+                <CardContent className="p-3 sm:p-4">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{selectedCustomer.totalOrders || 0}</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Spent</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(selectedCustomer.totalSpent || 0)}</p>
+                <CardContent className="p-3 sm:p-4">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Spent</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(selectedCustomer.totalSpent || 0)}</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Loyalty Points</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCustomer.loyaltyPoints?.toLocaleString() || 0}</p>
+                <CardContent className="p-3 sm:p-4">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Loyalty Points</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{selectedCustomer.loyaltyPoints?.toLocaleString() || 0}</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Average Order</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <CardContent className="p-3 sm:p-4">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Average Order</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
                     {selectedCustomer.totalOrders > 0 ? formatCurrency((selectedCustomer.totalSpent || 0) / selectedCustomer.totalOrders) : formatCurrency(0)}
                   </p>
                 </CardContent>
@@ -1033,13 +1037,14 @@ export default function CustomersPage() {
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setIsViewModalOpen(false);
                   setSelectedCustomerId('');
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Close
               </Button>
@@ -1048,9 +1053,9 @@ export default function CustomersPage() {
                   setIsViewModalOpen(false);
                   openLoyaltyModal(selectedCustomer);
                 }}
-                className="text-purple-600 hover:text-purple-700"
+                className="text-purple-600 hover:text-purple-700 w-full sm:w-auto text-sm sm:text-base"
               >
-                <TrophyIcon className="w-4 h-4 mr-2" />
+                <TrophyIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 Manage Loyalty
               </Button>
               <Button
@@ -1058,8 +1063,9 @@ export default function CustomersPage() {
                   setIsViewModalOpen(false);
                   openEditModal(selectedCustomer);
                 }}
+                className="w-full sm:w-auto text-sm sm:text-base"
               >
-                <PencilIcon className="w-4 h-4 mr-2" />
+                <PencilIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 Edit Customer
               </Button>
             </div>
@@ -1107,17 +1113,18 @@ export default function CustomersPage() {
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
           />
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsEditModalOpen(false);
                 resetForm();
               }}
+              className="w-full sm:w-auto text-sm sm:text-base"
             >
               Cancel
             </Button>
-            <Button onClick={handleEdit} disabled={isUpdating || !formData.firstName || !formData.lastName || !formData.email}>
+            <Button onClick={handleEdit} disabled={isUpdating || !formData.firstName || !formData.lastName || !formData.email} className="w-full sm:w-auto text-sm sm:text-base">
               {isUpdating ? 'Updating...' : 'Update Customer'}
             </Button>
           </div>
@@ -1183,47 +1190,49 @@ export default function CustomersPage() {
                   Points Adjustment
                 </label>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Input
                       type="number"
                       label="Points Amount"
                       value={loyaltyPointsChange.toString()}
                       onChange={(e) => setLoyaltyPointsChange(parseInt(e.target.value) || 0)}
                       placeholder="e.g., 100 or -50"
+                      className="text-sm sm:text-base"
                     />
                     <Input
                       label="Reason"
                       value={loyaltyReason}
                       onChange={(e) => setLoyaltyReason(e.target.value)}
                       placeholder="e.g., Bonus points, Reward, Redemption"
+                      className="text-sm sm:text-base"
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       variant="secondary"
                       onClick={() => handleQuickLoyaltyAdjustment(selectedCustomer.id, 100, 'Bonus points')}
-                      className="flex-1"
+                      className="flex-1 text-xs sm:text-sm"
                     >
                       +100 Points
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={() => handleQuickLoyaltyAdjustment(selectedCustomer.id, 500, 'Reward')}
-                      className="flex-1"
+                      className="flex-1 text-xs sm:text-sm"
                     >
                       +500 Points
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={() => handleQuickLoyaltyAdjustment(selectedCustomer.id, -50, 'Redemption')}
-                      className="flex-1 text-red-600 hover:text-red-700"
+                      className="flex-1 text-red-600 hover:text-red-700 text-xs sm:text-sm"
                     >
                       -50 Points
                     </Button>
                   </div>
                   <Button
                     onClick={handleLoyaltyAdjustment}
-                    className="w-full"
+                    className="w-full text-sm sm:text-base"
                     disabled={!loyaltyPointsChange || !loyaltyReason.trim()}
                   >
                     Apply Adjustment
