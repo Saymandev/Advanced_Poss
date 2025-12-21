@@ -14,6 +14,11 @@ import {
   useUpdatePOSSettingsMutation,
   useUpdatePrinterMutation,
 } from '@/lib/api/endpoints/posApi';
+import {
+  useGetCompanySettingsQuery,
+  useGetServiceChargeSettingsQuery,
+  useGetTaxSettingsQuery,
+} from '@/lib/api/endpoints/settingsApi';
 import { useAppSelector } from '@/lib/store';
 import {
   CheckIcon,
@@ -44,6 +49,28 @@ export default function POSSettingsPage() {
     branchId: user?.branchId || undefined,
   });
   
+  // Get company settings as fallback defaults
+  const { data: companySettings } = useGetCompanySettingsQuery(
+    user?.companyId || '',
+    { skip: !user?.companyId }
+  );
+  
+  // Get company tax and service charge settings as fallbacks
+  const { data: taxSettings = [] } = useGetTaxSettingsQuery(
+    user?.companyId || '',
+    { skip: !user?.companyId }
+  );
+  const { data: serviceChargeSettings = [] } = useGetServiceChargeSettingsQuery(
+    user?.companyId || '',
+    { skip: !user?.companyId }
+  );
+  
+  // Get active tax and service charge rates from company settings
+  const activeTax = taxSettings.find((tax: any) => tax.isActive && tax.appliesTo === 'all');
+  const activeServiceCharge = serviceChargeSettings.find((sc: any) => sc.isActive && sc.appliesTo === 'all');
+  const companyTaxRate = activeTax?.rate || 0;
+  const companyServiceChargeRate = activeServiceCharge?.rate || 0;
+  
   const { data: printers, isLoading: printersLoading, refetch: refetchPrinters } = useGetPrintersQuery();
   const [testPrinter] = useTestPrinterMutation();
   const [createPrinter, { isLoading: isCreatingPrinter }] = useCreatePrinterMutation();
@@ -63,6 +90,8 @@ export default function POSSettingsPage() {
     logoUrl: '',
     fontSize: 12,
     paperWidth: 80,
+    wifi: '',
+    wifiPassword: '',
     printerEnabled: false,
     printerId: '',
     printerType: 'thermal' as 'thermal' | 'laser' | 'inkjet',
@@ -223,15 +252,18 @@ export default function POSSettingsPage() {
     if (settings) {
       const settingsData = settings as any;
       setFormData({
+        // Use branch settings, fallback to company settings, then defaults
         taxRate: settingsData.taxRate ?? 10, // Use ?? to allow 0 as valid value
         serviceCharge: settingsData.serviceCharge ?? 0, // Use ?? to allow 0 as valid value
-        currency: settingsData.currency || 'USD',
-        receiptHeader: settingsData.receiptSettings?.header || 'Welcome to Our Restaurant',
-        receiptFooter: settingsData.receiptSettings?.footer || 'Thank you for your visit!',
-        showLogo: settingsData.receiptSettings?.showLogo ?? true,
-        logoUrl: settingsData.receiptSettings?.logoUrl || '',
-        fontSize: settingsData.receiptSettings?.fontSize || 12,
-        paperWidth: settingsData.receiptSettings?.paperWidth || 80,
+        currency: settingsData.currency || companySettings?.currency || 'USD',
+        receiptHeader: settingsData.receiptSettings?.header || companySettings?.receiptSettings?.header || 'Welcome to Our Restaurant',
+        receiptFooter: settingsData.receiptSettings?.footer || companySettings?.receiptSettings?.footer || 'Thank you for your visit!',
+        showLogo: settingsData.receiptSettings?.showLogo ?? companySettings?.receiptSettings?.showLogo ?? true,
+        logoUrl: settingsData.receiptSettings?.logoUrl || companySettings?.receiptSettings?.logoUrl || '',
+        fontSize: settingsData.receiptSettings?.fontSize || companySettings?.receiptSettings?.fontSize || 12,
+        paperWidth: settingsData.receiptSettings?.paperWidth || companySettings?.receiptSettings?.paperWidth || 80,
+        wifi: settingsData.receiptSettings?.wifi || companySettings?.receiptSettings?.wifi || '',
+        wifiPassword: settingsData.receiptSettings?.wifiPassword || companySettings?.receiptSettings?.wifiPassword || '',
         printerEnabled: settingsData.printerSettings?.enabled ?? false,
         printerId: settingsData.printerSettings?.printerId || '',
         printerType: settingsData.printerSettings?.printerType || 'thermal',
@@ -239,7 +271,7 @@ export default function POSSettingsPage() {
         autoPrint: settingsData.printerSettings?.autoPrint ?? false,
       });
     }
-  }, [settings]);
+  }, [settings, companySettings]);
   
   // Set default printer for test when printers load
   useEffect(() => {
@@ -297,6 +329,8 @@ export default function POSSettingsPage() {
           logoUrl: formData.logoUrl,
           fontSize: formData.fontSize,
           paperWidth: formData.paperWidth,
+          wifi: formData.wifi,
+          wifiPassword: formData.wifiPassword,
         },
         printerSettings: {
           enabled: formData.printerEnabled,
@@ -399,26 +433,60 @@ export default function POSSettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Tax Rate (%)
+                {!settings?.taxRate && companyTaxRate > 0 && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(Company default: {activeTax?.name || 'Tax'})</span>
+                )}
               </label>
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {settings?.taxRate ?? 10}%
+                {settings?.taxRate ?? companyTaxRate ?? 10}%
               </div>
+              {!settings?.taxRate && companyTaxRate > 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Using company default from <a href="/dashboard/settings?tab=taxes" className="text-blue-600 hover:underline">Tax Settings</a>
+                </p>
+              )}
+              {!settings?.taxRate && companyTaxRate === 0 && companySettings?.currency && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Configure in <a href="/dashboard/settings?tab=taxes" className="text-blue-600 hover:underline">Tax Settings</a>
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Service Charge (%)
+                {!settings?.serviceCharge && companyServiceChargeRate > 0 && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(Company default: {activeServiceCharge?.name || 'Service Charge'})</span>
+                )}
               </label>
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {settings?.serviceCharge || 0}%
+                {settings?.serviceCharge ?? companyServiceChargeRate ?? 0}%
               </div>
+              {!settings?.serviceCharge && companyServiceChargeRate > 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Using company default from <a href="/dashboard/settings?tab=service-charges" className="text-blue-600 hover:underline">Service Charges</a>
+                </p>
+              )}
+              {!settings?.serviceCharge && companyServiceChargeRate === 0 && companySettings?.currency && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Configure in <a href="/dashboard/settings?tab=service-charges" className="text-blue-600 hover:underline">Service Charges</a>
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Currency
+                {!settings?.currency && companySettings?.currency && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(Company default)</span>
+                )}
               </label>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                {settings?.currency || 'USD'}
+                {settings?.currency || companySettings?.currency || 'USD'}
               </div>
+              {!settings?.currency && companySettings?.currency && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Using company default from <a href="/dashboard/settings?tab=general" className="text-blue-600 hover:underline">General Settings</a>
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -435,18 +503,34 @@ export default function POSSettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Header Text
+                {!settings?.receiptSettings?.header && companySettings?.receiptSettings?.header && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(Company default)</span>
+                )}
               </label>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                {settings?.receiptSettings?.header || 'Welcome to Our Restaurant'}
+                {settings?.receiptSettings?.header || companySettings?.receiptSettings?.header || 'Welcome to Our Restaurant'}
               </div>
+              {!settings?.receiptSettings?.header && companySettings?.receiptSettings?.header && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Using company default from <a href="/dashboard/settings?tab=receipt" className="text-blue-600 hover:underline">Receipt Settings</a>
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Footer Text
+                {!settings?.receiptSettings?.footer && companySettings?.receiptSettings?.footer && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(Company default)</span>
+                )}
               </label>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                {settings?.receiptSettings?.footer || 'Thank you for your visit!'}
+                {settings?.receiptSettings?.footer || companySettings?.receiptSettings?.footer || 'Thank you for your visit!'}
               </div>
+              {!settings?.receiptSettings?.footer && companySettings?.receiptSettings?.footer && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Using company default from <a href="/dashboard/settings?tab=receipt" className="text-blue-600 hover:underline">Receipt Settings</a>
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -470,6 +554,26 @@ export default function POSSettingsPage() {
                 </label>
                 <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
                   {(settings as any).receiptSettings.logoUrl}
+                </div>
+              </div>
+            )}
+            {(settings as any)?.receiptSettings?.wifi && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  WiFi Name
+                </label>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {(settings as any).receiptSettings.wifi}
+                </div>
+              </div>
+            )}
+            {(settings as any)?.receiptSettings?.wifiPassword && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  WiFi Password
+                </label>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {'*'.repeat((settings as any).receiptSettings.wifiPassword.length)}
                 </div>
               </div>
             )}
@@ -837,6 +941,29 @@ export default function POSSettingsPage() {
                 </p>
               )}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              WiFi Name (Optional)
+            </label>
+            <Input
+              value={formData.wifi}
+              onChange={(e) => setFormData({ ...formData, wifi: e.target.value })}
+              placeholder="Enter WiFi network name"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              WiFi Password (Optional)
+            </label>
+            <Input
+              type="password"
+              value={formData.wifiPassword}
+              onChange={(e) => setFormData({ ...formData, wifiPassword: e.target.value })}
+              placeholder="Enter WiFi password"
+            />
           </div>
 
           <div>

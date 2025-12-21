@@ -1068,6 +1068,235 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
+                <ReceiptPercentIcon className="w-5 h-5" />
+                Receipt Settings
+              </CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                These are company-wide receipt settings. They will be used as defaults for all branches unless a branch has its own POS settings configured.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Note:</strong> These settings act as global fallbacks. Branch-specific settings in POS Settings will override these values.
+                </p>
+              </div>
+              <div>
+                <Input
+                  label="Receipt Header"
+                  value={companySettings?.receiptSettings?.header || ''}
+                  onChange={async (e) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId,
+                        data: {
+                          receiptSettings: {
+                            ...companySettings?.receiptSettings,
+                            header: e.target.value,
+                          },
+                        },
+                      }).unwrap();
+                      toast.success('Receipt header updated');
+                    } catch (error: any) {
+                      toast.error(error?.data?.message || 'Failed to update receipt header');
+                    }
+                  }}
+                  disabled={!companyId}
+                  placeholder="Welcome to Our Restaurant"
+                />
+              </div>
+              <div>
+                <Input
+                  label="Receipt Footer"
+                  value={companySettings?.receiptSettings?.footer || ''}
+                  onChange={async (e) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId,
+                        data: {
+                          receiptSettings: {
+                            ...companySettings?.receiptSettings,
+                            footer: e.target.value,
+                          },
+                        },
+                      }).unwrap();
+                      toast.success('Receipt footer updated');
+                    } catch (error: any) {
+                      toast.error(error?.data?.message || 'Failed to update receipt footer');
+                    }
+                  }}
+                  disabled={!companyId}
+                  placeholder="Thank you for your visit!"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Input
+                    label="Font Size"
+                    type="number"
+                    min="8"
+                    max="24"
+                    value={companySettings?.receiptSettings?.fontSize || 12}
+                    onChange={async (e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value) && value >= 8 && value <= 24) {
+                        try {
+                          await updateCompanySettings({
+                            companyId,
+                            data: {
+                              receiptSettings: {
+                                ...companySettings?.receiptSettings,
+                                fontSize: value,
+                              },
+                            },
+                          }).unwrap();
+                          toast.success('Font size updated');
+                        } catch (error: any) {
+                          toast.error(error?.data?.message || 'Failed to update font size');
+                        }
+                      }
+                    }}
+                    disabled={!companyId}
+                  />
+                </div>
+                <div>
+                  <Input
+                    label="Paper Width (mm)"
+                    type="number"
+                    min="50"
+                    max="100"
+                    value={companySettings?.receiptSettings?.paperWidth || 80}
+                    onChange={async (e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value) && value >= 50 && value <= 100) {
+                        try {
+                          await updateCompanySettings({
+                            companyId,
+                            data: {
+                              receiptSettings: {
+                                ...companySettings?.receiptSettings,
+                                paperWidth: value,
+                              },
+                            },
+                          }).unwrap();
+                          toast.success('Paper width updated');
+                        } catch (error: any) {
+                          toast.error(error?.data?.message || 'Failed to update paper width');
+                        }
+                      }
+                    }}
+                    disabled={!companyId}
+                  />
+                </div>
+              </div>
+              <div>
+                <Input
+                  label="WiFi Name (Optional)"
+                  value={companySettings?.receiptSettings?.wifi || ''}
+                  onChange={async (e) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId,
+                        data: {
+                          receiptSettings: {
+                            ...companySettings?.receiptSettings,
+                            wifi: e.target.value,
+                          },
+                        },
+                      }).unwrap();
+                      toast.success('WiFi name updated');
+                    } catch (error: any) {
+                      toast.error(error?.data?.message || 'Failed to update WiFi name');
+                    }
+                  }}
+                  disabled={!companyId}
+                  placeholder="Enter WiFi network name"
+                />
+              </div>
+              <div>
+                <Input
+                  label="WiFi Password (Optional)"
+                  type="password"
+                  value={companySettings?.receiptSettings?.wifiPassword || ''}
+                  onChange={async (e) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId,
+                        data: {
+                          receiptSettings: {
+                            ...companySettings?.receiptSettings,
+                            wifiPassword: e.target.value,
+                          },
+                        },
+                      }).unwrap();
+                      toast.success('WiFi password updated');
+                    } catch (error: any) {
+                      toast.error(error?.data?.message || 'Failed to update WiFi password');
+                    }
+                  }}
+                  disabled={!companyId}
+                  placeholder="Enter WiFi password"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Show Logo on Receipt
+                </label>
+                <input
+                  type="checkbox"
+                  checked={companySettings?.receiptSettings?.showLogo ?? true}
+                  onChange={async (e) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId,
+                        data: {
+                          receiptSettings: {
+                            ...companySettings?.receiptSettings,
+                            showLogo: e.target.checked,
+                          },
+                        },
+                      }).unwrap();
+                      toast.success('Show logo setting updated');
+                    } catch (error: any) {
+                      toast.error(error?.data?.message || 'Failed to update show logo setting');
+                    }
+                  }}
+                  disabled={!companyId}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+              </div>
+              {companySettings?.receiptSettings?.showLogo && (
+                <div>
+                  <Input
+                    label="Logo URL (Optional)"
+                    value={companySettings?.receiptSettings?.logoUrl || ''}
+                    onChange={async (e) => {
+                      try {
+                        await updateCompanySettings({
+                          companyId,
+                          data: {
+                            receiptSettings: {
+                              ...companySettings?.receiptSettings,
+                              logoUrl: e.target.value,
+                            },
+                          },
+                        }).unwrap();
+                        toast.success('Logo URL updated');
+                      } catch (error: any) {
+                        toast.error(error?.data?.message || 'Failed to update logo URL');
+                      }
+                    }}
+                    disabled={!companyId}
+                    placeholder="https://example.com/logo.png"
+                    type="url"
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 <GlobeAltIcon className="w-5 h-5" />
                 General Settings
               </CardTitle>

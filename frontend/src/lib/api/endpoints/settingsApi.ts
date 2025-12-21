@@ -60,6 +60,16 @@ export interface CompanySettings {
     reports: boolean;
     analytics: boolean;
   };
+  receiptSettings?: {
+    header?: string;
+    footer?: string;
+    showLogo?: boolean;
+    logoUrl?: string;
+    fontSize?: number;
+    paperWidth?: number;
+    wifi?: string;
+    wifiPassword?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
