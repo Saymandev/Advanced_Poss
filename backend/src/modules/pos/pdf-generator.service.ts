@@ -223,7 +223,7 @@ export class PDFGeneratorService {
         
         .receipt-header {
             text-align: center;
-            border-bottom: 2px solid #000;
+            border-bottom: 2px dotted #000;
             padding-bottom: 8px;
             margin-bottom: 10px;
         }
@@ -235,15 +235,15 @@ export class PDFGeneratorService {
         }
         
         .receipt-header .logo {
-            max-width: 150px;
-            max-height: 150px;
-            width: 150px;
-            height: 150px;
+            max-width: 100px;
+            max-height: 100px;
+            width: 100px;
+            height: 100px;
             display: block;
             margin: 0 auto 15px auto;
             object-fit: contain;
             border-radius: 50%;
-            border: 2px solid #e5e7eb;
+            border: 2px dotted #e5e7eb;
         }
         
         .order-info {
@@ -263,7 +263,7 @@ export class PDFGeneratorService {
         
         .items-table th {
             text-align: left;
-            border-bottom: 1px solid #000;
+            border-bottom: 1px dotted #000;
             padding: 3px 0;
             font-size: 10px;
             font-weight: bold;
@@ -289,7 +289,7 @@ export class PDFGeneratorService {
         }
         
         .totals {
-            border-top: 2px solid #000;
+            border-top: 2px dotted #000;
             padding-top: 8px;
             margin-top: 10px;
         }
@@ -304,7 +304,7 @@ export class PDFGeneratorService {
         .total-line.final {
             font-weight: bold;
             font-size: 13px;
-            border-top: 1px solid #000;
+            border-top: 1px dotted #000;
             padding-top: 5px;
             margin-top: 5px;
         }
@@ -321,7 +321,7 @@ export class PDFGeneratorService {
             text-align: center;
             margin-top: 20px;
             padding-top: 10px;
-            border-top: 1px solid #000;
+            border-top: 1px dotted #000;
             font-size: 10px;
         }
         
@@ -423,12 +423,6 @@ export class PDFGeneratorService {
         </div>
     ` : ''}
 
-    ${orderData.notes ? `
-        <div class="notes">
-            <strong>Order Notes:</strong> ${orderData.notes}
-        </div>
-    ` : ''}
-
     <div class="receipt-footer">
         <div style="text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px dotted #000;">
             <div style="font-weight: bold; font-size: 10px; text-decoration: underline; margin-bottom: 10px;">GUEST BILL</div>
@@ -437,13 +431,15 @@ export class PDFGeneratorService {
                     <div style="font-size: 9px; margin-bottom: 8px; color: #111827;">
                         Please rate our service of this order.
                     </div>
+                    ${orderData.publicUrl ? `
                     <div style="font-size: 8px; color: #333; word-break: break-all;">
-                        ${orderData.orderReviewUrl}
+                        ${orderData.publicUrl}
                     </div>
+                    ` : ''}
                 </div>
             ` : ''}
             <div style="font-size: 10px; margin-top: 10px; margin-bottom: 8px;">
-                Thank you. Come again.
+                ${receiptSettings?.footer || 'Thank you. Come again.'}
             </div>
             <div style="font-size: 8px; color: #666; margin-top: 10px;">
                 Powered By: <a href="https://infotigo.com/" style="color: #666; text-decoration: none;">https://infotigo.com/</a>

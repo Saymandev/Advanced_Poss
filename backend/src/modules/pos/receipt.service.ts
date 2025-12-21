@@ -521,21 +521,21 @@ export class ReceiptService {
         }
         .header {
             text-align: center;
-            border-bottom: 2px solid #000;
+            border-bottom: 2px dotted #000;
             padding-bottom: 10px;
             margin-bottom: 20px;
             color: #111827;
         }
         .header .logo {
-            max-width: 150px;
-            max-height: 150px;
-            width: 150px;
-            height: 150px;
+            max-width: 100px;
+            max-height: 100px;
+            width: 100px;
+            height: 100px;
             display: block;
             margin: 0 auto 15px auto;
             object-fit: contain;
             border-radius: 50%;
-            border: 2px solid #e5e7eb;
+            border: 2px dotted #e5e7eb;
         }
         .header h1 {
             margin: 0;
@@ -573,7 +573,7 @@ export class ReceiptService {
             color: #111827;
         }
         .totals {
-            border-top: 2px solid #000;
+            border-top: 2px dotted #000;
             padding-top: 10px;
             margin-top: 20px;
             color: #111827;
@@ -587,7 +587,7 @@ export class ReceiptService {
         .total-line.final {
             font-weight: bold;
             font-size: 16px;
-            border-top: 1px solid #000;
+            border-top: 1px dotted #000;
             padding-top: 10px;
             margin-top: 10px;
             color: #0f172a;
@@ -596,7 +596,7 @@ export class ReceiptService {
             text-align: center;
             margin-top: 30px;
             padding-top: 20px;
-            border-top: 1px solid #000;
+            border-top: 1px dotted #000;
             color: #111827;
         }
         .payment-info {
@@ -686,11 +686,6 @@ export class ReceiptService {
             ${receiptData.paymentDetails?.referenceNumber ? `<div><strong>Reference:</strong> ${receiptData.paymentDetails.referenceNumber}</div>` : ''}
         </div>
     ` : ''}
-    ${receiptData.notes ? `
-        <div class="notes">
-            <strong>Order Notes:</strong> ${receiptData.notes}
-        </div>
-    ` : ''}
     <div class="footer">
         <div style="text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px dotted #000;">
             <div style="font-weight: bold; font-size: 11px; text-decoration: underline; margin-bottom: 10px;">GUEST BILL</div>
@@ -702,13 +697,15 @@ export class ReceiptService {
                     <div style="display: flex; justify-content: center; margin-bottom: 8px;">
                         <img src="${qrCodeImageData}" alt="Order Review QR Code" style="width: 120px; height: 120px;" />
                     </div>
+                    ${receiptData.publicUrl ? `
                     <div style="font-size: 9px; color: #333; word-break: break-all;">
-                        ${receiptData.orderReviewUrl}
+                        ${receiptData.publicUrl}
                     </div>
+                    ` : ''}
                 </div>
             ` : ''}
             <div style="font-size: 11px; margin-top: 10px; margin-bottom: 8px;">
-                Thank you. Come again.
+                ${receiptData.receiptSettings.footer || 'Thank you. Come again.'}
             </div>
             <div style="font-size: 9px; color: #666; margin-top: 10px;">
                 Powered By: <a href="https://infotigo.com/" style="color: #666; text-decoration: none;">https://infotigo.com/</a>
