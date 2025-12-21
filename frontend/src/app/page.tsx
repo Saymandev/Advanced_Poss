@@ -11,7 +11,8 @@ import {
   BoltIcon,
   ChartBarIcon,
   CheckCircleIcon,
-  ChevronLeftIcon, ChevronRightIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CloudArrowUpIcon,
   CreditCardIcon,
   DevicePhoneMobileIcon,
@@ -507,7 +508,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="relative pt-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 overflow-hidden">
+      <section id="pricing" className="relative pt-24 pb-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900">
         {/* Background decoration */}
         <div className="absolute inset-0">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary-200 dark:bg-primary-900/30 rounded-full filter blur-3xl opacity-20"></div>
@@ -543,28 +544,28 @@ export default function LandingPage() {
               </p>
             </div>
           ) : (
-            <div className={`grid grid-cols-1 ${activePlans.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-6 max-w-5xl mx-auto`}>
+            <div className={`grid grid-cols-1 ${activePlans.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'} ${activePlans.length >= 2 ? 'lg:grid-cols-3' : ''} gap-6 max-w-7xl mx-auto items-start`}>
               {activePlans.map((plan: any, index: number) => {
                 const isPopular = plan.isPopular || index === 1;
                 
-                // Use admin-managed featureList from backend (fully dynamic - no hardcoding)
-                // Super admin can manage this via subscription plan management
-                const featureList: string[] = plan.featureList && plan.featureList.length > 0 
-                  ? plan.featureList 
-                  : []; // Empty array if no features configured (super admin should configure via backend)
+                // Use featureNames from backend (mapped from enabledFeatureKeys selected in super admin)
+                // This shows the actual feature names like "Dashboard", "Reports", "Staff Management"
+                const featureList: string[] = plan.featureNames && plan.featureNames.length > 0
+                  ? plan.featureNames
+                  : (plan.featureList && plan.featureList.length > 0 ? plan.featureList : []);
                 
                 return (
                   <div
                     key={plan.id}
-                    className={`relative rounded-3xl shadow-2xl p-10 transition-all duration-500 border-2 ${
+                    className={`relative rounded-3xl shadow-2xl p-6 sm:p-8 lg:p-10 transition-all duration-300 border-2 ${
                       isPopular
-                        ? 'border-primary-400 bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900 scale-105 hover:scale-110'
-                        : 'border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl hover:shadow-2xl hover:-translate-y-2 hover:border-primary-300 dark:hover:border-primary-700'
-                    } overflow-hidden group`}
+                        ? 'border-primary-400 bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900 scale-105'
+                        : 'border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-700'
+                    } group flex flex-col min-h-0`}
                   >
                     {/* Background gradient for popular plan */}
                     {isPopular && (
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary-900/20 via-secondary-900/20 to-primary-900/20 opacity-50"></div>
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary-900/20 via-secondary-900/20 to-primary-900/20 opacity-50 pointer-events-none rounded-3xl"></div>
                     )}
                     
                     {/* Popular badge */}
@@ -630,35 +631,215 @@ export default function LandingPage() {
 
                     
 
-                    <div className="space-y-3">
-                      {featureList.map((feature, idx) => (
-                        <div key={idx} className="flex items-start gap-2">
-                          <CheckCircleIcon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                            isPopular ? 'text-white' : 'text-green-500'
-                          }`} />
-                          <span className={`text-sm ${isPopular ? 'text-gray-200' : 'text-gray-600 dark:text-gray-300'}`}>
-                            {feature}
-                          </span>
+                    <div className="space-y-3 mb-4 relative z-10">
+                      {featureList.length > 0 ? (
+                        <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                          {featureList.map((feature, idx) => (
+                            <div key={idx} className="flex items-start gap-2">
+                              <CheckCircleIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                                isPopular ? 'text-white' : 'text-green-500'
+                              }`} />
+                              <span className={`text-sm ${isPopular ? 'text-gray-200' : 'text-gray-600 dark:text-gray-300'}`}>
+                                {feature}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className={`text-sm italic ${isPopular ? 'text-gray-300' : 'text-gray-500 dark:text-gray-400'}`}>
+                          No features configured
+                        </div>
+                      )}
                     </div>
-                    <div className='space-y-1'>
-                    <Link href="/auth/register" >
-                      <button
-                        className={`w-full py-3 rounded-lg font-semibold my-6 transition-all ${
-                          isPopular
-                            ? 'bg-red-600 text-white hover:bg-red-700'
-                            : 'bg-white text-gray-900 hover:bg-gray-100 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        Get Started
-                      </button>
-                    </Link>
+
+                    {/* Plan Limits */}
+                    {plan.limits && (
+                      <div className={`relative z-10 space-y-3 pt-4 mt-2 border-t ${isPopular ? 'border-gray-700' : 'border-gray-200 dark:border-gray-700'} mb-8`}>
+                        <h4 className={`font-semibold text-sm mb-3 ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                          Plan Limits
+                        </h4>
+                        
+                        {/* Resource Limits */}
+                        <div className="space-y-2">
+                          {plan.limits.maxTables !== undefined && (
+                            <div className="flex justify-between text-xs">
+                              <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Max Tables:</span>
+                              <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                {plan.limits.maxTables === -1 ? 'Unlimited' : plan.limits.maxTables}
+                              </span>
+                            </div>
+                          )}
+                          {plan.limits.maxBranches !== undefined && (
+                            <div className="flex justify-between text-xs">
+                              <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Max Branches:</span>
+                              <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                {plan.limits.maxBranches === -1 ? 'Unlimited' : plan.limits.maxBranches}
+                              </span>
+                            </div>
+                          )}
+                          {plan.limits.maxMenuItems !== undefined && (
+                            <div className="flex justify-between text-xs">
+                              <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Max Menu Items:</span>
+                              <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                {plan.limits.maxMenuItems === -1 ? 'Unlimited' : plan.limits.maxMenuItems}
+                              </span>
+                            </div>
+                          )}
+                          {plan.limits.maxUsers !== undefined && (
+                            <div className="flex justify-between text-xs">
+                              <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Max Users:</span>
+                              <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                {plan.limits.maxUsers === -1 ? 'Unlimited' : plan.limits.maxUsers}
+                              </span>
+                            </div>
+                          )}
+                          {plan.limits.maxCustomers !== undefined && (
+                            <div className="flex justify-between text-xs">
+                              <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Max Customers:</span>
+                              <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                {plan.limits.maxCustomers === -1 ? 'Unlimited' : plan.limits.maxCustomers}
+                              </span>
+                            </div>
+                          )}
+                          {plan.limits.storageGB !== undefined && (
+                            <div className="flex justify-between text-xs">
+                              <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Storage:</span>
+                              <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                {plan.limits.storageGB === -1 || plan.limits.storageGB === 0 ? 'Unlimited' : `${plan.limits.storageGB} GB`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Public Ordering Limits */}
+                        {(plan.limits.publicOrderingEnabled !== undefined || plan.limits.maxPublicBranches !== undefined) && (
+                          <div className="space-y-2 pt-2 border-t border-gray-600/30 dark:border-gray-600/30">
+                            <h5 className={`font-medium text-xs mb-1 ${isPopular ? 'text-gray-300' : 'text-gray-700 dark:text-gray-400'}`}>
+                              Public Ordering Limits
+                            </h5>
+                            {plan.limits.publicOrderingEnabled !== undefined && (
+                              <div className="flex justify-between text-xs">
+                                <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Enable Public Ordering:</span>
+                                <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                  {plan.limits.publicOrderingEnabled ? 'Yes' : 'No'}
+                                </span>
+                              </div>
+                            )}
+                            {plan.limits.maxPublicBranches !== undefined && (
+                              <div className="flex justify-between text-xs">
+                                <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Max Public Branches:</span>
+                                <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                  {plan.limits.maxPublicBranches === -1 ? 'Unlimited' : plan.limits.maxPublicBranches}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Review System Limits */}
+                        {(plan.limits.reviewsEnabled !== undefined || plan.limits.reviewModerationRequired !== undefined || plan.limits.maxReviewsPerMonth !== undefined) && (
+                          <div className="space-y-2 pt-2 border-t border-gray-600/30 dark:border-gray-600/30">
+                            <h5 className={`font-medium text-xs mb-1 ${isPopular ? 'text-gray-300' : 'text-gray-700 dark:text-gray-400'}`}>
+                              Review System Limits
+                            </h5>
+                            {plan.limits.reviewsEnabled !== undefined && (
+                              <div className="flex justify-between text-xs">
+                                <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Enable Reviews:</span>
+                                <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                  {plan.limits.reviewsEnabled ? 'Yes' : 'No'}
+                                </span>
+                              </div>
+                            )}
+                            {plan.limits.reviewModerationRequired !== undefined && (
+                              <div className="flex justify-between text-xs">
+                                <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Review Moderation:</span>
+                                <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                  {plan.limits.reviewModerationRequired ? 'Required' : 'Not Required'}
+                                </span>
+                              </div>
+                            )}
+                            {plan.limits.maxReviewsPerMonth !== undefined && (
+                              <div className="flex justify-between text-xs">
+                                <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Max Reviews Per Month:</span>
+                                <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                  {plan.limits.maxReviewsPerMonth === -1 ? 'Unlimited' : plan.limits.maxReviewsPerMonth}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Additional Features */}
+                        {(plan.limits.customDomainEnabled !== undefined || plan.limits.whitelabelEnabled !== undefined || plan.limits.prioritySupportEnabled !== undefined) && (
+                          <div className="space-y-2 pt-2 border-t border-gray-600/30 dark:border-gray-600/30">
+                            {plan.limits.customDomainEnabled !== undefined && (
+                              <div className="flex justify-between text-xs">
+                                <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Custom Domain Enabled:</span>
+                                <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                  {plan.limits.customDomainEnabled ? 'Yes' : 'No'}
+                                </span>
+                              </div>
+                            )}
+                            {plan.limits.whitelabelEnabled !== undefined && (
+                              <div className="flex justify-between text-xs">
+                                <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Whitelabel Enabled:</span>
+                                <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                  {plan.limits.whitelabelEnabled ? 'Yes' : 'No'}
+                                </span>
+                              </div>
+                            )}
+                            {plan.limits.prioritySupportEnabled !== undefined && (
+                              <div className="flex justify-between text-xs">
+                                <span className={isPopular ? 'text-gray-300' : 'text-gray-600 dark:text-gray-400'}>Priority Support:</span>
+                                <span className={`font-medium ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                  {plan.limits.prioritySupportEnabled ? 'Yes' : 'No'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className='mt-auto pt-6 pb-2 relative z-10'>
+                      <Link href="/auth/register" >
+                        <button
+                          className={`w-full py-3 rounded-lg font-semibold transition-all relative z-10 ${
+                            isPopular
+                              ? 'bg-red-600 text-white hover:bg-red-700'
+                              : 'bg-white text-gray-900 hover:bg-gray-100 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          Get Started
+                        </button>
+                      </Link>
                     </div>
                    
                   </div>
                 );
               })}
+              
+              {/* Custom Plan Card */}
+              <div className="relative rounded-3xl shadow-2xl p-6 sm:p-8 lg:p-10 transition-all duration-500 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 backdrop-blur-xl hover:shadow-2xl hover:-translate-y-2 hover:border-primary-300 dark:hover:border-primary-700 group flex flex-col items-center justify-center min-h-[500px]">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl mb-6">
+                    <SparklesIcon className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+                    Custom Plan
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-sm">
+                    Need a tailored solution? Let's create a custom plan that fits your unique business requirements.
+                  </p>
+                  <Link href="/contact">
+                    <button
+                      className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold transition-all bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+                    >
+                      Contact Us
+                    </button>
+                  </Link>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -126,17 +126,23 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
           }
           return plans.map((plan) => ({
             ...plan,
+            // Preserve featureNames from backend (mapped from enabledFeatureKeys)
+            // Only create featureList fallback if featureNames is not available
             featureList:
-              plan.featureList && plan.featureList.length > 0
-                ? plan.featureList
-                : [
-                    plan.features?.pos ? 'POS & Ordering' : null,
-                    plan.features?.inventory ? 'Inventory Management' : null,
-                    plan.features?.crm ? 'Customer CRM' : null,
-                    plan.features?.multiBranch ? 'Multi-branch Support' : null,
-                    plan.features?.aiInsights ? 'AI Insights' : null,
-                    plan.features?.accounting ? 'Accounting & Reports' : null,
-                  ].filter(Boolean) as string[],
+              plan.featureNames && plan.featureNames.length > 0
+                ? plan.featureNames // Use featureNames if available (from enabledFeatureKeys)
+                : (plan.featureList && plan.featureList.length > 0
+                  ? plan.featureList
+                  : [
+                      plan.features?.pos ? 'POS & Ordering' : null,
+                      plan.features?.inventory ? 'Inventory Management' : null,
+                      plan.features?.crm ? 'Customer CRM' : null,
+                      plan.features?.multiBranch ? 'Multi-branch Support' : null,
+                      plan.features?.aiInsights ? 'AI Insights' : null,
+                      plan.features?.accounting ? 'Accounting & Reports' : null,
+                    ].filter(Boolean) as string[]),
+            // Also preserve featureNames if it exists
+            featureNames: plan.featureNames || undefined,
           }));
         };
         // Handle { success: true, data: [...] } format (from backend interceptor)

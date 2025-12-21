@@ -2462,14 +2462,19 @@ export default function SubscriptionsPage() {
               key={plan.id}
                       className={`hover:shadow-lg transition-all ${
                 plan.isPopular ? 'border-2 border-primary-500' : ''
-              } ${effectiveSubscription?.plan?.id === plan.id ? 'ring-2 ring-green-500' : ''}`}
+              } ${effectiveSubscription?.planKey === plan.name ? 'ring-2 ring-green-500' : ''}`}
             >
               {plan.isPopular && (
                 <div className="bg-primary-500 text-white text-center py-2 rounded-t-lg">
                   <span className="text-sm font-semibold">Most Popular</span>
                 </div>
               )}
-              {effectiveSubscription?.plan?.id === plan.id && (
+              {(() => {
+                // Use planKey (from companyData.subscriptionPlan) as the single source of truth
+                const currentPlanKey = effectiveSubscription?.planKey;
+                // Only match if planKey exactly matches plan.name (case-sensitive exact match)
+                return currentPlanKey && currentPlanKey === plan.name;
+              })() && (
                 <div className="bg-green-500 text-white text-center py-2 rounded-t-lg">
                   <span className="text-sm font-semibold flex items-center justify-center gap-2">
                     <CheckCircleIcon className="w-4 h-4" />
@@ -2583,7 +2588,7 @@ export default function SubscriptionsPage() {
                     {plan.price > (effectiveSubscription?.plan?.price || 0) ? 'Upgrade' : plan.price < (effectiveSubscription?.plan?.price || 0) ? 'Downgrade' : 'Switch'} to {plan.displayName || plan.name}
                   </Button>
                 )}
-                {effectiveSubscription?.plan?.id === plan.id && (
+                {effectiveSubscription?.planKey === plan.name && (
                   <div className="w-full text-center py-2 px-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg font-medium">
                     Current Plan
                   </div>
@@ -2614,7 +2619,7 @@ export default function SubscriptionsPage() {
                       <th
                         key={plan.id}
                         className={`text-center py-4 px-4 text-sm font-semibold ${
-                          effectiveSubscription?.plan?.id === plan.id
+                          effectiveSubscription?.planKey === plan.name
                             ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
                             : 'text-gray-700 dark:text-gray-300'
                         }`}
@@ -2649,78 +2654,50 @@ export default function SubscriptionsPage() {
                       Core Features
                     </td>
                   </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">POS & Ordering</td>
-                    {plans.map((plan: any) => (
-                      <td key={plan.id} className="text-center py-3 px-4">
-                        {plan.features?.pos ? (
-                          <CheckCircleIcon className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <XCircleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Inventory Management</td>
-                    {plans.map((plan: any) => (
-                      <td key={plan.id} className="text-center py-3 px-4">
-                        {plan.features?.inventory ? (
-                          <CheckCircleIcon className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <XCircleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Customer CRM</td>
-                    {plans.map((plan: any) => (
-                      <td key={plan.id} className="text-center py-3 px-4">
-                        {plan.features?.crm ? (
-                          <CheckCircleIcon className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <XCircleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Accounting & Reports</td>
-                    {plans.map((plan: any) => (
-                      <td key={plan.id} className="text-center py-3 px-4">
-                        {plan.features?.accounting ? (
-                          <CheckCircleIcon className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <XCircleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">AI Insights</td>
-                    {plans.map((plan: any) => (
-                      <td key={plan.id} className="text-center py-3 px-4">
-                        {plan.features?.aiInsights ? (
-                          <CheckCircleIcon className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <XCircleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Multi-Branch Support</td>
-                    {plans.map((plan: any) => (
-                      <td key={plan.id} className="text-center py-3 px-4">
-                        {plan.features?.multiBranch ? (
-                          <CheckCircleIcon className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <XCircleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
-                        )}
-                      </td>
-                    ))}
-                  </tr>
+                  {/* Helper function to check if feature is enabled */}
+                  {(() => {
+                    const checkFeature = (plan: any, featureKey: string, legacyKey?: string) => {
+                      // Check enabledFeatureKeys first (new system)
+                      if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys)) {
+                        return plan.enabledFeatureKeys.includes(featureKey);
+                      }
+                      // Fallback to legacy features object
+                      if (legacyKey && plan.features?.[legacyKey] !== undefined) {
+                        return plan.features[legacyKey];
+                      }
+                      return false;
+                    };
+
+                    const featureRows = [
+                      { label: 'POS & Ordering', key: 'order-management', legacy: 'pos' },
+                      { label: 'Inventory Management', key: 'inventory', legacy: 'inventory' },
+                      { label: 'Customer CRM', key: 'customer-management', legacy: 'crm' },
+                      { label: 'Accounting & Reports', key: 'reports', legacy: 'accounting' },
+                      { label: 'AI Insights', key: 'ai-insights', legacy: 'aiInsights' },
+                      { label: 'Multi-Branch Support', key: 'multi-branch', legacy: 'multiBranch' },
+                      { label: 'Dashboard', key: 'dashboard', legacy: undefined },
+                      { label: 'Menu Management', key: 'menu-management', legacy: undefined },
+                      { label: 'Staff Management', key: 'staff-management', legacy: undefined },
+                      { label: 'Role Management', key: 'role-management', legacy: undefined },
+                      { label: 'Attendance', key: 'attendance', legacy: undefined },
+                      { label: 'QR Menus', key: 'qr-menus', legacy: undefined },
+                    ];
+
+                    return featureRows.map((feature) => (
+                      <tr key={feature.key} className="border-b border-gray-100 dark:border-gray-800">
+                        <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">{feature.label}</td>
+                        {plans.map((plan: any) => (
+                          <td key={plan.id} className="text-center py-3 px-4">
+                            {checkFeature(plan, feature.key, feature.legacy) ? (
+                              <CheckCircleIcon className="w-5 h-5 text-green-500 mx-auto" />
+                            ) : (
+                              <XCircleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 mx-auto" />
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ));
+                  })()}
                   {/* Limits Section */}
                   <tr className="border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <td colSpan={plans.length + 1} className="py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -2749,34 +2726,41 @@ export default function SubscriptionsPage() {
                       );
                     })}
                   </tr>
-                  {plans.some((p: any) => p.limits?.storageGB) && (
-                    <tr className="border-b border-gray-100 dark:border-gray-800">
-                      <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Storage</td>
-                      {plans.map((plan: any) => (
+                  <tr className="border-b border-gray-100 dark:border-gray-800">
+                    <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Storage</td>
+                    {plans.map((plan: any) => {
+                      const storageGB = plan.limits?.storageGB;
+                      return (
                         <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
-                          {plan.limits?.storageGB ? `${plan.limits.storageGB} GB` : 'Unlimited'}
+                          {storageGB === -1 || storageGB === 0 || storageGB === undefined ? 'Unlimited' : `${storageGB} GB`}
                         </td>
-                      ))}
-                    </tr>
-                  )}
-                  {plans.some((p: any) => p.limits?.maxTables) && (
+                      );
+                    })}
+                  </tr>
+                  {plans.some((p: any) => p.limits?.maxTables !== undefined) && (
                     <tr className="border-b border-gray-100 dark:border-gray-800">
                       <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Tables</td>
-                      {plans.map((plan: any) => (
-                        <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
-                          {plan.limits?.maxTables || 'Unlimited'}
-                        </td>
-                      ))}
+                      {plans.map((plan: any) => {
+                        const maxTables = plan.limits?.maxTables;
+                        return (
+                          <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
+                            {maxTables === -1 || maxTables === undefined ? 'Unlimited' : maxTables}
+                          </td>
+                        );
+                      })}
                     </tr>
                   )}
-                  {plans.some((p: any) => p.limits?.maxMenuItems) && (
+                  {plans.some((p: any) => p.limits?.maxMenuItems !== undefined) && (
                     <tr className="border-b border-gray-100 dark:border-gray-800">
                       <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Menu Items</td>
-                      {plans.map((plan: any) => (
-                        <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
-                          {plan.limits?.maxMenuItems || 'Unlimited'}
-                        </td>
-                      ))}
+                      {plans.map((plan: any) => {
+                        const maxMenuItems = plan.limits?.maxMenuItems;
+                        return (
+                          <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
+                            {maxMenuItems === -1 || maxMenuItems === undefined ? 'Unlimited' : maxMenuItems}
+                          </td>
+                        );
+                      })}
                     </tr>
                   )}
                 </tbody>

@@ -10,7 +10,6 @@ import { setCredentials } from '@/lib/slices/authSlice';
 import { useAppDispatch } from '@/lib/store';
 import {
   BuildingStorefrontIcon,
-  CheckCircleIcon,
   EnvelopeIcon,
   HomeIcon,
   MapPinIcon,
@@ -501,31 +500,6 @@ export default function RegisterPage() {
                         const isPopular = plan.isPopular || index === 1;
                         const isSelected = formData.subscriptionPackage === plan.name;
                         
-                        // Use admin-managed featureList if available
-                        const featureList: string[] = plan.featureList && plan.featureList.length > 0 
-                          ? plan.featureList 
-                          : [];
-                        
-                        // Fallback: Generate from plan.features if no featureList exists
-                        if (featureList.length === 0) {
-                          if (plan.features?.pos) featureList.push('Unlimited orders & access accounts');
-                          if (plan.features?.accounting) featureList.push('Realtime restaurant sales status');
-                          if (plan.features?.inventory) featureList.push('Stock, Inventory & Accounting');
-                          if (plan.features?.crm) featureList.push('Customer Loyalty & Discount');
-                          featureList.push('Daily SMS & Email sales report');
-                          if (plan.features?.multiBranch) featureList.push('Kitchen & Customer Display System');
-                          featureList.push('Mobile, Tablet and any OS friendly');
-                          featureList.push('Cloud data backup & security');
-                          if (plan.features?.aiInsights) featureList.push('AI Insight and analytics');
-                          if (index === 1 && plan.features?.multiBranch) {
-                            featureList.push('Online Ordering');
-                            featureList.push('Table Touch QR Ordering');
-                            featureList.push('Customer Feedback System');
-                            featureList.push('Target SMS marketing');
-                            featureList.push('Priority 24/7 Call & Agent Support');
-                          }
-                        }
-                        
                         return (
                           <div
                             key={plan.id}
@@ -546,14 +520,14 @@ export default function RegisterPage() {
                               </div>
                             )}
                             
-                            <div className="mb-4">
+                            <div className="mb-6">
                               <h3 className={`text-2xl font-bold mb-2 ${isPopular ? 'text-white' : 'text-gray-200'}`}>
                                 {(plan.displayName || plan.name).toUpperCase()}
                               </h3>
                               
                               {/* Feature count badge if using enabledFeatureKeys */}
                               {plan.enabledFeatureKeys && plan.enabledFeatureKeys.length > 0 && (
-                                <div className="mb-2">
+                                <div className="mb-4">
                                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                     isPopular 
                                       ? 'bg-white/20 text-white' 
@@ -570,13 +544,12 @@ export default function RegisterPage() {
                                     <span>Free</span>
                                   ) : (
                                     <>
-                                      {plan.currency} {plan.price.toLocaleString()}
-                                      {plan.price > 0 && <span className="text-lg">/{plan.billingCycle}</span>}
+                                      {plan.currency} {plan.price.toLocaleString()}/{plan.billingCycle}
                                     </>
                                   )}
                                 </div>
                                 {plan.trialPeriod && plan.trialPeriod > 0 && (
-                                  <div className={`text-sm font-semibold ${
+                                  <div className={`text-sm font-semibold mt-2 ${
                                     isPopular ? 'text-yellow-300' : 'text-primary-400'
                                   }`}>
                                     {plan.trialPeriod === 168 
@@ -586,7 +559,7 @@ export default function RegisterPage() {
                                 )}
                                 {plan.price > 0 && (
                                   <>
-                                    <div className="text-xs text-gray-400">
+                                    <div className="text-xs text-gray-400 mt-2">
                                       *Per Branch
                                     </div>
                                     <div className="text-xs text-gray-400">
@@ -603,7 +576,7 @@ export default function RegisterPage() {
                                 e.stopPropagation();
                                 setFormData({ ...formData, subscriptionPackage: plan.name });
                               }}
-                              className={`w-full py-3 rounded-lg font-semibold mb-4 transition-all ${
+                              className={`w-full py-3 rounded-lg font-semibold transition-all ${
                                 isSelected
                                   ? 'bg-primary-600 text-white'
                                   : isPopular
@@ -611,21 +584,8 @@ export default function RegisterPage() {
                                   : 'bg-white text-gray-900 hover:bg-gray-100'
                               }`}
                             >
-                              Get Started
+                              {isSelected ? 'Selected' : 'Select Plan'}
                             </button>
-
-                            <div className="space-y-2">
-                              {featureList.map((feature, idx) => (
-                                <div key={idx} className="flex items-start gap-2">
-                                  <CheckCircleIcon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                                    isPopular ? 'text-white' : 'text-gray-400'
-                                  }`} />
-                                  <span className={`text-sm ${isPopular ? 'text-gray-200' : 'text-gray-400'}`}>
-                                    {feature}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
                           </div>
                         );
                       })}
