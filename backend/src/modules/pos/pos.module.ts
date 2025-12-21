@@ -11,7 +11,9 @@ import { IngredientsModule } from '../ingredients/ingredients.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
+import { ServiceChargeSetting, ServiceChargeSettingSchema } from '../settings/schemas/service-charge-setting.schema';
 import { SystemSettings, SystemSettingsSchema } from '../settings/schemas/system-settings.schema';
+import { TaxSetting, TaxSettingSchema } from '../settings/schemas/tax-setting.schema';
 import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schemas/subscription-plan.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
@@ -44,6 +46,8 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: SystemSettings.name, schema: SystemSettingsSchema },
       { name: Table.name, schema: TableSchema },
+      { name: TaxSetting.name, schema: TaxSettingSchema },
+      { name: ServiceChargeSetting.name, schema: ServiceChargeSettingSchema },
     ]),
     MenuItemsModule,
     IngredientsModule,
