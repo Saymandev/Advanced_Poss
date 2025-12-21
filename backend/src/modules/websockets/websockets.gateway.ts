@@ -231,30 +231,77 @@ export class WebsocketsGateway
     payload: any;
   }) {
     const { companyId, branchId, roles = [], features = [], userIds = [], payload } = params;
+    
+    // Check if server and sockets are available
+    if (!this.server || !this.server.sockets || !this.server.sockets.sockets) {
+      this.logger.warn('⚠️ WebSocket server or sockets not available for emitScopedNotification');
+      return;
+    }
+
     const roleSet = new Set((roles || []).map((r) => r.toLowerCase()));
     const featureSet = new Set((features || []).map((f) => f.toLowerCase()));
     const userIdSet = new Set(userIds || []);
-    this.server.sockets.sockets.forEach((socket) => {
-      const sockUser = this.socketToUser.get(socket.id);
-      const sockBranch = this.socketToBranch.get(socket.id);
-      const sockCompany = this.socketToCompany.get(socket.id);
-      const sockRole = this.socketToRole.get(socket.id);
-      const sockFeatures = this.socketToFeatures.get(socket.id);
-      // Company / branch scoping
-      if (companyId && sockCompany !== companyId) return;
-      if (branchId && sockBranch !== branchId) return;
-      // Role scoping
-      if (roleSet.size > 0 && (!sockRole || !roleSet.has(sockRole))) return;
-      // User targeting
-      if (userIdSet.size > 0 && (!sockUser || !userIdSet.has(sockUser))) return;
-      // Feature scoping
-      if (featureSet.size > 0) {
-        if (!sockFeatures) return;
-        const hasFeature = [...featureSet].some((f) => sockFeatures.has(f));
-        if (!hasFeature) return;
+    
+    // Handle both Map and object/dictionary formats
+    const sockets = this.server.sockets.sockets;
+    let notificationCount = 0;
+    
+    // Iterate over sockets - handle both Map and object formats
+    if (sockets instanceof Map) {
+      for (const socket of sockets.values()) {
+        const sockUser = this.socketToUser.get(socket.id);
+        const sockBranch = this.socketToBranch.get(socket.id);
+        const sockCompany = this.socketToCompany.get(socket.id);
+        const sockRole = this.socketToRole.get(socket.id);
+        const sockFeatures = this.socketToFeatures.get(socket.id);
+        // Company / branch scoping
+        if (companyId && sockCompany !== companyId) continue;
+        if (branchId && sockBranch !== branchId) continue;
+        // Role scoping
+        if (roleSet.size > 0 && (!sockRole || !roleSet.has(sockRole))) continue;
+        // User targeting
+        if (userIdSet.size > 0 && (!sockUser || !userIdSet.has(sockUser))) continue;
+        // Feature scoping
+        if (featureSet.size > 0) {
+          if (!sockFeatures) continue;
+          const hasFeature = [...featureSet].some((f) => sockFeatures.has(f));
+          if (!hasFeature) continue;
+        }
+        socket.emit('notification', payload);
+        notificationCount++;
       }
-      socket.emit('notification', payload);
-    });
+    } else {
+      // Handle object/dictionary format
+      const socketValues = Object.values(sockets) as Socket[];
+      for (const socket of socketValues) {
+        const sockUser = this.socketToUser.get(socket.id);
+        const sockBranch = this.socketToBranch.get(socket.id);
+        const sockCompany = this.socketToCompany.get(socket.id);
+        const sockRole = this.socketToRole.get(socket.id);
+        const sockFeatures = this.socketToFeatures.get(socket.id);
+        // Company / branch scoping
+        if (companyId && sockCompany !== companyId) continue;
+        if (branchId && sockBranch !== branchId) continue;
+        // Role scoping
+        if (roleSet.size > 0 && (!sockRole || !roleSet.has(sockRole))) continue;
+        // User targeting
+        if (userIdSet.size > 0 && (!sockUser || !userIdSet.has(sockUser))) continue;
+        // Feature scoping
+        if (featureSet.size > 0) {
+          if (!sockFeatures) continue;
+          const hasFeature = [...featureSet].some((f) => sockFeatures.has(f));
+          if (!hasFeature) continue;
+        }
+        socket.emit('notification', payload);
+        notificationCount++;
+      }
+    }
+    
+    if (notificationCount > 0) {
+      this.logger.log(`✅ Sent notification to ${notificationCount} client(s)`);
+    } else {
+      this.logger.warn(`⚠️ No clients matched the notification criteria (companyId: ${companyId}, roles: ${roles.join(', ')})`);
+    }
   }
   @SubscribeMessage('join-table')
   handleJoinTable(

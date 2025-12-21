@@ -10,7 +10,10 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateSubscriptionPaymentMethodDto } from './dto/create-subscription-payment-method.dto';
 import { CreateSubscriptionPaymentDto } from './dto/create-subscription-payment.dto';
 import { ManualActivationDto } from './dto/manual-activation.dto';
+import { SubmitPaymentRequestDto } from './dto/submit-payment-request.dto';
 import { UpdateSubscriptionPaymentMethodDto } from './dto/update-subscription-payment-method.dto';
+import { VerifyPaymentRequestDto } from './dto/verify-payment-request.dto';
+import { PaymentRequestStatus } from './schemas/subscription-payment-request.schema';
 import { SubscriptionPaymentsService } from './subscription-payments.service';
 
 @ApiTags('Subscription Payments')
@@ -147,6 +150,50 @@ export class SubscriptionPaymentsController {
   @ApiResponse({ status: 200, description: 'Callback processed' })
   async handleNagadCallback(@Body() body: any, @Query() query: any) {
     return this.paymentsService.handleNagadCallback(body, query);
+  }
+
+  // ========== Payment Requests (Manual Payment Methods) ==========
+
+  @Post('requests')
+  @ApiOperation({ summary: 'Submit payment request for manual payment methods' })
+  @ApiResponse({ status: 201, description: 'Payment request submitted successfully' })
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  async submitPaymentRequest(@Body() dto: SubmitPaymentRequestDto) {
+    return this.paymentsService.submitPaymentRequest(dto);
+  }
+
+  @Get('requests')
+  @ApiOperation({ summary: 'Get payment requests (Super Admin only)' })
+  @ApiResponse({ status: 200, description: 'List of payment requests' })
+  @Roles(UserRole.SUPER_ADMIN)
+  async getPaymentRequests(
+    @Query('status') status?: PaymentRequestStatus,
+    @Query('companyId') companyId?: string,
+  ) {
+    return this.paymentsService.getPaymentRequests(status, companyId);
+  }
+
+  @Get('requests/:id')
+  @ApiOperation({ summary: 'Get payment request by ID' })
+  @ApiResponse({ status: 200, description: 'Payment request details' })
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
+  async getPaymentRequestById(@Param('id') id: string) {
+    return this.paymentsService.getPaymentRequestById(id);
+  }
+
+  @Post('requests/:id/verify')
+  @ApiOperation({ summary: 'Verify payment request (Super Admin only)' })
+  @ApiResponse({ status: 200, description: 'Payment request verified' })
+  @Roles(UserRole.SUPER_ADMIN)
+  async verifyPaymentRequest(
+    @Param('id') id: string,
+    @Body() dto: Omit<VerifyPaymentRequestDto, 'requestId'>,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.paymentsService.verifyPaymentRequest(
+      { ...dto, requestId: id },
+      adminId,
+    );
   }
 }
 

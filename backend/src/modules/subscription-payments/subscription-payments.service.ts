@@ -3,17 +3,26 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import Stripe from 'stripe';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
+import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateSubscriptionPaymentMethodDto } from './dto/create-subscription-payment-method.dto';
 import { CreateSubscriptionPaymentDto } from './dto/create-subscription-payment.dto';
 import { ManualActivationDto } from './dto/manual-activation.dto';
+import { SubmitPaymentRequestDto } from './dto/submit-payment-request.dto';
 import { UpdateSubscriptionPaymentMethodDto } from './dto/update-subscription-payment-method.dto';
+import { VerifyPaymentRequestDto } from './dto/verify-payment-request.dto';
 import {
   PaymentGateway,
   SubscriptionPaymentMethod,
   SubscriptionPaymentMethodDocument,
 } from './schemas/subscription-payment-method.schema';
+import {
+  PaymentRequestStatus,
+  SubscriptionPaymentRequest,
+  SubscriptionPaymentRequestDocument,
+} from './schemas/subscription-payment-request.schema';
 @Injectable()
 export class SubscriptionPaymentsService {
   private stripe: Stripe;
@@ -21,9 +30,12 @@ export class SubscriptionPaymentsService {
     private configService: ConfigService,
     @InjectModel(SubscriptionPaymentMethod.name)
     private paymentMethodModel: Model<SubscriptionPaymentMethodDocument>,
+    @InjectModel(SubscriptionPaymentRequest.name)
+    private paymentRequestModel: Model<SubscriptionPaymentRequestDocument>,
     @InjectModel(Company.name)
     private companyModel: Model<CompanyDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
+    private websocketsGateway: WebsocketsGateway,
   ) {
     const stripeKey = this.configService.get('stripe.secretKey');
     if (stripeKey) {
@@ -61,7 +73,12 @@ export class SubscriptionPaymentsService {
   }
   // Get all payment methods (for super admin - includes inactive)
   async getAllPaymentMethods() {
-    return this.paymentMethodModel.find().sort({ isDefault: -1, sortOrder: 1, name: 1 }).exec();
+    const methods = await this.paymentMethodModel.find().sort({ isDefault: -1, sortOrder: 1, name: 1 }).exec();
+    // Transform to ensure 'id' field exists
+    return methods.map((method) => ({
+      ...method.toObject(),
+      id: method._id.toString(),
+    }));
   }
   // Get payment method by ID
   async getPaymentMethodById(id: string) {
@@ -135,7 +152,7 @@ export class SubscriptionPaymentsService {
   }
   // Initialize payment based on gateway
   async initializePayment(dto: CreateSubscriptionPaymentDto) {
-    const { companyId, planName, paymentGateway, paymentDetails } = dto;
+    const { companyId, planName, paymentGateway, paymentDetails, paymentMethodId } = dto;
     // Get company
     const company = await this.companyModel.findById(companyId);
     if (!company) {
@@ -147,10 +164,19 @@ export class SubscriptionPaymentsService {
       throw new NotFoundException('Subscription plan not found');
     }
     // Get payment method config
-    const paymentMethod = await this.paymentMethodModel.findOne({
-      gateway: paymentGateway,
-      isActive: true,
-    });
+    // For MANUAL gateway, prefer paymentMethodId if provided, otherwise find first active one
+    let paymentMethod: SubscriptionPaymentMethodDocument | null;
+    if (paymentGateway === PaymentGateway.MANUAL && paymentMethodId) {
+      paymentMethod = await this.paymentMethodModel.findById(paymentMethodId);
+      if (!paymentMethod || !paymentMethod.isActive) {
+        throw new NotFoundException('Payment method not found or inactive');
+      }
+    } else {
+      paymentMethod = await this.paymentMethodModel.findOne({
+        gateway: paymentGateway,
+        isActive: true,
+      });
+    }
     if (!paymentMethod) {
       throw new NotFoundException('Payment method not available');
     }
@@ -166,6 +192,8 @@ export class SubscriptionPaymentsService {
         return this.initializeBkashPayment(company, plan, paymentMethod, paymentDetails);
       case PaymentGateway.NAGAD:
         return this.initializeNagadPayment(company, plan, paymentMethod, paymentDetails);
+      case PaymentGateway.MANUAL:
+        return this.initializeManualPayment(company, plan, paymentMethod);
       default:
         throw new BadRequestException(`Payment gateway ${paymentGateway} not implemented`);
     }
@@ -634,6 +662,51 @@ export class SubscriptionPaymentsService {
       };
     }
   }
+  // Manual payment initialization
+  private async initializeManualPayment(
+    company: CompanyDocument,
+    plan: any,
+    paymentMethod: SubscriptionPaymentMethodDocument,
+  ) {
+    // Check for account number in config - handle both nested and flat structures
+    const accountNumber = 
+      paymentMethod.config?.accountNumber || 
+      (paymentMethod.config as any)?.account_number ||
+      null;
+    
+    if (!accountNumber) {
+      // Provide helpful error message with payment method details
+      throw new BadRequestException(
+        `Account number is not configured for this manual payment method (${paymentMethod.name}). ` +
+        `Please update the payment method and add an account number in the Payment Gateway Credentials section.`
+      );
+    }
+
+    // Generate unique payment reference
+    const paymentReference = `SUB-${company._id.toString().slice(-6)}-${Date.now()}`;
+    const amount = plan.price.toString();
+    const currency = plan.currency || 'BDT';
+
+    // Get payment instructions from config or use default
+    const instructions = paymentMethod.config?.instructions || 
+      `Please send ${amount} ${currency} to the account number above. Use reference: ${paymentReference}`;
+
+    return {
+      gateway: PaymentGateway.MANUAL,
+      sessionId: null,
+      url: null,
+      clientSecret: null,
+      instructions: {
+        phoneNumber: accountNumber,
+        amount: plan.price,
+        currency: currency,
+        reference: paymentReference,
+        message: instructions,
+      },
+      requiresManualVerification: true,
+      paymentReference,
+    };
+  }
   // Manual activation by super admin
   async manualActivation(dto: ManualActivationDto) {
     const { companyId, planName, billingCycle, notes } = dto;
@@ -694,6 +767,259 @@ export class SubscriptionPaymentsService {
       transactionId,
     };
   }
+
+  // Submit payment request (for manual payment methods like bKash/Nagad)
+  async submitPaymentRequest(dto: SubmitPaymentRequestDto) {
+    const company = await this.companyModel.findById(dto.companyId);
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    const paymentMethod = await this.paymentMethodModel.findById(dto.paymentMethodId);
+    if (!paymentMethod) {
+      throw new NotFoundException('Payment method not found');
+    }
+
+    if (!paymentMethod.isActive) {
+      throw new BadRequestException('Payment method is not active');
+    }
+
+    // Check if there's already a pending request for this company and plan
+    const existingRequest = await this.paymentRequestModel.findOne({
+      companyId: dto.companyId,
+      planName: dto.planName,
+      status: PaymentRequestStatus.PENDING,
+    });
+
+    if (existingRequest) {
+      throw new BadRequestException('You already have a pending payment request for this plan');
+    }
+
+    const paymentRequest = new this.paymentRequestModel({
+      companyId: dto.companyId,
+      paymentMethodId: dto.paymentMethodId,
+      planName: dto.planName,
+      amount: dto.amount,
+      currency: dto.currency || 'BDT',
+      billingCycle: dto.billingCycle || 'monthly',
+      transactionId: dto.transactionId,
+      phoneNumber: dto.phoneNumber,
+      referenceNumber: dto.referenceNumber,
+      notes: dto.notes,
+      screenshotUrl: dto.screenshotUrl,
+      status: PaymentRequestStatus.PENDING,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    });
+
+    const savedRequest = await paymentRequest.save();
+    const populatedRequest = await savedRequest.populate([
+      { path: 'companyId', select: 'name email' },
+      { path: 'paymentMethodId', select: 'name displayName gateway' },
+    ]);
+
+    // Notify all super admins about new payment request
+    try {
+      if (this.websocketsGateway && this.websocketsGateway.broadcastToRole) {
+        this.websocketsGateway.broadcastToRole('super_admin', 'payment-request-created', {
+          type: 'payment_request',
+          title: 'New Payment Request',
+          message: `${company.name} has submitted a payment request for ${dto.planName} plan (${dto.amount} ${dto.currency || 'BDT'})`,
+          data: {
+            requestId: savedRequest._id.toString(),
+            companyId: company._id.toString(),
+            companyName: company.name,
+            planName: dto.planName,
+            amount: dto.amount,
+            currency: dto.currency || 'BDT',
+            transactionId: dto.transactionId,
+            phoneNumber: dto.phoneNumber,
+          },
+          timestamp: new Date(),
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error notifying super admins about payment request:', error);
+    }
+
+    // Notify company owner about submission
+    try {
+      if (this.websocketsGateway && typeof this.websocketsGateway.emitScopedNotification === 'function') {
+        this.websocketsGateway.emitScopedNotification({
+          companyId: company._id.toString(),
+          roles: [UserRole.OWNER],
+          payload: {
+            type: 'payment_request',
+            title: 'Payment Request Submitted',
+            message: `Your payment request for ${dto.planName} plan has been submitted. Our team will review and activate your subscription within 24 hours.`,
+            data: {
+              requestId: savedRequest._id.toString(),
+              planName: dto.planName,
+              amount: dto.amount,
+              currency: dto.currency || 'BDT',
+              status: 'pending',
+            },
+            timestamp: new Date(),
+          },
+        });
+        console.log('✅ Notification sent to company owner about payment request submission');
+      } else {
+        console.warn('⚠️ WebsocketsGateway.emitScopedNotification is not available');
+      }
+    } catch (error) {
+      console.error('❌ Error notifying company owner:', error);
+    }
+
+    return populatedRequest;
+  }
+
+  // Get payment requests (for super admin)
+  async getPaymentRequests(status?: PaymentRequestStatus, companyId?: string) {
+    const query: any = {};
+    if (status) {
+      query.status = status;
+    }
+    if (companyId) {
+      query.companyId = companyId;
+    }
+
+    const requests = await this.paymentRequestModel
+      .find(query)
+      .populate('companyId', 'name email')
+      .populate('paymentMethodId', 'name displayName gateway config')
+      .populate('verifiedBy', 'firstName lastName email')
+      .sort({ createdAt: -1 })
+      .exec();
+
+    return requests;
+  }
+
+  // Get payment request by ID
+  async getPaymentRequestById(id: string) {
+    const request = await this.paymentRequestModel
+      .findById(id)
+      .populate('companyId', 'name email')
+      .populate('paymentMethodId', 'name displayName gateway config')
+      .populate('verifiedBy', 'firstName lastName email')
+      .exec();
+
+    if (!request) {
+      throw new NotFoundException('Payment request not found');
+    }
+
+    return request;
+  }
+
+  // Verify payment request (for super admin)
+  async verifyPaymentRequest(dto: VerifyPaymentRequestDto, adminId: string) {
+    const request = await this.paymentRequestModel.findById(dto.requestId);
+    if (!request) {
+      throw new NotFoundException('Payment request not found');
+    }
+
+    if (request.status !== PaymentRequestStatus.PENDING) {
+      throw new BadRequestException(`Payment request is already ${request.status}`);
+    }
+
+    if (dto.status === PaymentRequestStatus.REJECTED && !dto.rejectionReason) {
+      throw new BadRequestException('Rejection reason is required when rejecting a payment request');
+    }
+
+    // Update request status
+    request.status = dto.status;
+    request.verifiedBy = adminId as any;
+    request.verifiedAt = new Date();
+    request.adminNotes = dto.adminNotes;
+    if (dto.rejectionReason) {
+      request.rejectionReason = dto.rejectionReason;
+    }
+
+    await request.save();
+    
+    // Get company ID as string before populating (to avoid issues with populated objects)
+    let companyIdString: string;
+    if (typeof request.companyId === 'object' && request.companyId !== null) {
+      companyIdString = (request.companyId as any)._id?.toString() || (request.companyId as any).toString();
+    } else {
+      companyIdString = String(request.companyId);
+    }
+
+    const populatedRequest = await request.populate([
+      { path: 'companyId', select: 'name email' },
+      { path: 'paymentMethodId', select: 'name displayName gateway' },
+      { path: 'verifiedBy', select: 'firstName lastName email' },
+    ]);
+
+    const company = typeof populatedRequest.companyId === 'object' ? populatedRequest.companyId : await this.companyModel.findById(companyIdString);
+
+    // If verified, activate the subscription
+    if (dto.status === PaymentRequestStatus.VERIFIED) {
+      await this.manualActivation({
+        companyId: companyIdString,
+        planName: request.planName,
+        billingCycle: request.billingCycle,
+        notes: `Verified payment request. Transaction ID: ${request.transactionId}, Phone: ${request.phoneNumber}. ${dto.adminNotes || ''}`,
+      });
+
+      // Notify company owner about successful verification
+      try {
+        if (this.websocketsGateway && typeof this.websocketsGateway.emitScopedNotification === 'function') {
+          this.websocketsGateway.emitScopedNotification({
+            companyId: companyIdString,
+            roles: [UserRole.OWNER],
+            payload: {
+              type: 'payment_request',
+              title: 'Payment Verified & Subscription Activated',
+              message: `Your payment request has been verified and your ${request.planName} subscription is now active!`,
+              data: {
+                requestId: request._id.toString(),
+                planName: request.planName,
+                amount: request.amount,
+                currency: request.currency,
+                status: 'verified',
+              },
+              timestamp: new Date(),
+            },
+          });
+          console.log('✅ Notification sent to company owner about verification');
+        } else {
+          console.warn('⚠️ WebsocketsGateway.emitScopedNotification is not available');
+        }
+      } catch (error) {
+        console.error('❌ Error notifying company owner about verification:', error);
+      }
+    } else if (dto.status === PaymentRequestStatus.REJECTED) {
+      // Notify company owner about rejection
+      try {
+        if (this.websocketsGateway && typeof this.websocketsGateway.emitScopedNotification === 'function') {
+          this.websocketsGateway.emitScopedNotification({
+            companyId: companyIdString,
+            roles: [UserRole.OWNER],
+            payload: {
+              type: 'payment_request',
+              title: 'Payment Request Rejected',
+              message: `Your payment request has been rejected. Reason: ${dto.rejectionReason || 'Please contact support for more information.'}`,
+              data: {
+                requestId: request._id.toString(),
+                planName: request.planName,
+                amount: request.amount,
+                currency: request.currency,
+                status: 'rejected',
+                rejectionReason: dto.rejectionReason,
+              },
+              timestamp: new Date(),
+            },
+          });
+          console.log('✅ Notification sent to company owner about rejection');
+        } else {
+          console.warn('⚠️ WebsocketsGateway.emitScopedNotification is not available');
+        }
+      } catch (error) {
+        console.error('❌ Error notifying company owner about rejection:', error);
+      }
+    }
+
+    return populatedRequest;
+  }
   // PayPal webhook handler
   async handlePayPalWebhook(body: any, headers: any) {
     // Verify webhook signature (implement proper verification)
@@ -750,4 +1076,4 @@ export class SubscriptionPaymentsService {
       verified: status === 'success' || transactionStatus === 'Completed',
     };
   }
-}
+}

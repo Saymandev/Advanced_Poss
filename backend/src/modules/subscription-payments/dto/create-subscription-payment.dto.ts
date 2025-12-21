@@ -41,5 +41,9 @@ export class CreateSubscriptionPaymentDto {
   @IsOptional()
   @IsString()
   billingCycle?: string; // 'monthly', 'quarterly', 'yearly'
+
+  @IsOptional()
+  @IsString()
+  paymentMethodId?: string; // Specific payment method ID (required for MANUAL gateway)
 }
 

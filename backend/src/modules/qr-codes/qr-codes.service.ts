@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as qrcode from 'qrcode';
@@ -14,6 +15,7 @@ export class QRCodesService {
     @InjectModel(QRCode.name) private qrCodeModel: Model<QRCodeDocument>,
     private branchesService: BranchesService,
     private companiesService: CompaniesService,
+    private configService: ConfigService,
   ) {}
 
   async generate(createQRCodeDto: CreateQRCodeDto, userId: string): Promise<QRCode> {
@@ -50,9 +52,11 @@ export class QRCodesService {
     branchSlug = branch?.slug;
     
     // Generate URL - prioritize custom domain, then slug-based, then fallback to branchId
+    // Use same priority as receipt service: APP_URL -> configService -> FRONTEND_URL -> localhost
     const baseUrl =
-      process.env.FRONTEND_URL ||
       process.env.APP_URL ||
+      this.configService.get<string>('frontend.url') ||
+      process.env.FRONTEND_URL ||
       'http://localhost:3000';
     let url: string;
     
@@ -88,7 +92,7 @@ export class QRCodesService {
         urlParams.append('table', createQRCodeDto.tableNumber.toString());
       }
       const queryString = urlParams.toString();
-      url = `${baseUrl}/${companySlug}/${branchSlug}/shop${queryString ? `?${queryString}` : ''}`;
+      url = `${baseUrl.replace(/\/$/, '')}/${companySlug}/${branchSlug}/shop${queryString ? `?${queryString}` : ''}`;
     } else {
       // Fallback to old format with branchId
       const urlParams = new URLSearchParams({
@@ -96,7 +100,7 @@ export class QRCodesService {
         ...(createQRCodeDto.tableNumber && { table: createQRCodeDto.tableNumber.toString() }),
         type: createQRCodeDto.menuType,
       });
-      url = `${baseUrl}/display/menu?${urlParams.toString()}`;
+      url = `${baseUrl.replace(/\/$/, '')}/display/menu?${urlParams.toString()}`;
     }
 
     // Generate QR code image
@@ -205,10 +209,12 @@ export class QRCodesService {
       branchSlug = branch?.slug;
       
       // Generate URL - prioritize custom domain, then slug-based, then fallback to branchId
-        const baseUrl =
-          process.env.FRONTEND_URL ||
-          process.env.APP_URL ||
-          'http://localhost:3000';
+      // Use same priority as receipt service: APP_URL -> configService -> FRONTEND_URL -> localhost
+      const baseUrl =
+        process.env.APP_URL ||
+        this.configService.get<string>('frontend.url') ||
+        process.env.FRONTEND_URL ||
+        'http://localhost:3000';
       let newUrl: string;
       
       if (customDomain) {
@@ -243,7 +249,7 @@ export class QRCodesService {
           urlParams.append('table', qrCode.tableNumber.toString());
         }
         const queryString = urlParams.toString();
-        newUrl = `${baseUrl}/${companySlug}/${branchSlug}/shop${queryString ? `?${queryString}` : ''}`;
+        newUrl = `${baseUrl.replace(/\/$/, '')}/${companySlug}/${branchSlug}/shop${queryString ? `?${queryString}` : ''}`;
       } else {
         // Fallback to old format with branchId
         const urlParams = new URLSearchParams({
@@ -251,7 +257,7 @@ export class QRCodesService {
           ...(qrCode.tableNumber && { table: qrCode.tableNumber.toString() }),
           type: updateQRCodeDto.menuType,
         });
-        newUrl = `${baseUrl}/display/menu?${urlParams.toString()}`;
+        newUrl = `${baseUrl.replace(/\/$/, '')}/display/menu?${urlParams.toString()}`;
       }
       
       // Regenerate QR code image with new URL
