@@ -1,9 +1,12 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { CheckCircleIcon, ClipboardDocumentIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useSubmitPaymentRequestMutation } from '@/lib/api/endpoints/subscriptionPaymentsApi';
+import { useUploadMenuImagesMutation } from '@/lib/api/endpoints/menuItemsApi';
+import { CheckCircleIcon, ClipboardDocumentIcon, ExclamationTriangleIcon, PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 interface PaymentInstructions {
@@ -21,6 +24,11 @@ interface PaymentInstructionsModalProps {
   instructions: PaymentInstructions;
   gateway: string;
   onPaymentCompleted?: () => void;
+  // Additional props for payment submission
+  companyId?: string;
+  paymentMethodId?: string;
+  planName?: string;
+  billingCycle?: string;
 }
 
 export function PaymentInstructionsModal({
@@ -29,8 +37,24 @@ export function PaymentInstructionsModal({
   instructions,
   gateway,
   onPaymentCompleted,
+  companyId,
+  paymentMethodId,
+  planName,
+  billingCycle = 'monthly',
 }: PaymentInstructionsModalProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    transactionId: '',
+    phoneNumber: '',
+    referenceNumber: '',
+    notes: '',
+  });
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
+  const [submitPaymentRequest, { isLoading: isSubmitting }] = useSubmitPaymentRequestMutation();
+  const [uploadImage, { isLoading: isUploadingScreenshot }] = useUploadMenuImagesMutation();
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -190,23 +214,269 @@ export function PaymentInstructionsModal({
           </div>
         </div>
 
-        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <Button variant="secondary" onClick={onClose} className="flex-1">
-            I'll Pay Later
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              if (onPaymentCompleted) {
-                onPaymentCompleted();
-              }
-              onClose();
-            }}
-            className="flex-1"
-          >
-            I've Completed Payment
-          </Button>
-        </div>
+        {!showPaymentForm ? (
+          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Button variant="secondary" onClick={onClose} className="flex-1">
+              I'll Pay Later
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                // Always show the form when user clicks "I've Completed Payment"
+                setShowPaymentForm(true);
+              }}
+              className="flex-1"
+            >
+              I've Completed Payment
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Submit Payment Details
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Please provide the transaction details from your payment:
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Transaction ID <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Enter transaction ID from {gatewayName}"
+                  value={paymentForm.transactionId}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, transactionId: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  The transaction ID you received after completing the payment
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Phone Number Used for Payment <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="tel"
+                  placeholder="01XXXXXXXXX"
+                  value={paymentForm.phoneNumber}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, phoneNumber: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  The phone number you used to make the payment
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Reference Number (Optional)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Enter reference number if available"
+                  value={paymentForm.referenceNumber}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, referenceNumber: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Additional Notes (Optional)
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  rows={3}
+                  placeholder="Any additional information about your payment..."
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Payment Screenshot (Optional)
+                </label>
+                <div className="space-y-2">
+                  {screenshotPreview && (
+                    <div className="relative inline-block">
+                      <img
+                        src={screenshotPreview}
+                        alt="Screenshot preview"
+                        className="w-full max-w-xs h-auto rounded-lg border border-gray-300 dark:border-gray-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScreenshotFile(null);
+                          setScreenshotPreview(null);
+                          if (screenshotInputRef.current) {
+                            screenshotInputRef.current.value = '';
+                          }
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    ref={screenshotInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      // Validate file type
+                      if (!file.type.startsWith('image/')) {
+                        toast.error('Please select an image file');
+                        return;
+                      }
+
+                      // Validate file size (5MB)
+                      if (file.size > 5 * 1024 * 1024) {
+                        toast.error('Image size must be less than 5MB');
+                        return;
+                      }
+
+                      setScreenshotFile(file);
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setScreenshotPreview(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="hidden"
+                    id="screenshot-upload"
+                  />
+                  <label
+                    htmlFor="screenshot-upload"
+                    className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <PhotoIcon className="w-5 h-5" />
+                    {screenshotPreview ? 'Change Screenshot' : 'Upload Payment Screenshot'}
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Upload a screenshot of your payment confirmation (JPEG, PNG, GIF, WebP - Max 5MB)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowPaymentForm(false);
+                  setPaymentForm({ transactionId: '', phoneNumber: '', referenceNumber: '', notes: '' });
+                  setScreenshotFile(null);
+                  setScreenshotPreview(null);
+                  if (screenshotInputRef.current) {
+                    screenshotInputRef.current.value = '';
+                  }
+                }}
+                className="flex-1"
+                disabled={isSubmitting || isUploadingScreenshot}
+              >
+                Back
+              </Button>
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  if (!paymentForm.transactionId || !paymentForm.phoneNumber) {
+                    toast.error('Please fill in all required fields');
+                    return;
+                  }
+
+                  // Try to get payment info from props first, then from instructions metadata
+                  const effectiveCompanyId = companyId || (instructions as any)?._paymentInfo?.companyId;
+                  const effectivePaymentMethodId = paymentMethodId || (instructions as any)?._paymentInfo?.paymentMethodId;
+                  const effectivePlanName = planName || (instructions as any)?._paymentInfo?.planName;
+                  const effectiveBillingCycle = billingCycle || (instructions as any)?._paymentInfo?.billingCycle || 'monthly';
+
+                  if (!effectiveCompanyId || !effectivePaymentMethodId || !effectivePlanName) {
+                    console.error('Missing payment information:', {
+                      companyId: effectiveCompanyId,
+                      paymentMethodId: effectivePaymentMethodId,
+                      planName: effectivePlanName,
+                      props: { companyId, paymentMethodId, planName },
+                      instructions: (instructions as any)?._paymentInfo,
+                    });
+                    toast.error('Missing payment information. Please close and try again from the beginning.');
+                    return;
+                  }
+
+                  try {
+                    // Upload screenshot if provided
+                    let screenshotUrl: string | undefined;
+                    if (screenshotFile) {
+                      toast.loading('Uploading screenshot...', { id: 'screenshot-upload' });
+                      try {
+                        const formData = new FormData();
+                        formData.append('images', screenshotFile);
+                        const uploadResult = await uploadImage(formData).unwrap();
+                        if (uploadResult.success && uploadResult.images && uploadResult.images.length > 0) {
+                          screenshotUrl = uploadResult.images[0].url;
+                          toast.success('Screenshot uploaded successfully', { id: 'screenshot-upload' });
+                        } else {
+                          toast.error('Failed to upload screenshot', { id: 'screenshot-upload' });
+                        }
+                      } catch (uploadError: any) {
+                        toast.error(uploadError?.data?.message || 'Failed to upload screenshot', { id: 'screenshot-upload' });
+                        return;
+                      }
+                    }
+
+                    toast.loading('Submitting payment details...', { id: 'payment-submit' });
+                    await submitPaymentRequest({
+                      companyId: effectiveCompanyId,
+                      paymentMethodId: effectivePaymentMethodId,
+                      planName: effectivePlanName,
+                      amount: instructions.amount,
+                      currency: instructions.currency,
+                      billingCycle: effectiveBillingCycle,
+                      transactionId: paymentForm.transactionId,
+                      phoneNumber: paymentForm.phoneNumber,
+                      referenceNumber: paymentForm.referenceNumber || undefined,
+                      notes: paymentForm.notes || undefined,
+                      screenshotUrl,
+                    }).unwrap();
+
+                    toast.dismiss('payment-submit');
+                    toast.success('Payment details submitted successfully! Our team will verify and activate your subscription within 24 hours.');
+                    
+                    if (onPaymentCompleted) {
+                      onPaymentCompleted();
+                    }
+                    
+                    setShowPaymentForm(false);
+                    setPaymentForm({ transactionId: '', phoneNumber: '', referenceNumber: '', notes: '' });
+                    setScreenshotFile(null);
+                    setScreenshotPreview(null);
+                    if (screenshotInputRef.current) {
+                      screenshotInputRef.current.value = '';
+                    }
+                    onClose();
+                  } catch (error: any) {
+                    toast.dismiss('payment-submit');
+                    toast.error(error?.data?.message || error?.message || 'Failed to submit payment details');
+                  }
+                }}
+                className="flex-1"
+                disabled={isSubmitting || isUploadingScreenshot}
+              >
+                {isSubmitting || isUploadingScreenshot ? 'Submitting...' : 'Submit Payment Details'}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   );

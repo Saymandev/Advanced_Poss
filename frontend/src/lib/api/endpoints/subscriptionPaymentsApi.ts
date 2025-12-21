@@ -45,6 +45,7 @@ export interface InitializePaymentRequest {
   companyId: string;
   planName: string;
   paymentGateway: PaymentGateway;
+  paymentMethodId?: string; // Specific payment method ID (required for MANUAL gateway)
   paymentDetails?: {
     transactionId?: string;
     referenceNumber?: string;
@@ -91,7 +92,13 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       },
       transformResponse: (response: any) => {
         const data = response?.data ?? response;
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data)) {
+          // Normalize IDs - ensure all items have 'id' field
+          return data.map((item: any) => ({
+            ...item,
+            id: item.id || item._id || item._id?.toString(),
+          }));
+        }
         return [];
       },
       providesTags: ['Subscription'],
@@ -102,7 +109,13 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       query: () => '/subscription-payments/admin/methods',
       transformResponse: (response: any) => {
         const data = response?.data ?? response;
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data)) {
+          // Normalize IDs - ensure all items have 'id' field
+          return data.map((item: any) => ({
+            ...item,
+            id: item.id || item._id || item._id?.toString(),
+          }));
+        }
         return [];
       },
       providesTags: ['Subscription'],
@@ -196,6 +209,64 @@ export const subscriptionPaymentsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Subscription'],
     }),
+    // ========== Payment Requests (Manual Payment Methods) ==========
+    // Submit payment request
+    submitPaymentRequest: builder.mutation<PaymentRequest, SubmitPaymentRequestDto>({
+      query: (body) => ({
+        url: '/subscription-payments/requests',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Subscription'],
+    }),
+    // Get payment requests (Super Admin only)
+    getPaymentRequests: builder.query<
+      PaymentRequest[],
+      { status?: PaymentRequestStatus; companyId?: string }
+    >({
+      query: ({ status, companyId }) => {
+        const params = new URLSearchParams();
+        if (status) params.append('status', status);
+        if (companyId) params.append('companyId', companyId);
+        return `/subscription-payments/requests?${params.toString()}`;
+      },
+      transformResponse: (response: any) => {
+        const data = response?.data ?? response;
+        if (Array.isArray(data)) {
+          // Normalize IDs - ensure all items have 'id' field
+          return data.map((item: any) => ({
+            ...item,
+            id: item.id || item._id || item._id?.toString(),
+          }));
+        }
+        return [];
+      },
+      providesTags: ['Subscription'],
+    }),
+    // Get payment request by ID
+    getPaymentRequestById: builder.query<PaymentRequest, string>({
+      query: (id) => `/subscription-payments/requests/${id}`,
+      transformResponse: (response: any) => {
+        return response?.data ?? response;
+      },
+      providesTags: (result, error, id) => [{ type: 'Subscription', id }],
+    }),
+    // Verify payment request (Super Admin only)
+    verifyPaymentRequest: builder.mutation<
+      PaymentRequest,
+      { requestId: string; status: PaymentRequestStatus; adminNotes?: string; rejectionReason?: string }
+    >({
+      query: ({ requestId, ...body }) => ({
+        url: `/subscription-payments/requests/${requestId}/verify`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result, error, { requestId }) => [
+        { type: 'Subscription', id: requestId },
+        'Subscription',
+        'Company',
+      ],
+    }),
   }),
 });
 export interface CreateSubscriptionPaymentMethodDto {
@@ -221,6 +292,50 @@ export interface CreateSubscriptionPaymentMethodDto {
     [key: string]: any;
   };
 }
+
+export enum PaymentRequestStatus {
+  PENDING = 'pending',
+  VERIFIED = 'verified',
+  REJECTED = 'rejected',
+  EXPIRED = 'expired',
+}
+
+export interface PaymentRequest {
+  id: string;
+  companyId: string | { id: string; name: string; email: string };
+  paymentMethodId: string | SubscriptionPaymentMethod;
+  planName: string;
+  amount: number;
+  currency: string;
+  billingCycle: string;
+  transactionId: string;
+  phoneNumber: string;
+  referenceNumber?: string;
+  notes?: string;
+  screenshotUrl?: string;
+  status: PaymentRequestStatus;
+  verifiedBy?: string | { id: string; firstName: string; lastName: string; email: string };
+  verifiedAt?: string;
+  rejectionReason?: string;
+  adminNotes?: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmitPaymentRequestDto {
+  companyId: string;
+  paymentMethodId: string;
+  planName: string;
+  amount: number;
+  currency?: string;
+  billingCycle?: string;
+  transactionId: string;
+  phoneNumber: string;
+  referenceNumber?: string;
+  notes?: string;
+  screenshotUrl?: string;
+}
 export const {
   useGetSubscriptionPaymentMethodsQuery,
   useGetAllSubscriptionPaymentMethodsQuery,
@@ -232,4 +347,8 @@ export const {
   useInitializeSubscriptionPaymentMutation,
   useManualActivateSubscriptionMutation,
   useVerifySubscriptionPaymentMutation,
-} = subscriptionPaymentsApi;
+  useSubmitPaymentRequestMutation,
+  useGetPaymentRequestsQuery,
+  useGetPaymentRequestByIdQuery,
+  useVerifyPaymentRequestMutation,
+} = subscriptionPaymentsApi;

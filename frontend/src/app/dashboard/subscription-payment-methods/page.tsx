@@ -252,7 +252,11 @@ export default function SubscriptionPaymentMethodsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string | undefined) => {
+    if (!id) {
+      toast.error('Payment method ID is missing');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this payment method?')) {
       return;
     }
@@ -330,7 +334,7 @@ export default function SubscriptionPaymentMethodsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {paymentMethods.map((method) => (
-            <Card key={method.id} className="relative">
+            <Card key={method.id || (method as any)._id} className="relative">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -378,7 +382,7 @@ export default function SubscriptionPaymentMethodsPage() {
                 </div>
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <Button
-                    onClick={() => handleToggleStatus(method.id)}
+                    onClick={() => handleToggleStatus(method.id || (method as any)._id)}
                     variant="ghost"
                     size="sm"
                     disabled={isToggling}
@@ -397,7 +401,7 @@ export default function SubscriptionPaymentMethodsPage() {
                     <PencilIcon className="h-4 w-4" />
                   </Button>
                   <Button
-                    onClick={() => handleDelete(method.id)}
+                    onClick={() => handleDelete(method.id || (method as any)._id)}
                     variant="ghost"
                     size="sm"
                     disabled={isDeleting}
@@ -599,6 +603,54 @@ export default function SubscriptionPaymentMethodsPage() {
             </p>
 
             <div className="space-y-4">
+              {/* Show MANUAL gateway fields first if selected */}
+              {formData.gateway === PaymentGateway.MANUAL && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Account Number / Phone Number *
+                    </label>
+                    <Input
+                      value={(formData.config as any)?.accountNumber || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          config: {
+                            ...(formData.config || {}),
+                            accountNumber: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="017XXXXXXXX or Account Number"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      The account number or phone number where users will send payments (bKash, Nagad, etc.)
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Payment Instructions (Optional)
+                    </label>
+                    <textarea
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      rows={3}
+                      value={(formData.config as any)?.instructions || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          config: {
+                            ...(formData.config || {}),
+                            instructions: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Additional instructions for users (e.g., 'Send money to this number and include reference number')"
+                    />
+                  </div>
+                </>
+              )}
+
               {formData.gateway === PaymentGateway.STRIPE && (
                 <>
                   <div>
@@ -909,7 +961,7 @@ export default function SubscriptionPaymentMethodsPage() {
               )}
 
               {/* Generic config fields for other gateways */}
-              {![PaymentGateway.STRIPE, PaymentGateway.PAYPAL, PaymentGateway.BKASH, PaymentGateway.NAGAD].includes(
+              {![PaymentGateway.STRIPE, PaymentGateway.PAYPAL, PaymentGateway.BKASH, PaymentGateway.NAGAD, PaymentGateway.MANUAL].includes(
                 formData.gateway!,
               ) && (
                 <div>

@@ -12,9 +12,13 @@ import { Modal } from '@/components/ui/Modal';
 import { useGetCompaniesQuery, useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
 import { useCreateCheckoutSessionMutation } from '@/lib/api/endpoints/paymentsApi';
 import {
+  PaymentRequest,
+  PaymentRequestStatus,
   SubscriptionPaymentMethod,
+  useGetPaymentRequestsQuery,
   useInitializeSubscriptionPaymentMutation,
   useManualActivateSubscriptionMutation,
+  useVerifyPaymentRequestMutation,
 } from '@/lib/api/endpoints/subscriptionPaymentsApi';
 import {
   BillingHistory,
@@ -47,6 +51,344 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+
+// Payment Requests Section Component
+function PaymentRequestsSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const [statusFilter, setStatusFilter] = useState<PaymentRequestStatus | undefined>(PaymentRequestStatus.PENDING);
+  const [selectedRequest, setSelectedRequest] = useState<PaymentRequest | null>(null);
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [verifyForm, setVerifyForm] = useState({
+    adminNotes: '',
+    rejectionReason: '',
+  });
+
+  const { data: paymentRequests = [], isLoading, refetch } = useGetPaymentRequestsQuery(
+    { status: statusFilter },
+    { skip: !isSuperAdmin }
+  );
+
+  const [verifyRequest, { isLoading: isVerifying }] = useVerifyPaymentRequestMutation();
+
+  const getStatusBadge = (status: PaymentRequestStatus) => {
+    const statusConfig = {
+      [PaymentRequestStatus.PENDING]: { variant: 'warning' as const, label: 'Pending' },
+      [PaymentRequestStatus.VERIFIED]: { variant: 'success' as const, label: 'Verified' },
+      [PaymentRequestStatus.REJECTED]: { variant: 'danger' as const, label: 'Rejected' },
+      [PaymentRequestStatus.EXPIRED]: { variant: 'secondary' as const, label: 'Expired' },
+    };
+    const config = statusConfig[status] || statusConfig[PaymentRequestStatus.PENDING];
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getCompanyName = (company: any) => {
+    if (typeof company === 'string') return 'Unknown Company';
+    return company?.name || 'Unknown Company';
+  };
+
+  const getPaymentMethodName = (method: any) => {
+    if (typeof method === 'string') return 'Unknown Method';
+    return method?.displayName || method?.name || 'Unknown Method';
+  };
+
+  const columns = [
+    {
+      key: 'company',
+      title: 'Company',
+      render: (_: any, row: PaymentRequest) => getCompanyName(row.companyId),
+    },
+    {
+      key: 'planName',
+      title: 'Plan',
+      render: (value: string) => value,
+    },
+    {
+      key: 'amount',
+      title: 'Amount',
+      render: (_: any, row: PaymentRequest) => formatCurrency(row.amount, row.currency),
+    },
+    {
+      key: 'paymentMethod',
+      title: 'Payment Method',
+      render: (_: any, row: PaymentRequest) => getPaymentMethodName(row.paymentMethodId),
+    },
+    {
+      key: 'transactionId',
+      title: 'Transaction ID',
+      render: (value: string) => (
+        <span className="font-mono text-xs">{value}</span>
+      ),
+    },
+    {
+      key: 'phoneNumber',
+      title: 'Phone Number',
+      render: (value: string) => value,
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      render: (_: any, row: PaymentRequest) => getStatusBadge(row.status),
+    },
+    {
+      key: 'createdAt',
+      title: 'Submitted',
+      render: (value: string) => formatDateTime(value),
+    },
+    {
+      key: 'actions',
+      title: 'Actions',
+      render: (_: any, row: PaymentRequest) => (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setSelectedRequest(row);
+              setIsVerifyModalOpen(true);
+            }}
+            disabled={row.status !== PaymentRequestStatus.PENDING}
+          >
+            Review
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const handleVerify = async (status: PaymentRequestStatus) => {
+    if (!selectedRequest) return;
+
+    if (status === PaymentRequestStatus.REJECTED && !verifyForm.rejectionReason) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+
+    // Ensure we have a valid request ID
+    const requestId = selectedRequest.id || (selectedRequest as any)._id;
+    if (!requestId) {
+      toast.error('Invalid payment request ID');
+      return;
+    }
+
+    try {
+      await verifyRequest({
+        requestId,
+        status,
+        adminNotes: verifyForm.adminNotes || undefined,
+        rejectionReason: verifyForm.rejectionReason || undefined,
+      }).unwrap();
+
+      toast.success(
+        status === PaymentRequestStatus.VERIFIED
+          ? 'Payment verified and subscription activated!'
+          : 'Payment request rejected'
+      );
+
+      setIsVerifyModalOpen(false);
+      setSelectedRequest(null);
+      setVerifyForm({ adminNotes: '', rejectionReason: '' });
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to verify payment request');
+    }
+  };
+
+  if (!isSuperAdmin) return null;
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <div>
+              <CardTitle className="text-lg sm:text-xl">Payment Requests</CardTitle>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                Review and verify manual payment requests
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={statusFilter === PaymentRequestStatus.PENDING ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => setStatusFilter(PaymentRequestStatus.PENDING)}
+              >
+                Pending ({paymentRequests.filter((r) => r.status === PaymentRequestStatus.PENDING).length})
+              </Button>
+              <Button
+                variant={statusFilter === undefined ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => setStatusFilter(undefined)}
+              >
+                All
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            data={paymentRequests}
+            columns={columns}
+            loading={isLoading}
+            searchable
+            selectable={false}
+            emptyMessage="No payment requests found"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Verify Payment Request Modal */}
+      <Modal
+        isOpen={isVerifyModalOpen}
+        onClose={() => {
+          setIsVerifyModalOpen(false);
+          setSelectedRequest(null);
+          setVerifyForm({ adminNotes: '', rejectionReason: '' });
+        }}
+        title="Review Payment Request"
+        size="lg"
+      >
+        {selectedRequest && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Company
+                </label>
+                <div className="text-gray-900 dark:text-white">{getCompanyName(selectedRequest.companyId)}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Plan
+                </label>
+                <div className="text-gray-900 dark:text-white">{selectedRequest.planName}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Amount
+                </label>
+                <div className="text-gray-900 dark:text-white">
+                  {formatCurrency(selectedRequest.amount, selectedRequest.currency)}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Payment Method
+                </label>
+                <div className="text-gray-900 dark:text-white">
+                  {getPaymentMethodName(selectedRequest.paymentMethodId)}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Transaction ID
+                </label>
+                <div className="font-mono text-sm text-gray-900 dark:text-white">
+                  {selectedRequest.transactionId}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Phone Number
+                </label>
+                <div className="text-gray-900 dark:text-white">{selectedRequest.phoneNumber}</div>
+              </div>
+              {selectedRequest.referenceNumber && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Reference Number
+                  </label>
+                  <div className="text-gray-900 dark:text-white">{selectedRequest.referenceNumber}</div>
+                </div>
+              )}
+              {selectedRequest.notes && (
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    User Notes
+                  </label>
+                  <div className="text-gray-900 dark:text-white">{selectedRequest.notes}</div>
+                </div>
+              )}
+              {selectedRequest.screenshotUrl && (
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Payment Screenshot
+                  </label>
+                  <div className="mt-2">
+                    <img
+                      src={selectedRequest.screenshotUrl}
+                      alt="Payment screenshot"
+                      className="max-w-full h-auto rounded-lg border border-gray-300 dark:border-gray-700 cursor-pointer hover:opacity-90"
+                      onClick={() => window.open(selectedRequest.screenshotUrl, '_blank')}
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Click to view full size
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Admin Notes (Optional)
+              </label>
+              <textarea
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                rows={3}
+                placeholder="Add any notes about this verification..."
+                value={verifyForm.adminNotes}
+                onChange={(e) => setVerifyForm({ ...verifyForm, adminNotes: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Rejection Reason (Required if rejecting)
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter reason for rejection..."
+                value={verifyForm.rejectionReason}
+                onChange={(e) => setVerifyForm({ ...verifyForm, rejectionReason: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsVerifyModalOpen(false);
+                  setSelectedRequest(null);
+                  setVerifyForm({ adminNotes: '', rejectionReason: '' });
+                }}
+                className="flex-1"
+                disabled={isVerifying}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => handleVerify(PaymentRequestStatus.REJECTED)}
+                className="flex-1"
+                disabled={isVerifying}
+              >
+                {isVerifying ? 'Rejecting...' : 'Reject'}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => handleVerify(PaymentRequestStatus.VERIFIED)}
+                className="flex-1"
+                disabled={isVerifying}
+              >
+                {isVerifying ? 'Verifying...' : 'Verify & Activate'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </>
+  );
+}
+
 export default function SubscriptionsPage() {
   const { user } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || '';
@@ -265,7 +607,7 @@ export default function SubscriptionsPage() {
   const [isPaymentInstructionsModalOpen, setIsPaymentInstructionsModalOpen] = useState(false);
   const [paymentInstructions, setPaymentInstructions] = useState<any>(null);
   const [paymentGateway, setPaymentGateway] = useState<string>('');
-  const [_selectedPaymentMethod, setSelectedPaymentMethod] = useState<SubscriptionPaymentMethod | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<SubscriptionPaymentMethod | null>(null);
   const [initializePayment, { isLoading: isInitializingPayment }] = useInitializeSubscriptionPaymentMutation();
   const [manualActivate, { isLoading: isActivating }] = useManualActivateSubscriptionMutation();
   // Auto-refresh + finalize plan when returning from checkout (Stripe)
@@ -404,10 +746,14 @@ export default function SubscriptionsPage() {
     try {
       toast.loading('Initializing payment...', { id: 'payment-init' });
       // Initialize payment based on selected method
+      // Ensure we have the payment method ID - try id, _id, or method itself
+      const methodId = method.id || (method as any)._id || (method as any).id?.toString() || (method as any)._id?.toString();
+      
       const paymentResponse = await initializePayment({
         companyId,
         planName: selectedPlan.name,
         paymentGateway: method.gateway,
+        paymentMethodId: methodId, // Pass the specific payment method ID for manual payments
         billingCycle: 'monthly',
       }).unwrap();
       toast.dismiss('payment-init');
@@ -432,7 +778,26 @@ export default function SubscriptionsPage() {
         window.location.href = paymentResponse.url;
       } else if (paymentResponse.requiresManualVerification && paymentResponse.instructions) {
         // For mobile wallets (bKash, Nagad) with manual verification, show instructions modal
-        setPaymentInstructions(paymentResponse.instructions);
+        // Store payment info in instructions to ensure it's available when form is submitted
+        // Ensure we have the payment method ID - try id, _id, or method itself
+        const methodId = method.id || (method as any)._id || (method as any).id?.toString() || (method as any)._id?.toString();
+        
+        if (!methodId) {
+          console.error('Payment method ID is missing:', method);
+          toast.error('Payment method ID is missing. Please try again.');
+          return;
+        }
+
+        const instructionsWithPaymentInfo = {
+          ...paymentResponse.instructions,
+          _paymentInfo: {
+            companyId,
+            paymentMethodId: methodId,
+            planName: selectedPlan?.name,
+            billingCycle: 'monthly',
+          },
+        };
+        setPaymentInstructions(instructionsWithPaymentInfo);
         setPaymentGateway(paymentResponse.gateway);
         setIsPaymentMethodModalOpen(false);
         setIsPaymentInstructionsModalOpen(true);
@@ -1102,6 +1467,8 @@ export default function SubscriptionsPage() {
             />
           </CardContent>
         </Card>
+        {/* Payment Requests Management */}
+        <PaymentRequestsSection isSuperAdmin={isSuperAdmin} />
         {/* Plan Management */}
         <Card>
           <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
@@ -2445,14 +2812,19 @@ export default function SubscriptionsPage() {
             setIsPaymentInstructionsModalOpen(false);
             setPaymentInstructions(null);
             setPaymentGateway('');
+            setSelectedPaymentMethod(null);
           }}
           instructions={paymentInstructions}
           gateway={paymentGateway}
+          companyId={companyId}
+          paymentMethodId={selectedPaymentMethod?.id}
+          planName={selectedPlan?.name}
+          billingCycle="monthly"
           onPaymentCompleted={() => {
-            toast.success('Thank you! Our support team will verify your payment and activate your subscription within 24 hours.');
             setIsPaymentInstructionsModalOpen(false);
             setPaymentInstructions(null);
             setPaymentGateway('');
+            setSelectedPaymentMethod(null);
             // Refresh subscription data
             refetchCompany();
             if (currentSubscription) {
