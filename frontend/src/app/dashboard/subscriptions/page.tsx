@@ -2654,7 +2654,7 @@ export default function SubscriptionsPage() {
                     size="lg"
                   >
                     Create Custom Subscription - {formatCurrency(featureSubscriptionPrice)}
-                    /{featureBillingCycle === 'monthly' ? 'month' : 'year'}
+                    /{featureBillingCycle === 'monthly' ? 'month' : featureBillingCycle === 'quarterly' ? 'quarter' : 'year'}
                   </Button>
                 </div>
               )}

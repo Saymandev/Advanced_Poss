@@ -26,7 +26,7 @@ export function FeatureBasedSubscriptionSelector({
   const { data: companyData } = useGetCompanyByIdQuery(companyId, { skip: !companyId });
   const { data: featuresData, isLoading, error: featuresError, refetch: refetchFeatures } = useGetSubscriptionFeaturesQuery();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [calculatePrice, { data: priceData, isLoading: isCalculatingPrice }] = useCalculateFeaturePriceMutation();
+  const [calculatePrice, { data: priceData, isLoading: isCalculatingPrice, isSuccess: isPriceCalculated }] = useCalculateFeaturePriceMutation();
   const [seedFeatures, { isLoading: isSeeding }] = useSeedSubscriptionFeaturesMutation();
   const isSuperAdmin = user?.role === 'super_admin';
   const handleSeedFeatures = async () => {
@@ -50,22 +50,37 @@ export function FeatureBasedSubscriptionSelector({
         billingCycle,
         branchCount,
         userCount,
-      }).then((result: any) => {
-        // Handle both { data: {...} } and direct response formats
-        const priceData = result?.data || result;
-        if (priceData?.totalPrice !== undefined && onPriceCalculated) {
-          onPriceCalculated(priceData.totalPrice);
-        }
-      }).catch((error: any) => {
-        console.error('Error calculating feature price:', error);
-        if (onPriceCalculated) {
-          onPriceCalculated(0);
-        }
-      });
-    } else if (onPriceCalculated) {
-      onPriceCalculated(0);
+      })
+        .unwrap()
+        .then((result: any) => {
+          // Handle both { data: {...} } and direct response formats
+          const priceData = result?.data || result;
+          const totalPrice = priceData?.totalPrice ?? 0;
+          if (onPriceCalculated) {
+            onPriceCalculated(totalPrice);
+          }
+        })
+        .catch((error: any) => {
+          console.error('Error calculating feature price:', error);
+          if (onPriceCalculated) {
+            onPriceCalculated(0);
+          }
+        });
+    } else {
+      // Reset price when no features selected
+      if (onPriceCalculated) {
+        onPriceCalculated(0);
+      }
     }
   }, [selectedFeatures, billingCycle, branchCount, userCount, calculatePrice, onPriceCalculated]);
+
+  // Also update price when mutation data changes (fallback)
+  useEffect(() => {
+    if (isPriceCalculated && priceData && onPriceCalculated) {
+      const totalPrice = priceData?.totalPrice ?? 0;
+      onPriceCalculated(totalPrice);
+    }
+  }, [isPriceCalculated, priceData, onPriceCalculated]);
   const featuresByCategory = useMemo(() => {
     if (!featuresData || !Array.isArray(featuresData)) return {};
     const grouped: Record<string, any[]> = {};
