@@ -912,13 +912,21 @@ export default function SubscriptionsPage() {
     }
   };
   const handleCancel = async () => {
-    if (!currentSubscription) {
+    // Prefer the actual subscription record (from current or by-company)
+    const sub: any = actualSubscription;
+    if (!sub) {
       toast.error('Subscription record not found. Cannot cancel subscription.');
+      return;
+    }
+    const subId = sub.id || sub._id;
+    if (!subId) {
+      console.error('❌ [CancelSubscription] Missing subscription id on object:', sub);
+      toast.error('Internal error: subscription ID is missing.');
       return;
     }
     try {
       await cancelSubscription({
-        id: currentSubscription.id,
+        id: subId,
         cancelAtPeriodEnd: true,
       }).unwrap();
       toast.success('Subscription will be cancelled at the end of the billing period');
@@ -2696,7 +2704,10 @@ export default function SubscriptionsPage() {
                     </div>
                   )}
                 </div>
-                {currentSubscription?.plan?.id !== plan.id && (
+                {/* Show Upgrade/Downgrade/Switch button for all NON-current plans.
+                    Use effectiveSubscription.planKey vs plan.name as the single source of truth,
+                    because backend doesn't always expose a normalized `id` field here. */}
+                {(!effectiveSubscription || effectiveSubscription.planKey !== plan.name) && (
                   <Button
                     onClick={() => {
                       setSelectedPlan(plan);
@@ -2893,10 +2904,10 @@ export default function SubscriptionsPage() {
       )}
       {/* Payment Method Selector Modal */}
       {isPaymentMethodModalOpen && selectedPlan && (() => {
-        // Get the actual plan from the plans array to ensure we have the latest price
-        const actualPlan = plans.find((p: any) => p.id === selectedPlan.id || p.name === selectedPlan.name) || selectedPlan;
-        const planPrice = actualPlan.price || selectedPlan.price || 0;
-        const planCurrency = actualPlan.currency || selectedPlan.currency || 'BDT';
+        // Always use the selected plan's price here so the amount matches the
+        // "New Plan" card in the confirmation modal (no confusion with current plan price)
+        const planPrice = selectedPlan.price || 0;
+        const planCurrency = selectedPlan.currency || 'BDT';
         return (
           <PaymentMethodSelector
             isOpen={isPaymentMethodModalOpen}
@@ -3153,14 +3164,14 @@ export default function SubscriptionsPage() {
             <p className="text-gray-600 dark:text-gray-400">
               Are you sure you want to cancel your subscription?
             </p>
-            {!currentSubscription && subscriptionFromCompany && (
+            {!actualSubscription && subscriptionFromCompany && (
               <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-800 dark:text-red-200">
                   <strong>Note:</strong> You don't have an active subscription record. Please contact support to manage your subscription.
                 </p>
               </div>
             )}
-            {currentSubscription && (
+            {actualSubscription && (
               <>
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
@@ -3193,7 +3204,7 @@ export default function SubscriptionsPage() {
               >
                 Keep Subscription
               </Button>
-              {currentSubscription ? (
+              {actualSubscription ? (
                 <Button
                   onClick={handleCancel}
                   isLoading={isCancelling}
