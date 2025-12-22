@@ -1019,6 +1019,7 @@ export default function SubscriptionsPage() {
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'basic' | 'features' | 'limits'>('basic');
+  const [billingCycleValue, setBillingCycleValue] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
   const [createPlan, { isLoading: isCreatingPlan }] = useCreateSubscriptionPlanMutation();
   const [updatePlan, { isLoading: isUpdatingPlan }] = useUpdateSubscriptionPlanMutation();
   const [deletePlan, { isLoading: isDeletingPlan }] = useDeleteSubscriptionPlanMutation();
@@ -1033,10 +1034,13 @@ export default function SubscriptionsPage() {
       const features = editingPlan.enabledFeatureKeys || planWithFeatures?.enabledFeatureKeys || [];
       setSelectedFeatures(features);
       setActiveTab('basic'); // Reset to basic tab
+      // Set billing cycle from editing plan
+      setBillingCycleValue((editingPlan.billingCycle as 'monthly' | 'quarterly' | 'yearly') || 'monthly');
     } else if (!editingPlan) {
       // Reset when creating new plan
       setSelectedFeatures([]);
       setActiveTab('basic');
+      setBillingCycleValue('monthly');
     }
   }, [editingPlan, isPlanModalOpen, planWithFeatures]);
   // Flatten subscription data for table/export (avoid nested objects as cell values)
@@ -1748,21 +1752,21 @@ export default function SubscriptionsPage() {
                   <div>
                     <Select
                       label="Billing Cycle"
-                      value={editingPlan?.billingCycle || 'monthly'}
+                      value={billingCycleValue}
                       onChange={(value) => {
+                        setBillingCycleValue(value as 'monthly' | 'quarterly' | 'yearly');
+                        // Update hidden input for form submission
                         const form = document.querySelector('form') as HTMLFormElement;
                         if (form) {
-                          const input = form.querySelector('input[name="billingCycle"]') as HTMLInputElement;
-                          if (input) {
-                            input.value = value;
-                          } else {
+                          let input = form.querySelector('input[name="billingCycle"]') as HTMLInputElement;
+                          if (!input) {
                             // Create hidden input if it doesn't exist
-                            const hiddenInput = document.createElement('input');
-                            hiddenInput.type = 'hidden';
-                            hiddenInput.name = 'billingCycle';
-                            hiddenInput.value = value;
-                            form.appendChild(hiddenInput);
+                            input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'billingCycle';
+                            form.appendChild(input);
                           }
+                          input.value = value;
                         }
                       }}
                       options={[
@@ -1772,7 +1776,7 @@ export default function SubscriptionsPage() {
                       ]}
                     />
                     {/* Hidden input for form submission */}
-                    <input type="hidden" name="billingCycle" value={editingPlan?.billingCycle || 'monthly'} />
+                    <input type="hidden" name="billingCycle" value={billingCycleValue} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
