@@ -10,8 +10,8 @@ import { JSX, useEffect, useMemo, useState } from 'react';
 interface FeatureBasedSubscriptionSelectorProps {
   selectedFeatures: string[];
   onChange: (features: string[]) => void;
-  billingCycle: 'monthly' | 'yearly';
-  onBillingCycleChange: (cycle: 'monthly' | 'yearly') => void;
+  billingCycle: 'monthly' | 'quarterly' | 'yearly';
+  onBillingCycleChange: (cycle: 'monthly' | 'quarterly' | 'yearly') => void;
   onPriceCalculated?: (price: number) => void;
 }
 export function FeatureBasedSubscriptionSelector({
@@ -206,6 +206,17 @@ export function FeatureBasedSubscriptionSelector({
             </button>
             <button
               type="button"
+              onClick={() => onBillingCycleChange('quarterly')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                billingCycle === 'quarterly'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+              }`}
+            >
+              Quarterly
+            </button>
+            <button
+              type="button"
               onClick={() => onBillingCycleChange('yearly')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 billingCycle === 'yearly'
@@ -229,7 +240,7 @@ export function FeatureBasedSubscriptionSelector({
               </p>
             )}
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              per {billingCycle === 'monthly' ? 'month' : 'year'}
+              per {billingCycle === 'monthly' ? 'month' : billingCycle === 'quarterly' ? 'quarter' : 'year'}
             </p>
           </div>
         )}
@@ -296,9 +307,16 @@ export function FeatureBasedSubscriptionSelector({
                   <CardContent className="pt-0">
                     <div className="space-y-3 pl-7">
                       {features.map((feature: any) => {
-                        const featurePrice = billingCycle === 'monthly' 
-                          ? feature.basePriceMonthly 
-                          : (feature.basePriceYearly || feature.basePriceMonthly * 10);
+                        let featurePrice: number;
+                        if (billingCycle === 'monthly') {
+                          featurePrice = feature.basePriceMonthly;
+                        } else if (billingCycle === 'quarterly') {
+                          // Quarterly is typically 3x monthly (or use basePriceQuarterly if available)
+                          featurePrice = feature.basePriceQuarterly || (feature.basePriceMonthly * 3);
+                        } else {
+                          // Yearly
+                          featurePrice = feature.basePriceYearly || (feature.basePriceMonthly * 10);
+                        }
                         return (
                           <div key={feature.key} className="flex items-start justify-between gap-4">
                             <Checkbox
@@ -321,7 +339,7 @@ export function FeatureBasedSubscriptionSelector({
                                 {formatCurrency(featurePrice)}
                               </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400">
-                                /{billingCycle === 'monthly' ? 'month' : 'year'}
+                                /{billingCycle === 'monthly' ? 'month' : billingCycle === 'quarterly' ? 'quarter' : 'year'}
                               </div>
                             </div>
                           </div>

@@ -6,7 +6,7 @@ export interface SubscriptionPlan {
   description: string;
   price: number;
   currency: string;
-  billingCycle: 'monthly' | 'yearly';
+  billingCycle: 'monthly' | 'quarterly' | 'yearly';
   trialPeriod: number; // Trial period in hours (e.g., 168 = 7 days)
   stripePriceId?: string;
   features: {
@@ -261,7 +261,7 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       companyId: string;
       plan?: string; // SubscriptionPlan enum value (e.g., 'basic', 'premium', 'enterprise') - Optional if enabledFeatures provided
       enabledFeatures?: string[]; // Array of feature keys for feature-based subscription
-      billingCycle: string; // BillingCycle enum value (e.g., 'monthly', 'yearly') - REQUIRED
+      billingCycle: string; // BillingCycle enum value (e.g., 'monthly', 'quarterly', 'yearly') - REQUIRED
       email: string; // REQUIRED
       companyName: string; // REQUIRED
       paymentMethodId?: string; // Optional
@@ -418,7 +418,7 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       },
       {
         featureKeys: string[];
-        billingCycle: 'monthly' | 'yearly';
+        billingCycle: 'monthly' | 'quarterly' | 'yearly';
         branchCount?: number;
         userCount?: number;
       }

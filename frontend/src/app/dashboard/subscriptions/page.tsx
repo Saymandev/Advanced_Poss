@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { useGetCompaniesQuery, useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
 import { useCreateCheckoutSessionMutation } from '@/lib/api/endpoints/paymentsApi';
 import {
@@ -673,7 +674,7 @@ export default function SubscriptionsPage() {
   const [viewMode, setViewMode] = useState<'plans' | 'features'>('plans');
   // Feature-based subscription state
   const [selectedSubscriptionFeatures, setSelectedSubscriptionFeatures] = useState<string[]>([]);
-  const [featureBillingCycle, setFeatureBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [featureBillingCycle, setFeatureBillingCycle] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
   const [featureSubscriptionPrice, setFeatureSubscriptionPrice] = useState<number>(0);
   const [isFeatureSubscriptionModalOpen, setIsFeatureSubscriptionModalOpen] = useState(false);
   // Super Admin: selected company for feature-based subscription
@@ -1745,13 +1746,33 @@ export default function SubscriptionsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Billing Cycle
-                    </label>
-                    <Input
-                      name="billingCycle"
-                      defaultValue={editingPlan?.billingCycle || 'monthly'}
+                    <Select
+                      label="Billing Cycle"
+                      value={editingPlan?.billingCycle || 'monthly'}
+                      onChange={(value) => {
+                        const form = document.querySelector('form') as HTMLFormElement;
+                        if (form) {
+                          const input = form.querySelector('input[name="billingCycle"]') as HTMLInputElement;
+                          if (input) {
+                            input.value = value;
+                          } else {
+                            // Create hidden input if it doesn't exist
+                            const hiddenInput = document.createElement('input');
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.name = 'billingCycle';
+                            hiddenInput.value = value;
+                            form.appendChild(hiddenInput);
+                          }
+                        }
+                      }}
+                      options={[
+                        { value: 'monthly', label: 'Monthly' },
+                        { value: 'quarterly', label: 'Quarterly' },
+                        { value: 'yearly', label: 'Yearly' },
+                      ]}
                     />
+                    {/* Hidden input for form submission */}
+                    <input type="hidden" name="billingCycle" value={editingPlan?.billingCycle || 'monthly'} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
