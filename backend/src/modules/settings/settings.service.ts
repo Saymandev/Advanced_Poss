@@ -1,45 +1,45 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CompaniesService } from '../companies/companies.service';
 import {
-  CreateServiceChargeSettingDto,
+    CreateServiceChargeSettingDto,
 } from './dto/create-service-charge-setting.dto';
 import { CreateTaxSettingDto } from './dto/create-tax-setting.dto';
 import {
-  UpdateCompanySettingsDto,
+    UpdateCompanySettingsDto,
 } from './dto/update-company-settings.dto';
 import {
-  UpdateInvoiceSettingsDto,
+    UpdateInvoiceSettingsDto,
 } from './dto/update-invoice-settings.dto';
 import {
-  UpdateServiceChargeSettingDto,
+    UpdateServiceChargeSettingDto,
 } from './dto/update-service-charge-setting.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { UpdateTaxSettingDto } from './dto/update-tax-setting.dto';
 import {
-  CompanySettings,
-  CompanySettingsDocument,
+    CompanySettings,
+    CompanySettingsDocument,
 } from './schemas/company-settings.schema';
 import {
-  InvoiceSettings,
-  InvoiceSettingsDocument,
+    InvoiceSettings,
+    InvoiceSettingsDocument,
 } from './schemas/invoice-settings.schema';
 import {
-  ServiceChargeSetting,
-  ServiceChargeSettingDocument,
+    ServiceChargeSetting,
+    ServiceChargeSettingDocument,
 } from './schemas/service-charge-setting.schema';
 import {
-  SystemSettings,
-  SystemSettingsDocument,
+    SystemSettings,
+    SystemSettingsDocument,
 } from './schemas/system-settings.schema';
 import {
-  TaxSetting,
-  TaxSettingDocument,
+    TaxSetting,
+    TaxSettingDocument,
 } from './schemas/tax-setting.schema';
 @Injectable()
 export class SettingsService {
@@ -67,14 +67,40 @@ export class SettingsService {
   }
   async getCompanySettings(companyId: string) {
     await this.assertCompany(companyId);
+    // Get system defaults first
+    const systemSettings = await this.getSystemSettings();
+    const systemDefaults = systemSettings.defaultCompanySettings || {
+      currency: 'BDT',
+      timezone: 'Asia/Dhaka',
+      dateFormat: 'DD/MM/YYYY',
+      timeFormat: '12h' as '12h' | '24h',
+      language: 'en',
+    };
+    
     const existing = await this.companySettingsModel
       .findOne({ companyId: this.toObjectId(companyId) })
       .lean();
+    
     if (existing) {
-      return existing;
+      // Merge existing settings with system defaults (system defaults as fallback)
+      return {
+        ...existing,
+        currency: existing.currency || systemDefaults.currency || 'BDT',
+        timezone: existing.timezone || systemDefaults.timezone || 'Asia/Dhaka',
+        dateFormat: existing.dateFormat || systemDefaults.dateFormat || 'DD/MM/YYYY',
+        timeFormat: existing.timeFormat || systemDefaults.timeFormat || '12h',
+        language: existing.language || systemDefaults.language || 'en',
+      };
     }
+    
+    // Create new company settings with system defaults
     const created = await this.companySettingsModel.create({
       companyId: this.toObjectId(companyId),
+      currency: systemDefaults.currency || 'BDT',
+      timezone: systemDefaults.timezone || 'Asia/Dhaka',
+      dateFormat: systemDefaults.dateFormat || 'DD/MM/YYYY',
+      timeFormat: systemDefaults.timeFormat || '12h',
+      language: systemDefaults.language || 'en',
     });
     return created.toJSON();
   }
@@ -256,4 +282,4 @@ export class SettingsService {
       .exec();
     return this.cleanSystemSettings(updated);
   }
-}
+}

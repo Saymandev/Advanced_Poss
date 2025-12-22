@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as crypto from 'crypto';
@@ -10,6 +12,7 @@ import { GeneratorUtil } from '../../common/utils/generator.util';
 import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
 import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
+import { SettingsService } from '../settings/settings.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { AddCustomDomainDto } from './dto/add-custom-domain.dto';
@@ -26,6 +29,8 @@ export class CompaniesService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
+    @Inject(forwardRef(() => SettingsService))
+    private settingsService: SettingsService,
   ) {}
   async create(createCompanyDto: CreateCompanyDto): Promise<Company> {
     // Check if email already exists
@@ -52,6 +57,30 @@ export class CompaniesService {
       const slugsList = existingSlugs.map((c: any) => c.slug).filter(Boolean);
       slug = GeneratorUtil.generateUniqueSlug(createCompanyDto.name, slugsList);
     }
+    // Get system defaults for company settings
+    let systemDefaults = {
+      currency: 'BDT',
+      timezone: 'Asia/Dhaka',
+      dateFormat: 'DD/MM/YYYY',
+      timeFormat: '12h',
+      language: 'en',
+    };
+    try {
+      const systemSettings = await this.settingsService.getSystemSettings();
+      if (systemSettings?.defaultCompanySettings) {
+        systemDefaults = {
+          currency: systemSettings.defaultCompanySettings.currency || 'BDT',
+          timezone: systemSettings.defaultCompanySettings.timezone || 'Asia/Dhaka',
+          dateFormat: systemSettings.defaultCompanySettings.dateFormat || 'DD/MM/YYYY',
+          timeFormat: systemSettings.defaultCompanySettings.timeFormat || '12h',
+          language: systemSettings.defaultCompanySettings.language || 'en',
+        };
+      }
+    } catch (error) {
+      // If system settings can't be fetched, use hardcoded defaults
+      console.warn('Could not fetch system settings, using defaults:', error);
+    }
+    
     const company = new this.companyModel({
       ...createCompanyDto,
       email: createCompanyDto.email.toLowerCase(),
@@ -60,8 +89,11 @@ export class CompaniesService {
       trialEndDate,
       subscriptionStartDate: new Date(),
       settings: {
-        currency: 'BDT', // Bangladesh Taka
-        language: 'en',
+        currency: systemDefaults.currency,
+        timezone: systemDefaults.timezone,
+        dateFormat: systemDefaults.dateFormat,
+        timeFormat: systemDefaults.timeFormat,
+        language: systemDefaults.language,
         features: subscriptionPlan.features,
       },
     });
