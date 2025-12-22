@@ -1302,7 +1302,14 @@ export default function SubscriptionsPage() {
               onClick={async () => {
                 if (!window.confirm(`Delete plan "${row.displayName || row.name}"?`)) return;
                 try {
-                  await deletePlan(row.id).unwrap();
+                  // Some responses use `_id` (MongoDB) instead of normalized `id`
+                  const planId = row.id || row._id;
+                  if (!planId) {
+                    console.error('❌ [Delete Plan] Missing plan id on row:', row);
+                    toast.error('Cannot delete plan: missing plan ID');
+                    return;
+                  }
+                  await deletePlan(planId).unwrap();
                   toast.success('Plan deleted');
                 } catch (err: any) {
                   toast.error(err?.data?.message || 'Failed to delete plan');
