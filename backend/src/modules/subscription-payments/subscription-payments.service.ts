@@ -5,7 +5,10 @@ import { Model } from 'mongoose';
 import Stripe from 'stripe';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
+import { NotificationsService } from '../notifications/notifications.service';
+import { BillingCycle, Subscription, SubscriptionDocument, SubscriptionStatus } from '../subscriptions/schemas/subscription.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
+import { convertLegacyFeaturesToKeys } from '../subscriptions/utils/plan-features.helper';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateSubscriptionPaymentMethodDto } from './dto/create-subscription-payment-method.dto';
 import { CreateSubscriptionPaymentDto } from './dto/create-subscription-payment.dto';
@@ -34,8 +37,11 @@ export class SubscriptionPaymentsService {
     private paymentRequestModel: Model<SubscriptionPaymentRequestDocument>,
     @InjectModel(Company.name)
     private companyModel: Model<CompanyDocument>,
+    @InjectModel(Subscription.name)
+    private subscriptionModel: Model<SubscriptionDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
     private websocketsGateway: WebsocketsGateway,
+    private notificationsService: NotificationsService,
   ) {
     const stripeKey = this.configService.get('stripe.secretKey');
     if (stripeKey) {
@@ -709,28 +715,191 @@ export class SubscriptionPaymentsService {
   }
   // Manual activation by super admin
   async manualActivation(dto: ManualActivationDto) {
+    console.log('🟡 [ManualActivation] DTO received:', dto);
     const { companyId, planName, billingCycle, notes } = dto;
+
     const company = await this.companyModel.findById(companyId);
     if (!company) {
+      console.error('🔴 [ManualActivation] Company NOT FOUND for id:', companyId);
       throw new NotFoundException('Company not found');
     }
+    console.log('🟡 [ManualActivation] Company found:', {
+      id: company._id?.toString?.() || companyId,
+      name: company.name,
+      subscriptionPlan: (company as any).subscriptionPlan,
+      subscriptionStatus: (company as any).subscriptionStatus,
+    });
+
     const plan = await this.subscriptionPlansService.findByName(planName);
     if (!plan) {
+      console.error('🔴 [ManualActivation] Plan NOT FOUND for name:', planName);
       throw new NotFoundException('Subscription plan not found');
     }
+    console.log('🟡 [ManualActivation] Plan found:', {
+      id: (plan as any)._id?.toString?.(),
+      name: plan.name,
+      displayName: (plan as any).displayName,
+      price: (plan as any).price,
+      currency: (plan as any).currency,
+      hasEnabledFeatureKeys: !!(plan as any).enabledFeatureKeys,
+      enabledFeatureKeysCount: (plan as any).enabledFeatureKeys?.length || 0,
+      hasLegacyFeatures: !!(plan as any).features,
+    });
+
     const now = new Date();
-    const cycle = billingCycle || 'monthly';
+    const cycle: BillingCycle =
+      (billingCycle as BillingCycle) || BillingCycle.MONTHLY;
     let periodDays = 30;
-    if (cycle === 'quarterly') {
+    if (cycle === BillingCycle.QUARTERLY) {
       periodDays = 90;
-    } else if (cycle === 'yearly') {
+    } else if (cycle === BillingCycle.YEARLY) {
       periodDays = 365;
     }
-    const subscriptionEndDate = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
-    // Update company subscription
+    const subscriptionEndDate = new Date(
+      now.getTime() + periodDays * 24 * 60 * 60 * 1000,
+    );
+
+    console.log('🟡 [ManualActivation] Cycle & period:', {
+      billingCycle: billingCycle || 'monthly',
+      resolvedCycle: cycle,
+      periodDays,
+      subscriptionEndDate,
+    });
+
+    // --- Sync Subscription document so feature system sees correct plan/features ---
+    // Resolve enabled feature keys from plan
+    let enabledFeatures: string[] = [];
+    if (
+      (plan as any).enabledFeatureKeys &&
+      Array.isArray((plan as any).enabledFeatureKeys) &&
+      (plan as any).enabledFeatureKeys.length > 0
+    ) {
+      enabledFeatures = (plan as any).enabledFeatureKeys;
+    } else if ((plan as any).features) {
+      enabledFeatures = convertLegacyFeaturesToKeys(
+        (plan as any).features || {},
+      );
+    }
+    console.log('🟡 [ManualActivation] Resolved enabledFeatures:', {
+      count: enabledFeatures.length,
+      sample: enabledFeatures.slice(0, 10),
+    });
+
+    // Build simple limits object from plan (similar to SubscriptionsService)
+    const maxBranches =
+      (plan as any).limits?.maxBranches ??
+      (plan as any).features?.maxBranches ??
+      -1;
+    const maxUsers =
+      (plan as any).limits?.maxUsers ?? (plan as any).features?.maxUsers ?? -1;
+    const derive = (value: number, multiplier: number) =>
+      value > 0 ? value * multiplier : -1;
+
+    const limits: any = {
+      maxBranches,
+      maxUsers,
+      maxMenuItems:
+        (plan as any).limits?.maxMenuItems ?? derive(maxUsers, 10),
+      maxOrders: (plan as any).limits?.maxOrders ?? derive(maxUsers, 50),
+      maxTables: (plan as any).limits?.maxTables ?? derive(maxBranches, 10),
+      maxCustomers:
+        (plan as any).limits?.maxCustomers ?? derive(maxUsers, 100),
+      aiInsightsEnabled: !!(plan as any).features?.aiInsights,
+      advancedReportsEnabled: !!(plan as any).features?.accounting,
+      multiLocationEnabled: !!(plan as any).features?.multiBranch,
+      apiAccessEnabled: !!(plan as any).features?.crm,
+      whitelabelEnabled: !!(plan as any).limits?.whitelabelEnabled,
+      customDomainEnabled: !!(plan as any).limits?.customDomainEnabled,
+      prioritySupportEnabled:
+        (plan as any).limits?.prioritySupportEnabled ??
+        !!(plan as any).features?.aiInsights,
+      storageGB: (plan as any).limits?.storageGB ?? 0,
+      publicOrderingEnabled: !!(plan as any).limits?.publicOrderingEnabled,
+      maxPublicBranches: (plan as any).limits?.maxPublicBranches ?? -1,
+      reviewsEnabled: !!(plan as any).limits?.reviewsEnabled,
+      reviewModerationRequired: !!(plan as any).limits?.reviewModerationRequired,
+      maxReviewsPerMonth: (plan as any).limits?.maxReviewsPerMonth ?? -1,
+    };
+
+    console.log('🟡 [ManualActivation] Built limits from plan:', limits);
+
+    // Find latest subscription for this company (if any)
+    let subscription = await this.subscriptionModel
+      .findOne({ companyId: company._id })
+      .sort({ createdAt: -1 })
+      .exec();
+
+    if (subscription) {
+      console.log('🟡 [ManualActivation] Existing subscription found:', {
+        id: subscription._id?.toString?.(),
+        plan: subscription.plan,
+        status: subscription.status,
+        isActive: subscription.isActive,
+      });
+      subscription.plan = plan.name as any;
+      subscription.status = SubscriptionStatus.ACTIVE;
+      subscription.billingCycle = cycle;
+      subscription.price = plan.price;
+      subscription.currency = plan.currency || 'BDT';
+      subscription.currentPeriodStart = now;
+      subscription.currentPeriodEnd = subscriptionEndDate;
+      subscription.nextBillingDate = subscriptionEndDate;
+      subscription.lastPaymentDate = now;
+      subscription.trialEndDate = null;
+      subscription.enabledFeatures = enabledFeatures;
+      subscription.limits = limits;
+      subscription.isActive = true;
+      await subscription.save();
+      console.log('🟢 [ManualActivation] Updated subscription:', {
+        id: subscription._id?.toString?.(),
+        plan: subscription.plan,
+        status: subscription.status,
+        isActive: subscription.isActive,
+        enabledFeaturesCount: subscription.enabledFeatures?.length || 0,
+      });
+    } else {
+      // Create a fresh subscription record
+      subscription = new this.subscriptionModel({
+        companyId: company._id,
+        plan: plan.name as any,
+        status: SubscriptionStatus.ACTIVE,
+        billingCycle: cycle,
+        price: plan.price,
+        currency: plan.currency || 'BDT',
+        currentPeriodStart: now,
+        currentPeriodEnd: subscriptionEndDate,
+        nextBillingDate: subscriptionEndDate,
+        lastPaymentDate: now,
+        trialEndDate: null,
+        enabledFeatures,
+        limits,
+        usage: {
+          currentBranches: 0,
+          currentUsers: 0,
+          currentMenuItems: 0,
+          currentOrders: 0,
+          currentTables: 0,
+          currentCustomers: 0,
+          storageUsed: 0,
+          lastUpdated: now,
+        },
+        autoRenew: false,
+        isActive: true,
+      });
+      await subscription.save();
+      console.log('🟢 [ManualActivation] Created new subscription:', {
+        id: subscription._id?.toString?.(),
+        plan: subscription.plan,
+        status: subscription.status,
+        isActive: subscription.isActive,
+        enabledFeaturesCount: subscription.enabledFeatures?.length || 0,
+      });
+    }
+
+    // Update company subscription summary
     await this.companyModel.findByIdAndUpdate(companyId, {
       $set: {
-        subscriptionPlan: planName,
+        subscriptionPlan: plan.name,
         subscriptionStatus: 'active',
         subscriptionStartDate: now,
         subscriptionEndDate: subscriptionEndDate,
@@ -750,7 +919,7 @@ export class SubscriptionPaymentsService {
       company: {
         id: companyId,
         name: company.name,
-        subscriptionPlan: planName,
+        subscriptionPlan: plan.name,
         subscriptionStatus: 'active',
         subscriptionEndDate,
       },
@@ -812,6 +981,28 @@ export class SubscriptionPaymentsService {
     });
 
     const savedRequest = await paymentRequest.save();
+
+    // Persist notification for company (owner/manager) so it appears in notifications list
+    try {
+      await this.notificationsService.create({
+        companyId: dto.companyId,
+        type: 'payment_request',
+        title: 'Payment Request Submitted',
+        message: `Your payment request for ${dto.planName} plan has been submitted. Our team will review and activate your subscription.`,
+        metadata: {
+          requestId: savedRequest._id.toString(),
+          planName: dto.planName,
+          amount: dto.amount,
+          currency: dto.currency || 'BDT',
+          billingCycle: dto.billingCycle || 'monthly',
+          status: 'pending',
+        },
+        roles: [UserRole.OWNER, UserRole.MANAGER],
+      });
+    } catch (err) {
+      console.warn(`Failed to create notification for payment request: ${err?.message || err}`);
+    }
+
     const populatedRequest = await savedRequest.populate([
       { path: 'companyId', select: 'name email' },
       { path: 'paymentMethodId', select: 'name displayName gateway' },
@@ -953,39 +1144,44 @@ export class SubscriptionPaymentsService {
 
     // If verified, activate the subscription
     if (dto.status === PaymentRequestStatus.VERIFIED) {
-      await this.manualActivation({
+      console.log('🟡 [VerifyPaymentRequest] About to call manualActivation with:', {
         companyId: companyIdString,
         planName: request.planName,
         billingCycle: request.billingCycle,
-        notes: `Verified payment request. Transaction ID: ${request.transactionId}, Phone: ${request.phoneNumber}. ${dto.adminNotes || ''}`,
       });
+
+      try {
+        await this.manualActivation({
+          companyId: companyIdString,
+          planName: request.planName,
+          billingCycle: request.billingCycle,
+          notes: `Verified payment request. Transaction ID: ${request.transactionId}, Phone: ${request.phoneNumber}. ${dto.adminNotes || ''}`,
+        });
+        console.log('🟢 [VerifyPaymentRequest] manualActivation completed successfully');
+      } catch (err) {
+        console.error('🔴 [VerifyPaymentRequest] manualActivation FAILED:', err);
+        throw err;
+      }
 
       // Notify company owner about successful verification
       try {
-        if (this.websocketsGateway && typeof this.websocketsGateway.emitScopedNotification === 'function') {
-          this.websocketsGateway.emitScopedNotification({
-            companyId: companyIdString,
-            roles: [UserRole.OWNER],
-            payload: {
-              type: 'payment_request',
-              title: 'Payment Verified & Subscription Activated',
-              message: `Your payment request has been verified and your ${request.planName} subscription is now active!`,
-              data: {
-                requestId: request._id.toString(),
-                planName: request.planName,
-                amount: request.amount,
-                currency: request.currency,
-                status: 'verified',
-              },
-              timestamp: new Date(),
-            },
-          });
-          console.log('✅ Notification sent to company owner about verification');
-        } else {
-          console.warn('⚠️ WebsocketsGateway.emitScopedNotification is not available');
-        }
+        // Persist notification so it shows in notifications list
+        await this.notificationsService.create({
+          companyId: companyIdString,
+          type: 'payment_request',
+          title: 'Payment Verified & Subscription Activated',
+          message: `Your payment request has been verified and your ${request.planName} subscription is now active!`,
+          metadata: {
+            requestId: request._id.toString(),
+            planName: request.planName,
+            amount: request.amount,
+            currency: request.currency,
+            status: 'verified',
+          },
+          roles: [UserRole.OWNER, UserRole.MANAGER],
+        });
       } catch (error) {
-        console.error('❌ Error notifying company owner about verification:', error);
+        console.error('❌ Error creating notification for verification:', error);
       }
     } else if (dto.status === PaymentRequestStatus.REJECTED) {
       // Notify company owner about rejection
