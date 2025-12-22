@@ -7,28 +7,23 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { QRCodeMenu, useDeleteQRCodeMutation, useGenerateQRCodeMutation, useGetQRCodesQuery, useUpdateQRCodeMutation } from '@/lib/api/endpoints/aiApi';
+import { useGetCategoryTypesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useGetTablesQuery } from '@/lib/api/endpoints/tablesApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-    ChartBarIcon,
-    EyeIcon,
-    LinkIcon,
-    PencilIcon,
-    PlusIcon,
-    QrCodeIcon,
-    TableCellsIcon,
-    TrashIcon
+  ChartBarIcon,
+  EyeIcon,
+  LinkIcon,
+  PencilIcon,
+  PlusIcon,
+  QrCodeIcon,
+  TableCellsIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-const MENU_TYPES = [
-  { value: 'full', label: 'Full Menu' },
-  { value: 'food', label: 'Food Menu' },
-  { value: 'drinks', label: 'Drinks Menu' },
-  { value: 'desserts', label: 'Desserts Menu' },
-];
 export default function QRCodesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -89,6 +84,38 @@ export default function QRCodesPage() {
     skip: !branchId,
     refetchOnMountOrArgChange: true,
   });
+  // Fetch category types dynamically from API
+  const { data: categoryTypesData, isLoading: isLoadingCategoryTypes } = useGetCategoryTypesQuery();
+  // Build menu types from category types, including "full" option
+  const menuTypes = useMemo(() => {
+    const types = [{ value: 'full', label: 'Full Menu' }];
+    if (categoryTypesData?.types) {
+      // Map category types to menu types
+      categoryTypesData.types.forEach((type) => {
+        // Map common category types to menu type values
+        const menuTypeValue = type.value === 'beverage' ? 'drinks' : 
+                             type.value === 'dessert' ? 'desserts' : 
+                             type.value.toLowerCase();
+        const menuTypeLabel = type.value === 'beverage' ? 'Drinks Menu' :
+                             type.value === 'dessert' ? 'Desserts Menu' :
+                             `${type.label} Menu`;
+        // Only add if not already in the list
+        if (!types.find(t => t.value === menuTypeValue)) {
+          types.push({ value: menuTypeValue, label: menuTypeLabel });
+        }
+      });
+    }
+    // Fallback to default types if API fails
+    if (types.length === 1) {
+      return [
+        { value: 'full', label: 'Full Menu' },
+        { value: 'food', label: 'Food Menu' },
+        { value: 'drinks', label: 'Drinks Menu' },
+        { value: 'desserts', label: 'Desserts Menu' },
+      ];
+    }
+    return types;
+  }, [categoryTypesData]);
   const [generateQR, { isLoading: isGenerating }] = useGenerateQRCodeMutation();
   const [updateQR, { isLoading: isUpdating }] = useUpdateQRCodeMutation();
   const [deleteQR, { isLoading: isDeleting }] = useDeleteQRCodeMutation();
@@ -446,12 +473,13 @@ export default function QRCodesPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Menu Types' },
-                  ...MENU_TYPES,
+                  ...menuTypes,
                 ]}
                 value={typeFilter}
                 onChange={setTypeFilter}
                 placeholder="Filter by menu type"
                 className="text-xs sm:text-sm"
+                disabled={isLoadingCategoryTypes}
               />
             </div>
             <div className="w-full sm:w-48">
@@ -569,7 +597,7 @@ export default function QRCodesPage() {
               Menu Type *
             </label>
             <Select
-              options={MENU_TYPES}
+              options={menuTypes}
               value={formData.menuType}
               onChange={(value) => {
                 setFormData({ ...formData, menuType: value as QRCodeMenu['menuType'] });
@@ -578,6 +606,7 @@ export default function QRCodesPage() {
                 }
               }}
               error={formErrors.menuType}
+              disabled={isLoadingCategoryTypes}
             />
           </div>
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
@@ -882,18 +911,11 @@ export default function QRCodesPage() {
                   Menu Type *
                 </label>
                 <Select
-                  options={MENU_TYPES}
+                  options={menuTypes}
                   value={editFormData.menuType}
                   onChange={(value) => setEditFormData({ ...editFormData, menuType: value as QRCodeMenu['menuType'] })}
+                  disabled={isLoadingCategoryTypes}
                 />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  <strong>Where menu types are defined:</strong>
-                </p>
-                <ul className="text-xs text-gray-500 dark:text-gray-400 mt-1 space-y-1 list-disc list-inside">
-                  <li>Frontend: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">frontend/src/app/dashboard/qr-code-menus/page.tsx</code> - MENU_TYPES constant (line 27-32)</li>
-                  <li>Backend Schema: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">backend/src/modules/qr-codes/schemas/qr-code.schema.ts</code> - enum on line 14</li>
-                  <li>Backend DTOs: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">backend/src/modules/qr-codes/dto/create-qr-code.dto.ts</code> and <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">update-qr-code.dto.ts</code></li>
-                </ul>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

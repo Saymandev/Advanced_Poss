@@ -110,7 +110,7 @@ export default function SettingsPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // General Settings
-  const { data: companySettings } = useGetCompanySettingsQuery(
+  const { data: companySettings, refetch: refetchCompanySettings } = useGetCompanySettingsQuery(
     companyId, 
     { skip: !companyId }
   );
@@ -1326,6 +1326,8 @@ export default function SettingsPage() {
                         data: { currency: value }
                       }).unwrap();
                       toast.success('Currency updated successfully');
+                      // Refetch to update UI immediately
+                      await refetchCompanySettings();
                     } catch (error: any) {
                       toast.error(error.data?.message || 'Failed to update currency');
                     }
@@ -1358,6 +1360,7 @@ export default function SettingsPage() {
                         data: { timezone: value }
                       }).unwrap();
                       toast.success('Timezone updated successfully');
+                      await refetchCompanySettings();
                     } catch (error: any) {
                       toast.error(error.data?.message || 'Failed to update timezone');
                     }
@@ -1383,6 +1386,7 @@ export default function SettingsPage() {
                         data: { dateFormat: value }
                       }).unwrap();
                       toast.success('Date format updated successfully');
+                      await refetchCompanySettings();
                     } catch (error: any) {
                       toast.error(error.data?.message || 'Failed to update date format');
                     }
@@ -1407,6 +1411,7 @@ export default function SettingsPage() {
                         data: { timeFormat: value as '12h' | '24h' }
                       }).unwrap();
                       toast.success('Time format updated successfully');
+                      await refetchCompanySettings();
                     } catch (error: any) {
                       toast.error(error.data?.message || 'Failed to update time format');
                     }
