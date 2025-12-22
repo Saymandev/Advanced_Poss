@@ -690,6 +690,11 @@ export default function SubscriptionsPage() {
   const [selectedSubscriptionFeatures, setSelectedSubscriptionFeatures] = useState<string[]>([]);
   const [featureBillingCycle, setFeatureBillingCycle] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
   const [featureSubscriptionPrice, setFeatureSubscriptionPrice] = useState<number>(0);
+  
+  // Debug: Log price changes
+  useEffect(() => {
+    console.log('[SubscriptionsPage] featureSubscriptionPrice updated:', featureSubscriptionPrice);
+  }, [featureSubscriptionPrice]);
   const [isFeatureSubscriptionModalOpen, setIsFeatureSubscriptionModalOpen] = useState(false);
   // Super Admin: selected company for feature-based subscription
   const [selectedCompanyForSubscription, setSelectedCompanyForSubscription] = useState<string>('');
@@ -3362,6 +3367,7 @@ export default function SubscriptionsPage() {
           setSelectedSubscriptionFeatures([]);
           setSelectedCompanyForSubscription('');
           setFeatureBillingCycle('monthly');
+          // Don't reset price here - let it persist until features are cleared
         }}
         title={isSuperAdmin ? "Create Feature-Based Subscription" : "Confirm Custom Subscription"}
         size={isSuperAdmin ? "xl" : "lg"}

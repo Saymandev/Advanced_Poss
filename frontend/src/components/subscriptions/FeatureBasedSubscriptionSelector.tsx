@@ -56,6 +56,7 @@ export function FeatureBasedSubscriptionSelector({
           // Handle both { data: {...} } and direct response formats
           const priceData = result?.data || result;
           const totalPrice = priceData?.totalPrice ?? 0;
+          console.log('[FeatureBasedSubscriptionSelector] Price calculated:', { totalPrice, result, selectedFeatures, billingCycle });
           if (onPriceCalculated) {
             onPriceCalculated(totalPrice);
           }
@@ -78,9 +79,11 @@ export function FeatureBasedSubscriptionSelector({
   useEffect(() => {
     if (isPriceCalculated && priceData && onPriceCalculated) {
       const totalPrice = priceData?.totalPrice ?? 0;
+      console.log('[FeatureBasedSubscriptionSelector] Price updated from mutation data:', { totalPrice, priceData });
       onPriceCalculated(totalPrice);
     }
   }, [isPriceCalculated, priceData, onPriceCalculated]);
+  
   const featuresByCategory = useMemo(() => {
     if (!featuresData || !Array.isArray(featuresData)) return {};
     const grouped: Record<string, any[]> = {};
@@ -165,6 +168,7 @@ export function FeatureBasedSubscriptionSelector({
   const selectedCount = selectedFeatures.length;
   // Handle both { data: {...} } and direct response formats
   const totalPrice = priceData?.totalPrice || (priceData as any)?.data?.totalPrice || 0;
+  
   // Show message when no features are available
   if (!isLoading && !featuresError && totalFeatures === 0) {
     return (
