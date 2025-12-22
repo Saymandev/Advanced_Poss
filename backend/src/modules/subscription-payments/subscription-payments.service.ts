@@ -17,15 +17,16 @@ import { SubmitPaymentRequestDto } from './dto/submit-payment-request.dto';
 import { UpdateSubscriptionPaymentMethodDto } from './dto/update-subscription-payment-method.dto';
 import { VerifyPaymentRequestDto } from './dto/verify-payment-request.dto';
 import {
-  PaymentGateway,
-  SubscriptionPaymentMethod,
-  SubscriptionPaymentMethodDocument,
+    PaymentGateway,
+    SubscriptionPaymentMethod,
+    SubscriptionPaymentMethodDocument,
 } from './schemas/subscription-payment-method.schema';
 import {
-  PaymentRequestStatus,
-  SubscriptionPaymentRequest,
-  SubscriptionPaymentRequestDocument,
+    PaymentRequestStatus,
+    SubscriptionPaymentRequest,
+    SubscriptionPaymentRequestDocument,
 } from './schemas/subscription-payment-request.schema';
+import { getBillingCycleDays, getPayPalBillingInterval, getStripeBillingInterval } from './utils/billing-cycle.helper';
 @Injectable()
 export class SubscriptionPaymentsService {
   private stripe: Stripe;
@@ -222,6 +223,10 @@ export class SubscriptionPaymentsService {
         stripeCustomerId: customerId,
       });
     }
+    // Get billing interval for Stripe (supports monthly, quarterly, yearly)
+    const billingCycle = plan.billingCycle || BillingCycle.MONTHLY;
+    const stripeInterval = getStripeBillingInterval(billingCycle);
+    
     // Create checkout session
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
@@ -236,7 +241,8 @@ export class SubscriptionPaymentsService {
             },
             unit_amount: Math.round(plan.price * 100), // Convert to cents
             recurring: {
-              interval: 'month',
+              interval: stripeInterval.interval as 'month' | 'year',
+              interval_count: stripeInterval.intervalCount,
             },
           },
           quantity: 1,
@@ -309,10 +315,9 @@ export class SubscriptionPaymentsService {
       // Use a default product ID or create one
       productId = 'PROD-' + company._id.toString().slice(-8);
     }
-    // Create PayPal billing plan
-    const billingCycle = plan.billingCycle || 'monthly';
-    const intervalUnit = billingCycle === 'yearly' ? 'YEAR' : 'MONTH';
-    const intervalCount = billingCycle === 'yearly' ? 1 : 1;
+    // Get billing interval for PayPal (supports monthly, quarterly, yearly)
+    const billingCycle = plan.billingCycle || BillingCycle.MONTHLY;
+    const paypalInterval = getPayPalBillingInterval(billingCycle);
     const planResponse = await fetch(`${baseUrl}/v1/billing/plans`, {
       method: 'POST',
       headers: {
@@ -328,8 +333,8 @@ export class SubscriptionPaymentsService {
         billing_cycles: [
           {
             frequency: {
-              interval_unit: intervalUnit,
-              interval_count: intervalCount,
+              interval_unit: paypalInterval.intervalUnit,
+              interval_count: paypalInterval.intervalCount,
             },
             tenure_type: 'REGULAR',
             sequence: 1,
@@ -749,12 +754,7 @@ export class SubscriptionPaymentsService {
     const now = new Date();
     const cycle: BillingCycle =
       (billingCycle as BillingCycle) || BillingCycle.MONTHLY;
-    let periodDays = 30;
-    if (cycle === BillingCycle.QUARTERLY) {
-      periodDays = 90;
-    } else if (cycle === BillingCycle.YEARLY) {
-      periodDays = 365;
-    }
+    const periodDays = getBillingCycleDays(cycle);
     const subscriptionEndDate = new Date(
       now.getTime() + periodDays * 24 * 60 * 60 * 1000,
     );

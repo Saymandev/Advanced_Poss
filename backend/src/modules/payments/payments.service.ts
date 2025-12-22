@@ -5,6 +5,7 @@ import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
+import { getStripeBillingInterval } from '../subscription-payments/utils/billing-cycle.helper';
 import { BillingCycle, Subscription, SubscriptionDocument, SubscriptionStatus } from '../subscriptions/schemas/subscription.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
@@ -174,9 +175,14 @@ export class PaymentsService {
               description: plan.description,
             },
             unit_amount: plan.price * 100, // Convert to cents
-            recurring: {
-              interval: plan.billingCycle === 'monthly' ? 'month' : 'year',
-            },
+            recurring: (() => {
+              const billingCycle = plan.billingCycle || BillingCycle.MONTHLY;
+              const stripeInterval = getStripeBillingInterval(billingCycle);
+              return {
+                interval: stripeInterval.interval as 'month' | 'year',
+                interval_count: stripeInterval.intervalCount,
+              };
+            })(),
           },
           quantity: 1,
         },

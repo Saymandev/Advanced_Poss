@@ -18,8 +18,8 @@ export class CreateSubscriptionPlanDto {
   @IsNumber()
   price: number;
 
-  @ApiProperty({ example: 'monthly', enum: ['monthly', 'yearly'] })
-  @IsEnum(['monthly', 'yearly'])
+  @ApiProperty({ example: 'monthly', enum: ['monthly', 'quarterly', 'yearly'] })
+  @IsEnum(['monthly', 'quarterly', 'yearly'])
   billingCycle: string;
 
   @ApiProperty({ example: 12 })
@@ -141,9 +141,9 @@ export class UpdateSubscriptionPlanDto {
   @IsNumber()
   price?: number;
 
-  @ApiPropertyOptional({ example: 'monthly', enum: ['monthly', 'yearly'] })
+  @ApiPropertyOptional({ example: 'monthly', enum: ['monthly', 'quarterly', 'yearly'] })
   @IsOptional()
-  @IsEnum(['monthly', 'yearly'])
+  @IsEnum(['monthly', 'quarterly', 'yearly'])
   billingCycle?: string;
 
   @ApiPropertyOptional({ example: 12 })
