@@ -1322,12 +1322,32 @@ export default function SubscriptionsPage() {
       // Base payload - different for create vs update
       // Note: Currency is handled globally in Settings, not per plan
       const payload: any = {};
-      // Always include displayName and description (text fields)
+      // Always include displayName and description (text fields) - but only if they have values
+      // For updates, use existing values if form fields are empty
       const displayName = (formData.get('displayName') as string)?.trim();
       const description = (formData.get('description') as string)?.trim();
-      if (displayName) payload.displayName = displayName;
-      if (description) payload.description = description;
+      
       if (isUpdate) {
+        // For updates: Always include displayName and description (use existing if form is empty)
+        // This ensures validation passes even when user is on Features tab
+        if (displayName && displayName.length > 0) {
+          payload.displayName = displayName;
+        } else if (editingPlan?.displayName) {
+          payload.displayName = editingPlan.displayName;
+        } else {
+          // Fallback: ensure we have a valid string
+          payload.displayName = editingPlan?.name || '';
+        }
+        
+        if (description && description.length > 0) {
+          payload.description = description;
+        } else if (editingPlan?.description) {
+          payload.description = editingPlan.description;
+        } else {
+          // Fallback: ensure we have a valid string
+          payload.description = '';
+        }
+        
         // For updates: Only include fields that have actual values (not empty/0)
         // This prevents overwriting existing data with empty values
         const priceValue = formData.get('price') as string;
