@@ -56,6 +56,7 @@ export function useRolePermissions() {
     // Super admin has access to everything
     if (isSuperAdminUser) return true;
     if (!userPermissions) return false;
+    if (!userPermissions.features || !Array.isArray(userPermissions.features)) return false;
     return userPermissions.features.includes(featureId);
   };
 
@@ -64,6 +65,7 @@ export function useRolePermissions() {
     // Super admin has access to everything
     if (isSuperAdminUser) return true;
     if (!userPermissions) return false;
+    if (!userPermissions.features || !Array.isArray(userPermissions.features)) return false;
     return featureIds.some((id) => userPermissions.features.includes(id));
   };
 
