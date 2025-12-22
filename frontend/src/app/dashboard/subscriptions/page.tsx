@@ -1317,8 +1317,26 @@ export default function SubscriptionsPage() {
     ];
     const handleSavePlan = async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      console.log('🔵 [1] Form submitted');
+      console.log('🔵 [1] editingPlan:', JSON.stringify(editingPlan, null, 2));
+      console.log('🔵 [1] activeTab:', activeTab);
+      
       const formData = new FormData(event.currentTarget);
-      const isUpdate = !!editingPlan?.id;
+      
+      // Log all form data
+      console.log('🔵 [2] FormData contents:');
+      for (const [key, value] of formData.entries()) {
+        console.log(`  - ${key}:`, value);
+      }
+      
+      // CRITICAL: Check for both id and _id (MongoDB uses _id, but API might normalize to id)
+      const planId = editingPlan?.id || editingPlan?._id;
+      const isUpdate = !!planId;
+      console.log('🔵 [3] isUpdate:', isUpdate);
+      console.log('🔵 [3] editingPlan?.id:', editingPlan?.id);
+      console.log('🔵 [3] editingPlan?._id:', editingPlan?._id);
+      console.log('🔵 [3] planId (resolved):', planId);
+      
       // Base payload - different for create vs update
       // Note: Currency is handled globally in Settings, not per plan
       const payload: any = {};
@@ -1327,59 +1345,105 @@ export default function SubscriptionsPage() {
       const displayName = (formData.get('displayName') as string)?.trim();
       const description = (formData.get('description') as string)?.trim();
       
+      console.log('🔵 [4] Extracted form values:');
+      console.log('  - displayName from form:', displayName);
+      console.log('  - description from form:', description);
+      
       if (isUpdate) {
-        // For updates: Always include displayName and description (use existing if form is empty)
-        // This ensures validation passes even when user is on Features tab
-        if (displayName && displayName.length > 0) {
-          payload.displayName = displayName;
-        } else if (editingPlan?.displayName) {
-          payload.displayName = editingPlan.displayName;
-        } else {
-          // Fallback: ensure we have a valid string
-          payload.displayName = editingPlan?.name || '';
-        }
+        // For updates: ALWAYS include basic fields from existing plan
+        // This is critical because when user is on Features or Limits tab,
+        // the form doesn't have these fields, but backend requires them
+        // Use form values if provided, otherwise use existing plan values
         
-        if (description && description.length > 0) {
-          payload.description = description;
-        } else if (editingPlan?.description) {
-          payload.description = editingPlan.description;
-        } else {
-          // Fallback: ensure we have a valid string
-          payload.description = '';
-        }
+        // displayName: use form value if provided, otherwise use existing plan value
+        payload.displayName = (displayName && displayName.length > 0) 
+          ? displayName 
+          : (editingPlan?.displayName || editingPlan?.name || 'Plan');
+        console.log('🟢 [5] displayName resolved:', payload.displayName);
+        console.log('  - form value:', displayName);
+        console.log('  - editingPlan.displayName:', editingPlan?.displayName);
+        console.log('  - editingPlan.name:', editingPlan?.name);
         
-        // For updates: Only include fields that have actual values (not empty/0)
-        // This prevents overwriting existing data with empty values
+        // description: use form value if provided, otherwise use existing plan value
+        payload.description = (description && description.length > 0) 
+          ? description 
+          : (editingPlan?.description || '');
+        console.log('🟢 [5] description resolved:', payload.description);
+        console.log('  - form value:', description);
+        console.log('  - editingPlan.description:', editingPlan?.description);
+        
+        // price: use form value if provided, otherwise use existing plan value
         const priceValue = formData.get('price') as string;
         if (priceValue && priceValue.trim() !== '') {
           const price = Number(priceValue);
           if (!isNaN(price) && price >= 0) {
             payload.price = price;
+          } else {
+            payload.price = editingPlan?.price ?? 0;
           }
+        } else {
+          payload.price = editingPlan?.price ?? 0;
         }
+        
+        // billingCycle: use form value if provided, otherwise use existing plan value
+        const billingCycle = (formData.get('billingCycle') as string)?.trim();
+        payload.billingCycle = billingCycle || editingPlan?.billingCycle || 'monthly';
+        
+        // trialPeriod: use form value if provided, otherwise use existing plan value
         const trialPeriodValue = formData.get('trialPeriod') as string;
         if (trialPeriodValue && trialPeriodValue.trim() !== '') {
           const trialPeriod = Number(trialPeriodValue);
           if (!isNaN(trialPeriod) && trialPeriod >= 0) {
             payload.trialPeriod = trialPeriod;
+          } else {
+            payload.trialPeriod = editingPlan?.trialPeriod ?? 0;
           }
+        } else {
+          payload.trialPeriod = editingPlan?.trialPeriod ?? 0;
         }
-        // Always include isActive if checkbox exists (user explicitly sets it)
+        
+        // isActive: use form value if checkbox exists, otherwise use existing plan value
         const isActiveCheckbox = formData.get('isActive');
         if (isActiveCheckbox !== null) {
           payload.isActive = isActiveCheckbox === 'on';
-        }
-        const billingCycle = (formData.get('billingCycle') as string)?.trim();
-        if (billingCycle) {
-          payload.billingCycle = billingCycle;
+        } else {
+          payload.isActive = editingPlan?.isActive ?? true;
         }
       } else {
         // For creation: Include all required fields with defaults
-        payload.name = (formData.get('name') as string)?.trim();
+        // CRITICAL: MongoDB requires non-empty strings for name, displayName, description
+        const nameValue = (formData.get('name') as string)?.trim();
+        const displayNameValue = displayName || (formData.get('displayName') as string)?.trim();
+        const descriptionValue = description || (formData.get('description') as string)?.trim();
+        
+        // Validate required fields
+        if (!nameValue || nameValue.length === 0) {
+          toast.error('Internal Name is required');
+          return;
+        }
+        
+        payload.name = nameValue;
+        payload.displayName = displayNameValue || nameValue; // Use name as fallback
+        payload.description = descriptionValue || 'No description provided'; // Default description
         payload.price = Number(formData.get('price') || 0);
         payload.billingCycle = (formData.get('billingCycle') as string) || 'monthly';
         payload.trialPeriod = Number(formData.get('trialPeriod') || 0);
         payload.isActive = formData.get('isActive') === 'on';
+        
+        // Backend requires features object (legacy format)
+        payload.features = {
+          pos: false,
+          inventory: false,
+          crm: false,
+          accounting: false,
+          aiInsights: false,
+          multiBranch: false,
+          maxUsers: 0,
+          maxBranches: 0,
+        };
+        
+        // Backend requires stripePriceId (must be non-empty string)
+        payload.stripePriceId = (formData.get('stripePriceId') as string)?.trim() || 'pending_stripe_setup';
       }
       // Include enabledFeatureKeys if features are selected
       if (selectedFeatures.length > 0) {
@@ -1427,13 +1491,44 @@ export default function SubscriptionsPage() {
       if (Object.keys(limits).length > 0) {
         payload.limits = limits;
       }
+      
+      console.log('🟡 [6] Final payload before API call:');
+      console.log(JSON.stringify(payload, null, 2));
+      console.log('🟡 [6] Payload keys:', Object.keys(payload));
+      
       try {
         if (isUpdate) {
-          await updatePlan({ id: editingPlan.id, data: payload }).unwrap();
+          // CRITICAL: UpdateSubscriptionPlanDto does NOT allow 'name' to be updated
+          // Only include fields that are allowed in UpdateSubscriptionPlanDto
+          const updatePlanId = editingPlan?.id || editingPlan?._id;
+          const finalPayload = {
+            // displayName (allowed in UpdateSubscriptionPlanDto)
+            displayName: String(payload.displayName || editingPlan?.displayName || editingPlan?.name || 'Plan'),
+            // description (allowed in UpdateSubscriptionPlanDto)
+            description: String(payload.description || editingPlan?.description || 'No description'),
+            // stripePriceId (allowed in UpdateSubscriptionPlanDto)
+            stripePriceId: String(payload.stripePriceId || editingPlan?.stripePriceId || 'pending_stripe_setup'),
+            // Optional fields - only include if they have values
+            ...(payload.price !== undefined && { price: payload.price }),
+            ...(payload.billingCycle && { billingCycle: payload.billingCycle }),
+            ...(payload.trialPeriod !== undefined && { trialPeriod: payload.trialPeriod }),
+            ...(payload.isActive !== undefined && { isActive: payload.isActive }),
+            ...(payload.enabledFeatureKeys && payload.enabledFeatureKeys.length > 0 && { enabledFeatureKeys: payload.enabledFeatureKeys }),
+            ...(payload.limits && Object.keys(payload.limits).length > 0 && { limits: payload.limits }),
+          };
+          
+          console.log('🟠 [7] Calling updatePlan with:');
+          console.log('  - id:', updatePlanId);
+          console.log('  - data:', JSON.stringify(finalPayload, null, 2));
+          
+          await updatePlan({ id: updatePlanId, data: finalPayload }).unwrap();
           toast.success('Plan updated successfully');
           // Manually refetch plans to ensure UI updates
           await refetchPlans();
         } else {
+          console.log('🟠 [7] Calling createPlan with:');
+          console.log('  - data:', JSON.stringify(payload, null, 2));
+          
           await createPlan(payload).unwrap();
           toast.success('Plan created successfully');
           // Manually refetch plans to ensure UI updates
