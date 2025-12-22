@@ -605,6 +605,7 @@ export default function SubscriptionsPage() {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [isFeatureSubscriptionPayment, setIsFeatureSubscriptionPayment] = useState(false);
   const [isPaymentInstructionsModalOpen, setIsPaymentInstructionsModalOpen] = useState(false);
   const [paymentInstructions, setPaymentInstructions] = useState<any>(null);
   const [paymentGateway, setPaymentGateway] = useState<string>('');
@@ -622,6 +623,19 @@ export default function SubscriptionsPage() {
     if (!hasSuccess) return;
     const finalizePendingPlan = async (subscriptionId?: string) => {
       try {
+        // Check for feature-based subscription first
+        const featureRaw = window.localStorage.getItem('pendingFeatureSubscription');
+        if (featureRaw) {
+          // Feature-based subscriptions are handled by webhook, just clean up
+          window.localStorage.removeItem('pendingFeatureSubscription');
+          toast.success('Feature-based subscription activated successfully');
+          refetchCompany();
+          refetchCurrentSubscription();
+          refetchSubscriptionByCompany();
+          return;
+        }
+        
+        // Handle plan-based subscription
         const raw = window.localStorage.getItem('pendingPlanChange');
         if (!raw) return;
         const pending = JSON.parse(raw);
@@ -835,7 +849,7 @@ export default function SubscriptionsPage() {
       await manualActivate({
         companyId: targetCompanyId,
         planName: selectedPlan.name,
-        billingCycle: 'monthly',
+        billingCycle: selectedPlan.billingCycle || 'monthly',
         notes: `Manually activated by Super Admin${user?.firstName ? ` (${user.firstName} ${user.lastName})` : ''}`,
       }).unwrap();
       toast.dismiss('manual-activate');
@@ -863,7 +877,7 @@ export default function SubscriptionsPage() {
     let targetCompanyEmail: string;
     let targetCompanyName: string;
     if (isSuperAdmin) {
-      // Super Admin: Use selected company
+      // Super Admin: Direct creation (no payment needed)
       if (!selectedCompanyForSubscription) {
         toast.error('Please select a company');
         return;
@@ -876,40 +890,112 @@ export default function SubscriptionsPage() {
       targetCompanyId = (selectedCompany as any)._id || selectedCompany.id;
       targetCompanyEmail = selectedCompany.email || '';
       targetCompanyName = selectedCompany.name || '';
+      try {
+        await createSubscription({
+          companyId: targetCompanyId,
+          enabledFeatures: selectedSubscriptionFeatures,
+          billingCycle: featureBillingCycle,
+          email: targetCompanyEmail,
+          companyName: targetCompanyName,
+        }).unwrap();
+        toast.success('Feature-based subscription created successfully!');
+        setIsFeatureSubscriptionModalOpen(false);
+        setSelectedSubscriptionFeatures([]);
+        setSelectedCompanyForSubscription('');
+        setFeatureBillingCycle('monthly');
+        refetchAllSubscriptions();
+      } catch (error: any) {
+        console.error('Feature subscription creation error:', error);
+        toast.error(error?.data?.message || error?.message || 'Failed to create subscription. Please try again.');
+      }
     } else {
-      // Regular user: Use their own company
-      if (!companyId || !companyData) {
-        toast.error('Company information not found');
-        return;
-      }
-      targetCompanyId = companyId;
-      targetCompanyEmail = user?.email || companyData.email || '';
-      targetCompanyName = companyData.name || '';
-    }
-    try {
-      await createSubscription({
-        companyId: targetCompanyId,
-        enabledFeatures: selectedSubscriptionFeatures,
-        billingCycle: featureBillingCycle,
-        email: targetCompanyEmail,
-        companyName: targetCompanyName,
-      }).unwrap();
-      toast.success('Feature-based subscription created successfully!');
+      // Regular user: Show payment method selector
       setIsFeatureSubscriptionModalOpen(false);
-      setSelectedSubscriptionFeatures([]);
-      setSelectedCompanyForSubscription('');
-      setFeatureBillingCycle('monthly');
-      if (!isSuperAdmin) {
-        setViewMode('plans');
+      setIsFeatureSubscriptionPayment(true);
+      setIsPaymentMethodModalOpen(true);
+    }
+  };
+  
+  // Handle payment method selection for feature-based subscriptions
+  const handleFeatureSubscriptionPayment = async (method: SubscriptionPaymentMethod) => {
+    if (!selectedSubscriptionFeatures || selectedSubscriptionFeatures.length === 0) {
+      toast.error('Please select at least one feature');
+      return;
+    }
+    if (!companyId) {
+      toast.error('Company information not found');
+      return;
+    }
+    setSelectedPaymentMethod(method);
+    try {
+      toast.loading('Initializing payment...', { id: 'feature-payment-init' });
+      const methodId = method.id || (method as any)._id || (method as any).id?.toString() || (method as any)._id?.toString();
+      
+      const paymentResponse = await initializePayment({
+        companyId,
+        enabledFeatures: selectedSubscriptionFeatures, // Pass enabledFeatures instead of planName
+        paymentGateway: method.gateway,
+        paymentMethodId: methodId,
+        billingCycle: featureBillingCycle,
+      }).unwrap();
+      
+      toast.dismiss('feature-payment-init');
+      
+      // Handle different payment gateway responses
+      if (paymentResponse.url) {
+        // Redirect to payment URL (Stripe, PayPal, Google Pay, etc.)
+        try {
+          window.localStorage.setItem(
+            'pendingFeatureSubscription',
+            JSON.stringify({
+              enabledFeatures: selectedSubscriptionFeatures,
+              billingCycle: featureBillingCycle,
+              companyId,
+            }),
+          );
+        } catch (e) {
+          console.warn('Failed to persist pendingFeatureSubscription', e);
+        }
+        window.location.href = paymentResponse.url;
+      } else if (paymentResponse.requiresManualVerification && paymentResponse.instructions) {
+        // For mobile wallets (bKash, Nagad) with manual verification
+        if (!methodId) {
+          console.error('Payment method ID is missing:', method);
+          toast.error('Payment method ID is missing. Please try again.');
+          return;
+        }
+        const instructionsWithPaymentInfo = {
+          ...paymentResponse.instructions,
+          _paymentInfo: {
+            companyId,
+            paymentMethodId: methodId,
+            enabledFeatures: selectedSubscriptionFeatures,
+            billingCycle: featureBillingCycle,
+          },
+        };
+        setPaymentInstructions(instructionsWithPaymentInfo);
+        setPaymentGateway(paymentResponse.gateway);
+        setIsPaymentMethodModalOpen(false);
+        setIsFeatureSubscriptionPayment(false);
+        setIsPaymentInstructionsModalOpen(true);
+        toast.success('Please follow the payment instructions below', {
+          duration: 5000,
+        });
+      } else if (paymentResponse.clientSecret) {
+        toast.error('This payment method requires additional setup. Please contact support.');
+      } else {
+        console.error('🔴 Payment initialization failed - no URL, clientSecret, or requiresManualVerification');
+        console.error('🔴 Full response:', paymentResponse);
+        toast.error('Payment initialization failed - no payment URL received. Please check console for details.');
       }
-      // Refetch subscription data
-      if (!isSuperAdmin) {
-        refetchCurrentSubscription();
-        refetchSubscriptionByCompany();
+      if (paymentResponse.url) {
+        setIsPaymentMethodModalOpen(false);
+        setIsFeatureSubscriptionPayment(false);
       }
     } catch (error: any) {
-      console.error('Feature subscription creation error:', error);
-      toast.error(error?.data?.message || error?.message || 'Failed to create subscription. Please try again.');
+      console.error('🔴 Feature subscription payment initialization error:', error);
+      toast.dismiss('feature-payment-init');
+      toast.error(error?.data?.message || error?.message || 'Failed to initialize payment');
     }
   };
   const handleCancel = async () => {
@@ -2928,23 +3014,40 @@ export default function SubscriptionsPage() {
         </Card>
       )}
       {/* Payment Method Selector Modal */}
-      {isPaymentMethodModalOpen && selectedPlan && (() => {
-        // Always use the selected plan's price here so the amount matches the
-        // "New Plan" card in the confirmation modal (no confusion with current plan price)
-        const planPrice = selectedPlan.price || 0;
-        const planCurrency = selectedPlan.currency || 'BDT';
-        return (
-          <PaymentMethodSelector
-            isOpen={isPaymentMethodModalOpen}
-            onClose={() => {
-              setIsPaymentMethodModalOpen(false);
-            }}
-            onSelect={handlePaymentMethodSelected}
-            amount={planPrice}
-            currency={planCurrency}
-            country="BD"
-          />
-        );
+      {isPaymentMethodModalOpen && (selectedPlan || isFeatureSubscriptionPayment) && (() => {
+        // Determine if this is for feature-based or plan-based subscription
+        if (isFeatureSubscriptionPayment) {
+          // Feature-based subscription
+          return (
+            <PaymentMethodSelector
+              isOpen={isPaymentMethodModalOpen}
+              onClose={() => {
+                setIsPaymentMethodModalOpen(false);
+                setIsFeatureSubscriptionPayment(false);
+              }}
+              onSelect={handleFeatureSubscriptionPayment}
+              amount={featureSubscriptionPrice}
+              currency="BDT"
+              country="BD"
+            />
+          );
+        } else {
+          // Plan-based subscription
+          const planPrice = selectedPlan?.price || 0;
+          const planCurrency = selectedPlan?.currency || 'BDT';
+          return (
+            <PaymentMethodSelector
+              isOpen={isPaymentMethodModalOpen}
+              onClose={() => {
+                setIsPaymentMethodModalOpen(false);
+              }}
+              onSelect={handlePaymentMethodSelected}
+              amount={planPrice}
+              currency={planCurrency}
+              country="BD"
+            />
+          );
+        }
       })()}
       {/* Payment Instructions Modal */}
       {paymentInstructions && (
@@ -2961,7 +3064,8 @@ export default function SubscriptionsPage() {
           companyId={companyId}
           paymentMethodId={selectedPaymentMethod?.id}
           planName={selectedPlan?.name}
-          billingCycle="monthly"
+          enabledFeatures={isFeatureSubscriptionPayment ? selectedSubscriptionFeatures : undefined}
+          billingCycle={isFeatureSubscriptionPayment ? featureBillingCycle : (selectedPlan?.billingCycle || 'monthly')}
           onPaymentCompleted={() => {
             setIsPaymentInstructionsModalOpen(false);
             setPaymentInstructions(null);
@@ -3322,11 +3426,11 @@ export default function SubscriptionsPage() {
             )}
           </div>
         ) : (
-          // Regular users: Confirmation modal
+          // Regular users: Confirmation modal with proceed to payment
           <div className="space-y-6">
             <div>
               <p className="text-gray-600 dark:text-gray-400 mb-2">
-                Are you sure you want to create a custom subscription with the selected features?
+                Review your custom subscription and proceed to payment
               </p>
             </div>
             {/* Subscription Summary */}
@@ -3348,7 +3452,7 @@ export default function SubscriptionsPage() {
               <div className="flex justify-between text-lg font-bold border-t border-primary-200 dark:border-primary-700 pt-2 mt-2">
                 <span className="text-gray-900 dark:text-white">Total Price:</span>
                 <span className="text-primary-600 dark:text-primary-400">
-                  {formatCurrency(featureSubscriptionPrice)}/{featureBillingCycle === 'monthly' ? 'month' : 'year'}
+                  {formatCurrency(featureSubscriptionPrice)}/{featureBillingCycle === 'monthly' ? 'month' : featureBillingCycle === 'quarterly' ? 'quarter' : 'year'}
                 </span>
               </div>
             </div>
@@ -3367,10 +3471,10 @@ export default function SubscriptionsPage() {
                 </div>
               </div>
             )}
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
                 <CreditCardIcon className="w-4 h-4 inline mr-2" />
-                Your custom subscription will be created immediately with the selected features.
+                You will be redirected to select a payment method after confirming.
               </p>
             </div>
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -3380,18 +3484,18 @@ export default function SubscriptionsPage() {
                   setIsFeatureSubscriptionModalOpen(false);
                 }}
                 className="flex-1"
-                disabled={isCreatingFeatureSubscription}
+                disabled={isInitializingPayment}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCreateFeatureSubscription}
-                isLoading={isCreatingFeatureSubscription}
+                isLoading={isInitializingPayment}
                 className="flex-1"
                 variant="primary"
                 disabled={selectedSubscriptionFeatures.length === 0}
               >
-                {isCreatingFeatureSubscription ? 'Creating...' : 'Create Subscription'}
+                Proceed to Payment
               </Button>
             </div>
           </div>

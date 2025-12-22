@@ -28,6 +28,7 @@ interface PaymentInstructionsModalProps {
   companyId?: string;
   paymentMethodId?: string;
   planName?: string;
+  enabledFeatures?: string[]; // For feature-based subscriptions
   billingCycle?: string;
 }
 
@@ -40,6 +41,7 @@ export function PaymentInstructionsModal({
   companyId,
   paymentMethodId,
   planName,
+  enabledFeatures,
   billingCycle = 'monthly',
 }: PaymentInstructionsModalProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -399,14 +401,20 @@ export function PaymentInstructionsModal({
                   const effectiveCompanyId = companyId || (instructions as any)?._paymentInfo?.companyId;
                   const effectivePaymentMethodId = paymentMethodId || (instructions as any)?._paymentInfo?.paymentMethodId;
                   const effectivePlanName = planName || (instructions as any)?._paymentInfo?.planName;
+                  const effectiveEnabledFeatures = enabledFeatures || (instructions as any)?._paymentInfo?.enabledFeatures;
                   const effectiveBillingCycle = billingCycle || (instructions as any)?._paymentInfo?.billingCycle || 'monthly';
+                  
+                  // Check if it's feature-based or plan-based
+                  const isFeatureBased = effectiveEnabledFeatures && Array.isArray(effectiveEnabledFeatures) && effectiveEnabledFeatures.length > 0;
 
-                  if (!effectiveCompanyId || !effectivePaymentMethodId || !effectivePlanName) {
+                  if (!effectiveCompanyId || !effectivePaymentMethodId || (!effectivePlanName && !isFeatureBased)) {
                     console.error('Missing payment information:', {
                       companyId: effectiveCompanyId,
                       paymentMethodId: effectivePaymentMethodId,
                       planName: effectivePlanName,
-                      props: { companyId, paymentMethodId, planName },
+                      enabledFeatures: effectiveEnabledFeatures,
+                      isFeatureBased,
+                      props: { companyId, paymentMethodId, planName, enabledFeatures },
                       instructions: (instructions as any)?._paymentInfo,
                     });
                     toast.error('Missing payment information. Please close and try again from the beginning.');
@@ -438,7 +446,10 @@ export function PaymentInstructionsModal({
                     await submitPaymentRequest({
                       companyId: effectiveCompanyId,
                       paymentMethodId: effectivePaymentMethodId,
-                      planName: effectivePlanName,
+                      ...(isFeatureBased 
+                        ? { enabledFeatures: effectiveEnabledFeatures }
+                        : { planName: effectivePlanName }
+                      ),
                       amount: instructions.amount,
                       currency: instructions.currency,
                       billingCycle: effectiveBillingCycle,

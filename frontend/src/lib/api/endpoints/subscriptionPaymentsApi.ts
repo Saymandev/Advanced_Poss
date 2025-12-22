@@ -43,7 +43,8 @@ export interface SubscriptionPaymentMethod {
 }
 export interface InitializePaymentRequest {
   companyId: string;
-  planName: string;
+  planName?: string; // Optional for plan-based subscriptions
+  enabledFeatures?: string[]; // Optional for feature-based subscriptions
   paymentGateway: PaymentGateway;
   paymentMethodId?: string; // Specific payment method ID (required for MANUAL gateway)
   paymentDetails?: {
@@ -326,7 +327,8 @@ export interface PaymentRequest {
 export interface SubmitPaymentRequestDto {
   companyId: string;
   paymentMethodId: string;
-  planName: string;
+  planName?: string; // Optional for plan-based subscriptions
+  enabledFeatures?: string[]; // Optional for feature-based subscriptions
   amount: number;
   currency?: string;
   billingCycle?: string;
