@@ -9,13 +9,13 @@ import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsA
 import { setCredentials } from '@/lib/slices/authSlice';
 import { useAppDispatch } from '@/lib/store';
 import {
-  BuildingStorefrontIcon,
-  EnvelopeIcon,
-  HomeIcon,
-  MapPinIcon,
-  PhoneIcon,
-  SparklesIcon,
-  UserIcon
+    BuildingStorefrontIcon,
+    EnvelopeIcon,
+    HomeIcon,
+    MapPinIcon,
+    PhoneIcon,
+    SparklesIcon,
+    UserIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
