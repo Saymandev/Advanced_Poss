@@ -17,14 +17,14 @@ import { SubmitPaymentRequestDto } from './dto/submit-payment-request.dto';
 import { UpdateSubscriptionPaymentMethodDto } from './dto/update-subscription-payment-method.dto';
 import { VerifyPaymentRequestDto } from './dto/verify-payment-request.dto';
 import {
-    PaymentGateway,
-    SubscriptionPaymentMethod,
-    SubscriptionPaymentMethodDocument,
+  PaymentGateway,
+  SubscriptionPaymentMethod,
+  SubscriptionPaymentMethodDocument,
 } from './schemas/subscription-payment-method.schema';
 import {
-    PaymentRequestStatus,
-    SubscriptionPaymentRequest,
-    SubscriptionPaymentRequestDocument,
+  PaymentRequestStatus,
+  SubscriptionPaymentRequest,
+  SubscriptionPaymentRequestDocument,
 } from './schemas/subscription-payment-request.schema';
 import { getBillingCycleDays, getPayPalBillingInterval, getStripeBillingInterval } from './utils/billing-cycle.helper';
 @Injectable()
@@ -752,8 +752,11 @@ export class SubscriptionPaymentsService {
     });
 
     const now = new Date();
+    // Use billingCycle from DTO, fallback to plan's billingCycle, then default to MONTHLY
     const cycle: BillingCycle =
-      (billingCycle as BillingCycle) || BillingCycle.MONTHLY;
+      (billingCycle as BillingCycle) || 
+      (plan.billingCycle as BillingCycle) || 
+      BillingCycle.MONTHLY;
     const periodDays = getBillingCycleDays(cycle);
     const subscriptionEndDate = new Date(
       now.getTime() + periodDays * 24 * 60 * 60 * 1000,

@@ -5,7 +5,7 @@ import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
-import { getStripeBillingInterval } from '../subscription-payments/utils/billing-cycle.helper';
+import { getBillingCycleDays, getStripeBillingInterval } from '../subscription-payments/utils/billing-cycle.helper';
 import { BillingCycle, Subscription, SubscriptionDocument, SubscriptionStatus } from '../subscriptions/schemas/subscription.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
@@ -103,7 +103,10 @@ export class PaymentsService {
       }
       // Calculate subscription dates using millisecond-based calculation
       const now = new Date();
-      const subscriptionEndDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days (1 month)
+      // Use billing cycle from plan to calculate end date
+      const billingCycle = (plan.billingCycle as BillingCycle) || BillingCycle.MONTHLY;
+      const periodDays = getBillingCycleDays(billingCycle);
+      const subscriptionEndDate = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
       // Update company subscription
       await this.companyModel.findByIdAndUpdate(companyId, {
         subscriptionPlan: planName,
@@ -247,8 +250,10 @@ export class PaymentsService {
     }
     // Calculate subscription dates using millisecond-based calculation
     const now = new Date();
-    // Add 30 days for monthly subscription (more accurate than setMonth)
-    const subscriptionEndDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
+    // Use billing cycle from plan to calculate end date
+    const billingCycle = (plan.billingCycle as BillingCycle) || BillingCycle.MONTHLY;
+    const periodDays = getBillingCycleDays(billingCycle);
+    const subscriptionEndDate = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
     // Update company subscription - use $unset to completely remove trialEndDate field
     // Properly merge settings to ensure features are saved correctly
     const existingSettings = company.settings || {};
