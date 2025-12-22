@@ -19,6 +19,7 @@
     "lint": "npm run lint:backend",
     "lint:backend": "cd backend && npm run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "remove-console-logs": "node scripts/remove-console-logs.js",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f"

@@ -96,10 +96,21 @@ export class SubscriptionPlansService {
   }
 
   async update(id: string, updateDto: UpdateSubscriptionPlanDto): Promise<SubscriptionPlan> {
+    console.log('🔴 [BACKEND] Update called with:');
+    console.log('  - id:', id);
+    console.log('  - updateDto:', JSON.stringify(updateDto, null, 2));
+    console.log('  - updateDto keys:', Object.keys(updateDto));
+    
     const existingPlan = await this.subscriptionPlanModel.findById(id);
     if (!existingPlan) {
       throw new NotFoundException('Subscription plan not found');
     }
+    
+    console.log('🔴 [BACKEND] Existing plan:');
+    console.log('  - name:', existingPlan.name);
+    console.log('  - displayName:', existingPlan.displayName);
+    console.log('  - description:', existingPlan.description);
+    console.log('  - stripePriceId:', existingPlan.stripePriceId);
 
     // Prepare update data - ONLY include fields that are actually provided
     // This prevents accidentally removing fields that weren't in the update request
@@ -108,11 +119,28 @@ export class SubscriptionPlansService {
     // Only update fields that are explicitly provided in the DTO
     // CRITICAL: Check for undefined AND null to prevent accidental overwrites
     // Frontend now only sends fields with actual values, so we can safely update what's provided
+    console.log('🔴 [BACKEND] Processing displayName:');
+    console.log('  - updateDto.displayName:', updateDto.displayName);
+    console.log('  - is undefined?', updateDto.displayName === undefined);
+    console.log('  - is null?', updateDto.displayName === null);
+    console.log('  - is empty?', updateDto.displayName === '');
     if (updateDto.displayName !== undefined && updateDto.displayName !== null && updateDto.displayName !== '') {
       updateData.displayName = updateDto.displayName;
+      console.log('  - ✅ Added to updateData');
+    } else {
+      console.log('  - ❌ NOT added to updateData');
     }
+    
+    console.log('🔴 [BACKEND] Processing description:');
+    console.log('  - updateDto.description:', updateDto.description);
+    console.log('  - is undefined?', updateDto.description === undefined);
+    console.log('  - is null?', updateDto.description === null);
+    console.log('  - is empty?', updateDto.description === '');
     if (updateDto.description !== undefined && updateDto.description !== null && updateDto.description !== '') {
       updateData.description = updateDto.description;
+      console.log('  - ✅ Added to updateData');
+    } else {
+      console.log('  - ❌ NOT added to updateData');
     }
     // Price: Only update if explicitly provided (frontend now only sends if field has value)
     if (updateDto.price !== undefined && updateDto.price !== null) {
@@ -171,16 +199,30 @@ export class SubscriptionPlansService {
     // If neither enabledFeatureKeys nor features are provided, preserve existing ones
     // Don't touch them if they're not in the update
 
+    console.log('🔴 [BACKEND] Final updateData:');
+    console.log(JSON.stringify(updateData, null, 2));
+    console.log('🔴 [BACKEND] updateData keys:', Object.keys(updateData));
+    
     // Only update if there's actually something to update
     if (Object.keys(updateData).length === 0) {
+      console.log('🔴 [BACKEND] No fields to update, returning existing plan');
       return existingPlan;
     }
+
+    console.log('🔴 [BACKEND] Calling findByIdAndUpdate with:');
+    console.log('  - id:', id);
+    console.log('  - $set:', JSON.stringify(updateData, null, 2));
 
     const plan = await this.subscriptionPlanModel.findByIdAndUpdate(
       id,
       { $set: updateData }, // Use $set operator to only update specified fields
       { new: true },
     );
+    
+    console.log('🔴 [BACKEND] Update result:');
+    console.log('  - plan.name:', plan?.name);
+    console.log('  - plan.displayName:', plan?.displayName);
+    console.log('  - plan.description:', plan?.description);
 
     if (!plan) {
       throw new NotFoundException('Subscription plan not found');
