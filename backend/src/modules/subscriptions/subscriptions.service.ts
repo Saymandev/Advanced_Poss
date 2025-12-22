@@ -456,6 +456,16 @@ export class SubscriptionsService {
         }
         const planKey = this.resolvePlanKey(plan.name);
         subscriptionData.plan = planKey;
+        
+        // Also set enabledFeatures from plan for immediate access (role-permissions service can use this)
+        // Priority: enabledFeatureKeys > legacy features conversion
+        if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
+          subscriptionData.enabledFeatures = plan.enabledFeatureKeys;
+        } else if (plan.features) {
+          // Convert legacy features to feature keys
+          const { convertLegacyFeaturesToKeys } = await import('./utils/plan-features.helper');
+          subscriptionData.enabledFeatures = convertLegacyFeaturesToKeys(plan.features);
+        }
       }
 
       subscriptionData.isActive = true; // Explicitly set isActive

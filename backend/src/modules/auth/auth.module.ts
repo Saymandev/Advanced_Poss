@@ -11,6 +11,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schemas/subscription-plan.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { SuperAdminNotificationsModule } from '../super-admin-notifications/super-admin-notifications.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
@@ -25,6 +26,7 @@ import { TwoFactorService } from './two-factor.service';
     forwardRef(() => CompaniesModule),
     forwardRef(() => BranchesModule),
     forwardRef(() => SubscriptionPlansModule),
+    forwardRef(() => SubscriptionsModule),
     forwardRef(() => LoginActivityModule),
     forwardRef(() => SuperAdminNotificationsModule),
     forwardRef(() => NotificationsModule),

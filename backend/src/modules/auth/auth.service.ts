@@ -18,6 +18,7 @@ import { LoginActivityService } from '../login-activity/login-activity.service';
 import { LoginMethod, LoginStatus } from '../login-activity/schemas/login-activity.schema';
 import { LoginSecurityService } from '../settings/login-security.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SuperAdminNotificationsService } from '../super-admin-notifications/super-admin-notifications.service';
 import { UsersService } from '../users/users.service';
 import { CompanyOwnerRegisterDto } from './dto/company-owner-register.dto';
@@ -38,6 +39,7 @@ export class AuthService {
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
     private subscriptionPlansService: SubscriptionPlansService,
+    private subscriptionsService: SubscriptionsService,
     private loginActivityService: LoginActivityService,
     private loginSecurityService: LoginSecurityService,
     private jwtService: JwtService,
@@ -482,6 +484,29 @@ export class AuthService {
     // Get subscription plan details
     const subscriptionPlan = await this.subscriptionPlansService.findByName(subscriptionPackage);
     const requiresPayment = subscriptionPlan.price > 0;
+
+    // Create trial subscription automatically for new company
+    // This ensures features are available immediately during trial period
+    try {
+      // SubscriptionPlan enum values are lowercase: 'basic', 'premium', 'enterprise', 'free'
+      // BillingCycle enum values are lowercase: 'monthly', 'quarterly', 'yearly'
+      // subscriptionPackage is already in the correct format from the DTO
+      const planValue = subscriptionPackage.toLowerCase() as any;
+      const billingCycleValue = (subscriptionPlan.billingCycle || 'monthly').toLowerCase() as any;
+      
+      await this.subscriptionsService.create({
+        companyId: (company as any)._id.toString(),
+        plan: planValue,
+        billingCycle: billingCycleValue,
+        email: companyEmail,
+        companyName: companyName,
+      });
+      this.logger.log(`✅ Trial subscription created for company ${companyName} with plan ${subscriptionPackage}`);
+    } catch (error) {
+      // Log error but don't fail registration - subscription can be created later
+      this.logger.warn(`⚠️ Failed to create trial subscription during registration: ${error?.message || error}`);
+      // Continue with registration even if subscription creation fails
+    }
 
     // Generate tokens
     const tokens = await this.generateTokens(user);
