@@ -76,9 +76,10 @@ export function FeatureBasedSubscriptionSelector({
   }, [selectedFeatures, billingCycle, branchCount, userCount, calculatePrice, onPriceCalculated]);
 
   // Also update price when mutation data changes (fallback)
+  // Only update if priceData has a valid totalPrice (not 0 or undefined)
   useEffect(() => {
-    if (isPriceCalculated && priceData && onPriceCalculated) {
-      const totalPrice = priceData?.totalPrice ?? 0;
+    if (isPriceCalculated && priceData && priceData.totalPrice && priceData.totalPrice > 0 && onPriceCalculated) {
+      const totalPrice = priceData.totalPrice;
       console.log('[FeatureBasedSubscriptionSelector] Price updated from mutation data:', { totalPrice, priceData });
       onPriceCalculated(totalPrice);
     }
