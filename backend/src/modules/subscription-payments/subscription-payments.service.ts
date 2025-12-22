@@ -1091,6 +1091,40 @@ export class SubscriptionPaymentsService {
       throw new BadRequestException('Either planName or enabledFeatures must be provided');
     }
 
+    // VALIDATION: Calculate expected price and verify it matches the submitted amount
+    let expectedPrice = 0;
+    if (isFeatureBased) {
+      // For feature-based subscriptions, calculate the expected price
+      const branchCount = await this.companyModel.db.collection('branches').countDocuments({ companyId: dto.companyId });
+      const userCount = await this.companyModel.db.collection('users').countDocuments({ companyId: dto.companyId });
+      
+      const pricing = await this.featuresService.calculatePrice(
+        dto.enabledFeatures,
+        (dto.billingCycle as 'monthly' | 'quarterly' | 'yearly') || 'monthly',
+        branchCount || 1,
+        userCount || 1,
+      );
+      
+      expectedPrice = pricing.totalPrice;
+    } else {
+      // For plan-based subscriptions, get price from plan
+      const plan = await this.subscriptionPlansService.findByName(dto.planName);
+      if (!plan) {
+        throw new NotFoundException('Subscription plan not found');
+      }
+      expectedPrice = plan.price;
+    }
+
+    // Validate that the submitted amount matches the calculated/expected price
+    // Allow small floating point differences (0.01 tolerance)
+    const priceDifference = Math.abs(dto.amount - expectedPrice);
+    if (priceDifference > 0.01) {
+      throw new BadRequestException(
+        `Payment amount mismatch. Expected ${expectedPrice} ${dto.currency || 'BDT'}, but received ${dto.amount} ${dto.currency || 'BDT'}. ` +
+        `This may indicate tampering. Please recalculate and resubmit.`
+      );
+    }
+
     // Check if there's already a pending request for this company and plan/features
     const existingRequestQuery: any = {
       companyId: dto.companyId,
