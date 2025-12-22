@@ -461,10 +461,17 @@ export class SubscriptionsService {
         // Priority: enabledFeatureKeys > legacy features conversion
         if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
           subscriptionData.enabledFeatures = plan.enabledFeatureKeys;
+          console.log(`[Subscriptions] ✅ Set enabledFeatures from plan.enabledFeatureKeys (${plan.enabledFeatureKeys.length} features) for plan '${plan.name}'`);
         } else if (plan.features) {
           // Convert legacy features to feature keys
           const { convertLegacyFeaturesToKeys } = await import('./utils/plan-features.helper');
           subscriptionData.enabledFeatures = convertLegacyFeaturesToKeys(plan.features);
+          console.log(`[Subscriptions] ✅ Converted plan.features to enabledFeatures (${subscriptionData.enabledFeatures.length} features) for plan '${plan.name}'`);
+        } else {
+          // Fallback: If plan has neither enabledFeatureKeys nor features, set empty array
+          // The role-permissions service will fallback to plan lookup, but we ensure enabledFeatures is always defined
+          console.warn(`[Subscriptions] ⚠️ Plan '${plan.name}' has no enabledFeatureKeys or features object. Setting empty enabledFeatures array.`);
+          subscriptionData.enabledFeatures = [];
         }
       }
 

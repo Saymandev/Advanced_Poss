@@ -117,10 +117,12 @@ export class RolePermissionsService {
     // In that case, fall back to plan lookup to get the full feature set
     if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures) && subscription.enabledFeatures.length >= 5) {
       enabledFeatures = subscription.enabledFeatures;
-      } else if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures) && subscription.enabledFeatures.length > 0) {
-      // Fallback to plan lookup
+    } else if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures) && subscription.enabledFeatures.length > 0) {
+      // If subscription has some features but less than 5, still use them but also try plan lookup for completeness
+      enabledFeatures = subscription.enabledFeatures;
+      // Continue to plan lookup below to potentially get more features
     }
-    // Priority 2: Get features from plan (if subscription.enabledFeatures is empty or has too few features)
+    // Priority 2: Get features from plan (if subscription.enabledFeatures is empty, undefined, or has too few features)
     if (enabledFeatures.length < 5 && subscription.plan) {
       try {
         // Handle both string and object (in case plan is populated)
@@ -151,8 +153,8 @@ export class RolePermissionsService {
         }
         // Continue to fallback logic
       }
-    } else {
-      console.warn(`[RolePermissions] ⚠️ Subscription has no plan property`);
+    } else if (!subscription.plan) {
+      console.warn(`[RolePermissions] ⚠️ Subscription has no plan property for company ${companyId}`);
     }
     // If subscription is active/trial but no features extracted (or very few), return all role features
     // This handles cases where subscription.enabledFeatures is incomplete or plan lookup failed
