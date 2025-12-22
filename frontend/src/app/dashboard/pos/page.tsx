@@ -2437,13 +2437,13 @@ export default function POSPage() {
   const renderPreOrderView = () => {
     if (orderType === 'dine-in') {
       return (
-        <div className="flex-1 overflow-y-auto px-6 py-10 min-h-0">
-          <div className="mx-auto max-w-5xl space-y-8">
+        <div className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-10 min-h-0">
+          <div className="mx-auto max-w-5xl space-y-4 sm:space-y-6 md:space-y-8">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Select a table to start a dine-in order</h2>
-              <p className="text-gray-600 dark:text-slate-400">Tap an available table below to launch the ordering workspace.</p>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 dark:text-slate-100">Select a table to start a dine-in order</h2>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-slate-400">Tap an available table below to launch the ordering workspace.</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {tablesLoading ? (
                 [...Array(8)].map((_, index) => (
                   <div key={index} className="h-40 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/40 animate-pulse" />
@@ -2814,7 +2814,7 @@ export default function POSPage() {
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 min-h-0">
+          <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 min-h-0">
         {/* Room service booking summary */}
         {requiresRoomService && selectedRoomServiceBooking && (
           <div className="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 sm:px-5 sm:py-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -3060,7 +3060,7 @@ export default function POSPage() {
             )}
           </div>
         ) : menuItemsLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
             {[...Array(8)].map((_, i) => (
               <Card key={i} className="animate-pulse bg-gray-100 dark:bg-slate-900/40 border border-gray-200 dark:border-slate-800">
                 <CardContent className="p-4">
@@ -3072,14 +3072,14 @@ export default function POSPage() {
             ))}
           </div>
         ) : filteredMenuItems.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
             {filteredMenuItems.map((item) => (
               <Card
                 key={item.id}
                 className="group relative overflow-hidden border border-gray-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-700/20"
               >
-                <CardContent className="p-4 space-y-3">
-                  <div className="relative aspect-square rounded-xl bg-gray-100 dark:bg-slate-950/60 flex items-center justify-center border border-gray-200 dark:border-slate-800/80 overflow-hidden">
+                <CardContent className="p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3">
+                  <div className="relative aspect-square rounded-lg sm:rounded-xl bg-gray-100 dark:bg-slate-950/60 flex items-center justify-center border border-gray-200 dark:border-slate-800/80 overflow-hidden">
                     {item.image ? (
                       <Image
                         src={item.image}
@@ -3110,22 +3110,22 @@ export default function POSPage() {
                     )}
                   </div>
                   <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-semibold text-gray-900 dark:text-slate-100 truncate">
+                    <div className="flex items-center justify-between gap-1 sm:gap-2">
+                      <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-slate-100 truncate">
                         {item.name}
                       </h3>
                       {item.category?.name && (
-                        <Badge className="bg-sky-500/10 dark:text-sky-200 text-gray-900 border border-sky-500/20">
+                        <Badge className="bg-sky-500/10 dark:text-sky-200 text-gray-900 border border-sky-500/20 text-[10px] sm:text-xs">
                           {item.category.name}
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-gray-600 dark:text-slate-400 line-clamp-2 min-h-[32px]">
+                    <p className="mt-1 text-[10px] sm:text-xs text-gray-600 dark:text-slate-400 line-clamp-2 min-h-[24px] sm:min-h-[32px]">
                       {item.description || "Perfect for today's menu."}
                     </p>
                   </div>
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-xl font-bold text-emerald-400">
+                  <div className="flex items-center justify-between pt-1 sm:pt-2 gap-2">
+                    <span className="text-base sm:text-lg md:text-xl font-bold text-emerald-400">
                       {formatCurrency(item.price)}
                     </span>
                     <Button
@@ -3142,10 +3142,10 @@ export default function POSPage() {
                         addToCart(item);
                       }}
                       disabled={item.isOutOfStock || item.isLowStock}
-                      className="flex items-center gap-1 rounded-full bg-sky-600 hover:bg-sky-500 disabled:bg-gray-600 disabled:text-gray-200 disabled:cursor-not-allowed disabled:hover:bg-gray-600"
+                      className="flex items-center gap-1 rounded-full bg-sky-600 hover:bg-sky-500 disabled:bg-gray-600 disabled:text-gray-200 disabled:cursor-not-allowed disabled:hover:bg-gray-600 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5"
                     >
-                      <PlusIcon className="h-4 w-4" />
-                      Add
+                      <PlusIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Add</span>
                     </Button>
                   </div>
                 </CardContent>
@@ -3175,13 +3175,13 @@ export default function POSPage() {
           {/* Mobile: Floating button to open queue */}
           <button
             onClick={() => setIsQueueCollapsed(false)}
-            className="fixed bottom-4 right-4 z-50 md:hidden flex items-center justify-center w-14 h-14 rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/50 transition-all"
+            className="fixed bottom-4 right-4 z-50 xl:hidden flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/50 transition-all"
             aria-label="Open Orders Queue"
           >
             <ClipboardDocumentListIcon className="h-6 w-6" />
           </button>
           {/* Desktop: Side collapsed panel */}
-          <aside className="hidden md:flex md:w-16 md:flex-col md:items-center md:justify-center border-l border-gray-200 dark:border-slate-900/50 bg-white dark:bg-slate-950/60">
+          <aside className="hidden xl:flex xl:w-16 xl:flex-col xl:items-center xl:justify-center border-l border-gray-200 dark:border-slate-900/50 bg-white dark:bg-slate-950/60">
             <Button
               variant="ghost"
               onClick={() => setIsQueueCollapsed(false)}
@@ -3197,14 +3197,14 @@ export default function POSPage() {
     return (
       <>
         <div
-          className="fixed inset-0 z-30 bg-black/50 dark:bg-slate-950/70 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-30 bg-black/50 dark:bg-slate-950/70 backdrop-blur-sm xl:hidden"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             setIsQueueCollapsed(true);
           }}
         />
-        <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-md flex-col border-l border-gray-200 dark:border-slate-900 bg-white dark:bg-slate-950/95 shadow-xl md:static md:z-auto md:max-w-xs md:bg-white md:dark:bg-slate-950/80 min-h-0">
+        <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-sm sm:max-w-md flex-col border-l border-gray-200 dark:border-slate-900 bg-white dark:bg-slate-950/95 shadow-xl xl:static xl:z-auto xl:max-w-xs xl:bg-white xl:dark:bg-slate-950/80 min-h-0">
           <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900/70 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Orders</p>
@@ -3532,24 +3532,24 @@ export default function POSPage() {
     ) : (
     <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100">
       {/* Header */}
-      <div className="bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-gray-200 dark:border-slate-800 px-6 py-5 shadow-lg">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">POS System</h1>
-              <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-200 border border-sky-500/30 dark:border-sky-500/50">
+      <div className="bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-gray-200 dark:border-slate-800 px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-5 shadow-lg">
+        <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">POS System</h1>
+              <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-200 border border-sky-500/30 dark:border-sky-500/50 text-xs sm:text-sm">
               {orderTypeLabel}
             </Badge>
             </div>
-            <div className="flex items-center gap-3 flex-wrap text-sm text-gray-600 dark:text-slate-300">
-              <TableCellsIcon className="h-4 w-4 text-slate-400" />
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs sm:text-sm text-gray-600 dark:text-slate-300">
+              <TableCellsIcon className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 flex-shrink-0" />
               {requiresTable ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <select
                     value={selectedTable}
                     onChange={(event) => handleTableSelection(event.target.value)}
                     disabled={tablesLoading || tables.length === 0}
-                    className="rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-1.5 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="flex-1 min-w-0 rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {tablesLoading ? 'Loading tables…' : 'Select a table'}
@@ -3572,12 +3572,12 @@ export default function POSPage() {
                   ) : null}
                 </div>
               ) : requiresRoomService ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <select
                     value={roomServiceBookingId}
                     onChange={(event) => setRoomServiceBookingId(event.target.value)}
                     disabled={roomServiceBookingsLoading || roomServiceBookings.length === 0}
-                    className="rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-1.5 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="flex-1 min-w-0 rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {roomServiceBookingsLoading
@@ -3629,8 +3629,8 @@ export default function POSPage() {
               )}
             </div>
           </div>
-          <div className="flex flex-col gap-3 lg:items-end">
-            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
+          <div className="flex flex-col gap-2 sm:gap-3 lg:items-end">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-start lg:justify-end">
                 {ORDER_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => {
                   const isActive = orderType === value;
                   return (
@@ -3647,7 +3647,7 @@ export default function POSPage() {
                   );
                 })}
               </div>
-            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end w-full sm:w-auto">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-start lg:justify-end w-full lg:w-auto">
               <Button
                 variant={isQueueCollapsed ? 'secondary' : 'primary'}
                 onClick={(e) => {
@@ -3688,7 +3688,7 @@ export default function POSPage() {
           </div>
         </div>
       </div>
-      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row min-h-0">
+      <div className="flex flex-1 overflow-hidden flex-col xl:flex-row min-h-0">
         <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
           {isOrderingActive ? renderOrderingWorkspace() : renderPreOrderView()}
         </div>
@@ -5741,4 +5741,4 @@ export default function POSPage() {
     </div>
     )
   );
-}
+}

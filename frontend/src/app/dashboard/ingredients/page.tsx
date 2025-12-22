@@ -10,27 +10,26 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import {
-    InventoryItem,
-    useAddStockMutation,
-    useCreateInventoryItemMutation,
-    useDeleteInventoryItemMutation,
-    useGetInventoryItemsQuery,
-    useRemoveStockMutation,
-    useUpdateInventoryItemMutation,
+  InventoryItem,
+  useAddStockMutation,
+  useCreateInventoryItemMutation,
+  useDeleteInventoryItemMutation,
+  useGetInventoryItemsQuery,
+  useRemoveStockMutation,
+  useUpdateInventoryItemMutation,
 } from '@/lib/api/endpoints/inventoryApi';
-import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-    ArchiveBoxIcon,
-    BeakerIcon,
-    ExclamationTriangleIcon,
-    EyeIcon,
-    PencilIcon,
-    PlusIcon,
-    TrashIcon,
+  ArchiveBoxIcon,
+  BeakerIcon,
+  ExclamationTriangleIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function IngredientsPage() {
@@ -46,9 +45,7 @@ export default function IngredientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  // Notifications (topbar bell)
-  const { addNotification } = useNotifications();
-  const hasNotifiedLowStockRef = useRef(false);
+  // Notifications are handled automatically via WebSocket in useSocket hook
 
   const branchId = (user as any)?.branchId || 
                    (companyContext as any)?.branchId || 
@@ -179,40 +176,8 @@ export default function IngredientsPage() {
     }
   }, [isCreateModalOpen, isEditModalOpen]);
 
-  // Trigger a notification when there are low/out-of-stock ingredients
-  useEffect(() => {
-    if (hasNotifiedLowStockRef.current) return;
-    if (!ingredients || ingredients.length === 0) return;
-
-    const lowOrOut = ingredients.filter((ing) => {
-      const status = getStockStatus(ing);
-      return status.status === 'low' || status.status === 'out';
-    });
-
-    if (lowOrOut.length === 0) return;
-
-    const first: any = lowOrOut[0];
-
-    addNotification({
-      type: 'system',
-      title:
-        lowOrOut.length === 1
-          ? 'Low stock ingredient'
-          : 'Multiple ingredients low on stock',
-      message:
-        lowOrOut.length === 1
-          ? `${first.name} is ${
-              first.isOutOfStock ? 'out of stock' : 'low on stock'
-            } (${first.currentStock} ${first.unit}).`
-          : `${lowOrOut.length} ingredients are low or out of stock. Open Inventory to review details.`,
-      data: {
-        source: 'inventory',
-        ingredientIds: lowOrOut.map((ing: any) => ing.id),
-      },
-    });
-
-    hasNotifiedLowStockRef.current = true;
-  }, [ingredients, addNotification]);
+  // Notifications for low/out-of-stock ingredients are handled automatically via WebSocket
+  // in the useSocket hook (inventory:low-stock and inventory:out-of-stock events)
 
   const resetForm = () => {
     setFormData({
@@ -427,16 +392,24 @@ export default function IngredientsPage() {
       key: 'currentStock',
       title: 'Stock',
       align: 'right' as const,
-      render: (value: number, row: any) => (
-        <div className="text-right">
-          <p className="font-semibold text-gray-900 dark:text-white">
-            {value || 0} {row.unit}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Min: {row.minimumStock || row.minStock || 0} {row.unit}
-          </p>
-        </div>
-      ),
+      render: (value: number, row: any) => {
+        const stockValue = typeof value === 'number' ? value : (typeof value === 'string' ? parseFloat(value) : 0);
+        const minValue = typeof (row.minimumStock || row.minStock || 0) === 'number' 
+          ? (row.minimumStock || row.minStock || 0) 
+          : (typeof (row.minimumStock || row.minStock || 0) === 'string' ? parseFloat(row.minimumStock || row.minStock || '0') : 0);
+        const formattedStock = isNaN(stockValue) ? '0.00' : stockValue.toFixed(2);
+        const formattedMin = isNaN(minValue) ? '0.00' : minValue.toFixed(2);
+        return (
+          <div className="text-right">
+            <p className="font-semibold text-gray-900 dark:text-white">
+              {formattedStock} {row.unit}
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Min: {formattedMin} {row.unit}
+            </p>
+          </div>
+        );
+      },
     },
     {
       key: 'unitPrice',
@@ -1127,13 +1100,17 @@ export default function IngredientsPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Stock</p>
                 <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {selectedIngredient.currentStock} {selectedIngredient.unit}
+                  {typeof selectedIngredient.currentStock === 'number' 
+                    ? selectedIngredient.currentStock.toFixed(2) 
+                    : selectedIngredient.currentStock} {selectedIngredient.unit}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum Stock</p>
                 <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {selectedIngredient.minimumStock || selectedIngredient.minStock} {selectedIngredient.unit}
+                  {typeof (selectedIngredient.minimumStock || selectedIngredient.minStock) === 'number'
+                    ? (selectedIngredient.minimumStock || selectedIngredient.minStock).toFixed(2)
+                    : (selectedIngredient.minimumStock || selectedIngredient.minStock)} {selectedIngredient.unit}
                 </p>
               </div>
               <div>
@@ -1158,7 +1135,9 @@ export default function IngredientsPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Maximum Stock</p>
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {selectedIngredient.maximumStock} {selectedIngredient.unit}
+                    {typeof selectedIngredient.maximumStock === 'number'
+                      ? selectedIngredient.maximumStock.toFixed(2)
+                      : selectedIngredient.maximumStock} {selectedIngredient.unit}
                   </p>
                 </div>
               )}
