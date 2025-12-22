@@ -25,9 +25,13 @@ export class CreateSubscriptionPaymentDto {
   @IsString()
   companyId: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  planName: string;
+  planName?: string; // Optional for plan-based subscriptions
+
+  @IsOptional()
+  @IsString({ each: true })
+  enabledFeatures?: string[]; // Optional for feature-based subscriptions
 
   @IsNotEmpty()
   @IsEnum(PaymentGateway)

@@ -1,14 +1,14 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateSubscriptionFeatureDto, UpdateSubscriptionFeatureDto } from './dto/subscription-feature.dto';
 import {
-  SubscriptionFeature,
-  SubscriptionFeatureDocument,
+    SubscriptionFeature,
+    SubscriptionFeatureDocument,
 } from './schemas/subscription-feature.schema';
 
 @Injectable()
@@ -103,7 +103,7 @@ export class SubscriptionFeaturesService {
    */
   async calculatePrice(
     featureKeys: string[],
-    billingCycle: 'monthly' | 'yearly' = 'monthly',
+    billingCycle: 'monthly' | 'quarterly' | 'yearly' = 'monthly',
     branchCount: number = 1,
     userCount: number = 1,
   ): Promise<{

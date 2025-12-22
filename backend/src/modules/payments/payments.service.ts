@@ -7,7 +7,9 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
 import { getBillingCycleDays, getStripeBillingInterval } from '../subscription-payments/utils/billing-cycle.helper';
 import { BillingCycle, Subscription, SubscriptionDocument, SubscriptionStatus } from '../subscriptions/schemas/subscription.schema';
+import { SubscriptionFeaturesService } from '../subscriptions/subscription-features.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 @Injectable()
@@ -19,6 +21,8 @@ export class PaymentsService {
     @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
+    private featuresService: SubscriptionFeaturesService,
+    private subscriptionsService: SubscriptionsService,
     private websocketsGateway: WebsocketsGateway,
   ) {
     this.stripe = new Stripe(this.configService.get('stripe.secretKey'), {
@@ -232,27 +236,108 @@ export class PaymentsService {
     return { received: true };
   }
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-    const { companyId, planName } = session.metadata;
-    if (!companyId || !planName) {
-      console.error('Missing metadata in checkout session');
+    const { companyId, planName, isFeatureBased, enabledFeatures, billingCycle } = session.metadata;
+    if (!companyId) {
+      console.error('Missing companyId in checkout session metadata');
       return;
     }
+    
+    // Check if it's feature-based or plan-based subscription
+    const isFeatureBasedSubscription = isFeatureBased === 'true';
+    
+    if (!isFeatureBasedSubscription && !planName) {
+      console.error('Missing planName in checkout session metadata for plan-based subscription');
+      return;
+    }
+    
     // Update company subscription
     const company = await this.companyModel.findById(companyId);
     if (!company) {
       console.error('Company not found:', companyId);
       return;
     }
-    const plan = await this.subscriptionPlansService.findByName(planName);
-    if (!plan) {
-      console.error('Plan not found:', planName);
-      return;
+    
+    let plan: any;
+    let enabledFeaturesList: string[] = [];
+    let limits: any;
+    let price = 0;
+    let currency = 'BDT';
+    
+    if (isFeatureBasedSubscription) {
+      // Feature-based subscription: Parse enabledFeatures from metadata
+      try {
+        enabledFeaturesList = JSON.parse(enabledFeatures || '[]');
+      } catch (e) {
+        console.error('Failed to parse enabledFeatures from metadata:', e);
+        enabledFeaturesList = [];
+      }
+      
+      if (enabledFeaturesList.length === 0) {
+        console.error('No enabledFeatures found in metadata for feature-based subscription');
+        return;
+      }
+      
+      // We need to calculate price and limits from features
+      // For now, we'll need to inject SubscriptionFeaturesService or use SubscriptionsService.create
+      // Let's use a simpler approach: create subscription via SubscriptionsService
+      // But first, let's create a virtual plan for consistency
+      plan = {
+        name: 'custom-features',
+        displayName: 'Custom Features Subscription',
+        price: 0, // Will be calculated
+        currency: 'BDT',
+        billingCycle: billingCycle || 'monthly',
+      };
+      
+      console.log('🟡 [StripeWebhook] Feature-based subscription:', {
+        enabledFeaturesCount: enabledFeaturesList.length,
+        billingCycle: billingCycle || 'monthly',
+      });
+    } else {
+      // Plan-based subscription
+      plan = await this.subscriptionPlansService.findByName(planName);
+      if (!plan) {
+        console.error('Plan not found:', planName);
+        return;
+      }
+      
+      // Resolve enabled features from plan
+      if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
+        enabledFeaturesList = plan.enabledFeatureKeys;
+      }
+      
+      price = plan.price;
+      currency = plan.currency || 'BDT';
     }
+    // For feature-based subscriptions, use SubscriptionsService.create
+    if (isFeatureBasedSubscription) {
+      try {
+        // Get billing cycle from metadata
+        const effectiveBillingCycle = (billingCycle as BillingCycle) || BillingCycle.MONTHLY;
+        
+        // Use SubscriptionsService to create feature-based subscription
+        await this.subscriptionsService.create({
+          companyId: company._id as any,
+          enabledFeatures: enabledFeaturesList,
+          billingCycle: effectiveBillingCycle,
+          email: company.email,
+          companyName: company.name,
+        });
+        
+        console.log('🟢 [StripeWebhook] Feature-based subscription created successfully');
+        return;
+      } catch (error) {
+        console.error('🔴 [StripeWebhook] Failed to create feature-based subscription:', error);
+        throw error;
+      }
+    }
+    
+    // Plan-based subscription: Continue with existing logic
     // Calculate subscription dates using millisecond-based calculation
     const now = new Date();
     // Use billing cycle from plan to calculate end date
-    const billingCycle = (plan.billingCycle as BillingCycle) || BillingCycle.MONTHLY;
-    const periodDays = getBillingCycleDays(billingCycle);
+    const effectiveBillingCycle = (plan.billingCycle as BillingCycle) || BillingCycle.MONTHLY;
+    const periodDays = getBillingCycleDays(effectiveBillingCycle);
     const subscriptionEndDate = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
     // Update company subscription - use $unset to completely remove trialEndDate field
     // Properly merge settings to ensure features are saved correctly

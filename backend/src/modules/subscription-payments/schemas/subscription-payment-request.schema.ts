@@ -18,8 +18,11 @@ export class SubscriptionPaymentRequest {
   @Prop({ required: true, type: Types.ObjectId, ref: 'SubscriptionPaymentMethod' })
   paymentMethodId: Types.ObjectId;
 
-  @Prop({ required: true })
-  planName: string;
+  @Prop()
+  planName?: string; // Optional for plan-based subscriptions
+
+  @Prop({ type: [String] })
+  enabledFeatures?: string[]; // Optional for feature-based subscriptions
 
   @Prop({ required: true })
   amount: number;

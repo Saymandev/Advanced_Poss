@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CompaniesModule } from '../companies/companies.module';
 import { Company, CompanySchema } from '../companies/schemas/company.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { Subscription, SubscriptionSchema } from '../subscriptions/schemas/subscription.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
 import {
   SubscriptionPaymentMethod,
@@ -27,6 +28,7 @@ import { SubscriptionPaymentsService } from './subscription-payments.service';
     ]),
     CompaniesModule,
     SubscriptionPlansModule,
+    forwardRef(() => SubscriptionsModule), // For SubscriptionFeaturesService
     WebsocketsModule,
     NotificationsModule,
   ],

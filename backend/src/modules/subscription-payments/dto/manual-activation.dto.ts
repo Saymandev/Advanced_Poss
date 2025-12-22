@@ -5,9 +5,13 @@ export class ManualActivationDto {
   @IsString()
   companyId: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  planName: string;
+  planName?: string; // Optional for plan-based subscriptions
+
+  @IsOptional()
+  @IsString({ each: true })
+  enabledFeatures?: string[]; // Optional for feature-based subscriptions
 
   @IsOptional()
   @IsString()

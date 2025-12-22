@@ -7,6 +7,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { Company, CompanyDocument } from '../companies/schemas/company.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { BillingCycle, Subscription, SubscriptionDocument, SubscriptionStatus } from '../subscriptions/schemas/subscription.schema';
+import { SubscriptionFeaturesService } from '../subscriptions/subscription-features.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { convertLegacyFeaturesToKeys } from '../subscriptions/utils/plan-features.helper';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
@@ -41,6 +42,7 @@ export class SubscriptionPaymentsService {
     @InjectModel(Subscription.name)
     private subscriptionModel: Model<SubscriptionDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
+    private featuresService: SubscriptionFeaturesService,
     private websocketsGateway: WebsocketsGateway,
     private notificationsService: NotificationsService,
   ) {
@@ -159,16 +161,56 @@ export class SubscriptionPaymentsService {
   }
   // Initialize payment based on gateway
   async initializePayment(dto: CreateSubscriptionPaymentDto) {
-    const { companyId, planName, paymentGateway, paymentDetails, paymentMethodId } = dto;
+    const { companyId, planName, enabledFeatures, paymentGateway, paymentDetails, paymentMethodId, billingCycle } = dto;
     // Get company
     const company = await this.companyModel.findById(companyId);
     if (!company) {
       throw new NotFoundException('Company not found');
     }
-    // Get plan
-    const plan = await this.subscriptionPlansService.findByName(planName);
-    if (!plan) {
-      throw new NotFoundException('Subscription plan not found');
+    
+    // Check if it's feature-based or plan-based subscription
+    const isFeatureBased = enabledFeatures && enabledFeatures.length > 0;
+    let plan: any;
+    
+    if (isFeatureBased) {
+      // Feature-based subscription: Calculate price and create virtual plan
+      if (!enabledFeatures || enabledFeatures.length === 0) {
+        throw new BadRequestException('At least one feature must be selected for feature-based subscription');
+      }
+      
+      // Get branch and user counts for price calculation
+      const branchCount = await this.companyModel.db.collection('branches').countDocuments({ companyId });
+      const userCount = await this.companyModel.db.collection('users').countDocuments({ companyId });
+      
+      // Calculate price from features
+      const pricing = await this.featuresService.calculatePrice(
+        enabledFeatures,
+        (billingCycle as 'monthly' | 'quarterly' | 'yearly') || 'monthly',
+        branchCount || 1,
+        userCount || 1,
+      );
+      
+      // Create virtual plan object for payment processing
+      plan = {
+        name: 'custom-features',
+        displayName: 'Custom Features Subscription',
+        description: `Custom subscription with ${enabledFeatures.length} features`,
+        price: pricing.totalPrice,
+        currency: 'BDT',
+        billingCycle: billingCycle || 'monthly',
+        enabledFeatureKeys: enabledFeatures,
+        features: {}, // Empty legacy features
+        limits: await this.featuresService.buildLimitsFromFeatures(enabledFeatures),
+      };
+    } else {
+      // Plan-based subscription: Get plan from database
+      if (!planName) {
+        throw new BadRequestException('Either planName or enabledFeatures must be provided');
+      }
+      plan = await this.subscriptionPlansService.findByName(planName);
+      if (!plan) {
+        throw new NotFoundException('Subscription plan not found');
+      }
     }
     // Get payment method config
     // For MANUAL gateway, prefer paymentMethodId if provided, otherwise find first active one
@@ -187,26 +229,39 @@ export class SubscriptionPaymentsService {
     if (!paymentMethod) {
       throw new NotFoundException('Payment method not available');
     }
+    // Store enabledFeatures in metadata for later use (if feature-based)
+    const paymentMetadata: any = {
+      companyId: companyId,
+      isFeatureBased: isFeatureBased ? 'true' : 'false',
+    };
+    
+    if (isFeatureBased) {
+      paymentMetadata.enabledFeatures = JSON.stringify(enabledFeatures);
+      paymentMetadata.billingCycle = billingCycle || 'monthly';
+    } else {
+      paymentMetadata.planName = planName;
+    }
+    
     // Route to appropriate gateway
     switch (paymentGateway) {
       case PaymentGateway.STRIPE:
-        return this.initializeStripePayment(company, plan, paymentMethod);
+        return this.initializeStripePayment(company, plan, paymentMethod, paymentMetadata);
       case PaymentGateway.PAYPAL:
-        return this.initializePayPalPayment(company, plan, paymentMethod);
+        return this.initializePayPalPayment(company, plan, paymentMethod, paymentMetadata);
       case PaymentGateway.GOOGLE_PAY:
-        return this.initializeGooglePayPayment(company, plan, paymentMethod);
+        return this.initializeGooglePayPayment(company, plan, paymentMethod, paymentMetadata);
       case PaymentGateway.BKASH:
-        return this.initializeBkashPayment(company, plan, paymentMethod, paymentDetails);
+        return this.initializeBkashPayment(company, plan, paymentMethod, paymentDetails, paymentMetadata);
       case PaymentGateway.NAGAD:
-        return this.initializeNagadPayment(company, plan, paymentMethod, paymentDetails);
+        return this.initializeNagadPayment(company, plan, paymentMethod, paymentDetails, paymentMetadata);
       case PaymentGateway.MANUAL:
-        return this.initializeManualPayment(company, plan, paymentMethod);
+        return this.initializeManualPayment(company, plan, paymentMethod, paymentMetadata);
       default:
         throw new BadRequestException(`Payment gateway ${paymentGateway} not implemented`);
     }
   }
   // Stripe payment initialization
-  private async initializeStripePayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument) {
+  private async initializeStripePayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument, metadata?: any) {
     if (!this.stripe) {
       throw new BadRequestException('Stripe is not configured');
     }
@@ -254,6 +309,7 @@ export class SubscriptionPaymentsService {
       metadata: {
         companyId: company._id.toString(),
         planName: plan.name,
+        ...(metadata || {}), // Include feature-based subscription metadata if provided
       },
     });
     return {
@@ -264,7 +320,7 @@ export class SubscriptionPaymentsService {
     };
   }
   // PayPal payment initialization
-  private async initializePayPalPayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument) {
+  private async initializePayPalPayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument, metadata?: any) {
     const paypalClientId = paymentMethod.config?.clientId || this.configService.get('paypal.clientId');
     const paypalSecret = paymentMethod.config?.secret || this.configService.get('paypal.secret');
     const paypalMode = paymentMethod.config?.mode || this.configService.get('paypal.mode') || 'sandbox';
@@ -411,7 +467,7 @@ export class SubscriptionPaymentsService {
     };
   }
   // Google Pay payment initialization
-  private async initializeGooglePayPayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument) {
+  private async initializeGooglePayPayment(company: CompanyDocument, plan: any, paymentMethod: SubscriptionPaymentMethodDocument, metadata?: any) {
     // Google Pay can work through Stripe (recommended) or directly
     // For subscriptions, we'll use Stripe Checkout with Google Pay enabled
     if (!this.stripe) {
@@ -478,6 +534,7 @@ export class SubscriptionPaymentsService {
     plan: any,
     paymentMethod: SubscriptionPaymentMethodDocument,
     paymentDetails?: any,
+    metadata?: any,
   ) {
     const appKey = paymentMethod.config?.appKey || this.configService.get('bkash.appKey');
     const appSecret = paymentMethod.config?.appSecret || this.configService.get('bkash.appSecret');
@@ -589,6 +646,7 @@ export class SubscriptionPaymentsService {
     plan: any,
     paymentMethod: SubscriptionPaymentMethodDocument,
     paymentDetails?: any,
+    metadata?: any,
   ) {
     const merchantId = paymentMethod.config?.merchantId || this.configService.get('nagad.merchantId');
     const publicKey = paymentMethod.config?.publicKey || this.configService.get('nagad.publicKey');
@@ -678,6 +736,7 @@ export class SubscriptionPaymentsService {
     company: CompanyDocument,
     plan: any,
     paymentMethod: SubscriptionPaymentMethodDocument,
+    metadata?: any,
   ) {
     // Check for account number in config - handle both nested and flat structures
     const accountNumber = 
@@ -721,7 +780,7 @@ export class SubscriptionPaymentsService {
   // Manual activation by super admin
   async manualActivation(dto: ManualActivationDto) {
     console.log('🟡 [ManualActivation] DTO received:', dto);
-    const { companyId, planName, billingCycle, notes } = dto;
+    const { companyId, planName, enabledFeatures, billingCycle, notes } = dto;
 
     const company = await this.companyModel.findById(companyId);
     if (!company) {
@@ -735,21 +794,134 @@ export class SubscriptionPaymentsService {
       subscriptionStatus: (company as any).subscriptionStatus,
     });
 
-    const plan = await this.subscriptionPlansService.findByName(planName);
-    if (!plan) {
-      console.error('🔴 [ManualActivation] Plan NOT FOUND for name:', planName);
-      throw new NotFoundException('Subscription plan not found');
+    // Check if it's feature-based or plan-based subscription
+    const isFeatureBased = enabledFeatures && enabledFeatures.length > 0;
+    let plan: any;
+    let enabledFeaturesList: string[] = [];
+    let limits: any;
+    let price = 0;
+    let currency = 'BDT';
+
+    if (isFeatureBased) {
+      // Feature-based subscription
+      if (!enabledFeatures || enabledFeatures.length === 0) {
+        throw new BadRequestException('At least one feature must be selected for feature-based subscription');
+      }
+      
+      enabledFeaturesList = enabledFeatures;
+      
+      // Get branch and user counts for price calculation
+      const branchCount = await this.companyModel.db.collection('branches').countDocuments({ companyId });
+      const userCount = await this.companyModel.db.collection('users').countDocuments({ companyId });
+      
+      // Calculate price from features
+      const pricing = await this.featuresService.calculatePrice(
+        enabledFeatures,
+        (billingCycle as 'monthly' | 'quarterly' | 'yearly') || 'monthly',
+        branchCount || 1,
+        userCount || 1,
+      );
+      
+      price = pricing.totalPrice;
+      currency = 'BDT';
+      
+      // Build limits from features
+      limits = await this.featuresService.buildLimitsFromFeatures(enabledFeatures);
+      
+      // Create virtual plan object for consistency
+      plan = {
+        name: 'custom-features',
+        displayName: 'Custom Features Subscription',
+        price,
+        currency,
+        billingCycle: billingCycle || 'monthly',
+      };
+      
+      console.log('🟡 [ManualActivation] Feature-based subscription:', {
+        enabledFeaturesCount: enabledFeatures.length,
+        price,
+        billingCycle: billingCycle || 'monthly',
+      });
+    } else {
+      // Plan-based subscription
+      if (!planName) {
+        throw new BadRequestException('Either planName or enabledFeatures must be provided');
+      }
+      
+      plan = await this.subscriptionPlansService.findByName(planName);
+      if (!plan) {
+        console.error('🔴 [ManualActivation] Plan NOT FOUND for name:', planName);
+        throw new NotFoundException('Subscription plan not found');
+      }
+      console.log('🟡 [ManualActivation] Plan found:', {
+        id: (plan as any)._id?.toString?.(),
+        name: plan.name,
+        displayName: (plan as any).displayName,
+        price: (plan as any).price,
+        currency: (plan as any).currency,
+        hasEnabledFeatureKeys: !!(plan as any).enabledFeatureKeys,
+        enabledFeatureKeysCount: (plan as any).enabledFeatureKeys?.length || 0,
+        hasLegacyFeatures: !!(plan as any).features,
+      });
+      
+      price = plan.price;
+      currency = plan.currency || 'BDT';
+      
+      // Resolve enabled feature keys from plan
+      if (
+        (plan as any).enabledFeatureKeys &&
+        Array.isArray((plan as any).enabledFeatureKeys) &&
+        (plan as any).enabledFeatureKeys.length > 0
+      ) {
+        enabledFeaturesList = (plan as any).enabledFeatureKeys;
+      } else if ((plan as any).features) {
+        enabledFeaturesList = convertLegacyFeaturesToKeys(
+          (plan as any).features || {},
+        );
+      }
+      
+      // Build limits from plan
+      const maxBranches =
+        (plan as any).limits?.maxBranches ??
+        (plan as any).features?.maxBranches ??
+        -1;
+      const maxUsers =
+        (plan as any).limits?.maxUsers ?? (plan as any).features?.maxUsers ?? -1;
+      const derive = (value: number, multiplier: number) =>
+        value > 0 ? value * multiplier : -1;
+
+      limits = {
+        maxBranches,
+        maxUsers,
+        maxMenuItems:
+          (plan as any).limits?.maxMenuItems ?? derive(maxUsers, 10),
+        maxOrders: (plan as any).limits?.maxOrders ?? derive(maxUsers, 50),
+        maxTables: (plan as any).limits?.maxTables ?? derive(maxBranches, 10),
+        maxCustomers:
+          (plan as any).limits?.maxCustomers ?? derive(maxUsers, 100),
+        aiInsightsEnabled: !!(plan as any).features?.aiInsights,
+        advancedReportsEnabled: !!(plan as any).features?.accounting,
+        multiLocationEnabled: !!(plan as any).features?.multiBranch,
+        apiAccessEnabled: !!(plan as any).features?.crm,
+        whitelabelEnabled: !!(plan as any).limits?.whitelabelEnabled,
+        customDomainEnabled: !!(plan as any).limits?.customDomainEnabled,
+        prioritySupportEnabled:
+          (plan as any).limits?.prioritySupportEnabled ??
+          !!(plan as any).features?.aiInsights,
+        storageGB: (plan as any).limits?.storageGB ?? 0,
+        publicOrderingEnabled: !!(plan as any).limits?.publicOrderingEnabled,
+        maxPublicBranches: (plan as any).limits?.maxPublicBranches ?? -1,
+        reviewsEnabled: !!(plan as any).limits?.reviewsEnabled,
+        reviewModerationRequired: !!(plan as any).limits?.reviewModerationRequired,
+        maxReviewsPerMonth: (plan as any).limits?.maxReviewsPerMonth ?? -1,
+      };
     }
-    console.log('🟡 [ManualActivation] Plan found:', {
-      id: (plan as any)._id?.toString?.(),
-      name: plan.name,
-      displayName: (plan as any).displayName,
-      price: (plan as any).price,
-      currency: (plan as any).currency,
-      hasEnabledFeatureKeys: !!(plan as any).enabledFeatureKeys,
-      enabledFeatureKeysCount: (plan as any).enabledFeatureKeys?.length || 0,
-      hasLegacyFeatures: !!(plan as any).features,
+
+    console.log('🟡 [ManualActivation] Resolved enabledFeatures:', {
+      count: enabledFeaturesList.length,
+      sample: enabledFeaturesList.slice(0, 10),
     });
+    console.log('🟡 [ManualActivation] Built limits:', limits);
 
     const now = new Date();
     // Use billingCycle from DTO, fallback to plan's billingCycle, then default to MONTHLY
@@ -768,63 +940,6 @@ export class SubscriptionPaymentsService {
       periodDays,
       subscriptionEndDate,
     });
-
-    // --- Sync Subscription document so feature system sees correct plan/features ---
-    // Resolve enabled feature keys from plan
-    let enabledFeatures: string[] = [];
-    if (
-      (plan as any).enabledFeatureKeys &&
-      Array.isArray((plan as any).enabledFeatureKeys) &&
-      (plan as any).enabledFeatureKeys.length > 0
-    ) {
-      enabledFeatures = (plan as any).enabledFeatureKeys;
-    } else if ((plan as any).features) {
-      enabledFeatures = convertLegacyFeaturesToKeys(
-        (plan as any).features || {},
-      );
-    }
-    console.log('🟡 [ManualActivation] Resolved enabledFeatures:', {
-      count: enabledFeatures.length,
-      sample: enabledFeatures.slice(0, 10),
-    });
-
-    // Build simple limits object from plan (similar to SubscriptionsService)
-    const maxBranches =
-      (plan as any).limits?.maxBranches ??
-      (plan as any).features?.maxBranches ??
-      -1;
-    const maxUsers =
-      (plan as any).limits?.maxUsers ?? (plan as any).features?.maxUsers ?? -1;
-    const derive = (value: number, multiplier: number) =>
-      value > 0 ? value * multiplier : -1;
-
-    const limits: any = {
-      maxBranches,
-      maxUsers,
-      maxMenuItems:
-        (plan as any).limits?.maxMenuItems ?? derive(maxUsers, 10),
-      maxOrders: (plan as any).limits?.maxOrders ?? derive(maxUsers, 50),
-      maxTables: (plan as any).limits?.maxTables ?? derive(maxBranches, 10),
-      maxCustomers:
-        (plan as any).limits?.maxCustomers ?? derive(maxUsers, 100),
-      aiInsightsEnabled: !!(plan as any).features?.aiInsights,
-      advancedReportsEnabled: !!(plan as any).features?.accounting,
-      multiLocationEnabled: !!(plan as any).features?.multiBranch,
-      apiAccessEnabled: !!(plan as any).features?.crm,
-      whitelabelEnabled: !!(plan as any).limits?.whitelabelEnabled,
-      customDomainEnabled: !!(plan as any).limits?.customDomainEnabled,
-      prioritySupportEnabled:
-        (plan as any).limits?.prioritySupportEnabled ??
-        !!(plan as any).features?.aiInsights,
-      storageGB: (plan as any).limits?.storageGB ?? 0,
-      publicOrderingEnabled: !!(plan as any).limits?.publicOrderingEnabled,
-      maxPublicBranches: (plan as any).limits?.maxPublicBranches ?? -1,
-      reviewsEnabled: !!(plan as any).limits?.reviewsEnabled,
-      reviewModerationRequired: !!(plan as any).limits?.reviewModerationRequired,
-      maxReviewsPerMonth: (plan as any).limits?.maxReviewsPerMonth ?? -1,
-    };
-
-    console.log('🟡 [ManualActivation] Built limits from plan:', limits);
 
     // Find latest subscription for this company (if any)
     let subscription = await this.subscriptionModel
@@ -849,9 +964,15 @@ export class SubscriptionPaymentsService {
       subscription.nextBillingDate = subscriptionEndDate;
       subscription.lastPaymentDate = now;
       subscription.trialEndDate = null;
-      subscription.enabledFeatures = enabledFeatures;
+      subscription.enabledFeatures = enabledFeaturesList;
       subscription.limits = limits;
       subscription.isActive = true;
+      // For feature-based, don't set plan
+      if (!isFeatureBased) {
+        subscription.plan = plan.name as any;
+      }
+      subscription.price = price;
+      subscription.currency = currency;
       await subscription.save();
       console.log('🟢 [ManualActivation] Updated subscription:', {
         id: subscription._id?.toString?.(),
@@ -864,17 +985,17 @@ export class SubscriptionPaymentsService {
       // Create a fresh subscription record
       subscription = new this.subscriptionModel({
         companyId: company._id,
-        plan: plan.name as any,
+        ...(isFeatureBased ? {} : { plan: plan.name as any }),
         status: SubscriptionStatus.ACTIVE,
         billingCycle: cycle,
-        price: plan.price,
-        currency: plan.currency || 'BDT',
+        price,
+        currency,
         currentPeriodStart: now,
         currentPeriodEnd: subscriptionEndDate,
         nextBillingDate: subscriptionEndDate,
         lastPaymentDate: now,
         trialEndDate: null,
-        enabledFeatures,
+        enabledFeatures: enabledFeaturesList,
         limits,
         usage: {
           currentBranches: 0,
@@ -900,18 +1021,25 @@ export class SubscriptionPaymentsService {
     }
 
     // Update company subscription summary
+    const companyUpdate: any = {
+      subscriptionStatus: 'active',
+      subscriptionStartDate: now,
+      subscriptionEndDate: subscriptionEndDate,
+      nextBillingDate: subscriptionEndDate,
+    };
+    
+    if (isFeatureBased) {
+      companyUpdate.subscriptionPlan = 'custom-features';
+    } else {
+      companyUpdate.subscriptionPlan = plan.name;
+      companyUpdate.settings = {
+        ...company.settings,
+        features: plan.features,
+      };
+    }
+    
     await this.companyModel.findByIdAndUpdate(companyId, {
-      $set: {
-        subscriptionPlan: plan.name,
-        subscriptionStatus: 'active',
-        subscriptionStartDate: now,
-        subscriptionEndDate: subscriptionEndDate,
-        nextBillingDate: subscriptionEndDate,
-        settings: {
-          ...company.settings,
-          features: plan.features,
-        },
-      },
+      $set: companyUpdate,
       $unset: {
         trialEndDate: '',
       },
@@ -922,7 +1050,7 @@ export class SubscriptionPaymentsService {
       company: {
         id: companyId,
         name: company.name,
-        subscriptionPlan: plan.name,
+        subscriptionPlan: isFeatureBased ? 'custom-features' : plan.name,
         subscriptionStatus: 'active',
         subscriptionEndDate,
       },
@@ -956,21 +1084,43 @@ export class SubscriptionPaymentsService {
       throw new BadRequestException('Payment method is not active');
     }
 
-    // Check if there's already a pending request for this company and plan
-    const existingRequest = await this.paymentRequestModel.findOne({
+    // Check if it's feature-based or plan-based
+    const isFeatureBased = dto.enabledFeatures && dto.enabledFeatures.length > 0;
+    
+    if (!isFeatureBased && !dto.planName) {
+      throw new BadRequestException('Either planName or enabledFeatures must be provided');
+    }
+
+    // Check if there's already a pending request for this company and plan/features
+    const existingRequestQuery: any = {
       companyId: dto.companyId,
-      planName: dto.planName,
       status: PaymentRequestStatus.PENDING,
-    });
+    };
+    
+    if (isFeatureBased) {
+      // For feature-based, check by enabledFeatures array match
+      existingRequestQuery.enabledFeatures = { $all: dto.enabledFeatures };
+    } else {
+      existingRequestQuery.planName = dto.planName;
+    }
+    
+    const existingRequest = await this.paymentRequestModel.findOne(existingRequestQuery);
 
     if (existingRequest) {
-      throw new BadRequestException('You already have a pending payment request for this plan');
+      throw new BadRequestException(
+        isFeatureBased 
+          ? 'You already have a pending payment request for these features'
+          : 'You already have a pending payment request for this plan'
+      );
     }
 
     const paymentRequest = new this.paymentRequestModel({
       companyId: dto.companyId,
       paymentMethodId: dto.paymentMethodId,
-      planName: dto.planName,
+      ...(isFeatureBased 
+        ? { enabledFeatures: dto.enabledFeatures }
+        : { planName: dto.planName }
+      ),
       amount: dto.amount,
       currency: dto.currency || 'BDT',
       billingCycle: dto.billingCycle || 'monthly',
@@ -991,10 +1141,15 @@ export class SubscriptionPaymentsService {
         companyId: dto.companyId,
         type: 'payment_request',
         title: 'Payment Request Submitted',
-        message: `Your payment request for ${dto.planName} plan has been submitted. Our team will review and activate your subscription.`,
+        message: isFeatureBased 
+          ? `Your payment request for custom features subscription has been submitted. Our team will review and activate your subscription.`
+          : `Your payment request for ${dto.planName} plan has been submitted. Our team will review and activate your subscription.`,
         metadata: {
           requestId: savedRequest._id.toString(),
-          planName: dto.planName,
+          ...(isFeatureBased 
+            ? { enabledFeatures: dto.enabledFeatures, featureCount: dto.enabledFeatures?.length }
+            : { planName: dto.planName }
+          ),
           amount: dto.amount,
           currency: dto.currency || 'BDT',
           billingCycle: dto.billingCycle || 'monthly',
@@ -1044,10 +1199,15 @@ export class SubscriptionPaymentsService {
           payload: {
             type: 'payment_request',
             title: 'Payment Request Submitted',
-            message: `Your payment request for ${dto.planName} plan has been submitted. Our team will review and activate your subscription within 24 hours.`,
+            message: isFeatureBased 
+              ? `Your payment request for custom features subscription has been submitted. Our team will review and activate your subscription within 24 hours.`
+              : `Your payment request for ${dto.planName} plan has been submitted. Our team will review and activate your subscription within 24 hours.`,
             data: {
               requestId: savedRequest._id.toString(),
-              planName: dto.planName,
+              ...(isFeatureBased 
+                ? { enabledFeatures: dto.enabledFeatures, featureCount: dto.enabledFeatures?.length }
+                : { planName: dto.planName }
+              ),
               amount: dto.amount,
               currency: dto.currency || 'BDT',
               status: 'pending',
@@ -1147,19 +1307,37 @@ export class SubscriptionPaymentsService {
 
     // If verified, activate the subscription
     if (dto.status === PaymentRequestStatus.VERIFIED) {
+      // Check if it's feature-based or plan-based
+      const isFeatureBased = request.enabledFeatures && Array.isArray(request.enabledFeatures) && request.enabledFeatures.length > 0;
+      
       console.log('🟡 [VerifyPaymentRequest] About to call manualActivation with:', {
         companyId: companyIdString,
+        isFeatureBased,
         planName: request.planName,
+        enabledFeatures: request.enabledFeatures,
         billingCycle: request.billingCycle,
       });
 
       try {
-        await this.manualActivation({
-          companyId: companyIdString,
-          planName: request.planName,
-          billingCycle: request.billingCycle,
-          notes: `Verified payment request. Transaction ID: ${request.transactionId}, Phone: ${request.phoneNumber}. ${dto.adminNotes || ''}`,
-        });
+        if (isFeatureBased) {
+          // For feature-based subscriptions, create subscription directly with enabledFeatures
+          // We need to use SubscriptionsService.create instead of manualActivation
+          // But manualActivation can be updated to support feature-based
+          // For now, let's update manualActivation to handle feature-based
+          await this.manualActivation({
+            companyId: companyIdString,
+            enabledFeatures: request.enabledFeatures,
+            billingCycle: request.billingCycle,
+            notes: `Verified payment request. Transaction ID: ${request.transactionId}, Phone: ${request.phoneNumber}. ${dto.adminNotes || ''}`,
+          });
+        } else {
+          await this.manualActivation({
+            companyId: companyIdString,
+            planName: request.planName,
+            billingCycle: request.billingCycle,
+            notes: `Verified payment request. Transaction ID: ${request.transactionId}, Phone: ${request.phoneNumber}. ${dto.adminNotes || ''}`,
+          });
+        }
         console.log('🟢 [VerifyPaymentRequest] manualActivation completed successfully');
       } catch (err) {
         console.error('🔴 [VerifyPaymentRequest] manualActivation FAILED:', err);
@@ -1169,11 +1347,15 @@ export class SubscriptionPaymentsService {
       // Notify company owner about successful verification
       try {
         // Persist notification so it shows in notifications list
+        const subscriptionName = isFeatureBased 
+          ? `custom features subscription (${request.enabledFeatures?.length} features)`
+          : request.planName;
+          
         await this.notificationsService.create({
           companyId: companyIdString,
           type: 'payment_request',
           title: 'Payment Verified & Subscription Activated',
-          message: `Your payment request has been verified and your ${request.planName} subscription is now active!`,
+          message: `Your payment request has been verified and your ${subscriptionName} subscription is now active!`,
           metadata: {
             requestId: request._id.toString(),
             planName: request.planName,
