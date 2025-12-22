@@ -6,6 +6,7 @@ import * as qrcode from 'qrcode';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
 import { SettingsService } from '../settings/settings.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { Table, TableDocument } from '../tables/schemas/table.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { PDFGeneratorService } from './pdf-generator.service';
@@ -24,6 +25,7 @@ export class ReceiptService {
     private companiesService: CompaniesService,
     private branchesService: BranchesService,
     private settingsService: SettingsService,
+    private subscriptionsService: SubscriptionsService,
     private configService: ConfigService,
   ) {}
   // Helper function to format currency
@@ -179,7 +181,26 @@ export class ReceiptService {
         // Validate ObjectId format before calling findOne
         if (companyIdStr && /^[0-9a-fA-F]{24}$/.test(companyIdStr)) {
           try {
+            // Fetch company once
             company = await this.companiesService.findOne(companyIdStr);
+
+            // OPTIONAL: Check subscription limits for reviews to decide if we should include review QR URL
+            try {
+              const companyObjectId = new Types.ObjectId(companyIdStr) as any;
+              const subscription = await this.subscriptionsService.findByCompany(companyObjectId);
+              const limits = (subscription as any)?.limits || {};
+
+              // If reviews are disabled completely, we won't generate a review URL later
+              if (limits.reviewsEnabled === false) {
+                // Explicitly clear publicUrl related to review experience
+                publicUrl = undefined;
+              }
+            } catch (subError) {
+              // If subscription lookup fails, just skip limits-based behavior and continue
+              // Receipt itself is still allowed; review creation is separately guarded in ReviewsService
+              // console.warn('Could not verify subscription limits for receipt review QR:', subError?.message);
+            }
+
             // Get company logo
             if (company?.logo) {
               companyLogo = company.logo;
@@ -206,9 +227,9 @@ export class ReceiptService {
               publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
             }
           } catch (companyError) {
-            console.error('Error fetching company for logo:', {
+            console.error('Error fetching company for logo / subscription:', {
               companyId: companyIdStr,
-              error: companyError.message,
+              error: (companyError as any)?.message || companyError,
               branchCompanyId: branch.companyId,
               branchCompanyIdType: typeof branch.companyId,
               branchCompanyIdKeys: typeof branch.companyId === 'object' ? Object.keys(branch.companyId) : [],

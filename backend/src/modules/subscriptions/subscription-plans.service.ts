@@ -6,8 +6,8 @@ import { SubscriptionPlan, SubscriptionPlanDocument } from './schemas/subscripti
 import {
   convertLegacyFeaturesToKeys,
   ensureCoreFeatures,
-  normalizeFeatureKeys,
-  getFeatureDisplayName
+  getFeatureDisplayName,
+  normalizeFeatureKeys
 } from './utils/plan-features.helper';
 
 @Injectable()
