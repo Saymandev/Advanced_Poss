@@ -6,8 +6,14 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Advanced Restaurant POS',
-  description: 'Modern restaurant management system for bars, cafes, and restaurants',
+  title: 'RESTOGO Management System',
+  description: 'RESTOGO – modern restaurant management system for bars, cafes, and restaurants',
+  applicationName: 'RESTOGO',
+  icons: {
+    icon: '/restogo-favicon.png',
+    shortcut: '/restogo-favicon.png',
+    apple: '/restogo-favicon.png',
+  },
 };
 
 export default function RootLayout({

@@ -6,26 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import {
-  useDisable2FAMutation,
-  useEnable2FAMutation,
-  useSetup2FAMutation,
+    useDisable2FAMutation,
+    useEnable2FAMutation,
+    useSetup2FAMutation,
 } from '@/lib/api/endpoints/authApi';
 import {
-  useChangePasswordMutation,
-  useChangePinMutation,
-  useGetProfileQuery,
-  useUpdateProfileMutation,
-  useUploadAvatarMutation,
+    useChangePasswordMutation,
+    useChangePinMutation,
+    useGetProfileQuery,
+    useUpdateProfileMutation,
+    useUploadAvatarMutation,
 } from '@/lib/api/endpoints/usersApi';
 import { setUser } from '@/lib/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import {
-  CheckCircleIcon,
-  KeyIcon,
-  LockClosedIcon,
-  PencilIcon,
-  PhotoIcon,
-  UserCircleIcon
+    CheckCircleIcon,
+    KeyIcon,
+    LockClosedIcon,
+    PencilIcon,
+    PhotoIcon,
+    UserCircleIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
@@ -1027,7 +1027,7 @@ export default function ProfilePage() {
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                   <p className="text-xs text-blue-800 dark:text-blue-200">
                     <strong>Instructions:</strong> Open your authenticator app, select "Enter a setup key", 
-                    enter the account name (e.g., "Restaurant POS (your@email.com)"), select "Time-based", 
+                    enter the account name (e.g., "RESTOGO (your@email.com)"), select "Time-based", 
                     and paste the secret key above.
                   </p>
                 </div>

@@ -34,6 +34,7 @@ import {
   UsersIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -633,9 +634,19 @@ export function Sidebar({ className }: SidebarProps) {
             "flex items-center gap-3 transition-all duration-300",
             isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
           )}>
-            <div>
-              <h2 className="font-semibold text-gray-900 dark:text-white text-base leading-tight">Restaurant POS</h2>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Management System</p>
+            <div className="flex items-center gap-3">
+              <Image
+                src="/restogo-logo.png"
+                alt="RESTOGO logo"
+                width={32}
+                height={32}
+                className="rounded-md"
+                priority
+              />
+              <div>
+                <h2 className="font-semibold text-gray-900 dark:text-white text-base leading-tight">RESTOGO</h2>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Management System</p>
+              </div>
             </div>
           </div>
 
@@ -687,7 +698,7 @@ export function Sidebar({ className }: SidebarProps) {
             "text-xs text-gray-600 dark:text-gray-400 text-center transition-all duration-300",
             isCollapsed ? "opacity-0 w-0 overflow-hidden h-0" : "opacity-100"
           )}>
-            <p className="leading-tight">Advanced Restaurant POS</p>
+            <p className="leading-tight">RESTOGO Management System</p>
             <p className="text-xs opacity-75">v1.0.0</p>
           </div>
         </div>

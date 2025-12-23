@@ -12,13 +12,13 @@ import { useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  DocumentTextIcon,
-  EnvelopeIcon,
-  EyeIcon,
-  PrinterIcon,
-  ReceiptRefundIcon,
-  ShoppingCartIcon,
-  UserIcon,
+    DocumentTextIcon,
+    EnvelopeIcon,
+    EyeIcon,
+    PrinterIcon,
+    ReceiptRefundIcon,
+    ShoppingCartIcon,
+    UserIcon,
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -398,7 +398,7 @@ export default function DigitalReceiptsPage() {
       </head>
       <body>
         <div class="header">
-          <h2>Restaurant POS</h2>
+          <h2>RESTOGO Management System</h2>
           <p>Receipt #${receipt.receiptNumber}</p>
           <p>${formatDateTime(receipt.createdAt)}</p>
         </div>
@@ -607,7 +607,7 @@ export default function DigitalReceiptsPage() {
           <div className="space-y-6">
             {/* Receipt Header */}
             <div className="text-center border-b border-gray-200 dark:border-gray-700 pb-4">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Restaurant POS</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">RESTOGO Management System</h2>
               <p className="text-gray-600 dark:text-gray-400">123 Main Street, Anytown, ST 12345</p>
               <p className="text-gray-600 dark:text-gray-400">Phone: (555) 123-4567</p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
