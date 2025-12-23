@@ -296,12 +296,15 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-3 group cursor-pointer">
-              <div className="relative">
-                <SparklesIcon className="w-10 h-10 text-primary-600 dark:text-primary-400 group-hover:scale-110 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-primary-400 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
+              <div className="relative flex items-center">
+                <img
+                  src="/restogo-logo.png"
+                  alt="RESTOGO logo"
+                  className="w-10 h-10 rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
+                />
               </div>
               <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 via-secondary-600 to-primary-600 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
-                Advanced POS
+                RESTOGO
               </span>
             </div>
             <div className="hidden md:flex items-center space-x-4">
@@ -965,7 +968,7 @@ export default function LandingPage() {
               Ready to Transform Your Restaurant?
             </h2>
             <p className="text-xl md:text-2xl text-white/90 mb-10 max-w-2xl mx-auto">
-              Join thousands of restaurants already using Advanced POS. Start your free trial today and experience the difference.
+              Join thousands of restaurants already using RESTOGO. Start your free trial today and experience the difference.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/auth/register" className="group">
@@ -1002,7 +1005,7 @@ export default function LandingPage() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <SparklesIcon className="w-6 h-6 text-primary-400" />
-                <span className="text-xl font-bold">Advanced POS</span>
+                <span className="text-xl font-bold">RESTOGO</span>
               </div>
               <p className="text-gray-400">
                 The most powerful restaurant management system
@@ -1034,8 +1037,8 @@ export default function LandingPage() {
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Advanced POS. All rights reserved.</p>
+            <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+            <p>&copy; 2024 RESTOGO Management System. All rights reserved.</p>
           </div>
         </div>
       </footer>

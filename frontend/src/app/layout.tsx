@@ -10,7 +10,10 @@ export const metadata: Metadata = {
   description: 'RESTOGO – modern restaurant management system for bars, cafes, and restaurants',
   applicationName: 'RESTOGO',
   icons: {
-    icon: '/restogo-favicon.png',
+    icon: [
+      { url: '/restogo-favicon.png', type: 'image/png', sizes: '32x32' },
+      { url: '/restogo-favicon.png', type: 'image/png', sizes: '64x64' },
+    ],
     shortcut: '/restogo-favicon.png',
     apple: '/restogo-favicon.png',
   },
