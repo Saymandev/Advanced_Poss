@@ -638,9 +638,9 @@ export function Sidebar({ className }: SidebarProps) {
               <Image
                 src="/restogo-logo.png"
                 alt="RESTOGO logo"
-                width={32}
-                height={32}
-                className="rounded-md"
+                width={40}
+                height={40}
+                className="rounded-md object-contain"
                 priority
               />
               <div>
