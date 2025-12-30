@@ -6,22 +6,22 @@ import { Button } from '@/components/ui/Button';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { useGetPublicStatsQuery, useGetPublicTestimonialsQuery } from '@/lib/api/endpoints/systemFeedbackApi';
 import {
-  ArrowRightIcon,
-  BellAlertIcon,
-  BoltIcon,
-  ChartBarIcon,
-  CheckCircleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  CloudArrowUpIcon,
-  CreditCardIcon,
-  DevicePhoneMobileIcon,
-  GlobeAltIcon,
-  PlayIcon,
-  ShieldCheckIcon,
-  SparklesIcon,
-  StarIcon,
-  UserGroupIcon
+    ArrowRightIcon,
+    BellAlertIcon,
+    BoltIcon,
+    ChartBarIcon,
+    CheckCircleIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    CloudArrowUpIcon,
+    CreditCardIcon,
+    DevicePhoneMobileIcon,
+    GlobeAltIcon,
+    PlayIcon,
+    ShieldCheckIcon,
+    SparklesIcon,
+    StarIcon,
+    UserGroupIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -298,7 +298,7 @@ export default function LandingPage() {
             <div className="flex items-center space-x-3 group cursor-pointer">
               <div className="relative flex items-center">
                 <img
-                  src="/restogo-logo.png"
+                  src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085415/restogo-logo_yxebls.png"
                   alt="RESTOGO logo"
                   className="w-10 h-10 rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
                 />

@@ -6,33 +6,33 @@ import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { useAppSelector } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-  Bars3Icon,
-  BeakerIcon,
-  BuildingOfficeIcon,
-  ChartBarIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  CogIcon,
-  ComputerDesktopIcon,
-  CurrencyDollarIcon,
-  DocumentTextIcon,
-  EnvelopeIcon,
-  ExclamationTriangleIcon,
-  GiftIcon,
-  HomeIcon,
-  PhotoIcon,
-  PrinterIcon,
-  ReceiptPercentIcon,
-  ShieldCheckIcon,
-  ShoppingBagIcon,
-  SparklesIcon,
-  TableCellsIcon,
-  TagIcon,
-  TruckIcon,
-  UserCircleIcon,
-  UserGroupIcon,
-  UsersIcon,
-  XMarkIcon
+    Bars3Icon,
+    BeakerIcon,
+    BuildingOfficeIcon,
+    ChartBarIcon,
+    ClipboardDocumentListIcon,
+    ClockIcon,
+    CogIcon,
+    ComputerDesktopIcon,
+    CurrencyDollarIcon,
+    DocumentTextIcon,
+    EnvelopeIcon,
+    ExclamationTriangleIcon,
+    GiftIcon,
+    HomeIcon,
+    PhotoIcon,
+    PrinterIcon,
+    ReceiptPercentIcon,
+    ShieldCheckIcon,
+    ShoppingBagIcon,
+    SparklesIcon,
+    TableCellsIcon,
+    TagIcon,
+    TruckIcon,
+    UserCircleIcon,
+    UserGroupIcon,
+    UsersIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -636,7 +636,7 @@ export function Sidebar({ className }: SidebarProps) {
           )}>
             <div className="flex items-center gap-3">
               <Image
-                src="/restogo-logo.png"
+                src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085415/restogo-logo_yxebls.png"
                 alt="RESTOGO logo"
                 width={40}
                 height={40}

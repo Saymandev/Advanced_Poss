@@ -11,11 +11,11 @@ export const metadata: Metadata = {
   applicationName: 'RESTOGO',
   icons: {
     icon: [
-      { url: '/restogo-favicon.png', type: 'image/png', sizes: '32x32' },
-      { url: '/restogo-favicon.png', type: 'image/png', sizes: '64x64' },
+      { url: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png', type: 'image/png', sizes: '32x32' },
+      { url: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png', type: 'image/png', sizes: '64x64' },
     ],
-    shortcut: '/restogo-favicon.png',
-    apple: '/restogo-favicon.png',
+    shortcut: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png',
+    apple: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png',
   },
 };
 
