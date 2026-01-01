@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,7 +6,7 @@ import {
   Post,
   Req,
   Res,
-  UseGuards,
+  UseGuards
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -397,26 +396,26 @@ export class AuthController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @Get('2fa/setup')
-  @ApiOperation({ summary: 'Setup 2FA - Generate QR code and secret' })
+  @Post('verify-pin')
+  @ApiOperation({ summary: 'Verify PIN for admin actions' })
   @ApiResponse({
     status: 200,
-    description: '2FA setup initiated',
+    description: 'PIN verified successfully',
     schema: {
       example: {
-        secret: 'JBSWY3DPEHPK3PXP',
-        qrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...',
-        backupCodes: ['ABCD-1234', 'EFGH-5678'],
-        message: 'Scan the QR code with your authenticator app and enter the code to enable 2FA',
-      },
-    },
+        success: true,
+        message: 'PIN verified successfully'
+      }
+    }
   })
-  setup2FA(@CurrentUser('id') userId: string) {
-    return this.authService.setup2FA(userId);
+  @ApiResponse({ status: 401, description: 'Invalid PIN' })
+  verifyPin(
+    @CurrentUser('id') userId: string,
+    @Body('pin') pin: string,
+  ) {
+    return this.authService.verifyPin(userId, pin);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @Post('2fa/enable')
   @ApiOperation({ summary: 'Enable 2FA with verification token' })
   @ApiResponse({
