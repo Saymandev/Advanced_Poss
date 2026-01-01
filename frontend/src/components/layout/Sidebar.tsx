@@ -6,33 +6,33 @@ import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { useAppSelector } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-    Bars3Icon,
-    BeakerIcon,
-    BuildingOfficeIcon,
-    ChartBarIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    CogIcon,
-    ComputerDesktopIcon,
-    CurrencyDollarIcon,
-    DocumentTextIcon,
-    EnvelopeIcon,
-    ExclamationTriangleIcon,
-    GiftIcon,
-    HomeIcon,
-    PhotoIcon,
-    PrinterIcon,
-    ReceiptPercentIcon,
-    ShieldCheckIcon,
-    ShoppingBagIcon,
-    SparklesIcon,
-    TableCellsIcon,
-    TagIcon,
-    TruckIcon,
-    UserCircleIcon,
-    UserGroupIcon,
-    UsersIcon,
-    XMarkIcon
+  Bars3Icon,
+  BeakerIcon,
+  BuildingOfficeIcon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  CogIcon,
+  ComputerDesktopIcon,
+  CurrencyDollarIcon,
+  DocumentTextIcon,
+  EnvelopeIcon,
+  ExclamationTriangleIcon,
+  GiftIcon,
+  HomeIcon,
+  PhotoIcon,
+  PrinterIcon,
+  ReceiptPercentIcon,
+  ShieldCheckIcon,
+  ShoppingBagIcon,
+  SparklesIcon,
+  TableCellsIcon,
+  TagIcon,
+  TruckIcon,
+  UserCircleIcon,
+  UserGroupIcon,
+  UsersIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -407,7 +407,7 @@ export function Sidebar({ className }: SidebarProps) {
   const { user } = useAppSelector((state) => state.auth);
   const { hasAnyFeature, isLoading: permissionsLoading, permissions: userPermissions } = useRolePermissions();
   const pathname = usePathname();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Inventory', 'Financial', 'Settings']);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['POS System']);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 

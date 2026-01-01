@@ -87,7 +87,7 @@ export default function PinLoginPage() {
     if (!companyContext || !selectedRole) {
       return;
     }
-    
+
     // Auto-select if exactly one user is available
     if (availableUsers.length === 1) {
       const singleUser = availableUsers[0];
@@ -104,6 +104,42 @@ export default function PinLoginPage() {
     }
     // If multiple users, let user manually select (don't auto-reset)
   }, [selectedRole, availableUsers, companyContext]);
+
+  // Add keyboard event listener for number keys when PIN input is visible
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Only handle keyboard input when PIN input section is visible
+      const pinInputVisible = selectedRole && (selectedUser || availableUsers.length === 0 || availableUsers.length === 1);
+
+      if (!pinInputVisible) return;
+
+      // Handle number keys 0-9
+      if (event.key >= '0' && event.key <= '9') {
+        event.preventDefault();
+        handlePinInput(event.key);
+      }
+
+      // Handle backspace
+      if (event.key === 'Backspace') {
+        event.preventDefault();
+        handleBackspace();
+      }
+
+      // Handle enter to submit
+      if (event.key === 'Enter' && pin.length >= 4) {
+        event.preventDefault();
+        handleSubmit();
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('keydown', handleKeyPress);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [selectedRole, selectedUser, availableUsers, pin.length]);
 
   // Prevent redirect during context check
   if (isCheckingContext || !companyContext) {
