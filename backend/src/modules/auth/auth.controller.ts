@@ -394,28 +394,6 @@ export class AuthController {
     );
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @Post('verify-pin')
-  @ApiOperation({ summary: 'Verify PIN for admin actions' })
-  @ApiResponse({
-    status: 200,
-    description: 'PIN verified successfully',
-    schema: {
-      example: {
-        success: true,
-        message: 'PIN verified successfully'
-      }
-    }
-  })
-  @ApiResponse({ status: 401, description: 'Invalid PIN' })
-  verifyPin(
-    @CurrentUser('id') userId: string,
-    @Body('pin') pin: string,
-  ) {
-    return this.authService.verifyPin(userId, pin);
-  }
-
   @Post('2fa/enable')
   @ApiOperation({ summary: 'Enable 2FA with verification token' })
   @ApiResponse({
