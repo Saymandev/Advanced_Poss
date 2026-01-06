@@ -394,6 +394,28 @@ export class AuthController {
     );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('2fa/setup')
+  @ApiOperation({ summary: 'Setup 2FA - Generate QR code and secret' })
+  @ApiResponse({
+    status: 200,
+    description: '2FA setup initiated',
+    schema: {
+      example: {
+        secret: 'JBSWY3DPEHPK3PXP',
+        qrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...',
+        backupCodes: ['ABCD-1234', 'EFGH-5678'],
+        message: 'Scan the QR code with your authenticator app and enter the code to enable 2FA',
+      },
+    },
+  })
+  setup2FA(@CurrentUser('id') userId: string) {
+    return this.authService.setup2FA(userId);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('2fa/enable')
   @ApiOperation({ summary: 'Enable 2FA with verification token' })
   @ApiResponse({
