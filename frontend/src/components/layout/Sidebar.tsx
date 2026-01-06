@@ -397,6 +397,12 @@ const superAdminNavigation: NavigationItem[] = [
     icon: EnvelopeIcon,
     roles: ['super_admin'],
   },
+  {
+    name: 'Trash Management',
+    href: '/dashboard/super-admin?scroll=trash',
+    icon: ExclamationTriangleIcon,
+    roles: ['super_admin'],
+  },
 ];
 
 interface SidebarProps {

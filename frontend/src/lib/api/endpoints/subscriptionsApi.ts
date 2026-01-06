@@ -273,10 +273,12 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Subscription'],
     }),
-    updateSubscription: builder.mutation<Subscription, { 
-      id: string; 
-      planId: string;
+    updateSubscription: builder.mutation<Subscription, {
+      id: string;
+      planId?: string;
       paymentMethodId?: string;
+      enabledFeatures?: string[];
+      limits?: any;
     }>({
       query: ({ id, ...data }) => ({
         url: `/subscriptions/${id}`,

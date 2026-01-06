@@ -1108,11 +1108,16 @@ export default function SubscriptionsPage() {
   );
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
+  const [editingSubscription, setEditingSubscription] = useState<any | null>(null);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'basic' | 'features' | 'limits'>('basic');
   const [billingCycleValue, setBillingCycleValue] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
+  const [overrideFeatures, setOverrideFeatures] = useState<string[]>([]);
+  const [overrideLimits, setOverrideLimits] = useState<any>({});
   const [createPlan, { isLoading: isCreatingPlan }] = useCreateSubscriptionPlanMutation();
   const [updatePlan, { isLoading: isUpdatingPlan }] = useUpdateSubscriptionPlanMutation();
+  const [updateSubscriptionOverride, { isLoading: isUpdatingSubscription }] = useUpdateSubscriptionMutation();
   const [deletePlan, { isLoading: isDeletingPlan }] = useDeleteSubscriptionPlanMutation();
   // Fetch plan with features when editing
   const { data: planWithFeatures } = useGetPlanWithFeaturesQuery(editingPlan?.id || '', {
@@ -1134,6 +1139,36 @@ export default function SubscriptionsPage() {
       setBillingCycleValue('monthly');
     }
   }, [editingPlan, isPlanModalOpen, planWithFeatures]);
+
+  // Handle subscription override
+  useEffect(() => {
+    if (editingSubscription && isOverrideModalOpen) {
+      setOverrideFeatures(editingSubscription.enabledFeatures || []);
+      setOverrideLimits(editingSubscription.limits || {});
+    } else if (!editingSubscription) {
+      setOverrideFeatures([]);
+      setOverrideLimits({});
+    }
+  }, [editingSubscription, isOverrideModalOpen]);
+
+  const handleSaveOverride = async () => {
+    if (!editingSubscription) return;
+
+    try {
+      await updateSubscriptionOverride({
+        id: editingSubscription.id,
+        enabledFeatures: overrideFeatures,
+        limits: overrideLimits,
+      }).unwrap();
+
+      toast.success('Subscription override applied successfully');
+      setIsOverrideModalOpen(false);
+      setEditingSubscription(null);
+      refetchAllSubscriptions();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to apply override');
+    }
+  };
   // Flatten subscription data for table/export (avoid nested objects as cell values)
   const flattenedSubscriptions = useMemo(() => {
     const source = subsData?.subscriptions || [];
@@ -1336,6 +1371,23 @@ export default function SubscriptionsPage() {
         title: 'Expires',
         render: (value: string) =>
           value ? formatDateTime(value).split(',')[0] : 'N/A',
+      },
+      {
+        key: 'actions',
+        title: 'Actions',
+        render: (_: any, row: any) => (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              // Open override modal for this subscription
+              setEditingSubscription(row);
+              setIsOverrideModalOpen(true);
+            }}
+          >
+            Override
+          </Button>
+        ),
       },
     ];
     const planColumns = [
@@ -2198,6 +2250,119 @@ export default function SubscriptionsPage() {
               </Button>
             </div>
           </form>
+        </Modal>
+        {/* Subscription Override Modal - Super Admin */}
+        <Modal
+          isOpen={isOverrideModalOpen}
+          onClose={() => {
+            setIsOverrideModalOpen(false);
+            setEditingSubscription(null);
+          }}
+          title={`Override Subscription: ${editingSubscription?.companyName || 'Unknown Company'}`}
+          size="xl"
+        >
+          <div className="space-y-6">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+                    Manual Override
+                  </h4>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    This will override the subscription features and limits for this specific user, bypassing their plan restrictions. Use with caution.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Current Plan Info */}
+            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Current Plan</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Plan:</span>
+                  <span className="ml-2 font-medium">{editingSubscription?.planKey || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                  <Badge variant={getStatusBadge(editingSubscription?.status)} className="ml-2">
+                    {editingSubscription?.status || 'N/A'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Features Override */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+                Override Features
+              </h4>
+              <PlanFeatureSelector
+                selectedFeatures={overrideFeatures}
+                onChange={setOverrideFeatures}
+              />
+            </div>
+
+            {/* Limits Override */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+                Override Limits
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Max Branches (-1 for unlimited)
+                  </label>
+                  <Input
+                    type="number"
+                    min={-1}
+                    value={overrideLimits.maxBranches ?? ''}
+                    onChange={(e) => setOverrideLimits({
+                      ...overrideLimits,
+                      maxBranches: e.target.value ? Number(e.target.value) : undefined
+                    })}
+                    placeholder="-1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Max Users (-1 for unlimited)
+                  </label>
+                  <Input
+                    type="number"
+                    min={-1}
+                    value={overrideLimits.maxUsers ?? ''}
+                    onChange={(e) => setOverrideLimits({
+                      ...overrideLimits,
+                      maxUsers: e.target.value ? Number(e.target.value) : undefined
+                    })}
+                    placeholder="-1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsOverrideModalOpen(false);
+                  setEditingSubscription(null);
+                }}
+                disabled={isUpdatingSubscription}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveOverride}
+                isLoading={isUpdatingSubscription}
+                variant="primary"
+              >
+                Apply Override
+              </Button>
+            </div>
+          </div>
         </Modal>
         {/* Feature-Based Subscription Creation Modal - Super Admin */}
         <Modal

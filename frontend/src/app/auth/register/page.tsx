@@ -9,13 +9,13 @@ import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsA
 import { setCredentials } from '@/lib/slices/authSlice';
 import { useAppDispatch } from '@/lib/store';
 import {
-    BuildingStorefrontIcon,
-    EnvelopeIcon,
-    HomeIcon,
-    MapPinIcon,
-    PhoneIcon,
-    SparklesIcon,
-    UserIcon
+  BuildingStorefrontIcon,
+  EnvelopeIcon,
+  HomeIcon,
+  MapPinIcon,
+  PhoneIcon,
+  SparklesIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -173,9 +173,16 @@ export default function RegisterPage() {
         throw new Error('Registration failed: User data not received in response');
       }
 
+      // Ensure companyId and branchId are properly serialized as strings
+      const sanitizedUser = {
+        ...userData,
+        companyId: typeof userData.companyId === 'object' ? userData.companyId?._id || userData.companyId?.id || null : userData.companyId,
+        branchId: typeof userData.branchId === 'object' ? userData.branchId?._id || userData.branchId?.id || null : userData.branchId,
+      };
+
       dispatch(
         setCredentials({
-          user: userData,
+          user: sanitizedUser,
         })
       );
 

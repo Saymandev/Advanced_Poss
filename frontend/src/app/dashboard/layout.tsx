@@ -1,11 +1,11 @@
 'use client';
 
+import { FeedbackTrigger } from '@/components/feedback/FeedbackTrigger';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { OrderNotificationManager } from '@/components/orders/OrderNotificationManager';
 import { DashboardSkeleton } from '@/components/ui/DashboardSkeleton';
 import { SubscriptionIndicator } from '@/components/ui/SubscriptionIndicator';
-import { FeedbackTrigger } from '@/components/feedback/FeedbackTrigger';
 import { useAppSelector } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -26,15 +26,12 @@ export default function DashboardLayout({
     setMounted(true);
   }, []);
 
-  // Check if auth state is being restored
+  // Authentication state should be ready immediately after login
   useEffect(() => {
     if (!mounted) return;
-    
-    const timer = setTimeout(() => {
-      setIsInitializing(false);
-    }, 1000); // Give time for auth restoration
 
-    return () => clearTimeout(timer);
+    // No delay needed - auth state is set synchronously
+    setIsInitializing(false);
   }, [mounted]);
 
   useEffect(() => {

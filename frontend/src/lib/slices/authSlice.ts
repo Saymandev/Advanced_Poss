@@ -112,7 +112,16 @@ const authSlice = createSlice({
         // Note: Authentication is verified via httpOnly cookies, not localStorage tokens
         if (userStr) {
           try {
-            state.user = JSON.parse(userStr);
+            const parsedUser = JSON.parse(userStr);
+
+            // Sanitize companyId and branchId to ensure they're strings, not objects
+            const sanitizedUser = {
+              ...parsedUser,
+              companyId: typeof parsedUser.companyId === 'object' ? parsedUser.companyId?._id || parsedUser.companyId?.id || null : parsedUser.companyId,
+              branchId: typeof parsedUser.branchId === 'object' ? parsedUser.branchId?._id || parsedUser.branchId?.id || null : parsedUser.branchId,
+            };
+
+            state.user = sanitizedUser;
             // Set authenticated if user exists (actual auth verified by backend via cookies)
             state.isAuthenticated = true;
           } catch (error) {

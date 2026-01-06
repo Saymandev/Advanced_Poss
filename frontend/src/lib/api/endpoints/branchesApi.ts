@@ -203,9 +203,23 @@ export const branchesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Branch'],
     }),
-    deleteBranch: builder.mutation<void, string>({
+    softDeleteBranch: builder.mutation<Branch, string>({
       query: (id) => ({
         url: `/branches/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Branch'],
+    }),
+    restoreBranch: builder.mutation<Branch, string>({
+      query: (id) => ({
+        url: `/branches/${id}/restore`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Branch'],
+    }),
+    permanentDeleteBranch: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/branches/${id}/permanent`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Branch'],
@@ -224,6 +238,22 @@ export const branchesApi = apiSlice.injectEndpoints({
         body: { publicUrl },
       }),
       invalidatesTags: ['Branch'],
+    }),
+    getDeletedBranches: builder.query<{
+      branches: Branch[];
+      total: number;
+      page: number;
+      limit: number;
+    }, { page?: number; limit?: number }>({
+      query: (params) => ({
+        url: '/branches/deleted',
+        params,
+      }),
+      providesTags: ['Branch'],
+      transformResponse: (response: any) => {
+        // Handle TransformInterceptor wrapper: { success: true, data: {...} }
+        return response.data || response;
+      },
     }),
     getBranchStats: builder.query<{
       branch: Branch;
@@ -280,10 +310,13 @@ export const branchesApi = apiSlice.injectEndpoints({
 });
 export const {
   useGetBranchesQuery,
+  useGetDeletedBranchesQuery,
   useGetBranchByIdQuery,
   useCreateBranchMutation,
   useUpdateBranchMutation,
-  useDeleteBranchMutation,
+  useSoftDeleteBranchMutation,
+  useRestoreBranchMutation,
+  usePermanentDeleteBranchMutation,
   useToggleBranchStatusMutation,
   useUpdateBranchPublicUrlMutation,
   useGetBranchStatsQuery,

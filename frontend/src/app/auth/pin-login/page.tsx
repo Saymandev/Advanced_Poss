@@ -11,7 +11,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { getRoleDashboardPath } from '@/utils/getRoleDashboard';
 import { ArrowLeftIcon, BackspaceIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 const getAvatarUrl = (user: any) => {
@@ -105,13 +105,25 @@ export default function PinLoginPage() {
     // If multiple users, let user manually select (don't auto-reset)
   }, [selectedRole, availableUsers, companyContext]);
 
-  // Add keyboard event listener for number keys when PIN input is visible
+  // Add keyboard event listener for number keys when PIN input section is visible
+  // This is for the number pad interface, not interfering with other inputs
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       // Only handle keyboard input when PIN input section is visible
       const pinInputVisible = selectedRole && (selectedUser || availableUsers.length === 0 || availableUsers.length === 1);
 
       if (!pinInputVisible) return;
+
+      // Check if the active element is an input field (which would be in a modal or other form)
+      // If so, don't intercept keyboard events
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        (activeElement as HTMLElement).contentEditable === 'true'
+      );
+
+      if (isInputFocused) return;
 
       // Handle number keys 0-9
       if (event.key >= '0' && event.key <= '9') {
@@ -139,31 +151,17 @@ export default function PinLoginPage() {
     return () => {
       document.removeEventListener('keydown', handleKeyPress);
     };
-  }, [selectedRole, selectedUser, availableUsers, pin.length]);
+  }, [selectedRole, selectedUser, availableUsers, pin.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Prevent redirect during context check
-  if (isCheckingContext || !companyContext) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
-          <p className="mt-4 text-white/80">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const handlePinInput = useCallback((digit: string) => {
+    setPin(prevPin => prevPin.length < 6 ? prevPin + digit : prevPin);
+  }, []);
 
-  const handlePinInput = (digit: string) => {
-    if (pin.length < 6) {
-      setPin(pin + digit);
-    }
-  };
+  const handleBackspace = useCallback(() => {
+    setPin(prevPin => prevPin.slice(0, -1));
+  }, []);
 
-  const handleBackspace = () => {
-    setPin(pin.slice(0, -1));
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!selectedBranch || !selectedRole || !pin || pin.length < 4) {
       toast.error('Please select branch, role, and enter your PIN');
       return;
@@ -226,10 +224,17 @@ export default function PinLoginPage() {
         return;
       }
       
+      // Ensure companyId and branchId are properly serialized as strings
+      const sanitizedUser = {
+        ...loggedInUser,
+        companyId: typeof loggedInUser.companyId === 'object' ? loggedInUser.companyId?._id || loggedInUser.companyId?.id || null : loggedInUser.companyId,
+        branchId: typeof loggedInUser.branchId === 'object' ? loggedInUser.branchId?._id || loggedInUser.branchId?.id || null : loggedInUser.branchId,
+      };
+
       // Tokens are in httpOnly cookies, only store user data
       dispatch(
         setCredentials({
-          user: loggedInUser,
+          user: sanitizedUser,
         })
       );
       
@@ -260,15 +265,23 @@ export default function PinLoginPage() {
       }
       // DO NOT redirect - stay on PIN login page so user can retry
     }
-  };
+  }, [selectedBranch, selectedRole, pin, availableUsers, selectedUser, companyContext, pinLogin, dispatch, router]);
 
   const handleBack = () => {
     dispatch(clearCompanyContext());
     router.push('/auth/login');
   };
 
-  if (!companyContext) {
-    return null;
+  // Prevent redirect during context check
+  if (isCheckingContext || !companyContext) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+          <p className="mt-4 text-white/80">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

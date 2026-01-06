@@ -175,7 +175,7 @@ export function Topbar() {
                     {user?.firstName} {user?.lastName}
                   </p>
                   <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">
-                    {user?.role.replace('_', ' ')}
+                    {user?.role ? user.role.replace('_', ' ') : 'Unknown'}
                   </p>
                 </div>
               </Button>

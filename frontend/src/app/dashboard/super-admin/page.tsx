@@ -1,24 +1,55 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { useGetDeletedBranchesQuery, usePermanentDeleteBranchMutation, useRestoreBranchMutation } from '@/lib/api/endpoints/branchesApi';
 import { useGetCompaniesQuery, useGetSystemStatsQuery } from '@/lib/api/endpoints/companiesApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
-import { BuildingOffice2Icon, ShieldCheckIcon, UsersIcon } from '@heroicons/react/24/outline';
-import { useRouter } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
+import { formatDateTime } from '@/lib/utils';
+import { ArrowPathIcon, BuildingOffice2Icon, ExclamationTriangleIcon, ShieldCheckIcon, TrashIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 
 export default function SuperAdminDashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: systemStats, isLoading: isLoadingStats } = useGetSystemStatsQuery();
   const { data: companiesData, isLoading: isLoadingCompanies } = useGetCompaniesQuery({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const { data: deletedBranchesData, isLoading: isLoadingDeleted, refetch: refetchDeleted } = useGetDeletedBranchesQuery({
+    page: currentPage,
+    limit: itemsPerPage,
+  }, {
+    refetchOnMountOrArgChange: true,
+  });
+  const [restoreBranch] = useRestoreBranchMutation();
+  const [permanentDeleteBranch] = usePermanentDeleteBranchMutation();
 
   useEffect(() => {
     if (!user || user.role !== UserRole.SUPER_ADMIN) {
       router.replace('/dashboard/super-admin');
     }
   }, [user, router]);
+
+  // Reset to page 1 when changing items per page
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
+
+  // Handle hash navigation to scroll to trash section
+  useEffect(() => {
+    if (searchParams.get('scroll') === 'trash' || window.location.hash === '#trash') {
+      const trashElement = document.getElementById('trash');
+      if (trashElement) {
+        trashElement.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [searchParams]);
 
   // Extract companies array from response (handles both array and object responses)
   const companies = useMemo(() => {
@@ -35,6 +66,59 @@ export default function SuperAdminDashboardPage() {
   }, [companiesData]);
 
   const totalCompanies = companies.length;
+
+  // Extract deleted branches with pagination info
+  const deletedBranchesDataProcessed = useMemo(() => {
+    if (!deletedBranchesData) {
+      return {
+        deletedBranches: [],
+        totalDeletedBranches: 0,
+        currentPage: 1,
+        totalPages: 0
+      };
+    }
+
+    const branches = deletedBranchesData.branches || [];
+    const total = deletedBranchesData.total || 0;
+    const page = deletedBranchesData.page || 1;
+    const limit = deletedBranchesData.limit || itemsPerPage;
+    const pages = Math.ceil(total / limit);
+
+    return {
+      deletedBranches: branches,
+      totalDeletedBranches: total,
+      currentPage: page,
+      totalPages: pages,
+    };
+  }, [deletedBranchesData, itemsPerPage]);
+
+  const { deletedBranches, totalDeletedBranches, totalPages } = deletedBranchesDataProcessed;
+
+  const handleRestoreBranch = async (branchId: string, branchName: string) => {
+    if (!confirm(`Are you sure you want to restore "${branchName}"?`)) return;
+
+    try {
+      await restoreBranch(branchId).unwrap();
+      toast.success('Branch restored successfully');
+      refetchDeleted();
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || 'Failed to restore branch';
+      toast.error(errorMessage);
+    }
+  };
+
+  const handlePermanentDelete = async (branchId: string, branchName: string) => {
+    if (!confirm(`⚠️ WARNING: This will PERMANENTLY DELETE "${branchName}" and ALL related data. This action CANNOT be undone. Are you sure?`)) return;
+
+    try {
+      await permanentDeleteBranch(branchId).unwrap();
+      toast.success('Branch permanently deleted with all related data');
+      refetchDeleted();
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || 'Failed to permanently delete branch';
+      toast.error(errorMessage);
+    }
+  };
 
   if (!user || user.role !== UserRole.SUPER_ADMIN) {
     return (
@@ -232,7 +316,122 @@ export default function SuperAdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Trashed Branches Management */}
+      <Card id="trash">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrashIcon className="w-5 h-5 text-red-600" />
+            Trashed Branches ({totalDeletedBranches})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingDeleted ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            </div>
+          ) : deletedBranches.length === 0 ? (
+            <p className="text-gray-600 dark:text-gray-400 text-center py-8">
+              No trashed branches found.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {deletedBranches.map((branch: any) => {
+                // Ensure we have the correct ID (MongoDB _id vs id)
+                const branchId = branch.id || branch._id || branch._id?.toString();
+                console.log('🔍 Branch data:', { branchId, branch });
+                return (
+                  <div
+                    key={branchId}
+                    className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                        {branch.name}
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {typeof branch.address === 'string'
+                          ? branch.address
+                          : `${branch.address?.city || ''}, ${branch.address?.country || ''}`.trim().replace(/^,/, '')}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Deleted: {formatDateTime(branch.deletedAt || branch.updatedAt)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleRestoreBranch(branchId, branch.name)}
+                        className="flex items-center gap-1"
+                      >
+                        <ArrowPathIcon className="w-4 h-4" />
+                        Restore
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => handlePermanentDelete(branchId, branch.name)}
+                        className="flex items-center gap-1"
+                      >
+                        <ExclamationTriangleIcon className="w-4 h-4" />
+                        Delete Forever
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <span>Show</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                    <span>per page</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Page {currentPage} of {totalPages}
+                    </span>
+
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

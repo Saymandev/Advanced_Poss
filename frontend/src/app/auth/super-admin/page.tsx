@@ -54,10 +54,17 @@ export default function SuperAdminLoginPage() {
         return;
       }
       
+      // Ensure companyId and branchId are properly serialized as strings
+      const sanitizedUser = {
+        ...loggedInUser,
+        companyId: typeof loggedInUser.companyId === 'object' ? loggedInUser.companyId?._id || loggedInUser.companyId?.id || null : loggedInUser.companyId,
+        branchId: typeof loggedInUser.branchId === 'object' ? loggedInUser.branchId?._id || loggedInUser.branchId?.id || null : loggedInUser.branchId,
+      };
+
       // Tokens are in httpOnly cookies, only store user data
       dispatch(
         setCredentials({
-          user: loggedInUser,
+          user: sanitizedUser,
         })
       );
 

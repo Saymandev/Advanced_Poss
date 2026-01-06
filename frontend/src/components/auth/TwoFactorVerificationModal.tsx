@@ -62,18 +62,23 @@ export function TwoFactorVerificationModal({
         return;
       }
 
-      // Tokens are in httpOnly cookies, only store user data
+      // Ensure companyId and branchId are properly serialized as strings
+      const sanitizedUser = {
+        ...loggedInUser,
+        companyId: typeof loggedInUser.companyId === 'object' ? loggedInUser.companyId?._id || loggedInUser.companyId?.id || null : loggedInUser.companyId,
+        branchId: typeof loggedInUser.branchId === 'object' ? loggedInUser.branchId?._id || loggedInUser.branchId?.id || null : loggedInUser.branchId,
+      };
+
       dispatch(
         setCredentials({
-          user: loggedInUser,
+          user: sanitizedUser,
         })
       );
 
       toast.success('2FA verified successfully!');
-      
-      // Redirect to role-specific dashboard
-      const dashboardPath = getRoleDashboardPath(loggedInUser?.role);
-      router.push(dashboardPath);
+
+      // Immediate redirect - authentication cookies should be set by backend
+      router.push(getRoleDashboardPath(loggedInUser?.role));
     } catch (error: any) {
       const errorMessage = error?.data?.message || 'Invalid 2FA code. Please try again.';
       toast.error(

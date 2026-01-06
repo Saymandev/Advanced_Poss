@@ -1,4 +1,5 @@
 'use client';
+import { PinVerificationModal } from '@/components/auth/PinVerificationModal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
-import { Branch, useCreateBranchMutation, useDeleteBranchMutation, useGetBranchByIdQuery, useGetBranchesQuery, useGetBranchStatsQuery, useToggleBranchStatusMutation, useUpdateBranchMutation } from '@/lib/api/endpoints/branchesApi';
+import { Branch, useCreateBranchMutation, useGetBranchByIdQuery, useGetBranchesQuery, useGetBranchStatsQuery, usePermanentDeleteBranchMutation, useRestoreBranchMutation, useSoftDeleteBranchMutation, useToggleBranchStatusMutation, useUpdateBranchMutation } from '@/lib/api/endpoints/branchesApi';
 import { Staff, useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
@@ -36,7 +37,9 @@ export default function BranchesPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ type: 'delete' | 'permanent-delete' | 'toggle'; data: Branch } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,7 +56,9 @@ export default function BranchesPage() {
   );
   const [createBranch, { isLoading: isCreating }] = useCreateBranchMutation();
   const [updateBranch, { isLoading: isUpdating }] = useUpdateBranchMutation();
-  const [deleteBranch, { isLoading: isDeleting }] = useDeleteBranchMutation();
+  const [softDeleteBranch, { isLoading: isSoftDeleting }] = useSoftDeleteBranchMutation();
+  const [restoreBranch, { isLoading: _isRestoring }] = useRestoreBranchMutation();
+  const [permanentDeleteBranch, { isLoading: _isPermanentDeleting }] = usePermanentDeleteBranchMutation();
   const [toggleBranchStatus, { isLoading: isToggling }] = useToggleBranchStatusMutation();
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -271,28 +276,94 @@ export default function BranchesPage() {
     }
   };
   const handleDelete = async (branch: Branch) => {
-    if (!confirm(`Are you sure you want to delete "${branch.name}"? This action cannot be undone.`)) return;
+    const isSuperAdmin = user?.role === 'super_admin';
+    const isOwner = user?.role === 'owner';
+
+    if (isSuperAdmin) {
+      // Super admins can permanently delete branches
+      if (!confirm(`⚠️ WARNING: As a Super Admin, this will PERMANENTLY DELETE "${branch.name}" and ALL related data. This action CANNOT be undone. Are you sure?`)) return;
+
+      setPendingAction({ type: 'permanent-delete', data: branch });
+      setIsPinModalOpen(true);
+    } else if (isOwner) {
+      // Owners soft delete branches (move to trash)
+      if (!confirm(`Are you sure you want to delete "${branch.name}"? It will be moved to trash and can be restored later.`)) return;
+
+      setPendingAction({ type: 'delete', data: branch });
+      setIsPinModalOpen(true);
+    } else {
+      // Non-admins shouldn't reach here due to UI restrictions
+      toast.error('You do not have permission to delete branches');
+    }
+  };
+
+  const handleRestore = async (branch: Branch) => {
+    if (!confirm(`Are you sure you want to restore "${branch.name}"?`)) return;
+
     try {
-      await deleteBranch(branch.id).unwrap();
-      toast.success('Branch deleted successfully');
+      await restoreBranch(branch.id).unwrap();
+      toast.success('Branch restored successfully');
       refetch();
     } catch (error: any) {
-      const errorMessage = error?.data?.message || error?.message || 'Failed to delete branch';
+      const errorMessage = error?.data?.message || error?.message || 'Failed to restore branch';
       toast.error(errorMessage);
-      console.error('Delete branch error:', error);
+      console.error('Restore branch error:', error);
+    }
+  };
+
+  const handlePinVerificationSuccess = async () => {
+    if (!pendingAction) return;
+
+    const branch = pendingAction.data;
+
+    try {
+      if (pendingAction.type === 'delete') {
+        await softDeleteBranch(branch.id).unwrap();
+        toast.success('Branch moved to trash successfully');
+      } else if (pendingAction.type === 'permanent-delete') {
+        await permanentDeleteBranch(branch.id).unwrap();
+        toast.success('Branch permanently deleted with all related data');
+      } else if (pendingAction.type === 'toggle') {
+        const action = branch.isActive ? 'deactivate' : 'activate';
+        await toggleBranchStatus(branch.id).unwrap();
+        toast.success(`Branch ${action}d successfully`);
+      }
+      refetch();
+    } catch (error: any) {
+      let action = '';
+      if (pendingAction.type === 'delete') action = 'delete';
+      else if (pendingAction.type === 'permanent-delete') action = 'permanently delete';
+      else if (pendingAction.type === 'toggle') action = branch.isActive ? 'deactivate' : 'activate';
+
+      const errorMessage = error?.data?.message || error?.message || `Failed to ${action} branch`;
+      toast.error(errorMessage);
+      console.error(`${action} branch error:`, error);
+    } finally {
+      setPendingAction(null);
     }
   };
   const handleToggleStatus = async (branch: Branch) => {
     const action = branch.isActive ? 'deactivate' : 'activate';
-    if (!confirm(`Are you sure you want to ${action} "${branch.name}"?`)) return;
-    try {
-      await toggleBranchStatus(branch.id).unwrap();
-      toast.success(`Branch ${action}d successfully`);
-      refetch();
-    } catch (error: any) {
-      const errorMessage = error?.data?.message || error?.message || `Failed to ${action} branch`;
-      toast.error(errorMessage);
-      console.error('Toggle branch status error:', error);
+
+    // Check if user is admin (Super Admin or Owner)
+    const isAdmin = user?.role === 'super_admin' || user?.role === 'owner';
+
+    if (isAdmin) {
+      // For admins, require PIN verification
+      setPendingAction({ type: 'toggle', data: branch });
+      setIsPinModalOpen(true);
+    } else {
+      // For non-admins, show regular confirmation (though they may not have permission due to backend guards)
+      if (!confirm(`Are you sure you want to ${action} "${branch.name}"?`)) return;
+      try {
+        await toggleBranchStatus(branch.id).unwrap();
+        toast.success(`Branch ${action}d successfully`);
+        refetch();
+      } catch (error: any) {
+        const errorMessage = error?.data?.message || error?.message || `Failed to ${action} branch`;
+        toast.error(errorMessage);
+        console.error('Toggle branch status error:', error);
+      }
     }
   };
   const openEditModal = (branch: Branch) => {
@@ -334,11 +405,11 @@ export default function BranchesPage() {
     setIsViewModalOpen(true);
   };
   // Fetch full branch details and stats when viewing
-  const { data: branchDetails, isLoading: isLoadingDetails, error: detailsError } = useGetBranchByIdQuery(selectedBranch?.id || '', {
+  const { data: branchDetails, isLoading: isLoadingDetails, error: _detailsError } = useGetBranchByIdQuery(selectedBranch?.id || '', {
     skip: !selectedBranch?.id || !isViewModalOpen,
     refetchOnMountOrArgChange: true,
   });
-  const { data: branchStats, isLoading: isLoadingStats, error: statsError } = useGetBranchStatsQuery(selectedBranch?.id || '', {
+  const { data: branchStats, isLoading: isLoadingStats, error: _statsError } = useGetBranchStatsQuery(selectedBranch?.id || '', {
     skip: !selectedBranch?.id || !isViewModalOpen,
     refetchOnMountOrArgChange: true,
   });
@@ -375,7 +446,7 @@ export default function BranchesPage() {
     if (isViewModalOpen && selectedBranch) {
       // Debug logging removed
     }
-  }, [isViewModalOpen, selectedBranch, branchDetails, branchStats, displayBranch, isLoadingDetails, isLoadingStats, detailsError, statsError]);
+  }, [isViewModalOpen, selectedBranch, branchDetails, branchStats, displayBranch, isLoadingDetails, isLoadingStats, _detailsError, _statsError]);
   const columns = [
     {
       key: 'name',
@@ -530,7 +601,7 @@ export default function BranchesPage() {
             variant="ghost"
             size="sm"
             onClick={() => handleDelete(row)}
-            disabled={isDeleting}
+            disabled={isSoftDeleting}
             className="text-red-600 hover:text-red-700"
             title="Delete branch"
           >
@@ -1369,7 +1440,7 @@ export default function BranchesPage() {
             <div className="text-sm text-gray-500 dark:text-gray-400">Loading branch details...</div>
           </div>
         )}
-        {(detailsError || statsError) && (
+        {(_detailsError || _statsError) && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
             <div className="flex items-start gap-2">
               <ExclamationTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
@@ -1378,8 +1449,8 @@ export default function BranchesPage() {
                   Error loading branch data
                 </p>
                 <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                  {detailsError ? 'Failed to load branch details' : ''}
-                  {statsError ? 'Failed to load branch statistics' : ''}
+                  {_detailsError ? 'Failed to load branch details' : ''}
+                  {_statsError ? 'Failed to load branch statistics' : ''}
                 </p>
               </div>
             </div>
@@ -1543,6 +1614,22 @@ export default function BranchesPage() {
           </div>
         )}
       </Modal>
+
+      {/* PIN Verification Modal for Admin Actions */}
+      <PinVerificationModal
+        isOpen={isPinModalOpen}
+        onClose={() => {
+          setIsPinModalOpen(false);
+          setPendingAction(null);
+        }}
+        onSuccess={handlePinVerificationSuccess}
+        title={pendingAction?.type === 'delete' ? 'Confirm Branch Deletion' : 'Confirm Branch Status Change'}
+        description={
+          pendingAction?.type === 'delete'
+            ? `Please enter your PIN to confirm deletion of "${pendingAction?.data?.name}". This action cannot be undone.`
+            : `Please enter your PIN to confirm ${pendingAction?.data?.isActive ? 'deactivation' : 'activation'} of "${pendingAction?.data?.name}".`
+        }
+      />
     </div>
   );
 }

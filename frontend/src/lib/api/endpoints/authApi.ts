@@ -231,6 +231,16 @@ export const authApi = apiSlice.injectEndpoints({
         url: '/auth/2fa/setup',
         method: 'GET',
       }),
+      transformResponse: (response: any) => {
+        // Handle TransformInterceptor wrapper: { success: true, data: ... }
+        const data = response?.data || response;
+        return {
+          secret: data.secret,
+          qrCode: data.qrCode,
+          backupCodes: data.backupCodes,
+          message: data.message,
+        };
+      },
     }),
     enable2FA: builder.mutation<{ message: string; backupCodes: string[] }, { token: string }>({
       query: (data) => ({
@@ -248,6 +258,13 @@ export const authApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Auth', 'User'],
     }),
+    verifyPin: builder.mutation<{ message: string }, { pin: string }>({
+      query: (data) => ({
+        url: '/auth/verify-pin',
+        method: 'POST',
+        body: data,
+      }),
+    }),
   }),
 });
 
@@ -262,5 +279,6 @@ export const {
   useSetup2FAMutation,
   useEnable2FAMutation,
   useDisable2FAMutation,
+  useVerifyPinMutation,
 } = authApi;
 

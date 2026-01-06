@@ -6,26 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import {
-    useDisable2FAMutation,
-    useEnable2FAMutation,
-    useSetup2FAMutation,
+  useDisable2FAMutation,
+  useEnable2FAMutation,
+  useSetup2FAMutation,
 } from '@/lib/api/endpoints/authApi';
 import {
-    useChangePasswordMutation,
-    useChangePinMutation,
-    useGetProfileQuery,
-    useUpdateProfileMutation,
-    useUploadAvatarMutation,
+  useChangePasswordMutation,
+  useChangePinMutation,
+  useGetProfileQuery,
+  useUpdateProfileMutation,
+  useUploadAvatarMutation,
 } from '@/lib/api/endpoints/usersApi';
 import { setUser } from '@/lib/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import {
-    CheckCircleIcon,
-    KeyIcon,
-    LockClosedIcon,
-    PencilIcon,
-    PhotoIcon,
-    UserCircleIcon
+  CheckCircleIcon,
+  KeyIcon,
+  LockClosedIcon,
+  PencilIcon,
+  PhotoIcon,
+  UserCircleIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
@@ -54,6 +54,8 @@ export default function ProfilePage() {
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [twoFactorToken, setTwoFactorToken] = useState('');
   const [disablePassword, setDisablePassword] = useState('');
+  const [disablePin, setDisablePin] = useState('');
+  const [disableMethod, setDisableMethod] = useState<'password' | 'pin'>('password');
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -259,7 +261,7 @@ export default function ProfilePage() {
     } catch (error: any) {
       const errorMessage = error?.data?.message || 'Failed to setup 2FA';
       toast.error(errorMessage);
-      
+
       // If 2FA is already enabled, show different message
       if (errorMessage.includes('already enabled')) {
         refetch(); // Refresh profile to get updated status
@@ -275,8 +277,26 @@ export default function ProfilePage() {
 
     // If QR code is not set, we need to setup first
     if (!qrCode) {
-      toast.error('Please setup 2FA first by clicking Enable');
-      return;
+      toast.error('2FA setup expired. Setting up again...');
+
+      // Automatically setup 2FA again
+      try {
+        const result = await setup2FA().unwrap();
+        setQrCode(result.qrCode);
+        setSecret(result.secret || '');
+        setBackupCodes(result.backupCodes || []);
+
+        // Now try to enable with the new setup
+        if (result.qrCode) {
+          // Continue with the enable process
+        } else {
+          toast.error('Failed to setup 2FA. Please try again.');
+          return;
+        }
+      } catch (setupError: any) {
+        toast.error('Failed to setup 2FA. Please close and reopen the setup.');
+        return;
+      }
     }
 
     try {
@@ -324,20 +344,29 @@ export default function ProfilePage() {
   };
 
   const handleDisable2FA = async () => {
-    if (!disablePassword.trim()) {
-      toast.error('Please enter your password');
+    const credential = disableMethod === 'password' ? disablePassword : disablePin;
+
+    if (!credential.trim()) {
+      toast.error(`Please enter your ${disableMethod}`);
       return;
     }
 
     try {
-      await disable2FA({ password: disablePassword }).unwrap();
+      const data = disableMethod === 'password'
+        ? { password: disablePassword }
+        : { pin: disablePin };
+
+      await disable2FA(data).unwrap();
       toast.success('2FA disabled successfully');
       setIs2FADisableModalOpen(false);
       setDisablePassword('');
+      setDisablePin('');
+      setDisableMethod('password');
       refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to disable 2FA');
       setDisablePassword('');
+      setDisablePin('');
     }
   };
 
@@ -1101,32 +1130,88 @@ export default function ProfilePage() {
         onClose={() => {
           setIs2FADisableModalOpen(false);
           setDisablePassword('');
+          setDisablePin('');
+          setDisableMethod('password');
         }}
         title="Disable Two-Factor Authentication"
         size="md"
       >
         <div className="space-y-6">
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Please enter your password to disable two-factor authentication.
+            Choose how you want to verify your identity to disable two-factor authentication.
           </p>
+
+          {/* Method Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Password
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Verification Method
             </label>
-            <Input
-              type="password"
-              value={disablePassword}
-              onChange={(e) => setDisablePassword(e.target.value)}
-              placeholder="Enter your password"
-              autoFocus
-            />
+            <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="disableMethod"
+                  value="password"
+                  checked={disableMethod === 'password'}
+                  onChange={(e) => setDisableMethod(e.target.value as 'password')}
+                  className="mr-2"
+                />
+                <span className="text-sm">Password</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="disableMethod"
+                  value="pin"
+                  checked={disableMethod === 'pin'}
+                  onChange={(e) => setDisableMethod(e.target.value as 'pin')}
+                  className="mr-2"
+                />
+                <span className="text-sm">PIN</span>
+              </label>
+            </div>
           </div>
+
+          {/* Password Input */}
+          {disableMethod === 'password' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Password
+              </label>
+              <Input
+                type="password"
+                value={disablePassword}
+                onChange={(e) => setDisablePassword(e.target.value)}
+                placeholder="Enter your password"
+                autoFocus
+              />
+            </div>
+          )}
+
+          {/* PIN Input */}
+          {disableMethod === 'pin' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                PIN
+              </label>
+              <Input
+                type="password"
+                value={disablePin}
+                onChange={(e) => setDisablePin(e.target.value)}
+                placeholder="Enter your PIN"
+                autoFocus
+                maxLength={6}
+              />
+            </div>
+          )}
           <div className="flex justify-end space-x-3 pt-4">
             <Button
               variant="secondary"
               onClick={() => {
                 setIs2FADisableModalOpen(false);
                 setDisablePassword('');
+                setDisablePin('');
+                setDisableMethod('password');
               }}
               disabled={isDisabling2FA}
             >
@@ -1134,7 +1219,7 @@ export default function ProfilePage() {
             </Button>
             <Button
               onClick={handleDisable2FA}
-              disabled={isDisabling2FA || !disablePassword.trim()}
+              disabled={isDisabling2FA || !(disableMethod === 'password' ? disablePassword.trim() : disablePin.trim())}
               variant="danger"
             >
               {isDisabling2FA ? 'Disabling...' : 'Disable 2FA'}
