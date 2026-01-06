@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsDate, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsDate, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { SubscriptionLimits } from '../schemas/subscription.schema';
 import { CreateSubscriptionDto } from './create-subscription.dto';
 
 export class UpdateSubscriptionDto extends PartialType(CreateSubscriptionDto) {
@@ -22,5 +23,10 @@ export class UpdateSubscriptionDto extends PartialType(CreateSubscriptionDto) {
   @IsString({ each: true })
   @IsOptional()
   enabledFeatures?: string[];
+
+  // Manual limit overrides (superadmin only)
+  @IsObject()
+  @IsOptional()
+  limits?: Partial<SubscriptionLimits>;
 }
 

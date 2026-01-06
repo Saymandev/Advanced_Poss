@@ -9,9 +9,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { BranchFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -19,7 +20,6 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
-import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
@@ -44,6 +44,17 @@ export class BranchesController {
   @ApiOperation({ summary: 'Get all branches' })
   findAll(@Query() filter: BranchFilterDto) {
     return this.branchesService.findAll(filter);
+  }
+
+  @Get('deleted')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get all soft deleted branches' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of soft deleted branches',
+  })
+  findDeleted(@Query() filter: BranchFilterDto) {
+    return this.branchesService.findDeleted(filter);
   }
 
   @Get('company/:companyId')
@@ -88,9 +99,35 @@ export class BranchesController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
-  @ApiOperation({ summary: 'Delete branch' })
-  remove(@Param('id') id: string) {
-    return this.branchesService.remove(id);
+  @ApiOperation({ summary: 'Soft delete branch (moves to trash)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Branch moved to trash successfully',
+  })
+  softDelete(@Param('id') id: string) {
+    return this.branchesService.softDelete(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Restore soft deleted branch' })
+  @ApiResponse({
+    status: 200,
+    description: 'Branch restored successfully',
+  })
+  restore(@Param('id') id: string) {
+    return this.branchesService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Permanently delete branch and all related data' })
+  @ApiResponse({
+    status: 200,
+    description: 'Branch permanently deleted with all related data',
+  })
+  permanentDelete(@Param('id') id: string) {
+    return this.branchesService.permanentDeleteWithCascade(id);
   }
 
   @Patch(':id/deactivate')

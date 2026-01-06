@@ -55,7 +55,7 @@ export const CORE_FEATURES = [
 /**
  * All available feature keys from FEATURES constants
  */
-export const ALL_FEATURE_KEYS = Object.values(FEATURES);
+export const ALL_FEATURE_KEYS = [...Object.values(FEATURES), 'multi-branch'];
 
 /**
  * Convert legacy features object to enabledFeatureKeys array
@@ -176,6 +176,7 @@ export function getFeaturesByCategory() {
     System: [
       { key: FEATURES.SETTINGS, name: 'Settings' },
       { key: FEATURES.BRANCHES, name: 'Branches' },
+      { key: 'multi-branch', name: 'Multi-Branch Support' },
       { key: FEATURES.NOTIFICATIONS, name: 'Notifications' },
     ],
     Hotel: [

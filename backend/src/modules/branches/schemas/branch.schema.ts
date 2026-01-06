@@ -107,6 +107,10 @@ export class Branch {
     allowTips: boolean;
     defaultTipPercentage?: number;
   };
+
+  // Soft delete
+  @Prop()
+  deletedAt?: Date;
 }
 
 export const BranchSchema = SchemaFactory.createForClass(Branch);

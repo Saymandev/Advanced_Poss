@@ -542,5 +542,29 @@ export class AuthController {
   ) {
     return this.authService.regenerateBackupCodes(userId, body.password);
   }
+
+  @Post('verify-pin')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Verify user PIN for admin actions' })
+  @ApiResponse({
+    status: 200,
+    description: 'PIN verified successfully',
+    schema: {
+      example: {
+        message: 'PIN verified successfully',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid PIN or unauthorized',
+  })
+  verifyPin(
+    @CurrentUser('id') userId: string,
+    @Body() body: { pin: string },
+  ) {
+    return this.authService.verifyPin(userId, body.pin);
+  }
 }
 

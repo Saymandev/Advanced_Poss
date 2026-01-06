@@ -1,17 +1,42 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { BranchFilterDto } from '../../common/dto/pagination.dto';
 import { GeneratorUtil } from '../../common/utils/generator.util';
+import { Attendance, AttendanceDocument } from '../attendance/schemas/attendance.schema';
+import { Booking, BookingDocument } from '../bookings/schemas/booking.schema';
+import { Category, CategoryDocument } from '../categories/schemas/category.schema';
 import { CompaniesService } from '../companies/companies.service';
+import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
+import { DeliveryZone, DeliveryZoneDocument } from '../delivery-zones/schemas/delivery-zone.schema';
+import { DigitalReceipt, DigitalReceiptDocument } from '../digital-receipts/schemas/digital-receipt.schema';
+import { Expense, ExpenseDocument } from '../expenses/schemas/expense.schema';
+import { Ingredient, IngredientDocument } from '../ingredients/schemas/ingredient.schema';
+import { KitchenOrder, KitchenOrderDocument } from '../kitchen/schemas/kitchen-order.schema';
+import { LoginActivity, LoginActivityDocument } from '../login-activity/schemas/login-activity.schema';
+import { LoginSession, LoginSessionDocument } from '../login-activity/schemas/login-session.schema';
+import { MarketingCampaign, MarketingCampaignDocument } from '../marketing/schemas/marketing-campaign.schema';
+import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+import { Notification, NotificationDocument } from '../notifications/schemas/notification.schema';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
+import { PaymentMethod, PaymentMethodDocument } from '../payment-methods/schemas/payment-method.schema';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
+import { POSPayment, POSPaymentDocument } from '../pos/schemas/pos-payment.schema';
+import { POSSettings, POSSettingsDocument } from '../pos/schemas/pos-settings.schema';
+import { PurchaseOrder, PurchaseOrderDocument } from '../purchase-orders/schemas/purchase-order.schema';
+import { QRCode, QRCodeDocument } from '../qr-codes/schemas/qr-code.schema';
+import { Review, ReviewDocument } from '../reviews/schemas/review.schema';
+import { Room, RoomDocument } from '../rooms/schemas/room.schema';
+import { ScheduleShift, ScheduleShiftDocument } from '../schedule/schemas/schedule-shift.schema';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
 import { Table, TableDocument } from '../tables/schemas/table.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { Wastage, WastageDocument } from '../wastage/schemas/wastage.schema';
+import { WorkPeriod, WorkPeriodDocument } from '../work-periods/schemas/work-period.schema';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { Branch, BranchDocument } from './schemas/branch.schema';
@@ -23,6 +48,31 @@ export class BranchesService {
     @InjectModel(Table.name) private tableModel: Model<TableDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
+    @InjectModel(Attendance.name) private attendanceModel: Model<AttendanceDocument>,
+    @InjectModel(Booking.name) private bookingModel: Model<BookingDocument>,
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
+    @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
+    @InjectModel(DeliveryZone.name) private deliveryZoneModel: Model<DeliveryZoneDocument>,
+    @InjectModel(DigitalReceipt.name) private digitalReceiptModel: Model<DigitalReceiptDocument>,
+    @InjectModel(Expense.name) private expenseModel: Model<ExpenseDocument>,
+    @InjectModel(Ingredient.name) private ingredientModel: Model<IngredientDocument>,
+    @InjectModel(KitchenOrder.name) private kitchenOrderModel: Model<KitchenOrderDocument>,
+    @InjectModel(LoginActivity.name) private loginActivityModel: Model<LoginActivityDocument>,
+    @InjectModel(LoginSession.name) private loginSessionModel: Model<LoginSessionDocument>,
+    @InjectModel(MarketingCampaign.name) private marketingCampaignModel: Model<MarketingCampaignDocument>,
+    @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+    @InjectModel(Notification.name) private notificationModel: Model<NotificationDocument>,
+    @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
+    @InjectModel(PaymentMethod.name) private paymentMethodModel: Model<PaymentMethodDocument>,
+    @InjectModel(POSPayment.name) private posPaymentModel: Model<POSPaymentDocument>,
+    @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
+    @InjectModel(PurchaseOrder.name) private purchaseOrderModel: Model<PurchaseOrderDocument>,
+    @InjectModel(QRCode.name) private qrCodeModel: Model<QRCodeDocument>,
+    @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
+    @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
+    @InjectModel(ScheduleShift.name) private scheduleShiftModel: Model<ScheduleShiftDocument>,
+    @InjectModel(Wastage.name) private wastageModel: Model<WastageDocument>,
+    @InjectModel(WorkPeriod.name) private workPeriodModel: Model<WorkPeriodDocument>,
     private companiesService: CompaniesService,
     private subscriptionPlansService: SubscriptionPlansService,
   ) {}
@@ -132,11 +182,17 @@ export class BranchesService {
 
   async findAll(
     filter: BranchFilterDto,
+    includeDeleted = false,
   ): Promise<{ branches: Branch[]; total: number; page: number; limit: number }> {
     const query: Record<string, any> = {};
 
     if (filter.companyId) {
       query.companyId = filter.companyId;
+    }
+
+    // Exclude soft deleted branches by default unless explicitly requested
+    if (!includeDeleted) {
+      query.deletedAt = { $exists: false };
     }
 
     if (filter.status === 'active') {
@@ -249,6 +305,12 @@ export class BranchesService {
     };
   }
 
+  async findDeleted(
+    filter: BranchFilterDto,
+  ): Promise<{ branches: Branch[]; total: number; page: number; limit: number }> {
+    return this.findAll(filter, true);
+  }
+
   async findOne(id: string): Promise<Branch> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid branch ID');
@@ -328,10 +390,9 @@ export class BranchesService {
   }
 
   async findByCompany(companyId: string): Promise<Branch[]> {
-    return this.branchModel
-      .find({ companyId: companyId })
-      .populate('managerId', 'firstName lastName email')
-      .exec();
+    // Use findAll to properly exclude soft-deleted branches
+    const result = await this.findAll({ companyId }, false); // false = exclude deleted
+    return result.branches;
   }
 
   async update(id: string, updateBranchDto: UpdateBranchDto): Promise<Branch> {
@@ -507,16 +568,140 @@ export class BranchesService {
     return branch;
   }
 
+  async softDelete(id: string): Promise<Branch> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid branch ID');
+    }
+
+    const branch = await this.branchModel.findByIdAndUpdate(
+      id,
+      { deletedAt: new Date() },
+      { new: true }
+    );
+
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    return branch;
+  }
+
+  async restore(id: string): Promise<Branch> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid branch ID');
+    }
+
+    const branch = await this.branchModel.findByIdAndUpdate(
+      id,
+      { $unset: { deletedAt: 1 } },
+      { new: true }
+    );
+
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    return branch;
+  }
+
   async remove(id: string): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid branch ID');
     }
 
-    const result = await this.branchModel.findByIdAndDelete(id);
-
-    if (!result) {
+    // First check if branch exists and is soft deleted
+    const branch = await this.branchModel.findById(id);
+    if (!branch) {
       throw new NotFoundException('Branch not found');
     }
+
+    if (!branch.deletedAt) {
+      throw new BadRequestException('Branch must be soft deleted before permanent deletion');
+    }
+
+    // Cascade delete all related data
+    await this.permanentDeleteWithCascade(id);
+  }
+
+  async permanentDeleteWithCascade(branchId: string): Promise<void> {
+    if (!branchId || branchId === 'undefined' || !Types.ObjectId.isValid(branchId)) {
+      throw new Error(`Invalid branchId: ${branchId}`);
+    }
+
+    // Delete QR codes FIRST (might be referenced by other operations)
+    await this.qrCodeModel.deleteMany({ branchId: new Types.ObjectId(branchId) });
+
+    // Delete all tables associated with this branch
+    await this.tableModel.deleteMany({ branchId });
+
+    // Delete all POS orders and related payments
+    await this.posOrderModel.deleteMany({ branchId });
+    await this.posPaymentModel.deleteMany({ branchId });
+
+    // Delete menu items and categories
+    await this.menuItemModel.deleteMany({ branchId });
+    await this.categoryModel.deleteMany({ branchId });
+
+    // Delete attendance records
+    await this.attendanceModel.deleteMany({ branchId });
+
+    // Delete bookings and rooms
+    await this.bookingModel.deleteMany({ branchId });
+    await this.roomModel.deleteMany({ branchId });
+
+    // Delete customers (branch-specific customers)
+    await this.customerModel.deleteMany({ branchId });
+
+    // Delete expenses
+    await this.expenseModel.deleteMany({ branchId });
+
+    // Delete ingredients and wastage
+    await this.ingredientModel.deleteMany({ branchId });
+    await this.wastageModel.deleteMany({ branchId });
+
+    // Delete kitchen orders
+    await this.kitchenOrderModel.deleteMany({ branchId });
+
+    // Delete notifications
+    await this.notificationModel.deleteMany({ branchId });
+
+    // Delete orders
+    await this.orderModel.deleteMany({ branchId });
+
+    // Delete payment methods
+    await this.paymentMethodModel.deleteMany({ branchId });
+
+    // Delete purchase orders
+    await this.purchaseOrderModel.deleteMany({ branchId });
+
+    // Delete reviews
+    await this.reviewModel.deleteMany({ branchId });
+
+    // Delete digital receipts
+    await this.digitalReceiptModel.deleteMany({ branchId });
+
+
+    // Delete schedule shifts
+    await this.scheduleShiftModel.deleteMany({ branchId });
+
+    // Delete work periods
+    await this.workPeriodModel.deleteMany({ branchId });
+
+    // Delete login activities and sessions
+    await this.loginActivityModel.deleteMany({ branchId });
+    await this.loginSessionModel.deleteMany({ branchId });
+
+    // Delete marketing campaigns
+    await this.marketingCampaignModel.deleteMany({ branchId });
+
+    // Delete delivery zones
+    await this.deliveryZoneModel.deleteMany({ branchId });
+
+    // Delete POS settings
+    await this.posSettingsModel.deleteMany({ branchId });
+
+    // Finally delete the branch itself
+    await this.branchModel.findByIdAndDelete(branchId);
   }
 
   async getStats(id: string): Promise<any> {

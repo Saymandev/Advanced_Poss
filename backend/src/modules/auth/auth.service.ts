@@ -341,6 +341,31 @@ export class AuthService {
     throw new UnauthorizedException('Invalid PIN for this role');
   }
 
+  async verifyPin(userId: string, pin: string) {
+    const user = await this.usersService.findOneWithPassword(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Check if user is admin (Super Admin or Owner)
+    if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.OWNER) {
+      throw new UnauthorizedException('Only admins can verify PIN for sensitive actions');
+    }
+
+    // Check if user has a PIN set
+    if (!user.pin || user.pin.trim() === '') {
+      throw new UnauthorizedException('No PIN set for this user. Please set a PIN first.');
+    }
+
+    // Verify PIN
+    const isValidPin = await PasswordUtil.compare(pin, user.pin);
+    if (!isValidPin) {
+      throw new UnauthorizedException('Invalid PIN');
+    }
+
+    return { message: 'PIN verified successfully' };
+  }
+
   async register(registerDto: RegisterDto) {
     const user = await this.usersService.create({
       ...registerDto,
