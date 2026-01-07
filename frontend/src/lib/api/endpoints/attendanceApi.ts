@@ -95,6 +95,34 @@ export const attendanceApi = apiSlice.injectEndpoints({
         };
       },
     }),
+    forceCheckOut: builder.mutation<AttendanceRecord, { userId: string; notes?: string }>({
+      query: ({ userId, ...data }) => ({
+        url: `/attendance/${userId}/force-check-out`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Attendance'],
+      transformResponse: (response: any) => {
+        const data = response?.data || response;
+        return {
+          id: data.id || data._id,
+          userId: data.userId?.id || data.userId?._id || data.userId,
+          userName: data.userName || `${data.userId?.firstName || ''} ${data.userId?.lastName || ''}`.trim() || data.userId?.email || 'Unknown',
+          branchId: data.branchId?.id || data.branchId?._id || data.branchId,
+          branchName: data.branchName || data.branchId?.name || data.branchId?.code || 'Unknown',
+          checkIn: data.checkIn,
+          checkOut: data.checkOut,
+          status: data.status || 'present',
+          totalHours: data.totalHours || data.workHours || 0,
+          overtime: data.overtime || data.overtimeHours || 0,
+          notes: data.notes,
+          approvedBy: data.approvedBy,
+          approvedAt: data.approvedAt,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+      },
+    }),
     getAttendanceRecords: builder.query<{ records: AttendanceRecord[]; total: number }, any>({
       query: (params) => ({
         url: '/attendance',
@@ -257,6 +285,7 @@ export const attendanceApi = apiSlice.injectEndpoints({
 export const {
   useCheckInMutation,
   useCheckOutMutation,
+  useForceCheckOutMutation,
   useGetAttendanceRecordsQuery,
   useGetTodayAttendanceQuery,
   useGetBranchAttendanceQuery,

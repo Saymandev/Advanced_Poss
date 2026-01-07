@@ -1,6 +1,7 @@
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetPOSOrdersQuery, useGetPOSStatsQuery } from '@/lib/api/endpoints/posApi';
 import { useGetReviewsQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
@@ -64,6 +65,9 @@ const QUICK_RANGE_OPTIONS: Array<{ label: string; value: QuickRange }> = [
 export default function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
   const router = useRouter();
+  
+  // Redirect if user doesn't have dashboard feature access
+  useFeatureRedirect('dashboard');
   // Default to 'lifetime' to show all past data
   const [quickRange, setQuickRange] = useState<QuickRange>('lifetime');
   const [dateRange, setDateRange] = useState(() => {
@@ -143,6 +147,9 @@ export default function DashboardPage() {
     if (statsError) {
       console.error('Dashboard stats error:', statsError);
     }
+    if (statsData) {
+      console.log('Dashboard stats data:', statsData);
+    }
   }, [statsParams, validDateRange, branchId, statsLoading, statsData, statsError]);
   const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useGetPOSOrdersQuery(
     {
@@ -161,7 +168,12 @@ export default function DashboardPage() {
       console.error('Dashboard orders error:', ordersError);
       console.error('Error details:', ordersError);
     }
-    // Debug logging removed
+    if (ordersData) {
+      console.log('Dashboard orders data:', ordersData);
+      console.log('Orders count:', ordersData?.orders?.length || 0);
+    }
+    console.log('Orders query skip:', !safeDateRange.start || !safeDateRange.end);
+    console.log('Safe date range:', safeDateRange);
   }, [ordersLoading, ordersData, ordersError, validDateRange, safeDateRange, branchId]);
   // Get reviews for waiter ratings
   const { data: reviewsData, error: reviewsError } = useGetReviewsQuery(
@@ -212,7 +224,16 @@ export default function DashboardPage() {
   }, [statsData, statsLoading]);
   // Transform orders to ensure proper structure
   const orders = useMemo(() => {
-    const ordersArray = (ordersData as any)?.orders || [];
+    if (!ordersData) {
+      console.log('No ordersData available');
+      return [];
+    }
+    const ordersArray = (ordersData as any)?.orders || (ordersData as any)?.data?.orders || (Array.isArray(ordersData) ? ordersData : []);
+    console.log('Orders array length:', ordersArray.length);
+    if (ordersArray.length === 0) {
+      console.log('Orders array is empty');
+      return [];
+    }
     // Transform orders to ensure all required fields are present
     const transformed = ordersArray.map((order: any) => {
       // Payment method can be in multiple places:

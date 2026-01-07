@@ -13,6 +13,7 @@ import {
   useCheckInMutation,
   useCheckOutMutation,
   useDeleteAttendanceMutation,
+  useForceCheckOutMutation,
   useGetAttendanceRecordsQuery,
   useGetAttendanceStatsQuery,
   useGetTodayAttendanceQuery,
@@ -30,7 +31,7 @@ import {
   UserGroupIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
 // Helper to display decimal hours in a friendly "Xh Ym" format
@@ -69,18 +70,41 @@ export default function AttendancePage() {
   // Check if user is owner/manager (can see all employees)
   const isOwnerOrManager = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'super_admin';
   
+  // Extract branchId from multiple sources
+  const branchId = user?.branchId || 
+                   (user as any)?.companyContext?.branchId || 
+                   (user as any)?.companyContext?.branches?.[0]?._id || 
+                   (user as any)?.companyContext?.branches?.[0]?.id;
+  const branchIdStr = branchId ? (typeof branchId === 'string' ? branchId : branchId.toString()) : '';
+  
   // API calls
-  const { data: todayAttendance = [], isLoading: todayLoading, refetch: refetchTodayAttendance } = useGetTodayAttendanceQuery(
-    user?.branchId || '',
-    { skip: !user?.branchId }
+  const { data: todayAttendance = [], isLoading: todayLoading, refetch: refetchTodayAttendance, error: todayError } = useGetTodayAttendanceQuery(
+    branchIdStr,
+    { 
+      skip: !branchIdStr,
+      pollingInterval: 30000, // Poll every 30 seconds for real-time updates
+    }
   );
+  
+  // Debug logging
+  useEffect(() => {
+    if (branchIdStr) {
+      console.log('🔍 Attendance Debug:', {
+        branchId: branchIdStr,
+        userRole: user?.role,
+        todayAttendanceCount: todayAttendance?.length || 0,
+        todayAttendance,
+        todayError,
+      });
+    }
+  }, [branchIdStr, user?.role, todayAttendance, todayError]);
   const { data: attendanceStats, isLoading: statsLoading } = useGetAttendanceStatsQuery(
-    user?.branchId || '',
-    { skip: !user?.branchId }
+    branchIdStr,
+    { skip: !branchIdStr }
   );
   // Fetch full attendance records with filters for owners/managers
   const { data: attendanceRecordsData, isLoading: recordsLoading } = useGetAttendanceRecordsQuery({
-    branchId: user?.branchId || '',
+    branchId: branchIdStr,
     page: currentPage,
     limit: pageLimit,
     ...(statusFilter && { status: statusFilter }),
@@ -88,7 +112,7 @@ export default function AttendancePage() {
     ...(endDate && { endDate }),
     ...(searchQuery && { search: searchQuery }),
   }, {
-    skip: !isOwnerOrManager || !user?.branchId, // Skip for waiters/employees to avoid 403
+    skip: !isOwnerOrManager || !branchIdStr, // Skip for waiters/employees to avoid 403
   });
 
   const attendanceRecords = attendanceRecordsData?.records || [];
@@ -97,24 +121,44 @@ export default function AttendancePage() {
   // Mutations
   const [checkIn, { isLoading: isCheckingIn }] = useCheckInMutation();
   const [checkOut, { isLoading: isCheckingOut }] = useCheckOutMutation();
+  const [forceCheckOut] = useForceCheckOutMutation();
   const [_markAbsent, { isLoading: _isMarkingAbsent }] = useMarkAbsentMutation();
   const [_updateAttendance, { isLoading: _isUpdating }] = useUpdateAttendanceMutation();
   const [approveAttendance, { isLoading: _isApproving }] = useApproveAttendanceMutation();
   const [deleteAttendance, { isLoading: _isDeleting }] = useDeleteAttendanceMutation();
 
   const handleCheckIn = async () => {
+    const branchId = user?.branchId || (user as any)?.companyContext?.branchId || (user as any)?.companyContext?.branches?.[0]?._id || (user as any)?.companyContext?.branches?.[0]?.id;
+    
+    if (!branchId) {
+      toast.error('Branch ID is required. Please select a branch.');
+      return;
+    }
+
+    const branchIdStr = typeof branchId === 'string' ? branchId : branchId.toString();
+    
+    if (!branchIdStr || branchIdStr === 'undefined' || branchIdStr.trim() === '') {
+      toast.error('Invalid branch ID. Please select a branch.');
+      return;
+    }
+
     try {
-      await checkIn({
-        branchId: user?.branchId || '',
+      const checkInData = {
+        branchId: branchIdStr,
         ...(checkInNotes?.trim() && { notes: checkInNotes.trim() }),
-      }).unwrap();
+      };
+      
+      console.log('🔍 Attendance Check-In Request:', { branchId: branchIdStr, hasNotes: !!checkInNotes?.trim() });
+      
+      await checkIn(checkInData).unwrap();
       toast.success('Checked in successfully');
       setIsCheckInModalOpen(false);
       setCheckInNotes('');
       // RTK Query will automatically refetch due to invalidatesTags, but we can also manually refetch for immediate update
       refetchTodayAttendance();
     } catch (error: any) {
-      toast.error(error.data?.message || 'Failed to check in');
+      console.error('❌ Attendance Check-In Error:', error);
+      toast.error(error?.data?.message || error?.message || 'Failed to check in');
     }
   };
 
@@ -163,6 +207,29 @@ export default function AttendancePage() {
       toast.success('Attendance record deleted');
     } catch (error: any) {
       toast.error(error.data?.message || 'Failed to delete attendance record');
+    }
+  };
+
+  const handleForceCheckOut = async (userId: string, recordId: string) => {
+    const record = todayAttendance.find(r => r.id === recordId);
+    const checkInTime = record ? new Date(record.checkIn).getTime() : Date.now();
+    const hoursSinceCheckIn = (Date.now() - checkInTime) / (1000 * 60 * 60);
+    
+    if (!confirm(
+      `Force check out this employee?\n\n` +
+      `They have been checked in for ${Math.floor(hoursSinceCheckIn)} hours.\n` +
+      `This action cannot be undone.`
+    )) return;
+    
+    try {
+      await forceCheckOut({
+        userId,
+        notes: `Force checked out after ${Math.floor(hoursSinceCheckIn)} hours (likely forgot to check out)`,
+      }).unwrap();
+      toast.success('Employee force checked out successfully');
+      refetchTodayAttendance();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to force check out');
     }
   };
 
@@ -252,6 +319,12 @@ export default function AttendancePage() {
       title: 'Check Out',
       header: 'Check Out',
       render: (_value: any, record: AttendanceRecord) => {
+        const checkInTime = new Date(record.checkIn).getTime();
+        const now = Date.now();
+        const hoursSinceCheckIn = (now - checkInTime) / (1000 * 60 * 60);
+        const isLongRunning = hoursSinceCheckIn > 8; // More than 8 hours
+        const isOvernight = hoursSinceCheckIn > 12; // More than 12 hours (likely forgot to check out)
+        
         return (
           <div>
             {record.checkOut ? (
@@ -266,7 +339,19 @@ export default function AttendancePage() {
                 )}
               </div>
             ) : (
-              <Badge variant="warning">Still Working</Badge>
+              <div className="space-y-1">
+                <Badge variant="warning">Still Working</Badge>
+                {isOvernight && (
+                  <Badge variant="danger" className="text-xs">
+                    ⚠️ Forgot to check out? ({Math.floor(hoursSinceCheckIn)}h)
+                  </Badge>
+                )}
+                {isLongRunning && !isOvernight && (
+                  <Badge variant="warning" className="text-xs">
+                    Long shift ({Math.floor(hoursSinceCheckIn)}h)
+                  </Badge>
+                )}
+              </div>
             )}
           </div>
         );
@@ -302,6 +387,17 @@ export default function AttendancePage() {
                 <ClockIcon className="w-4 h-4" />
               </Button>
             )}
+            {!record.checkOut && isOwnerOrManager && record.userId !== user?.id && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleForceCheckOut(record.userId, record.id)}
+                className="text-amber-600 hover:text-amber-700"
+                title="Force Check Out (for forgotten check-outs)"
+              >
+                <ClockIcon className="w-4 h-4" />
+              </Button>
+            )}
             {isOwnerOrManager && (record as any).status === 'pending' && (
               <Button
                 variant="ghost"
@@ -331,6 +427,12 @@ export default function AttendancePage() {
 
   const isLoading = todayLoading || statsLoading || recordsLoading;
 
+  // Check if current user has an active check-in (no checkOut)
+  const userActiveCheckIn = todayAttendance.find(
+    (record) => record.userId === user?.id && !record.checkOut
+  );
+  const hasActiveCheckIn = !!userActiveCheckIn;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -347,14 +449,16 @@ export default function AttendancePage() {
           <Button
             variant="secondary"
             onClick={() => setIsCheckInModalOpen(true)}
-            disabled={isCheckingIn}
+            disabled={isCheckingIn || hasActiveCheckIn}
+            title={hasActiveCheckIn ? 'You have already checked in. Please check out first.' : 'Check in for work'}
           >
             <ClockIcon className="w-5 h-5 mr-2" />
             Check In
           </Button>
           <Button
             onClick={() => setIsCheckOutModalOpen(true)}
-            disabled={isCheckingOut}
+            disabled={isCheckingOut || !hasActiveCheckIn}
+            title={!hasActiveCheckIn ? 'You must check in first' : 'Check out from work'}
           >
             <ClockIcon className="w-5 h-5 mr-2" />
             Check Out

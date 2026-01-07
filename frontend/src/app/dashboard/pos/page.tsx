@@ -2607,7 +2607,7 @@ export default function POSPage() {
                     </button>
                     {contextMenu && contextMenu.tableId === table.id && (
                       <div
-                        className="fixed z-50 min-w-[200px] rounded-lg border border-slate-700 bg-slate-900 shadow-xl py-2"
+                        className="fixed z-50 min-w-[200px] rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl py-2"
                         style={{
                           left: `${contextMenu.x}px`,
                           top: `${contextMenu.y}px`,
@@ -2629,7 +2629,7 @@ export default function POSPage() {
                                 toast.error(error?.data?.message || 'Failed to release table');
                               }
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-green-400 hover:bg-slate-800 transition-colors flex items-center gap-2"
+                            className="w-full px-4 py-2 text-left text-sm text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-2"
                           >
                             <span>✓</span>
                             <span>Release Table</span>
@@ -2640,7 +2640,7 @@ export default function POSPage() {
                             handleTableSelection(table.id);
                             setContextMenu(null);
                           }}
-                          className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-800 transition-colors flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-900 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-2"
                         >
                           <span>👁️</span>
                           <span>View Details</span>
@@ -2748,7 +2748,7 @@ export default function POSPage() {
               <Button
                 variant="secondary"
                 onClick={() => setIsCartModalOpen(true)}
-                className="flex items-center gap-1 sm:gap-2 rounded-xl bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 relative z-10 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
+                className="flex items-center gap-1 sm:gap-2 rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 relative z-10 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
               >
                 <ShoppingCartIcon className="h-4 w-4" />
                 <span className="hidden sm:inline">Open Order Cart</span>
@@ -2775,7 +2775,7 @@ export default function POSPage() {
                 </button>
                 <div className="relative group" style={{ zIndex: 99999 }}>
                   <InformationCircleIcon className="h-4 w-4 text-gray-400 dark:text-slate-500 cursor-help" />
-                  <div className="absolute right-0 top-6 w-72 p-3 bg-slate-900 dark:bg-slate-800 text-white text-xs rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-slate-700 pointer-events-none group-hover:pointer-events-auto whitespace-normal" style={{ zIndex: 999999 }}>
+                  <div className="absolute right-0 top-6 w-72 p-3 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-xs rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-300 dark:border-slate-700 pointer-events-none group-hover:pointer-events-auto whitespace-normal" style={{ zIndex: 999999 }}>
                     <div className="space-y-2">
                       <p className="font-semibold text-sky-300">Payment Mode Info:</p>
                       <div className="space-y-1.5">
@@ -2787,7 +2787,7 @@ export default function POSPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 dark:bg-slate-800 border-l border-t border-slate-700 transform rotate-45"></div>
+                    <div className="absolute -top-1 right-4 w-2 h-2 bg-white dark:bg-slate-800 border-l border-t border-gray-300 dark:border-slate-700 transform rotate-45"></div>
                   </div>
                 </div>
               </div>
@@ -3231,7 +3231,7 @@ export default function POSPage() {
                   e.stopPropagation();
                   setIsQueueCollapsed(true);
                 }}
-                className="h-9 w-9 rounded-full border border-slate-800 bg-slate-900/80 text-slate-200 hover:bg-slate-800/80"
+                className="h-9 w-9 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80"
                 title="Collapse queue"
                 type="button"
               >
@@ -3239,7 +3239,7 @@ export default function POSPage() {
               </Button>
             </div>
           </div>
-          <div className="border-b border-slate-900/70 px-4 py-3 space-y-3">
+          <div className="border-b border-gray-300 dark:border-slate-900/70 px-4 py-3 space-y-3">
             <div className="flex items-center gap-2">
               {(['active', 'history'] as const).map((tab) => {
                 const isActive = queueTab === tab;
@@ -3262,7 +3262,7 @@ export default function POSPage() {
             </div>
             <div className="grid gap-2">
               <div className="flex items-center gap-2">
-                <label className="text-xs uppercase tracking-[0.3em] text-slate-500">Type</label>
+                <label className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Type</label>
                 <select
                   value={queueOrderTypeFilter}
                   onChange={(event) => setQueueOrderTypeFilter(event.target.value as typeof queueOrderTypeFilter)}
@@ -3278,7 +3278,7 @@ export default function POSPage() {
               </div>
               {queueTab === 'history' && (
                 <div className="flex items-center gap-2">
-                  <label className="text-xs uppercase tracking-[0.3em] text-slate-500">Status</label>
+                  <label className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Status</label>
                   <select
                     value={queueStatusFilter}
                     onChange={(event) => setQueueStatusFilter(event.target.value as typeof queueStatusFilter)}
@@ -3293,27 +3293,27 @@ export default function POSPage() {
                 </div>
               )}
               <div className="relative">
-                <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500" />
                 <Input
                   value={queueSearchInput}
                   onChange={(event) => setQueueSearchInput(event.target.value)}
                   placeholder="Search order # or customer"
-                  className="pl-9 pr-3 py-2 text-sm h-10 bg-slate-950/80 border border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-sky-600 focus:ring-sky-600/40"
+                  className="pl-9 pr-3 py-2 text-sm h-10 bg-white dark:bg-slate-950/80 border border-gray-300 dark:border-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:border-sky-600 focus:ring-sky-600/40"
                 />
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-slate-900 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+              <div className="flex items-center justify-between rounded-lg border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/70 px-3 py-2 text-xs text-gray-700 dark:text-slate-300">
                 <span>{queueOrders.length} order{queueOrders.length === 1 ? '' : 's'} listed</span>
-                <span className="font-semibold text-emerald-300">{formatCurrency(queueTotalAmount)}</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-300">{formatCurrency(queueTotalAmount)}</span>
               </div>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {queueLoading ? (
               [...Array(5)].map((_, index) => (
-                <div key={index} className="h-24 rounded-2xl border border-slate-900/60 bg-slate-900/40 animate-pulse" />
+                <div key={index} className="h-24 rounded-2xl border border-gray-300 dark:border-slate-900/60 bg-gray-100 dark:bg-slate-900/40 animate-pulse" />
               ))
             ) : queueOrders.length === 0 ? (
-              <div className="rounded-2xl border border-slate-900/60 bg-slate-950/70 p-6 text-center text-sm text-slate-400">
+              <div className="rounded-2xl border border-gray-300 dark:border-slate-900/60 bg-gray-50 dark:bg-slate-950/70 p-6 text-center text-sm text-gray-600 dark:text-slate-400">
                 No orders found with the selected filters.
               </div>
             ) : (
@@ -3324,39 +3324,39 @@ export default function POSPage() {
                 return (
                 <div
                   key={derivedKey}
-                  className="rounded-2xl border border-slate-900/60 bg-slate-950/70 p-4 shadow-sm transition hover:border-sky-800/50 hover:shadow-sky-900/20"
+                  className="rounded-2xl border border-gray-300 dark:border-slate-900/60 bg-white dark:bg-slate-950/70 p-4 shadow-sm transition hover:border-sky-800/50 hover:shadow-sky-900/20"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-100">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                         {order.orderNumber || (orderId ? `Order ${orderId?.slice(-6)}` : 'Order')}
                       </p>
-                      <p className="text-xs text-slate-500">{order.createdAt ? formatDateTime(order.createdAt) : 'N/A'}</p>
+                      <p className="text-xs text-gray-600 dark:text-slate-500">{order.createdAt ? formatDateTime(order.createdAt) : 'N/A'}</p>
                     </div>
                     <Badge className={ORDER_STATUS_STYLES[order.status as 'pending' | 'paid' | 'cancelled'] || ORDER_STATUS_STYLES.pending}>
                       {ORDER_STATUS_LABELS[order.status as 'pending' | 'paid' | 'cancelled'] || order.status}
                     </Badge>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-300">
-                    <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-slate-300">
+                    <span className="rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/70 px-3 py-1 text-gray-900 dark:text-slate-200">
                       {getOrderTypeLabel(order.orderType as OrderType)}
                     </span>
-                    <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
+                    <span className="rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/70 px-3 py-1 text-gray-900 dark:text-slate-200">
                       {formatCurrency(Number(order.totalAmount || 0))}
                     </span>
                     {order.paymentMethod && (
-                      <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
+                      <span className="rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/70 px-3 py-1 text-gray-900 dark:text-slate-200">
                         Payment: {order.paymentMethod}
                       </span>
                     )}
                     {order?.customerInfo?.name && (
-                      <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1">
+                      <span className="rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/70 px-3 py-1 text-gray-900 dark:text-slate-200">
                         {order.customerInfo.name}
                       </span>
                     )}
                   </div>
                   {order.notes && (
-                    <p className="mt-2 rounded-lg border border-slate-900 bg-slate-950/80 px-3 py-2 text-xs text-slate-400">
+                    <p className="mt-2 rounded-lg border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/80 px-3 py-2 text-xs text-gray-600 dark:text-slate-400">
                       {order.notes}
                     </p>
                   )}
@@ -3366,7 +3366,7 @@ export default function POSPage() {
                       variant="secondary"
                       onClick={() => canAct && handleQueueViewDetails(orderId)}
                       disabled={!canAct}
-                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                      className="rounded-lg bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
                     >
                       View
                     </Button>
@@ -3375,7 +3375,7 @@ export default function POSPage() {
                       variant="secondary"
                       onClick={() => canAct && handleViewReceipt(orderId)}
                       disabled={!canAct}
-                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                      className="rounded-lg bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
                     >
                       Receipt
                     </Button>
@@ -3384,7 +3384,7 @@ export default function POSPage() {
                       variant="secondary"
                       onClick={() => canAct && handlePrintReceipt(orderId, false)}
                       disabled={!canAct}
-                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                      className="rounded-lg bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
                     >
                       Print
                     </Button>
@@ -3407,7 +3407,7 @@ export default function POSPage() {
                             }
                           }}
                           disabled={!canAct}
-                          className="rounded-lg bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
+                          className="rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
                         >
                           Mark Paid
                         </Button>
@@ -3416,7 +3416,7 @@ export default function POSPage() {
                           variant="secondary"
                           onClick={() => canAct && handleQueueCancel(orderId)}
                           disabled={!canAct || queueActionOrderId === orderId}
-                          className="rounded-lg bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
+                          className="rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
                         >
                           {queueActionOrderId === orderId ? 'Cancelling...' : 'Cancel'}
                         </Button>
@@ -3440,7 +3440,7 @@ export default function POSPage() {
                           }
                         }}
                         disabled={!canAct}
-                        className="rounded-lg bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 disabled:opacity-60"
+                        className="rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-200 hover:bg-amber-500/25 disabled:opacity-60"
                       >
                         Mark Pending
                       </Button>
@@ -3713,7 +3713,7 @@ export default function POSPage() {
                     variant={isActive ? 'primary' : 'secondary'}
                     onClick={() => handleOrderTypeChange(value)}
                     className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${
-                      isActive ? 'bg-sky-600 hover:bg-sky-500 text-white shadow shadow-sky-700/30' : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/70'
+                      isActive ? 'bg-sky-600 hover:bg-sky-500 text-white shadow shadow-sky-700/30' : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/70'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -3723,15 +3723,15 @@ export default function POSPage() {
               })}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Table</p>
+              <div className="space-y-1 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
+                <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Table</p>
                 {orderType === 'dine-in' ? (
                   <div className="space-y-3">
                     <select
                       value={selectedTable}
                       onChange={(event) => handleTableSelection(event.target.value)}
                       disabled={tablesLoading || tables.length === 0}
-                      className="w-full rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <option value="">
                         {tablesLoading ? 'Loading tables…' : 'Select a table'}
@@ -3758,7 +3758,7 @@ export default function POSPage() {
                     </select>
                     {selectedTable && activeTable && (
                       <div className="space-y-2">
-                        <label className="block text-xs text-slate-400">
+                        <label className="block text-xs text-gray-600 dark:text-slate-400">
                           Number of Guests
                         </label>
                         <input
@@ -3780,10 +3780,10 @@ export default function POSPage() {
                               localStorage.setItem('pos_guestCount', value.toString());
                             }
                           }}
-                          className="w-full rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                          className="w-full rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none"
                           placeholder="Enter guest count"
                         />
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-gray-600 dark:text-slate-500">
                           {activeTable.orderDetails?.remainingSeats 
                             ? `${activeTable.orderDetails.remainingSeats} seats available (${activeTable.orderDetails.usedSeats} already used)` 
                             : activeTable.capacity 
@@ -3795,7 +3795,7 @@ export default function POSPage() {
                     {tables.length === 0 && !tablesLoading ? (
                       <p className="text-xs text-slate-400">No tables available for this branch.</p>
                     ) : (
-                      <div className="flex items-center justify-between text-xs text-slate-400">
+                      <div className="flex items-center justify-between text-xs text-gray-600 dark:text-slate-400">
                         <span>
                           {selectedTable
                             ? `Currently assigned to table ${activeTable?.number || activeTable?.tableNumber || selectedTable}`
@@ -3810,16 +3810,16 @@ export default function POSPage() {
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-300">Table not required for this order type.</p>
+                  <p className="text-sm text-gray-700 dark:text-slate-300">Table not required for this order type.</p>
                 )}
             </div>
-              <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Assigned Waiter</p>
+              <div className="space-y-1 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
+                <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Assigned Waiter</p>
                 <select
                   value={selectedWaiterId}
                   onChange={(event) => setSelectedWaiterId(event.target.value)}
                   disabled={staffLoading || !branchId}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {staffLoading ? (
                     <option value="">Loading waiters...</option>
@@ -3854,15 +3854,15 @@ export default function POSPage() {
                 )}
               </div>
               </div>
-            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="space-y-1">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Customer</p>
-                  <div className="text-sm text-slate-200">
+                  <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Customer</p>
+                  <div className="text-sm text-gray-900 dark:text-slate-200">
                     {customerInfo.name ? customerInfo.name : 'Guest customer'}
                   </div>
                   {customerInfo.phone && (
-                    <div className="text-xs text-slate-400">{customerInfo.phone}</div>
+                    <div className="text-xs text-gray-600 dark:text-slate-400">{customerInfo.phone}</div>
                         )}
                       </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -3888,7 +3888,7 @@ export default function POSPage() {
                       setCustomerSearchTerm('');
                       setIsCustomerLookupOpen(true);
                     }}
-                    className="bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+                    className="bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80"
                         >
                     Lookup
                         </Button>
@@ -3897,7 +3897,7 @@ export default function POSPage() {
                       size="sm"
                       variant="ghost"
                       onClick={clearCustomerSelection}
-                      className="text-slate-400 hover:text-slate-100"
+                      className="text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100"
                     >
                       Clear
                     </Button>
@@ -3909,19 +3909,19 @@ export default function POSPage() {
                   value={customerInfo.name}
                   onChange={(event) => setCustomerInfo({ ...customerInfo, name: event.target.value })}
                   placeholder="Customer name"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                 />
                 <Input
                   value={customerInfo.phone}
                   onChange={(event) => setCustomerInfo({ ...customerInfo, phone: event.target.value })}
                   placeholder="Phone"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                 />
                 <Input
                   value={customerInfo.email}
                   onChange={(event) => setCustomerInfo({ ...customerInfo, email: event.target.value })}
                   placeholder="Email"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                 />
               </div>
               {selectedCustomer && (
@@ -3957,61 +3957,61 @@ export default function POSPage() {
           </div>
           {/* Delivery Details Section */}
           {orderType === 'delivery' && (
-            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Delivery Details</p>
+            <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
+              <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Delivery Details</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Input
                   value={deliveryDetails.contactName}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, contactName: e.target.value })}
                   placeholder="Contact Name *"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                   required
                 />
                 <Input
                   value={deliveryDetails.contactPhone}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, contactPhone: e.target.value })}
                   placeholder="Contact Phone *"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                   required
                 />
                 <Input
                   value={deliveryDetails.addressLine1}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, addressLine1: e.target.value })}
                   placeholder="Address Line 1 *"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
                   required
                 />
                 <Input
                   value={deliveryDetails.addressLine2}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, addressLine2: e.target.value })}
                   placeholder="Address Line 2"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
                 />
                 <Input
                   value={deliveryDetails.city}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, city: e.target.value })}
                   placeholder="City *"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                   required
                 />
                 <Input
                   value={deliveryDetails.state}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, state: e.target.value })}
                   placeholder="State/Province"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                 />
                 <Input
                   value={deliveryDetails.postalCode}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, postalCode: e.target.value })}
                   placeholder="Postal Code"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                 />
                 {/* Delivery Zone & Fee */}
                 <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Delivery Zone</label>
+                    <label className="block text-xs text-gray-600 dark:text-slate-400 mb-1">Delivery Zone</label>
                     <select
-                      className="w-full rounded-md bg-slate-950/60 border border-slate-850 text-slate-100 text-sm px-3 py-2"
+                      className="w-full rounded-md bg-white dark:bg-slate-950/60 border border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 text-sm px-3 py-2"
                       value={(deliveryDetails as any).zoneId || ''}
                       onChange={(e) => {
                         const zoneId = e.target.value;
@@ -4046,7 +4046,7 @@ export default function POSPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Delivery Fee</label>
+                    <label className="block text-xs text-gray-600 dark:text-slate-400 mb-1">Delivery Fee</label>
                     <Input
                       value={deliveryFee}
                       onChange={(e) => {
@@ -4059,7 +4059,7 @@ export default function POSPage() {
                       type="number"
                       min="0"
                       step="0.01"
-                      className="bg-slate-950/60 border-slate-850 text-slate-100"
+                      className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                     />
                   </div>
                 </div>
@@ -4067,13 +4067,13 @@ export default function POSPage() {
                   value={deliveryDetails.instructions}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, instructions: e.target.value })}
                   placeholder="Delivery Instructions"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
                 />
                 <Input
                   value={deliveryDetails.assignedDriver}
                   onChange={(e) => setDeliveryDetails({ ...deliveryDetails, assignedDriver: e.target.value })}
                   placeholder="Assigned Driver"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
                 />
               </div>
               {!deliveryIsValid && (
@@ -4085,34 +4085,34 @@ export default function POSPage() {
           )}
           {/* Takeaway Details Section */}
           {orderType === 'takeaway' && (
-            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Takeaway Details</p>
+            <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
+              <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Takeaway Details</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Input
                   value={takeawayDetails.contactName}
                   onChange={(e) => setTakeawayDetails({ ...takeawayDetails, contactName: e.target.value })}
                   placeholder="Contact Name *"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                   required
                 />
                 <Input
                   value={takeawayDetails.contactPhone}
                   onChange={(e) => setTakeawayDetails({ ...takeawayDetails, contactPhone: e.target.value })}
                   placeholder="Contact Phone *"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                   required
                 />
                 <Input
                   value={takeawayDetails.instructions}
                   onChange={(e) => setTakeawayDetails({ ...takeawayDetails, instructions: e.target.value })}
                   placeholder="Pickup Instructions"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
                 />
                 <Input
                   value={takeawayDetails.assignedDriver}
                   onChange={(e) => setTakeawayDetails({ ...takeawayDetails, assignedDriver: e.target.value })}
                   placeholder="Assigned Staff"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100 sm:col-span-2"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
                 />
               </div>
               {!takeawayIsValid && (
@@ -4124,10 +4124,10 @@ export default function POSPage() {
           )}
         </div>
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-slate-100">Items in Cart</h3>
-            <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-850 bg-slate-950/70">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Items in Cart</h3>
+            <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-300 dark:border-slate-850 bg-white dark:bg-slate-950/70">
             {cart.length === 0 ? (
-                <div className="py-12 text-center text-slate-500">
+                <div className="py-12 text-center text-gray-600 dark:text-slate-500">
                   <ShoppingCartIcon className="mx-auto mb-3 h-10 w-10 opacity-40" />
                   <p>No items yet. Add menu items to begin.</p>
               </div>
@@ -4136,21 +4136,21 @@ export default function POSPage() {
                   const itemDiscount = discountMode === 'item' ? itemDiscounts[item.id] : undefined;
                   const itemDiscountAmount = discountMode === 'item' ? getItemDiscountAmount(item) : 0;
                   return (
-                    <div key={item.id} className="border-b border-slate-900 last:border-b-0 px-4 py-4">
+                    <div key={item.id} className="border-b border-gray-300 dark:border-slate-900 last:border-b-0 px-4 py-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-slate-100">{item.name}</h4>
-                            <Badge className="bg-slate-900/70 text-slate-300 border border-slate-800">
+                            <h4 className="font-semibold text-gray-900 dark:text-slate-100">{item.name}</h4>
+                            <Badge className="bg-gray-100 dark:bg-slate-900/70 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-800">
                               {formatCurrency(item.price)}
                             </Badge>
                           </div>
-                          <p className="text-xs text-slate-500">{item.category}</p>
+                          <p className="text-xs text-gray-600 dark:text-slate-500">{item.category}</p>
                           {item.modifiersNote ? (
-                            <p className="text-xs text-slate-400">{item.modifiersNote}</p>
+                            <p className="text-xs text-gray-600 dark:text-slate-400">{item.modifiersNote}</p>
                           ) : null}
                           {item.notes ? (
-                            <p className="text-xs text-slate-400">Note: {item.notes}</p>
+                            <p className="text-xs text-gray-600 dark:text-slate-400">Note: {item.notes}</p>
                           ) : null}
                           {itemDiscountAmount > 0 && (
                             <p className="text-xs text-emerald-300">
@@ -4164,16 +4164,16 @@ export default function POSPage() {
                           size="sm"
                           variant="ghost"
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="h-8 w-8 p-0 text-slate-300 hover:text-slate-100"
+                            className="h-8 w-8 p-0 text-gray-700 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100"
                         >
                           <MinusIcon className="h-4 w-4" />
                         </Button>
-                          <span className="w-8 text-center text-sm font-semibold text-slate-200">{item.quantity}</span>
+                          <span className="w-8 text-center text-sm font-semibold text-gray-900 dark:text-slate-200">{item.quantity}</span>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="h-8 w-8 p-0 text-slate-300 hover:text-slate-100"
+                            className="h-8 w-8 p-0 text-gray-700 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100"
                         >
                           <PlusIcon className="h-4 w-4" />
                         </Button>
@@ -4196,9 +4196,9 @@ export default function POSPage() {
                         </Button>
                       </div>
                     </div>
-                      <div className="mt-3 flex items-center justify-between text-sm text-slate-300">
+                      <div className="mt-3 flex items-center justify-between text-sm text-gray-700 dark:text-slate-300">
                         <span>Line total</span>
-                        <span className="font-semibold text-slate-100">
+                        <span className="font-semibold text-gray-900 dark:text-slate-100">
                           {formatCurrency(item.price * item.quantity - itemDiscountAmount)}
                       </span>
                     </div>
@@ -4208,10 +4208,10 @@ export default function POSPage() {
             )}
             </div>
           </div>
-          <div className="space-y-3 rounded-xl border border-slate-850 bg-slate-950/70 p-4">
+          <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-850 bg-gray-50 dark:bg-slate-950/70 p-4">
             <div className="flex flex-wrap items-center gap-4 text-sm">
-              <span className="font-semibold text-slate-100">Discount</span>
-              <label className="flex items-center gap-2 text-slate-300">
+              <span className="font-semibold text-gray-900 dark:text-slate-100">Discount</span>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
                 <input
                   type="radio"
                   name="discount-mode"
@@ -4222,7 +4222,7 @@ export default function POSPage() {
                 />
                 Full order
               </label>
-              <label className="flex items-center gap-2 text-slate-300">
+              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
                 <input
                   type="radio"
                   name="discount-mode"
@@ -4242,12 +4242,12 @@ export default function POSPage() {
                   placeholder="0"
                   type="number"
                   min="0"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                 />
                 <select
                   value={discountType}
                   onChange={(event) => setDiscountType(event.target.value as 'percent' | 'amount')}
-                  className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                  className="rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none"
                 >
                   <option value="percent">Percent</option>
                   <option value="amount">Amount</option>
@@ -4259,55 +4259,55 @@ export default function POSPage() {
                   variant="secondary"
                   size="sm"
                   onClick={() => setIsItemDiscountModalOpen(true)}
-                  className="bg-slate-900/80 text-slate-100 hover:bg-slate-800/80"
+                  className="bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80"
                 >
                   Manage item discounts
                 </Button>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-gray-600 dark:text-slate-400">
                   Discounts apply per item; open the editor to adjust amounts.
                   </span>
                 </div>
             )}
               </div>
               <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-100">Order Notes</label>
+            <label className="text-sm font-semibold text-gray-900 dark:text-slate-100">Order Notes</label>
             <textarea
               value={orderNotes}
               onChange={(event) => setOrderNotes(event.target.value)}
               placeholder="Kitchen or cashier notes, customer requests, etc."
-              className="w-full min-h-[100px] rounded-xl border border-slate-850 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-600/40"
+              className="w-full min-h-[100px] rounded-xl border border-gray-300 dark:border-slate-850 bg-white dark:bg-slate-950/70 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-600/40"
             />
           </div>
-          <div className="rounded-xl border border-slate-850 bg-slate-950/75 p-4 space-y-2 text-sm">
-            <div className="flex items-center justify-between text-slate-300">
+          <div className="rounded-xl border border-gray-300 dark:border-slate-850 bg-gray-50 dark:bg-slate-950/75 p-4 space-y-2 text-sm">
+            <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
               <span>Subtotal</span>
-              <span className="text-slate-100">{formatCurrency(orderSummary.subtotal)}</span>
+              <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.subtotal)}</span>
             </div>
             {orderSummary.discount > 0 && (
-              <div className="flex items-center justify-between text-emerald-300">
+              <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-300">
                 <span>Discount</span>
                 <span>-{formatCurrency(orderSummary.discount)}</span>
               </div>
             )}
-            <div className="flex items-center justify-between text-slate-300">
+            <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
               <span>Tax ({taxRate}%)</span>
-              <span className="text-slate-100">{formatCurrency(orderSummary.tax)}</span>
+              <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.tax)}</span>
             </div>
             {orderSummary.deliveryFee > 0 && (
-              <div className="flex items-center justify-between text-slate-300">
+              <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
                 <span>Delivery Fee</span>
-                <span className="text-slate-100">{formatCurrency(orderSummary.deliveryFee)}</span>
+                <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.deliveryFee)}</span>
               </div>
             )}
-            <div className="flex items-center justify-between border-t border-slate-800 pt-3 text-base font-semibold text-emerald-400">
+            <div className="flex items-center justify-between border-t border-gray-300 dark:border-slate-800 pt-3 text-base font-semibold text-emerald-600 dark:text-emerald-400">
               <span>Total Due</span>
               <span>{formatCurrency(orderSummary.total)}</span>
             </div>
           </div>
           {/* Payment Method Selection - Quick Access */}
-          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+          <div className="rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-slate-200">Payment Method</label>
+              <label className="text-sm font-semibold text-gray-900 dark:text-slate-200">Payment Method</label>
               <Button
                 size="sm"
                 variant="ghost"
@@ -4319,7 +4319,7 @@ export default function POSPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {paymentMethodsLoading ? (
-                <div className="col-span-full text-center text-slate-400 py-2 text-xs">Loading payment methods...</div>
+                <div className="col-span-full text-center text-gray-600 dark:text-slate-400 py-2 text-xs">Loading payment methods...</div>
               ) : paymentMethods.length > 0 ? (
                 paymentMethods.slice(0, 6).map((method) => {
                   const isSelected = fullPaymentMethod === method.code;
@@ -4332,7 +4332,7 @@ export default function POSPage() {
                       className={`flex items-center justify-center gap-2 text-xs ${
                         isSelected
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                          : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                          : 'bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'
                       }`}
                     >
                       {method.icon ? (
@@ -4347,21 +4347,21 @@ export default function POSPage() {
                   );
                 })
               ) : (
-                <div className="col-span-full text-center text-slate-400 py-2 text-xs">
+                <div className="col-span-full text-center text-gray-600 dark:text-slate-400 py-2 text-xs">
                   No payment methods available
                 </div>
               )}
             </div>
             {fullPaymentMethod && (
-              <div className="text-xs text-slate-400">
-                Selected: <span className="font-semibold text-slate-200">
+              <div className="text-xs text-gray-600 dark:text-slate-400">
+                Selected: <span className="font-semibold text-gray-900 dark:text-slate-200">
                   {paymentMethods.find(m => m.code === fullPaymentMethod)?.displayName || fullPaymentMethod}
                 </span>
               </div>
             )}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-gray-600 dark:text-slate-500">
               {selectedWaiterName ? `Assigned waiter: ${selectedWaiterName}` : 'Waiter not set'}
             </div>
             <div className="flex flex-col gap-2">
@@ -4452,17 +4452,17 @@ export default function POSPage() {
             cart.map((item) => {
               const entry = itemDiscounts[item.id] || { type: 'percent', value: '0' };
               return (
-                <div key={item.id} className="rounded-lg border border-slate-850 bg-slate-950/70 p-4 space-y-3">
+                <div key={item.id} className="rounded-lg border border-gray-300 dark:border-slate-850 bg-gray-50 dark:bg-slate-950/70 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-semibold text-slate-100">{item.name}</h4>
-                      <p className="text-xs text-slate-500">{formatCurrency(item.price)} • Qty {item.quantity}</p>
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-slate-100">{item.name}</h4>
+                      <p className="text-xs text-gray-600 dark:text-slate-500">{formatCurrency(item.price)} • Qty {item.quantity}</p>
                     </div>
                 <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => updateItemDiscountEntry(item.id, { type: 'percent', value: '0' })}
-                      className="text-xs text-slate-400 hover:text-slate-100"
+                      className="text-xs text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100"
                     >
                       Reset
                 </Button>
@@ -4473,7 +4473,7 @@ export default function POSPage() {
                       onChange={(event) =>
                         updateItemDiscountEntry(item.id, { type: event.target.value as 'percent' | 'amount', value: entry.value })
                       }
-                      className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      className="rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none"
                     >
                       <option value="percent">Percent</option>
                       <option value="amount">Amount</option>
@@ -4486,9 +4486,9 @@ export default function POSPage() {
                       placeholder="0"
                       type="number"
                       min="0"
-                      className="bg-slate-950/60 border-slate-850 text-slate-100 placeholder:text-slate-500"
+                      className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500"
                     />
-                    <div className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-300">
+                    <div className="rounded-lg border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 px-3 py-2 text-sm text-gray-700 dark:text-slate-300">
                       Savings: {formatCurrency(getItemDiscountAmount(item))}
             </div>
                   </div>
@@ -4510,7 +4510,7 @@ export default function POSPage() {
               value={noteEditor.value}
               onChange={(event) => setNoteEditor({ ...noteEditor, value: event.target.value })}
               placeholder="Add special instructions for this item"
-              className="w-full min-h-[120px] rounded-xl border border-slate-850 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-600/40"
+              className="w-full min-h-[120px] rounded-xl border border-gray-300 dark:border-slate-850 bg-white dark:bg-slate-950/60 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-600/40"
             />
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setNoteEditor(null)}>
@@ -4538,22 +4538,22 @@ export default function POSPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Search customers</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Search customers</label>
             <Input
               value={customerSearchTerm}
               onChange={(event) => setCustomerSearchTerm(event.target.value)}
               placeholder="Search by name, phone, or email"
-              className="bg-slate-950/70 border-slate-850 text-slate-100"
+              className="bg-white dark:bg-slate-950/70 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
             />
           </div>
           {customerSearchTerm.trim().length < 2 ? (
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-gray-600 dark:text-slate-400">
               Enter at least two characters to search your customer list.
             </p>
           ) : isCustomerSearchLoading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, index) => (
-                <div key={index} className="h-16 animate-pulse rounded-xl bg-slate-900/60" />
+                <div key={index} className="h-16 animate-pulse rounded-xl bg-gray-100 dark:bg-slate-900/60" />
               ))}
             </div>
           ) : resolvedCustomerResults.length > 0 ? (
@@ -4568,8 +4568,8 @@ export default function POSPage() {
                     onClick={() => applyCustomerSelection(customer)}
                     className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                       isActive
-                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-100'
-                        : 'border-slate-850 bg-slate-950/70 text-slate-200 hover:bg-slate-900/70'
+                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-100'
+                        : 'border-gray-300 dark:border-slate-850 bg-white dark:bg-slate-950/70 text-gray-900 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-900/70'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -4577,7 +4577,7 @@ export default function POSPage() {
                         <p className="font-semibold">{fullName}</p>
                         {phone && <p className="text-xs text-slate-400">{phone}</p>}
                       </div>
-                      <Badge className="bg-slate-900/60 text-slate-300 border border-slate-800">
+                      <Badge className="bg-gray-100 dark:bg-slate-900/60 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-800">
                         {customer.totalOrders ? `${customer.totalOrders} orders` : 'Customer'}
                       </Badge>
                     </div>
@@ -4586,7 +4586,7 @@ export default function POSPage() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-slate-400">No customers found for that search.</p>
+            <p className="text-sm text-gray-600 dark:text-slate-400">No customers found for that search.</p>
           )}
         </div>
       </Modal>
@@ -4598,12 +4598,12 @@ export default function POSPage() {
         size="lg"
       >
         <div className="space-y-6">
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/60 p-1">
+          <div className="flex items-center gap-2 rounded-2xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-1">
               <Button
               size="sm"
               variant={paymentTab === 'full' ? 'primary' : 'secondary'}
               onClick={() => setPaymentTab('full')}
-              className={`flex-1 rounded-xl ${paymentTab === 'full' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-transparent text-slate-300 hover:bg-slate-900/70'}`}
+              className={`flex-1 rounded-xl ${paymentTab === 'full' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-transparent text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-900/70'}`}
               >
               Full Amount
               </Button>
@@ -4611,7 +4611,7 @@ export default function POSPage() {
               size="sm"
               variant={paymentTab === 'multi' ? 'primary' : 'secondary'}
               onClick={() => setPaymentTab('multi')}
-              className={`flex-1 rounded-xl ${paymentTab === 'multi' ? 'bg-sky-600 hover:bg-sky-500' : 'bg-transparent text-slate-300 hover:bg-slate-900/70'}`}
+              className={`flex-1 rounded-xl ${paymentTab === 'multi' ? 'bg-sky-600 hover:bg-sky-500' : 'bg-transparent text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-900/70'}`}
             >
               Split Tender
               </Button>
@@ -4619,10 +4619,10 @@ export default function POSPage() {
           {paymentTab === 'full' ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Select Payment Method</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Select Payment Method</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {paymentMethodsLoading ? (
-                    <div className="col-span-full text-center text-slate-400 py-4">Loading payment methods...</div>
+                    <div className="col-span-full text-center text-gray-600 dark:text-slate-400 py-4">Loading payment methods...</div>
                   ) : paymentMethods.length > 0 ? (
                     paymentMethods.map((method) => {
                       const isSelected = fullPaymentMethod === method.code;
@@ -4642,7 +4642,7 @@ export default function POSPage() {
                               ? method.color
                                 ? `bg-[${method.color}] hover:opacity-90`
                                 : 'bg-emerald-600 hover:bg-emerald-500'
-                              : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                              : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'
                           }`}
                         >
                           {typeof getIcon() === 'string' ? (
@@ -4655,21 +4655,21 @@ export default function POSPage() {
                       );
                     })
                   ) : (
-                    <div className="col-span-full text-center text-slate-400 py-4">
+                    <div className="col-span-full text-center text-gray-600 dark:text-slate-400 py-4">
                       No payment methods available. Please configure payment methods in settings.
                     </div>
                   )}
                 </div>
               </div>
           <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Amount received</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Amount received</label>
             <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={fullPaymentReceived}
                   onChange={(event) => setFullPaymentReceived(event.target.value)}
-                  className="bg-slate-950/70 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/70 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                   placeholder="0.00"
             />
           </div>
@@ -4681,7 +4681,7 @@ export default function POSPage() {
                       size="sm"
                       variant="secondary"
                       onClick={() => setFullPaymentReceived(suggestion.toFixed(2))}
-                      className="rounded-full bg-slate-900/80 text-slate-200 hover:bg-slate-800/80"
+                      className="rounded-full bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80"
                     >
                       {formatCurrency(suggestion)}
                     </Button>
@@ -4692,9 +4692,9 @@ export default function POSPage() {
                 const selectedMethod = paymentMethods.find(m => m.code === fullPaymentMethod);
                 const allowsChange = selectedMethod?.allowsChangeDue ?? (fullPaymentMethod === 'cash');
                 return allowsChange && (
-                  <div className="text-sm text-slate-300">
+                  <div className="text-sm text-gray-700 dark:text-slate-300">
                     Change due:{' '}
-                    <span className="font-semibold text-emerald-300">{formatCurrency(fullPaymentChange)}</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-300">{formatCurrency(fullPaymentChange)}</span>
                   </div>
                 );
               })()}
@@ -4706,14 +4706,14 @@ export default function POSPage() {
                   return (
                     <div
                       key={row.id}
-                      className="grid gap-3 sm:grid-cols-[160px_1fr_auto] items-center rounded-xl border border-slate-850 bg-slate-950/60 p-3"
+                      className="grid gap-3 sm:grid-cols-[160px_1fr_auto] items-center rounded-xl border border-gray-300 dark:border-slate-850 bg-gray-50 dark:bg-slate-950/60 p-3"
                     >
                       <select
                         value={row.method}
                         onChange={(event) =>
                           updateMultiPaymentRow(row.id, { method: event.target.value })
                         }
-                        className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                        className="rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none"
                         disabled={paymentMethodsLoading}
                       >
                         {paymentMethodsLoading ? (
@@ -4736,7 +4736,7 @@ export default function POSPage() {
                         step="0.01"
                         value={row.amount}
                         onChange={(event) => updateMultiPaymentRow(row.id, { amount: event.target.value })}
-                        className="bg-slate-950/70 border-slate-850 text-slate-100"
+                        className="bg-white dark:bg-slate-950/70 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                         placeholder="0.00"
                       />
                       <Button
@@ -4756,21 +4756,21 @@ export default function POSPage() {
             <Button
               variant="secondary"
                 onClick={addMultiPaymentRow}
-                className="w-full rounded-xl bg-slate-900/80 text-slate-200 hover:bg-slate-800/80"
+                className="w-full rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80"
               >
                 + Add another payment
               </Button>
-              <div className="flex items-center justify-between rounded-xl border border-slate-850 bg-slate-950/70 p-3 text-sm text-slate-300">
+              <div className="flex items-center justify-between rounded-xl border border-gray-300 dark:border-slate-850 bg-gray-50 dark:bg-slate-950/70 p-3 text-sm text-gray-700 dark:text-slate-300">
                 <span>Applied</span>
-                <span className="font-semibold text-slate-100">{formatCurrency(splitTotals.applied)}</span>
+                <span className="font-semibold text-gray-900 dark:text-slate-100">{formatCurrency(splitTotals.applied)}</span>
               </div>
               <div
                 className={`text-sm ${
                   splitTotals.remaining > 0
-                    ? 'text-amber-300'
+                    ? 'text-amber-600 dark:text-amber-300'
                     : splitTotals.remaining < 0
-                    ? 'text-emerald-300'
-                    : 'text-slate-300'
+                    ? 'text-emerald-600 dark:text-emerald-300'
+                    : 'text-gray-700 dark:text-slate-300'
                 }`}
               >
                 {splitTotals.remaining > 0 && `${formatCurrency(Math.abs(splitTotals.remaining))} remaining`}
@@ -4779,28 +4779,28 @@ export default function POSPage() {
               </div>
             </div>
           )}
-          <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4 space-y-2 text-sm">
-            <div className="flex items-center justify-between text-slate-300">
+          <div className="rounded-xl border border-gray-300 dark:border-slate-850 bg-gray-50 dark:bg-slate-950/70 p-4 space-y-2 text-sm">
+            <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
               <span>Subtotal</span>
-              <span className="text-slate-100">{formatCurrency(orderSummary.subtotal)}</span>
+              <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.subtotal)}</span>
             </div>
             {orderSummary.discount > 0 && (
-              <div className="flex items-center justify-between text-emerald-300">
+              <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-300">
                 <span>Discount</span>
                 <span>-{formatCurrency(orderSummary.discount)}</span>
               </div>
             )}
-            <div className="flex items-center justify-between text-slate-300">
+            <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
               <span>Tax ({taxRate}%)</span>
-              <span className="text-slate-100">{formatCurrency(orderSummary.tax)}</span>
+              <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.tax)}</span>
             </div>
             {orderSummary.deliveryFee > 0 && (
-              <div className="flex items-center justify-between text-slate-300">
+              <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
                 <span>Delivery Fee</span>
-                <span className="text-slate-100">{formatCurrency(orderSummary.deliveryFee)}</span>
+                <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.deliveryFee)}</span>
               </div>
             )}
-            <div className="flex items-center justify-between border-t border-slate-800 pt-3 text-base font-semibold text-emerald-400">
+            <div className="flex items-center justify-between border-t border-gray-300 dark:border-slate-800 pt-3 text-base font-semibold text-emerald-600 dark:text-emerald-400">
               <span>Total Due</span>
               <span>{formatCurrency(orderSummary.total)}</span>
             </div>
@@ -4908,10 +4908,10 @@ export default function POSPage() {
               <div className="space-y-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-100">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
                       {queueDetail.orderNumber || (detailId ? `Order ${String(detailId).slice(-6)}` : 'Order')}
                     </h3>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-gray-600 dark:text-slate-400">
                       {queueDetail.createdAt ? formatDateTime(queueDetail.createdAt) : 'N/A'}
                     </p>
                   </div>
@@ -4920,9 +4920,9 @@ export default function POSPage() {
                   </Badge>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Order Type</p>
-                    <p className="text-sm font-semibold text-slate-100">
+                  <div className="rounded-xl border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/70 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500 mb-1">Order Type</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                       {getOrderTypeLabel(queueDetail.orderType as OrderType)}
                     </p>
                   </div>
@@ -4935,7 +4935,7 @@ export default function POSPage() {
                   {queueDetail.customerInfo && (
                     <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3 sm:col-span-2">
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Customer</p>
-                      <div className="space-y-1 text-sm text-slate-200">
+                      <div className="space-y-1 text-sm text-gray-900 dark:text-slate-200">
                         {queueDetail.customerInfo.name && <p>{queueDetail.customerInfo.name}</p>}
                         {queueDetail.customerInfo.phone && <p>{queueDetail.customerInfo.phone}</p>}
                         {queueDetail.customerInfo.email && <p>{queueDetail.customerInfo.email}</p>}
@@ -4947,7 +4947,7 @@ export default function POSPage() {
                   )}
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-200 uppercase tracking-[0.25em]">Items</h4>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-slate-200 uppercase tracking-[0.25em]">Items</h4>
                   <div className="mt-3 space-y-3">
                     {Array.isArray(queueDetail.items) && queueDetail.items.length > 0 ? (
                       queueDetail.items.map((item: any, index: number) => {
@@ -4961,21 +4961,21 @@ export default function POSPage() {
                         return (
                           <div
                             key={`${item.menuItemId || index}-${index}`}
-                            className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3 text-sm text-slate-200"
+                            className="rounded-xl border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/70 px-4 py-3 text-sm text-gray-900 dark:text-slate-200"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="font-semibold text-slate-100">{itemLabel}</p>
-                                <p className="text-xs text-slate-400">
+                                <p className="font-semibold text-gray-900 dark:text-slate-100">{itemLabel}</p>
+                                <p className="text-xs text-gray-600 dark:text-slate-400">
                                   Qty {item.quantity || 0} • {formatCurrency(Number(item.price || 0))}
                                 </p>
                                 {item.notes && (
-                                  <p className="mt-2 rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-300 whitespace-pre-line">
+                                  <p className="mt-2 rounded-lg bg-gray-100 dark:bg-slate-900/60 px-3 py-2 text-xs text-gray-700 dark:text-slate-300 whitespace-pre-line">
                                     {item.notes}
                                   </p>
                                 )}
                               </div>
-                              <span className="text-sm font-semibold text-slate-100">
+                              <span className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                                 {formatCurrency(itemTotal)}
                               </span>
                             </div>
@@ -5014,7 +5014,7 @@ export default function POSPage() {
                       variant="secondary"
                       onClick={() => canActOnOrder && handleViewReceipt(detailId)}
                       disabled={!canActOnOrder}
-                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                      className="rounded-lg bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
                     >
                       View Receipt
                     </Button>
@@ -5022,7 +5022,7 @@ export default function POSPage() {
                       variant="secondary"
                       onClick={() => canActOnOrder && handlePrintReceipt(detailId, false)}
                       disabled={!canActOnOrder}
-                      className="rounded-lg bg-slate-900/80 text-slate-100 hover:bg-slate-800/80 disabled:opacity-40"
+                      className="rounded-lg bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
                     >
                       Print
                     </Button>
@@ -5205,7 +5205,7 @@ export default function POSPage() {
                               className={`rounded-full ${
                                 isActive
                                   ? 'bg-sky-600 hover:bg-sky-500'
-                                  : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                                  : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'
                               }`}
                             >
                               {option.name}
@@ -5273,7 +5273,7 @@ export default function POSPage() {
                                 className={`rounded-full ${
                                   isActive
                                     ? 'bg-amber-500 hover:bg-amber-400'
-                                    : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                                    : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'
                                 }`}
                               >
                                 {option.name}
@@ -5320,7 +5320,7 @@ export default function POSPage() {
                           className={`rounded-full ${
                             isActive
                               ? 'bg-emerald-600 hover:bg-emerald-500'
-                              : 'bg-slate-900/80 text-slate-200 hover:bg-slate-800/80'
+                              : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'
                           }`}
                         >
                           {addon.name}
@@ -5677,7 +5677,7 @@ export default function POSPage() {
                   placeholder="0.00"
                   min="0"
                   step="0.01"
-                  className="bg-slate-950/60 border-slate-850 text-slate-100"
+                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
                 />
                 {parseFloat(pendingOrderPaymentReceived || '0') > (occupiedTableModal.orderDetails.totalAmount || 0) && (
                   <p className="text-sm text-amber-400">

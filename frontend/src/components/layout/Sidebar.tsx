@@ -75,13 +75,13 @@ const navigation: NavigationItem[] = [
         name: 'POS Settings',
         href: '/dashboard/pos-settings',
         icon: CogIcon,
-        requiredFeature: 'order-management',
+        requiredFeature: 'pos-settings',
       },
       {
         name: 'Printer Management',
         href: '/dashboard/printer-management',
         icon: PrinterIcon,
-        requiredFeature: 'order-management',
+        requiredFeature: 'printer-management',
       },
     ],
   },
@@ -247,13 +247,13 @@ const navigation: NavigationItem[] = [
     name: 'Digital Services',
     href: '/dashboard/digital-receipts',
     icon: ReceiptPercentIcon,
-    requiredFeature: 'order-management',
+    requiredFeature: ['digital-receipts', 'menu-management'], // Show if user has ANY of these
     children: [
       {
         name: 'Digital Receipts',
         href: '/dashboard/digital-receipts',
         icon: ReceiptPercentIcon,
-        requiredFeature: 'order-management',
+        requiredFeature: 'digital-receipts',
       },
       {
         name: 'QR Menus',
