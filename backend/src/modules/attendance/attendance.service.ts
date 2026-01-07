@@ -23,7 +23,12 @@ export class AttendanceService {
 
   // SHARED HELPER: Find open attendance record for a user
   // This ensures checkIn, checkOut, and getTodayAttendance use EXACTLY the same query
-  private async findOpenAttendance(userId: string): Promise<AttendanceDocument | null> {
+  // Optionally filters by branchId and/or only recent records (within last 24 hours)
+  private async findOpenAttendance(
+    userId: string,
+    branchId?: string,
+    onlyRecent: boolean = true,
+  ): Promise<AttendanceDocument | null> {
     // In most cases userId will be a string representation of an ObjectId and the
     // schema field is an ObjectId. However, to be extra defensive (and to help in
     // cases where historical data might have been stored as a plain string), we
@@ -38,6 +43,23 @@ export class AttendanceService {
     // Also try matching the raw string value in case some documents were stored that way
     userConditions.push({ userId });
 
+    // Build branch filter if provided
+    const branchConditions: any[] = [];
+    if (branchId) {
+      branchConditions.push({ branchId });
+      if (Types.ObjectId.isValid(branchId)) {
+        branchConditions.push({ branchId: new Types.ObjectId(branchId) });
+      }
+    }
+
+    // Build date filter for recent records (last 24 hours) if onlyRecent is true
+    const dateConditions: any[] = [];
+    if (onlyRecent) {
+      const yesterday = new Date();
+      yesterday.setHours(yesterday.getHours() - 24);
+      dateConditions.push({ checkIn: { $gte: yesterday } });
+    }
+
     const query: any = {
       $and: [
         { $or: userConditions },
@@ -50,45 +72,20 @@ export class AttendanceService {
       ],
     };
 
+    // Add branch filter if provided
+    if (branchConditions.length > 0) {
+      query.$and.push({ $or: branchConditions });
+    }
+
+    // Add date filter if onlyRecent is true
+    if (dateConditions.length > 0) {
+      query.$and.push(...dateConditions);
+    }
+
     const result = await this.attendanceModel
       .findOne(query)
       .sort({ checkIn: -1 })
       .exec();
-
-    // DEBUG: Log what we're finding
-    if (!result) {
-      // Also check what records exist for this user
-      const userFilter: any = isValidObjectId
-        ? {
-            $or: [
-              { userId: new Types.ObjectId(userId) },
-              { userId },
-            ],
-          }
-        : { userId };
-
-      const allRecords = await this.attendanceModel
-        .find(userFilter)
-        .limit(5)
-        .sort({ checkIn: -1 })
-        .exec();
-
-      // Return null if no records found, or return the first record with recent records
-      if (allRecords.length > 0) {
-        const firstRecord = allRecords[0];
-        return {
-          ...firstRecord.toObject(),
-          recentRecords: allRecords.map((r: any) => ({
-            id: r._id,
-            userId: r.userId,
-            date: r.date,
-            checkIn: r.checkIn,
-            checkOut: r.checkOut,
-            hasCheckOut: !!r.checkOut,
-          })),
-        } as any;
-      }
-    }
 
     return result;
   }
@@ -186,14 +183,56 @@ export class AttendanceService {
     const localDateString = this.getLocalDateString(checkInTime, timezone);
 
     // Get the date range for today in local timezone (as UTC timestamps)
-    const { start: todayStart } = this.getLocalDateRange(localDateString, timezone);
+    const { start: todayStart, end: todayEnd } = this.getLocalDateRange(localDateString, timezone);
 
     // Check if there's any OPEN attendance record using shared helper
-    // This ensures checkIn and checkOut find the SAME record
-    const openAttendance = await this.findOpenAttendance(checkInDto.userId);
+    // Only check for open records from the same branch and within last 24 hours
+    // This prevents old forgotten check-ins from blocking new check-ins
+    const openAttendance = await this.findOpenAttendance(
+      checkInDto.userId,
+      checkInDto.branchId,
+      true, // onlyRecent = true (last 24 hours)
+    );
 
     if (openAttendance) {
+      // If we found an open attendance record from the same branch within last 24 hours,
+      // block the new check-in (user needs to check out first)
       throw new BadRequestException('You have already checked in. Please check out first.');
+    }
+
+    // Also check if user has already checked in today (even if checked out)
+    // This prevents multiple check-ins per day
+    const isValidUserId = Types.ObjectId.isValid(checkInDto.userId);
+    const userConditions: any[] = [];
+    if (isValidUserId) {
+      userConditions.push({ userId: new Types.ObjectId(checkInDto.userId) });
+    }
+    userConditions.push({ userId: checkInDto.userId });
+
+    const isValidBranchId = Types.ObjectId.isValid(checkInDto.branchId);
+    const branchConditions: any[] = [];
+    if (isValidBranchId) {
+      branchConditions.push({ branchId: new Types.ObjectId(checkInDto.branchId) });
+    }
+    branchConditions.push({ branchId: checkInDto.branchId });
+
+    const todayAttendance = await this.attendanceModel
+      .findOne({
+        $and: [
+          { $or: userConditions },
+          { $or: branchConditions },
+          {
+            date: {
+              $gte: todayStart,
+              $lte: todayEnd,
+            },
+          },
+        ],
+      })
+      .exec();
+
+    if (todayAttendance) {
+      throw new BadRequestException('You have already checked in today. Only one check-in per day is allowed.');
     }
     const expectedStartTime = new Date(checkInTime);
     expectedStartTime.setHours(9, 0, 0, 0); // Assuming 9 AM start time
@@ -254,8 +293,13 @@ export class AttendanceService {
     }
 
     // Find the open attendance record using the SHARED helper
-    // This ensures we find the same record that checkIn would block on
-    const attendance = await this.findOpenAttendance(checkOutDto.userId);
+    // For check-out, we want to find ANY open record (not just recent ones)
+    // so users can check out even if they forgot yesterday
+    const attendance = await this.findOpenAttendance(
+      checkOutDto.userId,
+      undefined, // no branch filter for check-out
+      false, // allow old records for check-out
+    );
 
     if (!attendance) {
       throw new NotFoundException('Check-in record not found. Please check in first.');
@@ -465,15 +509,7 @@ export class AttendanceService {
       branchConditions.push({ branchId: new Types.ObjectId(branchId) });
     }
 
-    const andConditions: any[] = [
-      { $or: branchConditions },
-      {
-        // Today's records based on checkIn time
-        checkIn: { $gte: todayStart, $lte: todayEnd },
-      },
-    ];
-
-    // If userId is provided, only return that user's attendance (for employees)
+    // Build user filter if userId is provided
     const isValidUserId = userId && Types.ObjectId.isValid(userId);
     let userFilter: any = {};
     if (userId) {
@@ -482,41 +518,78 @@ export class AttendanceService {
         userConditions.push({ userId: new Types.ObjectId(userId) });
       }
       userFilter = { $or: userConditions };
-      andConditions.push(userFilter);
     }
 
-    const query: any = { $and: andConditions };
+    // Query 1: Today's records based on checkIn time
+    const todayQuery: any = {
+      $and: [
+        { $or: branchConditions },
+        {
+          checkIn: { $gte: todayStart, $lte: todayEnd },
+        },
+      ],
+    };
+    if (userId) {
+      todayQuery.$and.push(userFilter);
+    }
 
     let attendances = await this.attendanceModel
-      .find(query)
+      .find(todayQuery)
       .populate('userId', 'firstName lastName employeeId role email')
       .populate('branchId', 'name code')
       .sort({ checkIn: -1 })
       .exec();
 
-    // Fallback: if nothing matched the date-range query but we have a userId, return
-    // the MOST RECENT attendance record for this user in this branch using the same
-    // flexible ID matching rules.
-    if (attendances.length === 0 && userId) {
-      const fallbackBranchFilter =
-        branchConditions.length > 1 ? { $or: branchConditions } : branchConditions[0];
+    // Query 2: Also include OPEN attendance records (no checkOut) for users
+    // This ensures that if someone checked in yesterday and never checked out,
+    // their active check-in will still show up in today's attendance
+    const openAttendanceQuery: any = {
+      $and: [
+        { $or: branchConditions },
+        {
+          $or: [
+            { checkOut: { $exists: false } },
+            { checkOut: null },
+          ],
+        },
+      ],
+    };
+    if (userId) {
+      openAttendanceQuery.$and.push(userFilter);
+    }
 
-      const fallbackUserConditions: any[] = [{ userId }];
-      if (isValidUserId) {
-        fallbackUserConditions.push({ userId: new Types.ObjectId(userId) });
-      }
+    const openAttendances = await this.attendanceModel
+      .find(openAttendanceQuery)
+      .populate('userId', 'firstName lastName employeeId role email')
+      .populate('branchId', 'name code')
+      .sort({ checkIn: -1 })
+      .exec();
 
-      attendances = await this.attendanceModel
-        .find({
-          ...fallbackBranchFilter,
-          $or: fallbackUserConditions,
-        })
-        .populate('userId', 'firstName lastName employeeId role email')
-        .populate('branchId', 'name code')
-        .sort({ checkIn: -1 })
-        .limit(1)
-        .exec();
+    // Merge today's records with open records, avoiding duplicates
+    const attendanceMap = new Map<string, any>();
+    
+    // Add today's records first
+    attendances.forEach((att: any) => {
+      const id = att._id?.toString() || att.id?.toString();
+      if (id) {
+        attendanceMap.set(id, att);
       }
+    });
+
+    // Add open records (will overwrite if duplicate, but that's fine)
+    openAttendances.forEach((att: any) => {
+      const id = att._id?.toString() || att.id?.toString();
+      if (id) {
+        attendanceMap.set(id, att);
+      }
+    });
+
+    // Convert map back to array and sort by checkIn time (most recent first)
+    attendances = Array.from(attendanceMap.values()).sort((a: any, b: any) => {
+      const aTime = new Date(a.checkIn).getTime();
+      const bTime = new Date(b.checkIn).getTime();
+      return bTime - aTime;
+    });
 
     // Transform to include userName and branchName
     return attendances.map((attendance: any) => {

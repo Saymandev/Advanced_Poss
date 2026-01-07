@@ -8,6 +8,7 @@ import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.mod
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { UsersModule } from '../users/users.module';
 import { AttendanceController } from './attendance.controller';
+import { AttendanceSchedulerService } from './attendance-scheduler.service';
 import { AttendanceService } from './attendance.service';
 import { Attendance, AttendanceSchema } from './schemas/attendance.schema';
 
@@ -24,7 +25,7 @@ import { Attendance, AttendanceSchema } from './schemas/attendance.schema';
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
   ],
   controllers: [AttendanceController],
-  providers: [AttendanceService, RoleFeatureGuard],
+  providers: [AttendanceService, AttendanceSchedulerService, RoleFeatureGuard],
   exports: [AttendanceService],
 })
 export class AttendanceModule {}

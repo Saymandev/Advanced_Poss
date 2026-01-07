@@ -35,7 +35,7 @@ import { ReceiptService } from './receipt.service';
 
 @Controller('pos')
 @UseGuards(JwtAuthGuard, RoleFeatureGuard, SubscriptionFeatureGuard, WorkPeriodCheckGuard)
-@RequiresFeature(FEATURES.ORDER_MANAGEMENT)
+// Note: Feature requirements are now at endpoint level for flexibility
 export class POSController {
   constructor(
     private readonly posService: POSService,
@@ -44,6 +44,7 @@ export class POSController {
 
   // POS Orders
   @Post('orders')
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
   async createOrder(@Body() createOrderDto: CreatePOSOrderDto, @Request() req) {
     const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
@@ -54,7 +55,8 @@ export class POSController {
   }
 
   @Get('orders')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.DASHBOARD) // Dashboard feature allows access to orders
+  @RequiresRoleFeature(FEATURES.DASHBOARD)
   async getOrders(@Query() filters: POSOrderFiltersDto, @Request() req) {
     const filtersWithBranch = {
       ...filters,
@@ -92,7 +94,8 @@ export class POSController {
 
   // Statistics
   @Get('stats')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.DASHBOARD) // Dashboard feature allows access to stats
+  @RequiresRoleFeature(FEATURES.DASHBOARD)
   async getStats(@Query() filters: POSStatsFiltersDto, @Request() req) {
     const filtersWithBranch = {
       ...filters,

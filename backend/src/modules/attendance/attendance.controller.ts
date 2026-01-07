@@ -1,18 +1,19 @@
 import {
-    BadRequestException,
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    Request,
-    UseGuards,
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -59,6 +60,23 @@ export class AttendanceController {
     return this.attendanceService.checkOut({
       ...checkOutDto,
       userId: req.user.id,
+    });
+  }
+
+  @Post(':userId/force-check-out')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Force check out for a user (Manager/Owner only)' })
+  forceCheckOut(
+    @Param('userId') userId: string,
+    @Body() checkOutDto: CheckOutDto,
+    @CurrentUser('id') managerId?: string,
+  ) {
+    return this.attendanceService.checkOut({
+      ...checkOutDto,
+      userId,
+      notes: checkOutDto.notes 
+        ? `${checkOutDto.notes}\n[Force checked out by manager]`
+        : '[Force checked out by manager]',
     });
   }
 
