@@ -61,37 +61,34 @@ export class SubscriptionFeatureGuard implements CanActivate {
     }
 
     // Check if feature-based subscription (new flexible model)
+    let isFeatureEnabled = false;
     if (subscription.enabledFeatures && subscription.enabledFeatures.length > 0) {
       // Feature-based: Check if required feature is in enabledFeatures array
-      const isFeatureEnabled = subscription.enabledFeatures.includes(requiredFeature);
+      isFeatureEnabled = subscription.enabledFeatures.includes(requiredFeature);
+    }
 
-      if (!isFeatureEnabled) {
+    // If not found in subscription.enabledFeatures, check the plan
+    if (!isFeatureEnabled && subscription.plan) {
+      // Get plan details
+      const plan = await this.subscriptionPlansService.findByName(subscription.plan);
+      if (plan) {
+        // Check if feature is enabled in plan (using new enabledFeatureKeys or legacy features)
+        isFeatureEnabled = isFeatureEnabledInPlan(plan, requiredFeature);
+      }
+    }
+
+    // If still not found, block access
+    if (!isFeatureEnabled) {
+      if (subscription.plan) {
+        const plan = await this.subscriptionPlansService.findByName(subscription.plan);
+        throw new ForbiddenException(
+          `Feature '${requiredFeature}' is not available in your ${plan?.displayName || subscription.plan} plan. Please upgrade to access this feature.`,
+        );
+      } else {
         throw new ForbiddenException(
           `Feature '${requiredFeature}' is not enabled in your subscription. Please contact support to enable this feature.`,
         );
       }
-
-      return true;
-    }
-
-    // Legacy plan-based subscription
-    if (!subscription.plan) {
-      throw new ForbiddenException('Subscription plan not found');
-    }
-
-    // Get plan details
-    const plan = await this.subscriptionPlansService.findByName(subscription.plan);
-    if (!plan) {
-      throw new ForbiddenException('Subscription plan not found');
-    }
-
-    // Check if feature is enabled in plan (using new enabledFeatureKeys or legacy features)
-    const isFeatureEnabled = isFeatureEnabledInPlan(plan, requiredFeature);
-
-    if (!isFeatureEnabled) {
-      throw new ForbiddenException(
-        `Feature '${requiredFeature}' is not available in your ${plan.displayName} plan. Please upgrade to access this feature.`,
-      );
     }
 
     return true;
