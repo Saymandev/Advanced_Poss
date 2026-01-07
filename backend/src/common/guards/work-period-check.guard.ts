@@ -5,7 +5,8 @@ import { isSuperAdmin } from '../utils/query.utils';
 
 /**
  * Guard that ensures an active work period exists before accessing POS terminal.
- * Bypasses check for owner, manager, and super_admin roles (they can access dashboard/stats without work period).
+ * Bypasses check for owner and super_admin roles only (they can access dashboard/stats without work period).
+ * Managers and other roles require an active work period.
  */
 @Injectable()
 export class WorkPeriodCheckGuard implements CanActivate {
@@ -29,8 +30,8 @@ export class WorkPeriodCheckGuard implements CanActivate {
       return true;
     }
 
-    // Bypass for OWNER, MANAGER, and SUPER_ADMIN for full POS access
-    const bypassRoles = ['owner', 'manager'];
+    // Bypass for OWNER and SUPER_ADMIN only (managers also need active work period)
+    const bypassRoles = ['owner'];
     if (isSuperAdmin(user.role) || bypassRoles.includes(user.role?.toLowerCase())) {
       return true;
     }

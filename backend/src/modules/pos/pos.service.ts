@@ -15,6 +15,7 @@ import { SettingsService } from '../settings/settings.service';
 import { TablesService } from '../tables/tables.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
+import { WorkPeriodsService } from '../work-periods/work-periods.service';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
 import { POSOrderFiltersDto, POSStatsFiltersDto } from './dto/pos-filters.dto';
 import { UpdatePOSSettingsDto } from './dto/pos-settings.dto';
@@ -49,6 +50,8 @@ export class POSService {
     private customersService: CustomersService,
     @Inject(forwardRef(() => BookingsService))
     private bookingsService: BookingsService,
+    @Inject(forwardRef(() => WorkPeriodsService))
+    private workPeriodsService: WorkPeriodsService,
   ) {}
   // Generate unique order number
   private async generateOrderNumber(branchId: string): Promise<string> {
@@ -79,6 +82,18 @@ export class POSService {
     // Owners can create orders for any branch in their company, but other roles must be assigned to the branch
     if (creatingUser.role !== 'owner' && creatingUserBranchId !== orderBranchId) {
       throw new BadRequestException(`You are not assigned to branch ${orderBranchId}. Please assign yourself to this branch first.`);
+    }
+    // Validate active work period for non-owner users (only owners can create orders without active work period)
+    if (creatingUser.role !== 'owner') {
+      if (!companyId) {
+        throw new BadRequestException('Company ID is required to validate work period');
+      }
+      const activeWorkPeriod = await this.workPeriodsService.findActive(companyId, orderBranchId);
+      if (!activeWorkPeriod) {
+        throw new BadRequestException(
+          'No active work period found. Please start a work period from the Work Periods page before creating orders.'
+        );
+      }
     }
     // Validate waiter/employee assignment if waiterId is provided
     if (createOrderDto.waiterId && createOrderDto.waiterId !== userId) {
@@ -704,6 +719,19 @@ export class POSService {
   }
   // Process payment
   async processPayment(processPaymentDto: ProcessPaymentDto, userId: string, branchId: string, companyId?: string): Promise<POSPayment> {
+    // Validate active work period for non-owner users (only owners can process payments without active work period)
+    const processingUser = await this.userModel.findById(userId).select('role');
+    if (processingUser && processingUser.role !== 'owner') {
+      if (!companyId) {
+        throw new BadRequestException('Company ID is required to validate work period');
+      }
+      const activeWorkPeriod = await this.workPeriodsService.findActive(companyId, branchId);
+      if (!activeWorkPeriod) {
+        throw new BadRequestException(
+          'No active work period found. Please start a work period from the Work Periods page before processing payments.'
+        );
+      }
+    }
     const order = await this.posOrderModel.findById(processPaymentDto.orderId).exec();
     if (!order) {
       throw new NotFoundException('POS order not found');
