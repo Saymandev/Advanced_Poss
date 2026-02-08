@@ -8,7 +8,7 @@ import {
   ChevronUpIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Checkbox } from './Checkbox';
 
 interface Column<T> {
@@ -80,6 +80,25 @@ export function DataTable<T extends Record<string, any>>({
   const [sortKey, setSortKey] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Scroll detection
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = () => {
+    if (tableContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1); // -1 for rounding errors
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, [safeData]);
 
   const handleSort = (key: string) => {
     if (!sortable) return;
@@ -214,9 +233,36 @@ export function DataTable<T extends Record<string, any>>({
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Table - Scrollable Container */}
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Left Scroll Indicator */}
+        {canScrollLeft && (
+          <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-white dark:from-gray-800 to-transparent z-10 pointer-events-none flex items-center justify-start pl-2">
+             <div className="bg-white/80 dark:bg-gray-800/80 p-1 rounded-full shadow-md border border-gray-100 dark:border-gray-700">
+              <ChevronDownIcon className="w-4 h-4 rotate-90 text-gray-500" />
+            </div>
+          </div>
+        )}
+
+        {/* Right Scroll Indicator */}
+        {canScrollRight && (
+          <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white dark:from-gray-800 to-transparent z-10 pointer-events-none flex items-center justify-end pr-2">
+            <div className="bg-white/80 dark:bg-gray-800/80 p-1 rounded-full shadow-md border border-gray-100 dark:border-gray-700">
+              <ChevronDownIcon className="w-4 h-4 -rotate-90 text-gray-500" />
+            </div>
+          </div>
+        )}
+
+        <div 
+          ref={tableContainerRef}
+          onScroll={checkScroll}
+          className="overflow-x-auto scrollbar-thin scrollbar-thumb-primary-500/50 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 hover:scrollbar-thumb-primary-600/70"
+          style={{
+            // Fallback for browsers that don't support tailwind-scrollbar or custom scrollbar utilities
+            scrollbarWidth: 'auto',
+            scrollbarColor: 'var(--primary-color, #3b82f6) transparent'
+          }}
+        >
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
