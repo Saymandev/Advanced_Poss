@@ -60,6 +60,7 @@ import { SubscriptionsService } from './subscriptions.service';
   providers: [
     SubscriptionsService,
     SubscriptionFeaturesService,
+    SubscriptionPlansService,
     StripeService,
   ],
   exports: [
