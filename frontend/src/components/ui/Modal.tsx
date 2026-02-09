@@ -20,13 +20,13 @@ const sizeClasses = {
   full: 'max-w-full mx-4',
 };
 
-export function Modal({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children, 
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
   size = 'md',
-  className 
+  className
 }: ModalProps) {
   if (!isOpen) return null;
 
@@ -36,20 +36,20 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 overflow-y-auto animate-fade-in" style={{ zIndex: zIndexValue }}>
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div 
+      <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
           onClick={onClose}
         />
         <div className={cn(
-          'relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full transform transition-all duration-300 animate-scale-in',
+          'relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full transform transition-all duration-300 animate-scale-in text-left my-8',
           'border border-gray-200 dark:border-gray-700',
           sizeClasses[size],
           className
         )}>
           {/* Top gradient border */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500 rounded-t-2xl" />
-          
+
           {title && (
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -106,13 +106,12 @@ export function ConfirmModal({
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors ${
-              variant === 'danger'
+            className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors ${variant === 'danger'
                 ? 'bg-red-600 hover:bg-red-700'
                 : variant === 'warning'
-                ? 'bg-yellow-600 hover:bg-yellow-700'
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
+                  ? 'bg-yellow-600 hover:bg-yellow-700'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
           >
             {confirmText}
           </button>

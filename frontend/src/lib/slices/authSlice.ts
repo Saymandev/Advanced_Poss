@@ -11,6 +11,7 @@ export interface User {
   isSuperAdmin?: boolean;
   phoneNumber?: string;
   avatar?: string;
+  permissions?: string[];
 }
 
 export interface AuthState {
@@ -47,7 +48,7 @@ const authSlice = createSlice({
     ) => {
       state.user = action.payload.user;
       state.isAuthenticated = true;
-      
+
       // Store minimal user data (exclude sensitive fields like email, phone)
       // Tokens are in httpOnly cookies, not stored in localStorage
       if (typeof window !== 'undefined') {
@@ -59,9 +60,10 @@ const authSlice = createSlice({
           companyId: action.payload.user.companyId,
           branchId: action.payload.user.branchId,
           isSuperAdmin: action.payload.user.isSuperAdmin,
+          permissions: action.payload.user.permissions,
         };
         localStorage.setItem('user', JSON.stringify(minimalUser));
-        
+
         // Clear old tokens from localStorage if they exist (migration cleanup)
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -69,7 +71,7 @@ const authSlice = createSlice({
     },
     setCompanyContext: (state, action: PayloadAction<any>) => {
       state.companyContext = action.payload;
-      
+
       // Save to localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('companyContext', JSON.stringify(action.payload));
@@ -85,7 +87,7 @@ const authSlice = createSlice({
       state.user = null;
       state.isAuthenticated = false;
       state.companyContext = undefined;
-      
+
       // Clear localStorage (tokens are cleared by backend via httpOnly cookies)
       if (typeof window !== 'undefined') {
         localStorage.removeItem('accessToken');
@@ -98,7 +100,7 @@ const authSlice = createSlice({
       if (typeof window !== 'undefined') {
         const userStr = localStorage.getItem('user');
         const companyContextStr = localStorage.getItem('companyContext');
-        
+
         // Always restore companyContext if it exists (for login flow)
         if (companyContextStr) {
           try {
@@ -107,7 +109,7 @@ const authSlice = createSlice({
             // Silent error - invalid JSON, just skip restoration
           }
         }
-        
+
         // Restore user data if exists
         // Note: Authentication is verified via httpOnly cookies, not localStorage tokens
         if (userStr) {
@@ -128,7 +130,7 @@ const authSlice = createSlice({
             // Silent error - invalid JSON
           }
         }
-        
+
         // Clear old tokens from localStorage (migration cleanup)
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -149,7 +151,7 @@ const authSlice = createSlice({
     setUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
-        
+
         // Update localStorage with minimal user data (exclude sensitive fields)
         if (typeof window !== 'undefined') {
           const minimalUser = {
@@ -160,6 +162,7 @@ const authSlice = createSlice({
             companyId: state.user.companyId,
             branchId: state.user.branchId,
             isSuperAdmin: state.user.isSuperAdmin,
+            permissions: state.user.permissions,
           };
           localStorage.setItem('user', JSON.stringify(minimalUser));
         }

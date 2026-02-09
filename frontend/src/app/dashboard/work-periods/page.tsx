@@ -8,19 +8,19 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPeriodActivitiesQuery, useGetWorkPeriodByIdQuery, useGetWorkPeriodSalesSummaryQuery, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
+import { useEmailWorkPeriodReportMutation, useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPeriodActivitiesQuery, useGetWorkPeriodByIdQuery, useGetWorkPeriodSalesSummaryQuery, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ArrowDownTrayIcon,
-    ClockIcon,
-    CurrencyDollarIcon,
-    EyeIcon,
-    PaperAirplaneIcon,
-    PlayIcon,
-    PrinterIcon,
-    StopIcon,
-    UserIcon,
+  ArrowDownTrayIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  EyeIcon,
+  PaperAirplaneIcon,
+  PlayIcon,
+  PrinterIcon,
+  StopIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -49,7 +49,7 @@ export default function WorkPeriodsPage() {
   // Client-side filtering
   const filteredWorkPeriods = useMemo(() => {
     if (!workPeriodsData?.workPeriods) return [];
-    
+
     let filtered = [...workPeriodsData.workPeriods];
 
     // Search filter
@@ -223,7 +223,7 @@ export default function WorkPeriodsPage() {
 
   // Live duration counter for active periods
   const [currentTime, setCurrentTime] = useState(new Date());
-  
+
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
@@ -387,6 +387,56 @@ export default function WorkPeriodsPage() {
     return found || null;
   }, [activePeriod, filteredWorkPeriods]);
 
+  const [emailWorkPeriodReport, { isLoading: isEmailing }] = useEmailWorkPeriodReportMutation();
+
+  const handleDownloadReport = async (id: string, serial: number) => {
+    try {
+      toast.loading('Generating PDF...', { id: 'download-pdf' });
+      // We use direct fetch here to handle the blob response easily
+      const token = localStorage.getItem('token'); // Or however you store the token
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/work-periods/${id}/pdf`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to generate PDF');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `work-period-${serial}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.dismiss('download-pdf');
+      toast.success('PDF downloaded successfully');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.dismiss('download-pdf');
+      toast.error('Failed to download PDF');
+    }
+  };
+
+  const handleEmailReport = async (id: string) => {
+    try {
+      const email = prompt('Enter email address to send report to:', user?.email);
+      if (!email) return;
+
+      toast.loading('Sending email...', { id: 'send-email' });
+      await emailWorkPeriodReport({ id, email }).unwrap();
+      toast.dismiss('send-email');
+      toast.success(`Report sent to ${email}`);
+    } catch (error: any) {
+      console.error('Email error:', error);
+      toast.dismiss('send-email');
+      toast.error(error?.data?.message || 'Failed to send email');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -410,7 +460,7 @@ export default function WorkPeriodsPage() {
                   // This import is for historical data entry
                   const _openingBalance = parseFloat(item.openingBalance || item['Opening Balance'] || 0);
                   const _startTime = item.startTime || item['Start Time'] || new Date().toISOString();
-                  
+
                   toast.success('Work periods are typically managed through the UI. Import functionality is for reference only.');
                   successCount++;
                 } catch (error: any) {
@@ -806,10 +856,7 @@ export default function WorkPeriodsPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    // Download functionality
-                    toast('Download feature coming soon');
-                  }}
+                  onClick={() => handleDownloadReport(selectedWorkPeriod.id, selectedWorkPeriod.serial)}
                   className="flex items-center gap-2"
                 >
                   <ArrowDownTrayIcon className="w-4 h-4" />
@@ -817,14 +864,12 @@ export default function WorkPeriodsPage() {
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => {
-                    // Send Email functionality
-                    toast('Send email feature coming soon');
-                  }}
+                  onClick={() => handleEmailReport(selectedWorkPeriod.id)}
+                  disabled={isEmailing}
                   className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
                 >
                   <PaperAirplaneIcon className="w-4 h-4" />
-                  Send Email
+                  {isEmailing ? 'Sending...' : 'Send Email'}
                 </Button>
               </div>
             </div>
@@ -868,11 +913,10 @@ export default function WorkPeriodsPage() {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">Difference:</span>
-                  <p className={`font-semibold ${
-                    (selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0)) >= 0
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  }`}>
+                  <p className={`font-semibold ${(selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0)) >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                    }`}>
                     {isLoadingSalesSummary ? (
                       <span>Loading...</span>
                     ) : (
@@ -1021,11 +1065,10 @@ export default function WorkPeriodsPage() {
               <Card>
                 <CardContent className="p-3 sm:p-4 text-center">
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Expected Closing</p>
-                  <p className={`text-base sm:text-lg md:text-xl font-bold truncate ${
-                    (salesSummary?.grossSales || 0) >= 0
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  }`} title={isLoadingSalesSummary ? 'Loading...' : formatCurrency((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))}>
+                  <p className={`text-base sm:text-lg md:text-xl font-bold truncate ${(salesSummary?.grossSales || 0) >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                    }`} title={isLoadingSalesSummary ? 'Loading...' : formatCurrency((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))}>
                     {isLoadingSalesSummary ? (
                       <span className="text-xs sm:text-sm">Loading...</span>
                     ) : (
@@ -1111,11 +1154,10 @@ export default function WorkPeriodsPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Variance:</span>
-                        <span className={`font-medium ${
-                          (selectedWorkPeriod.closingBalance - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))) >= 0
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                        }`}>
+                        <span className={`font-medium ${(selectedWorkPeriod.closingBalance - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))) >= 0
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                          }`}>
                           {isLoadingSalesSummary ? (
                             <span>Loading...</span>
                           ) : (

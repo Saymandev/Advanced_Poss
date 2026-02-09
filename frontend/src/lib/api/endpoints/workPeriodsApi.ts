@@ -51,7 +51,7 @@ export interface WorkPeriodStats {
 
 export const workPeriodsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getWorkPeriods: builder.query<{ workPeriods: WorkPeriod[]; total: number }, { 
+    getWorkPeriods: builder.query<{ workPeriods: WorkPeriod[]; total: number }, {
       branchId?: string;
       status?: string;
       page?: number;
@@ -68,7 +68,7 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         // Handle TransformInterceptor format: { success: true, data: ... }
         const data = response?.data !== undefined ? response.data : response;
-        
+
         // Ensure workPeriods is an array and map _id to id
         const workPeriods = (data?.workPeriods || []).map((wp: any) => {
           const workPeriod = {
@@ -87,7 +87,7 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
           };
           return workPeriod;
         });
-        
+
         return {
           workPeriods,
           total: data?.total || workPeriods.length,
@@ -146,17 +146,17 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         // Handle TransformInterceptor format: { success: true, data: ... }
         const data = response?.data !== undefined ? response.data : response;
-        
+
         // Ensure paymentMethods is an array
         if (data?.paymentMethods && !Array.isArray(data.paymentMethods)) {
           data.paymentMethods = [];
         }
-        
+
         // Ensure orders is an array
         if (data?.orders && !Array.isArray(data.orders)) {
           data.orders = [];
         }
-        
+
         return {
           totalOrders: data?.totalOrders || 0,
           grossSales: data?.grossSales || 0,
@@ -176,32 +176,32 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         // Handle TransformInterceptor format: { success: true, data: ... }
         const data = response?.data !== undefined ? response.data : response;
-        
+
         // If data is null, return null
         if (data === null || data === undefined) {
           return null;
         }
-        
+
         // If data is an empty object, return null
         if (typeof data === 'object' && Object.keys(data).length === 0) {
           return null;
         }
-        
+
         // If data doesn't have an id or _id, return null
         if (!data.id && !data._id) {
           return null;
         }
-        
+
         // Ensure we have an id field
         if (data._id && !data.id) {
           data.id = data._id.toString();
         }
-        
+
         // Ensure status is set correctly
         if (!data.status) {
           data.status = 'active'; // Default to active if not set
         }
-        
+
         return data;
       },
     }),
@@ -217,6 +217,13 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
       query: (id) => `/work-periods/${id}/activities`,
       providesTags: ['WorkPeriod'],
     }),
+    emailWorkPeriodReport: builder.mutation<{ success: boolean; message: string }, { id: string; email: string }>({
+      query: ({ id, email }) => ({
+        url: `/work-periods/${id}/email`,
+        method: 'POST',
+        body: { email },
+      }),
+    }),
   }),
 });
 
@@ -231,4 +238,5 @@ export const {
   useGetWorkPeriodSalesSummaryQuery,
   useGetCurrentWorkPeriodQuery,
   useGetWorkPeriodActivitiesQuery,
+  useEmailWorkPeriodReportMutation,
 } = workPeriodsApi;

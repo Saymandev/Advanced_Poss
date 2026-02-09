@@ -1,93 +1,55 @@
-import { useGetMyPermissionsQuery, useGetRolePermissionsQuery } from '@/lib/api/endpoints/rolePermissionsApi';
-import { UserRole } from '@/lib/enums/user-role.enum';
+import { usePermissions } from './usePermissions';
+import { useGetMyPermissionsQuery } from '@/lib/api/endpoints/rolePermissionsApi';
 import { useAppSelector } from '@/lib/store';
 import { useMemo } from 'react';
 
-/**
- * Check if user is super admin
- */
-function isSuperAdmin(role?: string | null): boolean {
-  if (!role) return false;
-  return role.toLowerCase() === UserRole.SUPER_ADMIN.toLowerCase() || role.toLowerCase() === 'super_admin';
-}
-
 export function useRolePermissions() {
-  const { user, companyContext } = useAppSelector((state) => state.auth);
-  const companyId = user?.companyId || companyContext?.companyId || null;
-  const userRole = user?.role?.toLowerCase();
-  const isSuperAdminUser = isSuperAdmin(user?.role);
-  const isOwnerOrAdmin = user?.role?.toLowerCase() === 'owner' || isSuperAdminUser;
+  const { user } = useAppSelector((state) => state.auth);
+  // Get permissions from the new hook/store
+  const { permissions: storePermissions, can, canAny, isSuperAdmin } = usePermissions();
 
-  // Super admin doesn't need permissions check - they have access to everything
-  // Skip permission queries for super admin
-  const { data: myPermissions, isLoading: isLoadingMy, refetch: refetchMy } = useGetMyPermissionsQuery(
+  // Keep the query for now as a fallback or for background updates, but rely on store primarily
+  // If store has permissions, we don't strictly need the query, but it helps to keep them fresh
+  const { data: apiPermissions, isLoading: isLoadingApi, refetch: refetchApi } = useGetMyPermissionsQuery(
     undefined,
-    { skip: !companyId || !userRole || isSuperAdminUser }
+    { skip: !user || isSuperAdmin || (user.permissions && user.permissions.length > 0) }
   );
 
-  const { data: allRolePermissions, isLoading: isLoadingAll } = useGetRolePermissionsQuery(
-    undefined,
-    { skip: !companyId || !userRole || !isOwnerOrAdmin } // Only fetch all permissions if owner/admin
-  );
+  // Combine permissions (prefer store, fallback to API)
+  const userFeatures = useMemo(() => {
+    if (isSuperAdmin) return []; // Super admin has access to everything effectively
 
-  // Primary loading state is based on my-permissions query
-  // allRolePermissions is only for role-access page, not needed for sidebar
-  // Super admin doesn't need to load permissions
-  const isLoading = isSuperAdminUser ? false : isLoadingMy;
+    if (user?.permissions && user.permissions.length > 0) {
+      return user.permissions;
+    }
 
-  // Use my-permissions directly (available to all users)
-  // For owners/admins, we can use allRolePermissions if needed, but myPermissions should work
-  const userPermissions = useMemo(() => {
-    // Prioritize my-permissions endpoint (works for all users)
-    if (myPermissions) {
-      return myPermissions;
+    if (apiPermissions?.features) {
+      return apiPermissions.features;
     }
-    
-    // Fallback: if owner/admin and we have all permissions, find user's role
-    if (allRolePermissions && userRole) {
-      return allRolePermissions.find((perm) => perm.role === userRole) || null;
-    }
-    
-    return null;
-  }, [myPermissions, allRolePermissions, userRole]);
+
+    return storePermissions || [];
+  }, [user?.permissions, apiPermissions, storePermissions, isSuperAdmin]);
 
   // Check if user has access to a specific feature
   const hasFeature = (featureId: string): boolean => {
-    // Super admin has access to everything
-    if (isSuperAdminUser) return true;
-    if (!userPermissions) return false;
-    if (!userPermissions.features || !Array.isArray(userPermissions.features)) return false;
-    return userPermissions.features.includes(featureId);
+    return can(featureId);
   };
 
   // Check if user has access to any of the provided features
   const hasAnyFeature = (featureIds: string[]): boolean => {
-    // Super admin has access to everything
-    if (isSuperAdminUser) return true;
-    if (!userPermissions) return false;
-    if (!userPermissions.features || !Array.isArray(userPermissions.features)) return false;
-    return featureIds.some((id) => userPermissions.features.includes(id));
+    return canAny(featureIds);
   };
 
-  // Get all features user has access to
-  const userFeatures = useMemo(() => {
-    return userPermissions?.features || [];
-  }, [userPermissions]);
-
   const refetch = () => {
-    refetchMy();
-    if (isOwnerOrAdmin) {
-      // Note: refetch all permissions if owner/admin (but useGetRolePermissionsQuery doesn't expose refetch directly)
-      // The refetchMy should be sufficient as it invalidates cache
-    }
+    refetchApi();
   };
 
   return {
-    permissions: userPermissions,
+    permissions: { features: userFeatures }, // Adapter for old interface expecting object
     userFeatures,
     hasFeature,
     hasAnyFeature,
-    isLoading,
+    isLoading: isSuperAdmin ? false : (isLoadingApi && (!user?.permissions || user.permissions.length === 0)),
     refetch,
   };
 }

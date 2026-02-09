@@ -20,6 +20,7 @@ import {
   useMarkAbsentMutation,
   useUpdateAttendanceMutation
 } from '@/lib/api/endpoints/attendanceApi';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -49,7 +50,7 @@ const formatWorkedHours = (hours?: number | null) => {
 
 export default function AttendancePage() {
   const { user } = useAppSelector((state) => state.auth);
-  
+
   // Redirect if user doesn't have attendance feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('attendance');
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
@@ -67,25 +68,28 @@ export default function AttendancePage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageLimit = 20;
 
-  // Check if user is owner/manager (can see all employees)
-  const isOwnerOrManager = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'super_admin';
-  
+  // Check permissions using the new hook
+  const { can, hasRole } = usePermissions();
+  const canManageAttendance = can('attendance') && (hasRole('owner') || hasRole('manager') || hasRole('super_admin')); // Or strictly can('manage_attendance') if that existed
+  // For now, owner/manager check is still needed for specific management actions unless we have granular features
+  const isOwnerOrManager = hasRole('owner') || hasRole('manager') || hasRole('super_admin');
+
   // Extract branchId from multiple sources
-  const branchId = user?.branchId || 
-                   (user as any)?.companyContext?.branchId || 
-                   (user as any)?.companyContext?.branches?.[0]?._id || 
-                   (user as any)?.companyContext?.branches?.[0]?.id;
+  const branchId = user?.branchId ||
+    (user as any)?.companyContext?.branchId ||
+    (user as any)?.companyContext?.branches?.[0]?._id ||
+    (user as any)?.companyContext?.branches?.[0]?.id;
   const branchIdStr = branchId ? (typeof branchId === 'string' ? branchId : branchId.toString()) : '';
-  
+
   // API calls
   const { data: todayAttendance = [], isLoading: todayLoading, refetch: refetchTodayAttendance, error: todayError } = useGetTodayAttendanceQuery(
     branchIdStr,
-    { 
+    {
       skip: !branchIdStr,
       pollingInterval: 30000, // Poll every 30 seconds for real-time updates
     }
   );
-  
+
   // Debug logging
   useEffect(() => {
     if (branchIdStr) {
@@ -129,14 +133,14 @@ export default function AttendancePage() {
 
   const handleCheckIn = async () => {
     const branchId = user?.branchId || (user as any)?.companyContext?.branchId || (user as any)?.companyContext?.branches?.[0]?._id || (user as any)?.companyContext?.branches?.[0]?.id;
-    
+
     if (!branchId) {
       toast.error('Branch ID is required. Please select a branch.');
       return;
     }
 
     const branchIdStr = typeof branchId === 'string' ? branchId : branchId.toString();
-    
+
     if (!branchIdStr || branchIdStr === 'undefined' || branchIdStr.trim() === '') {
       toast.error('Invalid branch ID. Please select a branch.');
       return;
@@ -147,9 +151,9 @@ export default function AttendancePage() {
         branchId: branchIdStr,
         ...(checkInNotes?.trim() && { notes: checkInNotes.trim() }),
       };
-      
+
       console.log('🔍 Attendance Check-In Request:', { branchId: branchIdStr, hasNotes: !!checkInNotes?.trim() });
-      
+
       await checkIn(checkInData).unwrap();
       toast.success('Checked in successfully');
       setIsCheckInModalOpen(false);
@@ -201,7 +205,7 @@ export default function AttendancePage() {
 
   const handleDeleteAttendance = async (id: string) => {
     if (!confirm('Are you sure you want to delete this attendance record?')) return;
-    
+
     try {
       await deleteAttendance(id).unwrap();
       toast.success('Attendance record deleted');
@@ -214,13 +218,13 @@ export default function AttendancePage() {
     const record = todayAttendance.find(r => r.id === recordId);
     const checkInTime = record ? new Date(record.checkIn).getTime() : Date.now();
     const hoursSinceCheckIn = (Date.now() - checkInTime) / (1000 * 60 * 60);
-    
+
     if (!confirm(
       `Force check out this employee?\n\n` +
       `They have been checked in for ${Math.floor(hoursSinceCheckIn)} hours.\n` +
       `This action cannot be undone.`
     )) return;
-    
+
     try {
       await forceCheckOut({
         userId,
@@ -324,7 +328,7 @@ export default function AttendancePage() {
         const hoursSinceCheckIn = (now - checkInTime) / (1000 * 60 * 60);
         const isLongRunning = hoursSinceCheckIn > 8; // More than 8 hours
         const isOvernight = hoursSinceCheckIn > 12; // More than 12 hours (likely forgot to check out)
-        
+
         return (
           <div>
             {record.checkOut ? (
@@ -371,7 +375,7 @@ export default function AttendancePage() {
         // Only show actions for owners/managers, or if it's the user's own record
         const canManage = isOwnerOrManager || record.userId === user?.id;
         if (!canManage) return null;
-        
+
         return (
           <div className="flex items-center gap-2">
             {!record.checkOut && record.userId === user?.id && (
@@ -602,7 +606,7 @@ export default function AttendancePage() {
                 <FunnelIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Filters</h3>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Status Filter */}
                 <div>
@@ -760,7 +764,7 @@ export default function AttendancePage() {
                   loading={false}
                   searchable={false}
                 />
-                
+
                 {/* Pagination */}
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
