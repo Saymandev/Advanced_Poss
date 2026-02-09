@@ -19,6 +19,7 @@ import {
   useGetServiceChargeSettingsQuery,
   useGetTaxSettingsQuery,
 } from '@/lib/api/endpoints/settingsApi';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useAppSelector } from '@/lib/store';
 import {
   CheckIcon,
@@ -37,6 +38,9 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function POSSettingsPage() {
+  // Redirect if user doesn't have pos-settings feature
+  useFeatureRedirect('pos-settings');
+
   const { user } = useAppSelector((state) => state.auth);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isTestPrintModalOpen, setIsTestPrintModalOpen] = useState(false);
@@ -48,13 +52,13 @@ export default function POSSettingsPage() {
   const { data: settings, isLoading, refetch: refetchSettings } = useGetPOSSettingsQuery({
     branchId: user?.branchId || undefined,
   });
-  
+
   // Get company settings as fallback defaults
   const { data: companySettings } = useGetCompanySettingsQuery(
     user?.companyId || '',
     { skip: !user?.companyId }
   );
-  
+
   // Get company tax and service charge settings as fallbacks
   const { data: taxSettings = [] } = useGetTaxSettingsQuery(
     user?.companyId || '',
@@ -64,13 +68,13 @@ export default function POSSettingsPage() {
     user?.companyId || '',
     { skip: !user?.companyId }
   );
-  
+
   // Get active tax and service charge rates from company settings
   const activeTax = taxSettings.find((tax: any) => tax.isActive && tax.appliesTo === 'all');
   const activeServiceCharge = serviceChargeSettings.find((sc: any) => sc.isActive && sc.appliesTo === 'all');
   const companyTaxRate = activeTax?.rate || 0;
   const companyServiceChargeRate = activeServiceCharge?.rate || 0;
-  
+
   const { data: printers, isLoading: printersLoading, refetch: refetchPrinters } = useGetPrintersQuery();
   const [testPrinter] = useTestPrinterMutation();
   const [createPrinter, { isLoading: isCreatingPrinter }] = useCreatePrinterMutation();
@@ -246,7 +250,7 @@ export default function POSSettingsPage() {
       toast.error(error?.data?.message || 'Failed to delete printer.');
     }
   };
-  
+
   // Populate form when settings load
   useEffect(() => {
     if (settings) {
@@ -272,7 +276,7 @@ export default function POSSettingsPage() {
       });
     }
   }, [settings, companySettings]);
-  
+
   // Set default printer for test when printers load
   useEffect(() => {
     if (printerList.length > 0 && !selectedPrinterForTest) {
@@ -359,7 +363,7 @@ export default function POSSettingsPage() {
       toast.error('Please select a printer');
       return;
     }
-    
+
     setIsTestingPrint(true);
     try {
       const result = await testPrinter({ printerName: selectedPrinterForTest }).unwrap();
@@ -881,7 +885,7 @@ export default function POSSettingsPage() {
               <option value="PKR">PKR - Pakistani Rupee</option>
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Logo URL (Optional)
@@ -893,7 +897,7 @@ export default function POSSettingsPage() {
               type="url"
             />
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1068,7 +1072,7 @@ export default function POSSettingsPage() {
                   </p>
                 )}
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1255,7 +1259,7 @@ export default function POSSettingsPage() {
           <p className="text-gray-600 dark:text-gray-400">
             This will send a test print to your configured printer. Make sure the printer is connected and ready.
           </p>
-          
+
           {printerList && printerList.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1274,7 +1278,7 @@ export default function POSSettingsPage() {
               </select>
             </div>
           )}
-          
+
           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
             <h4 className="font-semibold mb-2">Test Receipt Preview:</h4>
             <div className="text-sm font-mono">

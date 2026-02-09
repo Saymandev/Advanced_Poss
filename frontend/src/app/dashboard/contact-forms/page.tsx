@@ -9,18 +9,19 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useGetCompaniesQuery } from '@/lib/api/endpoints/companiesApi';
 import {
-    ContactForm,
-    ContactFormFilters,
-    useGetContactFormsQuery,
-    useGetContactFormStatsQuery,
-    useUpdateContactFormMutation,
+  ContactForm,
+  ContactFormFilters,
+  useGetContactFormsQuery,
+  useGetContactFormStatsQuery,
+  useUpdateContactFormMutation,
 } from '@/lib/api/endpoints/contactFormsApi';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useAppSelector } from '@/lib/store';
 import {
-    EnvelopeIcon,
-    EyeIcon,
-    MagnifyingGlassIcon,
-    PhoneIcon,
+  EnvelopeIcon,
+  EyeIcon,
+  MagnifyingGlassIcon,
+  PhoneIcon,
 } from '@heroicons/react/24/outline';
 import { useCallback, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -41,6 +42,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function ContactFormsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+
+  // Redirect if user doesn't have settings feature (includes contact forms)
+  useFeatureRedirect('settings');
   const isSuperAdmin = (user as any)?.role === 'SUPER_ADMIN' || (user as any)?.role === 'super_admin';
 
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -63,13 +67,13 @@ export default function ContactFormsPage() {
   // Extract companyId like other pages do
   // For super admin: use selectedCompanyId if set, otherwise undefined (show all)
   // For company users: use their companyId
-  const rawCompanyId = isSuperAdmin 
+  const rawCompanyId = isSuperAdmin
     ? (selectedCompanyId || undefined)
-    : ((user as any)?.companyId || 
-       (companyContext as any)?.companyId ||
-       (companyContext as any)?._id ||
-       (companyContext as any)?.id ||
-       null);
+    : ((user as any)?.companyId ||
+      (companyContext as any)?.companyId ||
+      (companyContext as any)?._id ||
+      (companyContext as any)?.id ||
+      null);
 
   // Ensure companyId is a string (handle ObjectId objects)
   const companyId = useMemo(() => {
@@ -88,7 +92,7 @@ export default function ContactFormsPage() {
       page: currentPage,
       limit: itemsPerPage,
     };
-    
+
     // Add companyId filter:
     // - For super admin: use selectedCompanyId if set (or 'null' for general inquiries)
     // - For company users: use their companyId
@@ -100,14 +104,14 @@ export default function ContactFormsPage() {
     } else if (companyId) {
       filterObj.companyId = companyId;
     }
-    
+
     return filterObj;
   }, [isSuperAdmin, companyId, selectedCompanyId, statusFilter, searchQuery, currentPage, itemsPerPage]);
 
   const { data: formsResponse, isLoading, refetch } = useGetContactFormsQuery(filters);
   // For super admin: use selectedCompanyId if set, otherwise undefined (all stats)
   // For company users: use their companyId
-  const statsCompanyId = isSuperAdmin 
+  const statsCompanyId = isSuperAdmin
     ? (selectedCompanyId === 'null' ? null : (selectedCompanyId || undefined))
     : (companyId || null);
   const { data: statsResponse } = useGetContactFormStatsQuery(statsCompanyId);
@@ -126,7 +130,7 @@ export default function ContactFormsPage() {
     setSelectedForm(form);
     setAdminNotes(form.adminNotes || '');
     setIsViewModalOpen(true);
-    
+
     // Mark as read if it's new
     if (form.status === 'new') {
       updateForm({

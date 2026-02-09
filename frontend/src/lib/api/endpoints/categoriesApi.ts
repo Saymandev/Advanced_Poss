@@ -38,7 +38,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         const data = response.data || response;
         let items = [];
-        
+
         // Handle array response
         if (Array.isArray(data)) {
           items = data;
@@ -47,7 +47,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
         } else if (data.items) {
           items = data.items;
         }
-        
+
         return {
           categories: items.map((cat: any) => ({
             id: cat._id || cat.id,
@@ -70,9 +70,9 @@ export const categoriesApi = apiSlice.injectEndpoints({
       providesTags: (result) =>
         result?.categories
           ? [
-              ...result.categories.map(({ id }) => ({ type: 'Category' as const, id })),
-              'Category',
-            ]
+            ...result.categories.map(({ id }) => ({ type: 'Category' as const, id })),
+            'Category',
+          ]
           : ['Category'],
     }),
     getCategoryById: builder.query<Category, string>({
@@ -126,7 +126,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
         // Handle wrapped response from TransformInterceptor: { success: true, data: [...] }
         // or direct response: [...]
         let data: any;
-        
+
         if (response && typeof response === 'object') {
           if (response.success && response.data) {
             // Wrapped response: { success: true, data: [...] }
@@ -141,7 +141,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
         } else {
           data = response;
         }
-        
+
         // Extract items array
         let items: any[] = [];
         if (Array.isArray(data)) {
@@ -153,7 +153,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
             items = data.items;
           }
         }
-        
+
         // Map to Category format
         return items.map((cat: any) => ({
           id: cat._id || cat.id,
@@ -208,7 +208,7 @@ export const categoriesApi = apiSlice.injectEndpoints({
           dispatch(
             categoriesApi.util.invalidateTags(['Category'])
           );
-        } catch (error) {
+        } catch {
           // Handle error
         }
       },

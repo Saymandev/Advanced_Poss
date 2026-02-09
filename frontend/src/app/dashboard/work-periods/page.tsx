@@ -8,6 +8,7 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useEmailWorkPeriodReportMutation, useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPeriodActivitiesQuery, useGetWorkPeriodByIdQuery, useGetWorkPeriodSalesSummaryQuery, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -27,6 +28,9 @@ import toast from 'react-hot-toast';
 
 export default function WorkPeriodsPage() {
   const { user } = useAppSelector((state) => state.auth);
+
+  // Redirect if user doesn't have work-periods feature
+  useFeatureRedirect('work-periods');
   const [isOpenModalOpen, setIsOpenModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);

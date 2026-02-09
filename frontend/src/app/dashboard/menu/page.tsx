@@ -14,6 +14,7 @@ import {
   useToggleAvailabilityMutation,
   useUpdateMenuItemMutation,
 } from '@/lib/api/endpoints/menuItemsApi';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import { MagnifyingGlassIcon, PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -21,9 +22,12 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function MenuPage() {
+  // Redirect if user doesn't have menu-management feature
+  useFeatureRedirect('menu-management');
+
   const { user } = useAppSelector((state) => state.auth);
   const { data, isLoading, refetch } = useGetMenuItemsQuery({ branchId: user?.branchId });
-  
+
   const [createMenuItem] = useCreateMenuItemMutation();
   const [updateMenuItem] = useUpdateMenuItemMutation();
   const [deleteMenuItem] = useDeleteMenuItemMutation();
@@ -214,11 +218,10 @@ export default function MenuPage() {
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap ${
-                    selectedCategory === category
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap ${selectedCategory === category
                       ? 'bg-primary-500 text-white'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   {category}
                 </button>

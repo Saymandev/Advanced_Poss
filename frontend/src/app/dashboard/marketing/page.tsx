@@ -17,6 +17,7 @@ import {
   useSendCampaignMutation,
   useUpdateCampaignMutation
 } from '@/lib/api/endpoints/marketingApi';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useAppSelector } from '@/lib/store';
 import {
   BellIcon,
@@ -37,6 +38,9 @@ const STORAGE_KEY = 'marketing_campaigns';
 
 export default function MarketingPage() {
   const { user } = useAppSelector((state) => state.auth);
+
+  // Redirect if user doesn't have marketing feature
+  useFeatureRedirect('marketing');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<MarketingCampaign | null>(null);
@@ -51,8 +55,8 @@ export default function MarketingPage() {
     skip: !user?.companyId,
   });
 
-  const { data: customersData } = useGetCustomersQuery({ 
-    branchId: user?.branchId || undefined 
+  const { data: customersData } = useGetCustomersQuery({
+    branchId: user?.branchId || undefined
   });
 
   const [createCampaign] = useCreateCampaignMutation();
@@ -453,162 +457,161 @@ export default function MarketingPage() {
                 return (
                   <div key={campaignId} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                        {campaign.name}
-                      </h3>
-                      {getStatusBadge(campaign.status)}
-                      <div className="flex items-center gap-1 text-gray-500">
-                        {getTypeIcon(campaign.type)}
-                        <span className="text-xs sm:text-sm capitalize">{campaign.type}</span>
-                      </div>
-                    </div>
-
-                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 break-words">
-                      {campaign.message}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                      <span>Target: {campaign.target}</span>
-                      {campaign.scheduledDate && (
-                        <span>Scheduled: {new Date(campaign.scheduledDate).toLocaleDateString()}</span>
-                      )}
-                      {campaign.sentDate && (
-                        <span>Sent: {new Date(campaign.sentDate).toLocaleDateString()}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 sm:ml-4 w-full sm:w-auto">
-                    {!campaign.sentDate && campaign.status !== 'draft' && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            await sendCampaign(campaignId.toString()).unwrap();
-                            await refetch();
-                            toast.success('Campaign sent successfully!');
-                          } catch (error: any) {
-                            toast.error(error?.data?.message || 'Failed to send campaign');
-                          }
-                        }}
-                        disabled={isSending}
-                      >
-                        {isSending ? 'Sending...' : 'Send Now'}
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const newStatus = campaign.status === 'active' ? 'paused' : 'active';
-                        handleStatusChange(campaign, newStatus);
-                      }}
-                      disabled={campaign.status === 'completed'}
-                    >
-                      {campaign.status === 'active' ? 'Pause' : campaign.status === 'paused' ? 'Resume' : 'Activate'}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditModal({ ...campaign, id: campaignId.toString() })}
-                    >
-                      <PencilIcon className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(campaignId.toString(), campaign.name)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Campaign Stats */}
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center">
-                    <div>
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={campaign.recipients.toLocaleString()}>
-                        {campaign.recipients.toLocaleString()}
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Recipients</p>
-                      {campaign.sentDate && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Sent: {new Date(campaign.sentDate).toLocaleDateString()}
-                        </p>
-                      )}
-                      {!campaign.sentDate && campaign.status !== 'draft' && (
-                        <p className="text-xs text-yellow-600 mt-1">Not sent yet</p>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate">
-                        {campaign.opened ? ((campaign.opened / campaign.recipients) * 100).toFixed(1) : '0.0'}%
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Open Rate</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {campaign.opened || 0} opened
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate">
-                        {campaign.clicked 
-                          ? campaign.opened 
-                            ? ((campaign.clicked / campaign.opened) * 100).toFixed(1)
-                            : '0.0'
-                          : '0.0'}%
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Click Rate</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {campaign.clicked || 0} clicked
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-600 truncate" title={(campaign.converted || 0).toLocaleString()}>
-                        {campaign.converted || 0}
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Conversions</p>
-                      {campaign.recipients > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {((campaign.converted || 0) / campaign.recipients * 100).toFixed(1)}% rate
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {campaign.sentDate && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center justify-between text-sm">
-                        <div>
-                          <span className="text-gray-600 dark:text-gray-400">Performance: </span>
-                          <span className={`font-semibold ${
-                            campaign.opened && campaign.opened > 0
-                              ? 'text-green-600'
-                              : 'text-gray-400'
-                          }`}>
-                            {campaign.opened && campaign.opened > 0
-                              ? 'Active Engagement'
-                              : 'No Engagement Yet'}
-                          </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                            {campaign.name}
+                          </h3>
+                          {getStatusBadge(campaign.status)}
+                          <div className="flex items-center gap-1 text-gray-500">
+                            {getTypeIcon(campaign.type)}
+                            <span className="text-xs sm:text-sm capitalize">{campaign.type}</span>
+                          </div>
                         </div>
-                        {campaign.type === 'email' && (
-                          <span className="text-gray-500 text-xs">
-                            Opens tracked via email pixel
-                          </span>
+
+                        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 break-words">
+                          {campaign.message}
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                          <span>Target: {campaign.target}</span>
+                          {campaign.scheduledDate && (
+                            <span>Scheduled: {new Date(campaign.scheduledDate).toLocaleDateString()}</span>
+                          )}
+                          {campaign.sentDate && (
+                            <span>Sent: {new Date(campaign.sentDate).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 sm:ml-4 w-full sm:w-auto">
+                        {!campaign.sentDate && campaign.status !== 'draft' && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await sendCampaign(campaignId.toString()).unwrap();
+                                await refetch();
+                                toast.success('Campaign sent successfully!');
+                              } catch (error: any) {
+                                toast.error(error?.data?.message || 'Failed to send campaign');
+                              }
+                            }}
+                            disabled={isSending}
+                          >
+                            {isSending ? 'Sending...' : 'Send Now'}
+                          </Button>
                         )}
-                        {campaign.type === 'sms' && (
-                          <span className="text-gray-500 text-xs">
-                            SMS delivery confirmed
-                          </span>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const newStatus = campaign.status === 'active' ? 'paused' : 'active';
+                            handleStatusChange(campaign, newStatus);
+                          }}
+                          disabled={campaign.status === 'completed'}
+                        >
+                          {campaign.status === 'active' ? 'Pause' : campaign.status === 'paused' ? 'Resume' : 'Activate'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditModal({ ...campaign, id: campaignId.toString() })}
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(campaignId.toString(), campaign.name)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
+
+                    {/* Campaign Stats */}
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center">
+                        <div>
+                          <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={campaign.recipients.toLocaleString()}>
+                            {campaign.recipients.toLocaleString()}
+                          </p>
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Recipients</p>
+                          {campaign.sentDate && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Sent: {new Date(campaign.sentDate).toLocaleDateString()}
+                            </p>
+                          )}
+                          {!campaign.sentDate && campaign.status !== 'draft' && (
+                            <p className="text-xs text-yellow-600 mt-1">Not sent yet</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate">
+                            {campaign.opened ? ((campaign.opened / campaign.recipients) * 100).toFixed(1) : '0.0'}%
+                          </p>
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Open Rate</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {campaign.opened || 0} opened
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate">
+                            {campaign.clicked
+                              ? campaign.opened
+                                ? ((campaign.clicked / campaign.opened) * 100).toFixed(1)
+                                : '0.0'
+                              : '0.0'}%
+                          </p>
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Click Rate</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {campaign.clicked || 0} clicked
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-600 truncate" title={(campaign.converted || 0).toLocaleString()}>
+                            {campaign.converted || 0}
+                          </p>
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Conversions</p>
+                          {campaign.recipients > 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {((campaign.converted || 0) / campaign.recipients * 100).toFixed(1)}% rate
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {campaign.sentDate && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center justify-between text-sm">
+                            <div>
+                              <span className="text-gray-600 dark:text-gray-400">Performance: </span>
+                              <span className={`font-semibold ${campaign.opened && campaign.opened > 0
+                                  ? 'text-green-600'
+                                  : 'text-gray-400'
+                                }`}>
+                                {campaign.opened && campaign.opened > 0
+                                  ? 'Active Engagement'
+                                  : 'No Engagement Yet'}
+                              </span>
+                            </div>
+                            {campaign.type === 'email' && (
+                              <span className="text-gray-500 text-xs">
+                                Opens tracked via email pixel
+                              </span>
+                            )}
+                            {campaign.type === 'sms' && (
+                              <span className="text-gray-500 text-xs">
+                                SMS delivery confirmed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
 

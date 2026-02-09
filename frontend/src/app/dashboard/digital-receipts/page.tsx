@@ -9,22 +9,26 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { DigitalReceipt, useEmailDigitalReceiptMutation, useGenerateDigitalReceiptMutation, useGetDigitalReceiptsQuery } from '@/lib/api/endpoints/aiApi';
 import { useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    DocumentTextIcon,
-    EnvelopeIcon,
-    EyeIcon,
-    PrinterIcon,
-    ReceiptRefundIcon,
-    ShoppingCartIcon,
-    UserIcon,
+  DocumentTextIcon,
+  EnvelopeIcon,
+  EyeIcon,
+  PrinterIcon,
+  ReceiptRefundIcon,
+  ShoppingCartIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function DigitalReceiptsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+
+  // Redirect if user doesn't have digital-receipts feature
+  useFeatureRedirect('digital-receipts');
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<DigitalReceipt | null>(null);
@@ -35,10 +39,10 @@ export default function DigitalReceiptsPage() {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
   // Extract branchId
-  const branchId = (user as any)?.branchId || 
-                   (companyContext as any)?.branchId || 
-                   (companyContext as any)?.branches?.[0]?._id ||
-                   (companyContext as any)?.branches?.[0]?.id;
+  const branchId = (user as any)?.branchId ||
+    (companyContext as any)?.branchId ||
+    (companyContext as any)?.branches?.[0]?._id ||
+    (companyContext as any)?.branches?.[0]?.id;
 
   // Form error states
   const [formErrors, setFormErrors] = useState<{
@@ -141,12 +145,12 @@ export default function DigitalReceiptsPage() {
     try {
       // Find the order to get the proper ID format
       const selectedOrder = completedOrders?.orders?.find(
-        (o: any) => 
-          (o.id === generateForm.orderId) || 
+        (o: any) =>
+          (o.id === generateForm.orderId) ||
           (o.id?.toString() === generateForm.orderId)
       );
 
-      const orderId = selectedOrder 
+      const orderId = selectedOrder
         ? (selectedOrder.id || generateForm.orderId).toString()
         : generateForm.orderId.trim();
 
@@ -164,7 +168,7 @@ export default function DigitalReceiptsPage() {
     } catch (error: any) {
       const errorMessage = error?.data?.message || error?.message || 'Failed to generate digital receipt';
       toast.error(errorMessage);
-      
+
       // Set field-specific errors if available
       if (error?.data?.errors) {
         setFormErrors(prev => ({
@@ -221,7 +225,7 @@ export default function DigitalReceiptsPage() {
     } catch (error: any) {
       const errorMessage = error?.data?.message || error?.message || 'Failed to email receipt';
       toast.error(errorMessage);
-      
+
       // Set field-specific errors if available
       if (error?.data?.errors) {
         setFormErrors(prev => ({
@@ -260,11 +264,11 @@ export default function DigitalReceiptsPage() {
       sortable: true,
       render: (value: string, row: DigitalReceipt) => {
         // Safely extract orderId as string
-        const orderIdStr = typeof row.orderId === 'string' 
-          ? row.orderId 
+        const orderIdStr = typeof row.orderId === 'string'
+          ? row.orderId
           : (row.orderId as any)?.toString() || String(row.orderId || '');
         const orderIdDisplay = orderIdStr.length >= 8 ? orderIdStr.slice(-8) : orderIdStr;
-        
+
         return (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
@@ -369,7 +373,7 @@ export default function DigitalReceiptsPage() {
     if (!receiptsData) return [];
     return Array.isArray(receiptsData) ? receiptsData : [];
   }, [receiptsData]);
-  
+
   const stats = useMemo(() => {
     return {
       total: receipts.length,
@@ -569,7 +573,7 @@ export default function DigitalReceiptsPage() {
       {/* Digital Receipts Table */}
       <Card>
         <CardContent>
-            <DataTable
+          <DataTable
             data={receipts}
             columns={columns}
             loading={isLoading}
@@ -873,7 +877,7 @@ export default function DigitalReceiptsPage() {
               if (!value || value === '' || isLoadingOrders) {
                 return;
               }
-              
+
               // Clear error when value changes
               if (formErrors.generate?.orderId) {
                 setFormErrors(prev => ({
@@ -881,7 +885,7 @@ export default function DigitalReceiptsPage() {
                   generate: { ...prev.generate, orderId: undefined },
                 }));
               }
-              
+
               // Find the selected order - try multiple ID formats
               const selectedOrder = completedOrders?.orders?.find(
                 (o: any) => {
@@ -890,12 +894,12 @@ export default function DigitalReceiptsPage() {
                   return oId === vId || o.id === value || o._id === value || o._id?.toString() === value;
                 }
               );
-              
+
               if (selectedOrder) {
                 // Extract the proper ID - try multiple formats
                 const orderId = selectedOrder.id || (selectedOrder as any)._id || value;
-                setGenerateForm({ 
-                  ...generateForm, 
+                setGenerateForm({
+                  ...generateForm,
                   orderId: orderId?.toString() || value,
                   customerEmail: selectedOrder.customerInfo?.email || generateForm.customerEmail,
                 });
@@ -908,7 +912,7 @@ export default function DigitalReceiptsPage() {
               isLoadingOrders
                 ? []
                 : completedOrders?.orders?.length
-                ? completedOrders.orders
+                  ? completedOrders.orders
                     .filter((order: any) => {
                       // Filter out orders without valid IDs
                       const orderId = order.id || (order as any)._id;
@@ -918,30 +922,30 @@ export default function DigitalReceiptsPage() {
                       // Extract proper ID - try multiple formats
                       const orderId = order.id || (order as any)._id || '';
                       if (!orderId) return null;
-                      
+
                       // Build customer info string
-                      const customerInfo = order.customerInfo 
-                        ? (order.customerInfo.name 
-                            ? `${order.customerInfo.name}${order.customerInfo.email ? ` (${order.customerInfo.email})` : ''}`
-                            : order.customerInfo.email || '')
+                      const customerInfo = order.customerInfo
+                        ? (order.customerInfo.name
+                          ? `${order.customerInfo.name}${order.customerInfo.email ? ` (${order.customerInfo.email})` : ''}`
+                          : order.customerInfo.email || '')
                         : 'Walk-in Customer';
-                      
+
                       return {
                         value: orderId.toString(),
                         label: `Order #${order.orderNumber || order.orderNumber || 'N/A'} - ${formatCurrency(order.totalAmount || 0)} - ${customerInfo} - ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`,
                       };
                     })
                     .filter((opt: any): opt is { value: string; label: string } => opt !== null) // Remove null entries
-                : []
+                  : []
             }
             error={formErrors.generate?.orderId}
             disabled={isLoadingOrders || !completedOrders?.orders?.length}
             placeholder={
-              isLoadingOrders 
-                ? 'Loading orders...' 
-                : !completedOrders?.orders?.length 
-                ? 'No completed orders available' 
-                : 'Select an order...'
+              isLoadingOrders
+                ? 'Loading orders...'
+                : !completedOrders?.orders?.length
+                  ? 'No completed orders available'
+                  : 'Select an order...'
             }
           />
 

@@ -38,7 +38,7 @@ function formatValue(value: any): string {
       if (!isNaN(date.getTime())) {
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
       }
-    } catch (e) {
+    } catch {
       // Not a valid date, continue
     }
   }
@@ -84,7 +84,7 @@ function getHeaders(data: any[], options: ExportOptions): string[] {
   }
 
   const headers = Object.keys(data[0]);
-  
+
   // Filter out excluded columns
   if (options.excludeColumns) {
     return headers.filter(h => !options.excludeColumns!.includes(h));
@@ -119,7 +119,7 @@ function escapeCSV(value: string): string {
   }
 
   const stringValue = String(value);
-  
+
   // If value contains comma, quote, or newline, wrap in quotes and escape quotes
   if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
     return `"${stringValue.replace(/"/g, '""')}"`;
@@ -157,7 +157,7 @@ export function exportToCSV(data: any[], options: ExportOptions = {}): void {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
-  
+
   link.setAttribute('href', url);
   link.setAttribute('download', filename);
   link.style.visibility = 'hidden';
@@ -196,7 +196,7 @@ export function exportToExcel(data: any[], options: ExportOptions = {}): void {
   const blob = new Blob([tsvContent], { type: 'application/vnd.ms-excel' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
-  
+
   link.setAttribute('href', url);
   link.setAttribute('download', filename);
   link.style.visibility = 'hidden';
@@ -301,7 +301,7 @@ export function exportToPDF(data: any[], options: ExportOptions = {}): void {
   if (printWindow) {
     printWindow.document.write(tableHtml);
     printWindow.document.close();
-    
+
     // Wait for content to load before printing
     printWindow.onload = () => {
       setTimeout(() => {

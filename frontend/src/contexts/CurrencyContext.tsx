@@ -27,13 +27,13 @@ let globalCurrency = 'BDT';
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const { user, companyContext, isAuthenticated } = useAppSelector((state) => state.auth);
-  
+
   // Super admin doesn't need company-specific settings - use default currency
   const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN';
-  
-  const companyId = 
-    companyContext?.companyId || 
-    (user as any)?.companyId || 
+
+  const companyId =
+    companyContext?.companyId ||
+    (user as any)?.companyId ||
     '';
 
   // Only fetch company settings if user is authenticated and has permission
@@ -52,7 +52,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     currencyRef.current = currency;
     globalCurrency = currency;
-    
+
     // Also set on window for backward compatibility with existing code
     if (typeof window !== 'undefined') {
       (window as any).__CURRENCY__ = currency;
@@ -66,7 +66,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         style: 'currency',
         currency: currencyToUse,
       }).format(amount);
-    } catch (error) {
+    } catch {
       // Fallback if currency code is invalid
       return new Intl.NumberFormat('en-US', {
         style: 'currency',

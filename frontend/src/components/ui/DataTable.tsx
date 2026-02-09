@@ -8,7 +8,7 @@ import {
   ChevronUpIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Checkbox } from './Checkbox';
 
 interface Column<T> {
@@ -75,8 +75,8 @@ export function DataTable<T extends Record<string, any>>({
   onRowClick,
 }: DataTableProps<T>) {
   // Ensure data is always an array
-  const safeData = Array.isArray(data) ? data : [];
-  
+  const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
+
   const [sortKey, setSortKey] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -111,7 +111,7 @@ export function DataTable<T extends Record<string, any>>({
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectable || !onSelectionChange) return;
-    
+
     if (e.target.checked) {
       onSelectionChange(data);
     } else {
@@ -138,7 +138,7 @@ export function DataTable<T extends Record<string, any>>({
 
   const renderCell = (column: Column<T>, row: T) => {
     const value = getValue(row, column.key as string);
-    
+
     if (column.render) {
       const rendered = column.render(value, row);
       // Validate that rendered value is safe for React
@@ -181,7 +181,7 @@ export function DataTable<T extends Record<string, any>>({
         return '[Object]';
       }
     }
-    
+
     // Ensure we return a string for all primitives
     return String(value);
   };
@@ -219,7 +219,7 @@ export function DataTable<T extends Record<string, any>>({
             />
           </div>
         )}
-        
+
         {exportable && (
           <div className="w-full sm:w-auto flex justify-end">
             <ExportButton
@@ -238,7 +238,7 @@ export function DataTable<T extends Record<string, any>>({
         {/* Left Scroll Indicator */}
         {canScrollLeft && (
           <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-white dark:from-gray-800 to-transparent z-10 pointer-events-none flex items-center justify-start pl-2">
-             <div className="bg-white/80 dark:bg-gray-800/80 p-1 rounded-full shadow-md border border-gray-100 dark:border-gray-700">
+            <div className="bg-white/80 dark:bg-gray-800/80 p-1 rounded-full shadow-md border border-gray-100 dark:border-gray-700">
               <ChevronDownIcon className="w-4 h-4 rotate-90 text-gray-500" />
             </div>
           </div>
@@ -253,7 +253,7 @@ export function DataTable<T extends Record<string, any>>({
           </div>
         )}
 
-        <div 
+        <div
           ref={tableContainerRef}
           onScroll={checkScroll}
           className="overflow-x-auto scrollbar-thin scrollbar-thumb-primary-500/50 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 hover:scrollbar-thumb-primary-600/70"

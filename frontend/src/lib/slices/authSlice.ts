@@ -105,7 +105,7 @@ const authSlice = createSlice({
         if (companyContextStr) {
           try {
             state.companyContext = JSON.parse(companyContextStr);
-          } catch (error) {
+          } catch {
             // Silent error - invalid JSON, just skip restoration
           }
         }
@@ -126,7 +126,7 @@ const authSlice = createSlice({
             state.user = sanitizedUser;
             // Set authenticated if user exists (actual auth verified by backend via cookies)
             state.isAuthenticated = true;
-          } catch (error) {
+          } catch {
             // Silent error - invalid JSON
           }
         }
@@ -142,7 +142,7 @@ const authSlice = createSlice({
         if (companyContextStr) {
           try {
             state.companyContext = JSON.parse(companyContextStr);
-          } catch (error) {
+          } catch {
             // Silent error - invalid JSON, just skip restoration
           }
         }

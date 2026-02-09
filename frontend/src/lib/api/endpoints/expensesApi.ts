@@ -82,7 +82,7 @@ export const expensesApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         const data = response.data || response;
         let items = [];
-        
+
         if (Array.isArray(data)) {
           items = data;
         } else if (data.expenses) {
@@ -90,7 +90,7 @@ export const expensesApi = apiSlice.injectEndpoints({
         } else if (data.items) {
           items = data.items;
         }
-        
+
         return {
           expenses: items.map((exp: any) => {
             // Helper to extract ID from populated object or string
@@ -107,7 +107,7 @@ export const expensesApi = apiSlice.injectEndpoints({
               if (!value) return undefined;
               const id = extractId(value);
               if (!id) return undefined;
-              
+
               if (typeof value === 'object') {
                 return {
                   id,
@@ -116,7 +116,7 @@ export const expensesApi = apiSlice.injectEndpoints({
                   name: value.name || (value.firstName && value.lastName ? `${value.firstName} ${value.lastName}` : value.firstName || value.lastName || undefined),
                 };
               }
-              
+
               return { id };
             };
 
@@ -156,9 +156,9 @@ export const expensesApi = apiSlice.injectEndpoints({
       providesTags: (result) =>
         result?.expenses
           ? [
-              ...result.expenses.map(({ id }) => ({ type: 'Expense' as const, id })),
-              'Expense',
-            ]
+            ...result.expenses.map(({ id }) => ({ type: 'Expense' as const, id })),
+            'Expense',
+          ]
           : ['Expense'],
     }),
     getExpenseById: builder.query<Expense, string>({
@@ -173,7 +173,7 @@ export const expensesApi = apiSlice.injectEndpoints({
       }),
       transformResponse: (response: any) => {
         const exp = response.data || response;
-        
+
         // Helper to extract ID from populated object or string
         const extractId = (value: any): string | undefined => {
           if (!value) return undefined;
@@ -188,7 +188,7 @@ export const expensesApi = apiSlice.injectEndpoints({
           if (!value) return undefined;
           const id = extractId(value);
           if (!id) return undefined;
-          
+
           if (typeof value === 'object') {
             return {
               id,
@@ -197,7 +197,7 @@ export const expensesApi = apiSlice.injectEndpoints({
               name: value.name || (value.firstName && value.lastName ? `${value.firstName} ${value.lastName}` : value.firstName || value.lastName || undefined),
             };
           }
-          
+
           return { id };
         };
 
@@ -234,7 +234,7 @@ export const expensesApi = apiSlice.injectEndpoints({
         try {
           await queryFulfilled;
           dispatch(expensesApi.util.invalidateTags(['Expense']));
-        } catch (error) {
+        } catch {
           // Handle error
         }
       },
@@ -270,10 +270,10 @@ export const expensesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Expense'],
     }),
-    getExpenseSummary: builder.query<ExpenseSummary, { 
-      branchId?: string; 
-      startDate?: string; 
-      endDate?: string 
+    getExpenseSummary: builder.query<ExpenseSummary, {
+      branchId?: string;
+      startDate?: string;
+      endDate?: string
     }>({
       query: (params) => ({
         url: '/expenses/summary',

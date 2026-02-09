@@ -104,18 +104,18 @@ function convertValue(value: string, type: ImportColumn['type']): any {
     case 'number':
       const num = parseFloat(trimmed);
       return isNaN(num) ? null : num;
-    
+
     case 'boolean':
       const lower = trimmed.toLowerCase();
       return lower === 'true' || lower === 'yes' || lower === '1';
-    
+
     case 'date':
       const date = new Date(trimmed);
       return isNaN(date.getTime()) ? null : date;
-    
+
     case 'email':
       return trimmed.toLowerCase();
-    
+
     default:
       return trimmed;
   }
@@ -124,7 +124,7 @@ function convertValue(value: string, type: ImportColumn['type']): any {
 /**
  * Validate a value based on column definition
  */
-function validateValue(value: any, column: ImportColumn, row: any): string | null {
+function validateValue(value: any, column: ImportColumn, _row: any): string | null {
   // Check required
   if (column.required && (value === null || value === undefined || value === '')) {
     return `${column.label} is required`;
@@ -165,12 +165,12 @@ export async function importFromCSV(
 ): Promise<ImportResult> {
   return new Promise((resolve) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
         const rows = parseCSV(content, options.delimiter);
-        
+
         if (rows.length === 0) {
           resolve({
             success: false,
@@ -221,12 +221,12 @@ export async function importFromExcel(
 ): Promise<ImportResult> {
   return new Promise((resolve) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
         const rows = parseTSV(content);
-        
+
         if (rows.length === 0) {
           resolve({
             success: false,
@@ -274,13 +274,13 @@ export async function importFromExcel(
 function processRows(rows: string[][], options: ImportOptions): ImportResult {
   const data: any[] = [];
   const errors: Array<{ row: number; errors: string[]; data: any }> = [];
-  
+
   let startIndex = options.skipFirstRow !== false ? 1 : 0; // Skip header by default
-  
+
   // If columns are defined, use them; otherwise, use first row as headers
   const hasCustomColumns = options.columns && options.columns.length > 0;
   let headers: string[] = [];
-  
+
   if (!hasCustomColumns && rows.length > 0) {
     headers = rows[0];
     startIndex = 1; // Skip header row
@@ -290,7 +290,7 @@ function processRows(rows: string[][], options: ImportOptions): ImportResult {
 
   for (let i = startIndex; i < rows.length; i++) {
     const row = rows[i];
-    
+
     // Skip empty rows
     if (row.every(cell => !cell || cell.trim() === '')) {
       continue;
@@ -307,7 +307,7 @@ function processRows(rows: string[][], options: ImportOptions): ImportResult {
       if (column) {
         // Convert value
         let value = convertValue(cellValue, column.type);
-        
+
         // Apply transform if provided
         if (column.transform) {
           try {
@@ -362,7 +362,7 @@ export async function importData(
   options: ImportOptions = {}
 ): Promise<ImportResult> {
   const fileName = file.name.toLowerCase();
-  
+
   if (fileName.endsWith('.csv')) {
     return importFromCSV(file, options);
   } else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx') || fileName.endsWith('.tsv')) {
@@ -397,7 +397,7 @@ export function downloadImportTemplate(
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
-  
+
   link.setAttribute('href', url);
   link.setAttribute('download', `${filename}.csv`);
   link.style.visibility = 'hidden';

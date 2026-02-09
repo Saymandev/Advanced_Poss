@@ -17,6 +17,7 @@ import {
   useUpdatePrinterMutation
 } from '@/lib/api/endpoints/posApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useAppSelector } from '@/lib/store';
 import {
   CheckCircleIcon,
@@ -36,6 +37,9 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function PrinterManagementPage() {
+  // Redirect if user doesn't have printer-management feature
+  useFeatureRedirect('printer-management');
+
   const { user } = useAppSelector((state) => state.auth);
   const hasManagePermission = [UserRole.OWNER, UserRole.MANAGER].includes((user?.role as UserRole) ?? UserRole.CASHIER);
 
@@ -79,20 +83,20 @@ export default function PrinterManagementPage() {
 
   const resetForm = () => {
     setFormErrors({});
-      setFormData({
-        name: '',
-        type: 'thermal',
-        width: 80,
-        height: 100,
-        networkUrl: '',
-        driver: '',
-        enabled: true,
-        copies: 1,
-        priority: 'normal',
-        autoPrint: false,
-        description: '',
-      });
-      setPrinterToEdit(null);
+    setFormData({
+      name: '',
+      type: 'thermal',
+      width: 80,
+      height: 100,
+      networkUrl: '',
+      driver: '',
+      enabled: true,
+      copies: 1,
+      priority: 'normal',
+      autoPrint: false,
+      description: '',
+    });
+    setPrinterToEdit(null);
   };
 
   // Populate form when editing
@@ -194,7 +198,7 @@ export default function PrinterManagementPage() {
       toast.error('Please select a printer');
       return;
     }
-    
+
     try {
       const result = await testPrinter({ printerName: selectedPrinter }).unwrap();
       if (result.success) {
@@ -396,86 +400,86 @@ export default function PrinterManagementPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {printers.map((printer) => (
-          <Card key={printer.name} className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                  <PrinterIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+            <Card key={printer.name} className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                    <PrinterIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{printer.name}</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{printer.type}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">{printer.name}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{printer.type}</p>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={printer.isOnline ? 'success' : 'danger'}
+                    className="text-xs"
+                  >
+                    {printer.isOnline ? 'Online' : 'Offline'}
+                  </Badge>
+                  <Badge
+                    variant={printer.enabled ? 'info' : 'secondary'}
+                    className="text-xs"
+                  >
+                    {printer.enabled ? 'Enabled' : 'Disabled'}
+                  </Badge>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge 
-                  variant={printer.isOnline ? 'success' : 'danger'}
-                  className="text-xs"
-                >
-                  {printer.isOnline ? 'Online' : 'Offline'}
-                </Badge>
-                <Badge 
-                  variant={printer.enabled ? 'info' : 'secondary'}
-                  className="text-xs"
-                >
-                  {printer.enabled ? 'Enabled' : 'Disabled'}
-                </Badge>
-              </div>
-            </div>
 
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Width:</span>
-                <span className="font-medium">{printer.width || 'N/A'}mm</span>
+              <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Width:</span>
+                  <span className="font-medium">{printer.width || 'N/A'}mm</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Type:</span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${getPrinterTypeColor(printer.type || 'thermal')}`}>
+                    {(printer.type || 'Unknown').toUpperCase()}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Type:</span>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${getPrinterTypeColor(printer.type || 'thermal')}`}>
-                  {(printer.type || 'Unknown').toUpperCase()}
-                </span>
-              </div>
-            </div>
 
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                className="flex-1"
-                onClick={() => {
-                  if (!hasManagePermission) {
-                    toast.error('Only owners and managers can test printers.');
-                    return;
-                  }
-                  setSelectedPrinter(printer.name);
-                  setIsTestModalOpen(true);
-                }}
-                disabled={!hasManagePermission}
-              >
-                <PlayIcon className="w-4 h-4 mr-1" />
-                Test
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="flex-1"
-                onClick={() => handleOpenEditModal(printer)}
-                disabled={!hasManagePermission}
-              >
-                <PencilIcon className="w-4 h-4 mr-1" />
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="flex-1"
-                onClick={() => handleOpenDeleteModal(printer.name)}
-                disabled={!hasManagePermission}
-              >
-                <TrashIcon className="w-4 h-4 mr-1 text-red-600" />
-                Delete
-              </Button>
-            </div>
-          </Card>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    if (!hasManagePermission) {
+                      toast.error('Only owners and managers can test printers.');
+                      return;
+                    }
+                    setSelectedPrinter(printer.name);
+                    setIsTestModalOpen(true);
+                  }}
+                  disabled={!hasManagePermission}
+                >
+                  <PlayIcon className="w-4 h-4 mr-1" />
+                  Test
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => handleOpenEditModal(printer)}
+                  disabled={!hasManagePermission}
+                >
+                  <PencilIcon className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => handleOpenDeleteModal(printer.name)}
+                  disabled={!hasManagePermission}
+                >
+                  <TrashIcon className="w-4 h-4 mr-1 text-red-600" />
+                  Delete
+                </Button>
+              </div>
+            </Card>
           ))}
         </div>
       )}
@@ -649,7 +653,7 @@ export default function PrinterManagementPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Printer Name
             </label>
-            <Input 
+            <Input
               value={formData.name}
               onChange={(e) => {
                 setFormData({ ...formData, name: e.target.value });
@@ -670,7 +674,7 @@ export default function PrinterManagementPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Printer Type
             </label>
-            <select 
+            <select
               value={formData.type}
               onChange={(e) => setFormData({ ...formData, type: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -687,8 +691,8 @@ export default function PrinterManagementPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Paper Width (mm)
               </label>
-              <Input 
-                type="number" 
+              <Input
+                type="number"
                 value={formData.width}
                 onChange={(e) => {
                   setFormData({ ...formData, width: Number(e.target.value) });
@@ -709,8 +713,8 @@ export default function PrinterManagementPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Paper Height (mm)
               </label>
-              <Input 
-                type="number" 
+              <Input
+                type="number"
                 value={formData.height}
                 onChange={(e) => {
                   setFormData({ ...formData, height: Number(e.target.value) });
@@ -734,7 +738,7 @@ export default function PrinterManagementPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Network URL
               </label>
-              <Input 
+              <Input
                 value={formData.networkUrl}
                 onChange={(e) => {
                   setFormData({ ...formData, networkUrl: e.target.value });
@@ -755,7 +759,7 @@ export default function PrinterManagementPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Driver (Optional)
             </label>
-            <Input 
+            <Input
               value={formData.driver}
               onChange={(e) => setFormData({ ...formData, driver: e.target.value })}
               placeholder="Printer driver name..."
@@ -766,7 +770,7 @@ export default function PrinterManagementPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Description (Optional)
             </label>
-            <Input 
+            <Input
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Brief description..."
@@ -778,8 +782,8 @@ export default function PrinterManagementPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Default Copies
               </label>
-              <Input 
-                type="number" 
+              <Input
+                type="number"
                 value={formData.copies}
                 onChange={(e) => setFormData({ ...formData, copies: Number(e.target.value) })}
                 min="1"
@@ -790,7 +794,7 @@ export default function PrinterManagementPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Priority
               </label>
-              <select 
+              <select
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -927,7 +931,7 @@ export default function PrinterManagementPage() {
             <div>
               <p className="text-gray-600 dark:text-gray-400 mb-1">Content</p>
               <pre className="bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap text-xs text-gray-800 dark:text-gray-200">
-{jobToView.content || 'No content available'}
+                {jobToView.content || 'No content available'}
               </pre>
             </div>
 

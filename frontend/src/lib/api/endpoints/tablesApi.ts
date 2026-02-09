@@ -58,7 +58,7 @@ export const tablesApi = apiSlice.injectEndpoints({
       transformResponse: (response: any) => {
         const data = response.data || response;
         let items = [];
-        
+
         // Handle array response
         if (Array.isArray(data)) {
           items = data;
@@ -67,7 +67,7 @@ export const tablesApi = apiSlice.injectEndpoints({
         } else if (data.items) {
           items = data.items;
         }
-        
+
         return {
           tables: items.map((table: any) => ({
             id: table._id || table.id,
@@ -152,7 +152,7 @@ export const tablesApi = apiSlice.injectEndpoints({
           dispatch(
             tablesApi.util.invalidateTags(['Table', 'POS'])
           );
-        } catch (error) {
+        } catch {
           // Handle error
         }
       },

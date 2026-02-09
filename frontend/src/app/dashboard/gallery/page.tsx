@@ -12,6 +12,8 @@ import {
   useUpdateGalleryImageMutation,
   useUploadGalleryImageMutation,
 } from '@/lib/api/endpoints/galleryApi';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
+import { useAppSelector } from '@/lib/store';
 import {
   ArrowUpTrayIcon,
   EyeIcon,
@@ -26,6 +28,9 @@ import { useCallback, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function GalleryPage() {
+  // Redirect if user doesn't have settings feature (includes gallery)
+  useFeatureRedirect('settings');
+
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -33,7 +38,7 @@ export default function GalleryPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Form state
   const [uploadForm, setUploadForm] = useState({
     file: null as File | null,
@@ -91,7 +96,7 @@ export default function GalleryPage() {
     }
 
     setUploadForm((prev) => ({ ...prev, file }));
-    
+
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -328,11 +333,10 @@ export default function GalleryPage() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragging
-                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                : 'border-gray-300 dark:border-gray-600 hover:border-primary-400'
-            }`}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+              : 'border-gray-300 dark:border-gray-600 hover:border-primary-400'
+              }`}
           >
             {previewImage ? (
               <div className="relative">

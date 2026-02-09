@@ -1,7 +1,7 @@
 'use client';
 
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isBefore, startOfDay, addDays } from 'date-fns';
-import { useState, useMemo } from 'react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isBefore, startOfDay } from 'date-fns';
+import { useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from '@heroicons/react/24/outline';
 
 interface DateRangePickerProps {
@@ -34,7 +34,7 @@ export function DateRangePicker({
   const isDateDisabled = (date: Date) => {
     const today = startOfDay(minDate);
     const dateToCheck = startOfDay(date);
-    
+
     // Can't select past dates
     if (isBefore(dateToCheck, today)) {
       return true;
@@ -153,8 +153,8 @@ export function DateRangePicker({
                 ${isSelectedCheckIn || isSelectedCheckOut
                   ? 'bg-primary-600 text-white hover:bg-primary-700'
                   : isInRange
-                  ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'text-gray-700 dark:text-gray-300'
+                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                    : 'text-gray-700 dark:text-gray-300'
                 }
                 ${isToday && !isSelectedCheckIn && !isSelectedCheckOut
                   ? 'ring-2 ring-primary-400'

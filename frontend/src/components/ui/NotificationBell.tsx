@@ -174,14 +174,14 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [setIsOpen]);
 
   // Load notifications when panel first opens (non-super-admin path)
   useEffect(() => {
     if (!isSuperAdmin && active.isOpen && !hasLoaded) {
       fetchFallbackNotifications();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.isOpen, isSuperAdmin]);
 
   const getNotificationIcon = (type: string) => {
@@ -280,9 +280,8 @@ export function NotificationBell({ className }: NotificationBellProps) {
                 {notifications.map((notification: any) => (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors ${
-                      !notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`}
+                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors ${!notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      }`}
                     onClick={() => markAsRead(notification.id)}
                   >
                     <div className="flex items-start gap-3">
@@ -292,14 +291,12 @@ export function NotificationBell({ className }: NotificationBellProps) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <p className={`text-sm font-medium ${
-                              !notification.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
-                            }`}>
+                            <p className={`text-sm font-medium ${!notification.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
+                              }`}>
                               {notification.title}
                             </p>
-                            <p className={`text-sm mt-1 ${
-                              !notification.read ? 'text-gray-700 dark:text-gray-300' : 'text-gray-600 dark:text-gray-400'
-                            }`}>
+                            <p className={`text-sm mt-1 ${!notification.read ? 'text-gray-700 dark:text-gray-300' : 'text-gray-600 dark:text-gray-400'
+                              }`}>
                               {notification.message}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
