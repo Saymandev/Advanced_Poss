@@ -22,8 +22,8 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 import { AttendanceService } from './attendance.service';
-import { CheckInDto } from './dto/check-in.dto';
-import { CheckOutDto } from './dto/check-out.dto';
+import { AttendanceCheckInDto } from './dto/attendance-check-in.dto';
+import { AttendanceCheckOutDto } from './dto/attendance-check-out.dto';
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
@@ -39,7 +39,7 @@ export class AttendanceController {
   @Post('check-in')
   @RequiresFeature(FEATURES.ATTENDANCE)
   @ApiOperation({ summary: 'Check in for work' })
-  checkIn(@Body() checkInDto: CheckInDto, @Request() req: any) {
+  checkIn(@Body() checkInDto: AttendanceCheckInDto, @Request() req: any) {
     // Use authenticated user's ID (required)
     if (!req.user?.id) {
       throw new BadRequestException('User ID is required');
@@ -53,7 +53,7 @@ export class AttendanceController {
   @Post('check-out')
   @RequiresFeature(FEATURES.ATTENDANCE)
   @ApiOperation({ summary: 'Check out from work' })
-  checkOut(@Body() checkOutDto: CheckOutDto, @Request() req: any) {
+  checkOut(@Body() checkOutDto: AttendanceCheckOutDto, @Request() req: any) {
     // Use authenticated user's ID (required)
     if (!req.user?.id) {
       throw new BadRequestException('User ID is required');
@@ -69,7 +69,7 @@ export class AttendanceController {
   @ApiOperation({ summary: 'Force check out for a user (Manager/Owner only)' })
   forceCheckOut(
     @Param('userId') userId: string,
-    @Body() checkOutDto: CheckOutDto,
+    @Body() checkOutDto: AttendanceCheckOutDto,
     @CurrentUser('id') managerId?: string,
   ) {
     return this.attendanceService.checkOut({

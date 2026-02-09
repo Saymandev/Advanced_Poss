@@ -6,7 +6,10 @@ import {
   Post,
   Query,
   UseGuards,
+  Res,
+  BadRequestException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -104,6 +107,36 @@ export class WorkPeriodsController {
     @CurrentUser('branchId') branchId?: string,
   ) {
     return this.workPeriodsService.getPeriodActivities(id, branchId);
+  }
+
+  @Get(':id/pdf')
+  @ApiOperation({ summary: 'Download work period report as PDF' })
+  async downloadReport(@Param('id') id: string, @Res() res: Response) {
+    const buffer = await this.workPeriodsService.generateWorkPeriodReport(id);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=work-period-${id}.pdf`,
+      'Content-Length': buffer.length,
+    });
+
+    res.end(buffer);
+  }
+
+  @Post(':id/email')
+  @ApiOperation({ summary: 'Email work period report to owner' })
+  async emailReport(
+    @Param('id') id: string,
+    @Body('email') email: string,
+    @CurrentUser('email') userEmail: string,
+  ) {
+    const targetEmail = email || userEmail;
+    if (!targetEmail) {
+      throw new BadRequestException('Email address is required');
+    }
+
+    await this.workPeriodsService.emailWorkPeriodReport(id, targetEmail);
+    return { success: true, message: `Report sent to ${targetEmail}` };
   }
 
   @Get(':id')

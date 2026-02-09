@@ -68,7 +68,7 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
   ],
   controllers: [POSController, PrinterManagementController],
   providers: [POSService, ReceiptService, PDFGeneratorService, PrinterService, EmailService, SmsService],
-  exports: [POSService, ReceiptService, PDFGeneratorService, PrinterService],
+  exports: [POSService, ReceiptService, PDFGeneratorService, PrinterService, EmailService],
 })
-export class POSModule {}
+export class POSModule { }
 

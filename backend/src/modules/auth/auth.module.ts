@@ -8,6 +8,7 @@ import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { LoginActivityModule } from '../login-activity/login-activity.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schemas/subscription-plan.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
@@ -35,6 +36,7 @@ import { TwoFactorService } from './two-factor.service';
     MongooseModule.forFeature([
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
     ]),
+    RolePermissionsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -50,5 +52,5 @@ import { TwoFactorService } from './two-factor.service';
   providers: [AuthService, TwoFactorService, JwtStrategy, LocalStrategy, EmailService],
   exports: [AuthService, TwoFactorService],
 })
-export class AuthModule {}
+export class AuthModule { }
 

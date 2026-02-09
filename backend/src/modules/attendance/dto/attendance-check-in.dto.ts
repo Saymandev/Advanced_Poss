@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
 
-export class CheckInDto {
+export class AttendanceCheckInDto {
   @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
   @IsString()
   @IsOptional()
@@ -27,4 +27,3 @@ export class CheckInDto {
     longitude: number;
   };
 }
-

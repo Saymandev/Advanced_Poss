@@ -8,8 +8,8 @@ import { Model, Types } from 'mongoose';
 import { AttendanceFilterDto } from '../../common/dto/pagination.dto';
 import { BranchesService } from '../branches/branches.service';
 import { SettingsService } from '../settings/settings.service';
-import { CheckInDto } from './dto/check-in.dto';
-import { CheckOutDto } from './dto/check-out.dto';
+import { AttendanceCheckInDto } from './dto/attendance-check-in.dto';
+import { AttendanceCheckOutDto } from './dto/attendance-check-out.dto';
 import { Attendance, AttendanceDocument } from './schemas/attendance.schema';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class AttendanceService {
     private attendanceModel: Model<AttendanceDocument>,
     private branchesService: BranchesService,
     private settingsService: SettingsService,
-  ) {}
+  ) { }
 
   // SHARED HELPER: Find open attendance record for a user
   // This ensures checkIn, checkOut, and getTodayAttendance use EXACTLY the same query
@@ -171,7 +171,7 @@ export class AttendanceService {
     return { start: startUTC, end: endUTC };
   }
 
-  async checkIn(checkInDto: CheckInDto): Promise<Attendance> {
+  async checkIn(checkInDto: AttendanceCheckInDto): Promise<Attendance> {
     if (!checkInDto.userId) {
       throw new BadRequestException('User ID is required');
     }
@@ -287,7 +287,7 @@ export class AttendanceService {
     }
   }
 
-  async checkOut(checkOutDto: CheckOutDto): Promise<Attendance> {
+  async checkOut(checkOutDto: AttendanceCheckOutDto): Promise<Attendance> {
     if (!checkOutDto.userId) {
       throw new BadRequestException('User ID is required');
     }
@@ -314,7 +314,7 @@ export class AttendanceService {
     attendance.breakTime = checkOutDto.breakTime || 0;
     // Append notes if check-in had notes, otherwise set new notes
     if (checkOutDto.notes) {
-      attendance.notes = attendance.notes 
+      attendance.notes = attendance.notes
         ? `${attendance.notes}\nCheck-out: ${checkOutDto.notes}`
         : `Check-out: ${checkOutDto.notes}`;
     }
@@ -341,13 +341,13 @@ export class AttendanceService {
   }
 
   async findAll(filterDto: AttendanceFilterDto): Promise<{ attendance: Attendance[], total: number, page: number, limit: number }> {
-    const { 
-      page = 1, 
-      limit = 20, 
-      sortBy = 'date', 
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'date',
       sortOrder = 'desc',
       search,
-      ...filters 
+      ...filters
     } = filterDto;
 
     const skip = (page - 1) * limit;
@@ -567,7 +567,7 @@ export class AttendanceService {
 
     // Merge today's records with open records, avoiding duplicates
     const attendanceMap = new Map<string, any>();
-    
+
     // Add today's records first
     attendances.forEach((att: any) => {
       const id = att._id?.toString() || att.id?.toString();
@@ -599,8 +599,8 @@ export class AttendanceService {
         ...attendance.toObject(),
         userName: user
           ? `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
-            user.email ||
-            'Unknown'
+          user.email ||
+          'Unknown'
           : 'Unknown',
         branchName: branch ? branch.name || branch.code || 'Unknown' : 'Unknown',
         totalHours: attendance.workHours || 0,

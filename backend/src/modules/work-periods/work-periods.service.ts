@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException, UnauthorizedExcepti
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { PasswordUtil } from '../../common/utils/password.util';
+import { EmailService } from '../../common/services/email.service';
+import { PDFGeneratorService } from '../pos/pdf-generator.service';
 import { POSService } from '../pos/pos.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { UsersService } from '../users/users.service';
@@ -16,7 +18,9 @@ export class WorkPeriodsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private usersService: UsersService,
     private posService: POSService,
-  ) {}
+    private pdfGeneratorService: PDFGeneratorService,
+    private emailService: EmailService,
+  ) { }
 
   async findAll(options: {
     page: number;
@@ -176,11 +180,11 @@ export class WorkPeriodsService {
     const endTime = new Date();
     const startTime = new Date(workPeriod.startTime);
     const durationMs = endTime.getTime() - startTime.getTime();
-    
+
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((durationMs % (1000 * 60)) / 1000);
-    
+
     const duration = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
     workPeriod.endTime = endTime;
@@ -210,7 +214,7 @@ export class WorkPeriodsService {
     const workPeriod = await this.workPeriodModel.findById(workPeriodId)
       .populate('startedBy', 'branchId')
       .exec();
-    
+
     if (!workPeriod) {
       throw new NotFoundException('Work period not found');
     }
@@ -228,12 +232,12 @@ export class WorkPeriodsService {
     // Format dates properly for filtering
     // For startDate, use the exact start time (ISO string) so orders created after work period start are included
     const startDateStr = startTime.toISOString();
-    
+
     // For endDate:
     // - If it's an active period (no endTime), use current time (full ISO string)
     // - If it's completed, use the exact end time (full ISO string)
     // pos.service.ts now handles both date-only strings and full ISO strings
-    const endDateStr = workPeriod.endTime 
+    const endDateStr = workPeriod.endTime
       ? endTime.toISOString()  // Full ISO string for completed periods
       : new Date().toISOString();  // Current time for active periods
 
@@ -256,7 +260,7 @@ export class WorkPeriodsService {
     let totalOrders = orders.orders.length;
     let voidCount = 0;
     let cancelCount = 0;
-    
+
     // Payment methods breakdown
     const paymentMethods: Record<string, { count: number; amount: number }> = {};
     const totalByPaymentMethod: Record<string, number> = {};
@@ -266,7 +270,7 @@ export class WorkPeriodsService {
       if (order.status === 'cancelled') {
         cancelCount++;
       }
-      
+
       // Count void orders (if status is void or similar)
       // Note: Adjust based on your actual void status
       if (order.status === 'void' || order.status === 'voided') {
@@ -297,7 +301,7 @@ export class WorkPeriodsService {
       // Commission calculation (example: 2% for cash, 3.5% for card)
       const commissionRate = method === 'cash' ? 0.02 : method === 'card' ? 0.035 : 0;
       const commission = data.amount * commissionRate;
-      
+
       return {
         type: method.charAt(0).toUpperCase() + method.slice(1),
         percentage: percentage.toFixed(2),
@@ -330,7 +334,7 @@ export class WorkPeriodsService {
 
   async getPeriodActivities(workPeriodId: string, branchId?: string) {
     const workPeriod = await this.workPeriodModel.findById(workPeriodId);
-    
+
     if (!workPeriod) {
       throw new NotFoundException('Work period not found');
     }
@@ -341,7 +345,7 @@ export class WorkPeriodsService {
     // Format dates properly for filtering (same as getSalesSummary)
     // Use exact start time for accurate filtering
     const startDateStr = startTime.toISOString();
-    const endDateStr = workPeriod.endTime 
+    const endDateStr = workPeriod.endTime
       ? endTime.toISOString()  // Full ISO string for completed periods
       : new Date().toISOString();  // Current time for active periods
 
@@ -378,5 +382,156 @@ export class WorkPeriodsService {
       totalActivities: activities.length,
       activities,
     };
+  }
+  async generateWorkPeriodReport(workPeriodId: string): Promise<Buffer> {
+    const summary = await this.getSalesSummary(workPeriodId);
+    const workPeriod = await this.findOne(workPeriodId);
+
+    const html = this.generateWorkPeriodHtml(workPeriod, summary);
+
+    return this.pdfGeneratorService.generateReceiptPDF(html, {
+      format: 'A4',
+      width: '210mm',
+      printBackground: true,
+      margin: {
+        top: '15mm',
+        right: '15mm',
+        bottom: '15mm',
+        left: '15mm',
+      }
+    });
+  }
+
+  async emailWorkPeriodReport(workPeriodId: string, email: string): Promise<boolean> {
+    const summary = await this.getSalesSummary(workPeriodId);
+    const workPeriod = await this.findOne(workPeriodId);
+
+    const html = this.generateWorkPeriodHtml(workPeriod, summary);
+
+    const dateStr = new Date(workPeriod.startTime).toLocaleDateString();
+    const subject = `Work Period Report - ${dateStr} - Serial #${workPeriod.serial}`;
+
+    return this.emailService.sendEmail(email, subject, html);
+  }
+
+  private generateWorkPeriodHtml(workPeriod: any, summary: any): string {
+    // Helper to format currency
+    const formatCurrency = (amount: number) => {
+      try {
+        return new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT' }).format(amount);
+      } catch (e) {
+        return `BDT ${amount}`;
+      }
+    };
+
+    const startTime = new Date(workPeriod.startTime).toLocaleString();
+    const endTime = workPeriod.endTime ? new Date(workPeriod.endTime).toLocaleString() : 'Active';
+    const duration = workPeriod.duration || 'N/A';
+
+    const startedBy = workPeriod.startedBy ? `${workPeriod.startedBy.firstName} ${workPeriod.startedBy.lastName}` : 'Unknown';
+    const endedBy = workPeriod.endedBy ? `${workPeriod.endedBy.firstName} ${workPeriod.endedBy.lastName}` : 'N/A';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Work Period Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; }
+          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+          .header h1 { margin: 0; color: #2c3e50; }
+          .meta-info { display: flex; justify-content: space-between; margin-bottom: 20px; background: #f9f9f9; padding: 15px; border-radius: 5px; }
+          .meta-column { width: 48%; }
+          .meta-item { margin-bottom: 5px; }
+          .meta-label { font-weight: bold; color: #666; }
+          
+          .section-title { font-size: 18px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; color: #2c3e50; }
+          
+          .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+          .summary-card { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
+          .summary-value { font-size: 24px; font-weight: bold; color: #2c3e50; }
+          .summary-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+          
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { text-align: left; background: #f0f0f0; padding: 10px; border-bottom: 2px solid #ddd; }
+          td { padding: 10px; border-bottom: 1px solid #eee; }
+          tr:last-child td { border-bottom: none; }
+          
+          .payment-methods { margin-top: 20px; }
+          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Work Period Report</h1>
+          <p>Serial #${workPeriod.serial}</p>
+        </div>
+        
+        <div class="meta-info">
+          <div class="meta-column">
+            <div class="meta-item"><span class="meta-label">Status:</span> ${workPeriod.status.toUpperCase()}</div>
+            <div class="meta-item"><span class="meta-label">Started By:</span> ${startedBy}</div>
+            <div class="meta-item"><span class="meta-label">Start Time:</span> ${startTime}</div>
+            <div class="meta-item"><span class="meta-label">Opening Balance:</span> ${formatCurrency(workPeriod.openingBalance)}</div>
+          </div>
+          <div class="meta-column">
+            <div class="meta-item"><span class="meta-label">Duration:</span> ${duration}</div>
+            <div class="meta-item"><span class="meta-label">Ended By:</span> ${endedBy}</div>
+            <div class="meta-item"><span class="meta-label">End Time:</span> ${endTime}</div>
+            <div class="meta-item"><span class="meta-label">Closing Balance:</span> ${workPeriod.closingBalance !== undefined ? formatCurrency(workPeriod.closingBalance) : 'N/A'}</div>
+          </div>
+        </div>
+        
+        <div class="section-title">Sales Summary</div>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-value">${formatCurrency(summary.grossSales)}</div>
+            <div class="summary-label">Gross Sales</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-value">${summary.totalOrders}</div>
+            <div class="summary-label">Total Orders</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-value">${summary.voidCount}</div>
+            <div class="summary-label">Voided Orders</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-value">${summary.cancelCount}</div>
+            <div class="summary-label">Cancelled Orders</div>
+          </div>
+        </div>
+        
+        <div class="section-title">Payment Methods</div>
+        <div class="payment-methods">
+          <table>
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Count</th>
+                <th>Amount</th>
+                <th>%</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${summary.paymentMethods.map((pm: any) => `
+                <tr>
+                  <td>${pm.type}</td>
+                  <td>${pm.count}</td>
+                  <td>${formatCurrency(pm.amount)}</td>
+                  <td>${pm.percentage}%</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="footer">
+          Generated on ${new Date().toLocaleString()}
+        </div>
+      </body>
+      </html>
+    `;
   }
 }
