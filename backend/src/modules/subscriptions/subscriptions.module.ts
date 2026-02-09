@@ -32,6 +32,7 @@ import { SubscriptionFeaturesController } from './subscription-features.controll
 import { SubscriptionFeaturesService } from './subscription-features.service';
 import { SubscriptionsWebhookController } from './subscriptions-webhook.controller';
 import { SubscriptionsController } from './subscriptions.controller';
+import { SubscriptionPlansService } from './subscription-plans.service';
 import { SubscriptionsService } from './subscriptions.service';
 
 @Module({
@@ -66,7 +67,8 @@ import { SubscriptionsService } from './subscriptions.service';
     SubscriptionFeaturesService,
     StripeService,
     MongooseModule, // Export to make Subscription model available to other modules
+    SubscriptionPlansService,
   ],
 })
-export class SubscriptionsModule {}
+export class SubscriptionsModule { }
 
