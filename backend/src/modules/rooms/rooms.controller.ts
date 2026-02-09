@@ -24,6 +24,7 @@ import { RoomsService } from './rooms.service';
 @ApiTags('Rooms')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
+@RequiresFeature(FEATURES.ROOM_MANAGEMENT)
 @Controller('rooms')
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) { }

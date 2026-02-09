@@ -41,7 +41,7 @@ export class PasswordValidator {
     // Check special characters requirement
     if (
       securitySettings.requireSpecialChars &&
-      !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+      !/[!@#$%^&*()_+\-=\x5b\x5d{};':"\\|,.<>\x2f?]/.test(password)
     ) {
       errors.push('Password must contain at least one special character');
     }

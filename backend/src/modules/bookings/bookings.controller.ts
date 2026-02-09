@@ -24,6 +24,7 @@ import { UpdateBookingDto } from './dto/update-booking.dto';
 @ApiTags('Bookings')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.BOOKING_MANAGEMENT)
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) { }

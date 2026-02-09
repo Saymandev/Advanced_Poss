@@ -16,9 +16,8 @@ export class RequestLoggerMiddleware implements NestMiddleware {
         console.error(logMessage);
       } else if (statusCode >= 400) {
         console.warn(logMessage);
-      } else {
-        }
+      }
     });
     next();
   }
-}
+}

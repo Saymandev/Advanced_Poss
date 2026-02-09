@@ -28,9 +28,8 @@ export class SystemFeedbackController {
   constructor(private readonly feedbackService: SystemFeedbackService) { }
 
   @Post()
-  @RequiresFeature(FEATURES.SETTINGS)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Submit system feedback (Company Owner/Manager)' })
+  @ApiOperation({ summary: 'Submit system feedback' })
   create(
     @Body() createFeedbackDto: CreateSystemFeedbackDto,
     @CurrentUser() user: any,
@@ -52,7 +51,6 @@ export class SystemFeedbackController {
   }
 
   @Get('my-feedback')
-  @RequiresFeature(FEATURES.SETTINGS)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get my feedback submissions' })
   getMyFeedback(@CurrentUser() user: any) {
@@ -81,7 +79,6 @@ export class SystemFeedbackController {
   }
 
   @Get(':id')
-  @RequiresFeature(FEATURES.SETTINGS)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get feedback by ID' })
   findOne(@Param('id') id: string) {
