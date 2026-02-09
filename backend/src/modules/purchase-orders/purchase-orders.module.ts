@@ -8,6 +8,7 @@ import {
 } from './schemas/purchase-order.schema';
 import { Supplier, SupplierSchema } from '../suppliers/schemas/supplier.schema';
 import { Ingredient, IngredientSchema } from '../ingredients/schemas/ingredient.schema';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { ExpensesModule } from '../expenses/expenses.module';
 
 @Module({
@@ -18,11 +19,12 @@ import { ExpensesModule } from '../expenses/expenses.module';
       { name: Ingredient.name, schema: IngredientSchema },
     ]),
     forwardRef(() => ExpensesModule),
+    SubscriptionsModule,
   ],
   controllers: [PurchaseOrdersController],
   providers: [PurchaseOrdersService],
   exports: [PurchaseOrdersService],
 })
-export class PurchaseOrdersModule {}
+export class PurchaseOrdersModule { }
 
 
