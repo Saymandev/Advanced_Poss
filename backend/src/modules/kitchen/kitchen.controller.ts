@@ -1,153 +1,113 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { FEATURES } from '../../common/constants/features.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { KitchenService } from './kitchen.service';
 
 @ApiTags('Kitchen')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('kitchen')
 export class KitchenController {
-  constructor(private readonly kitchenService: KitchenService) {}
+  constructor(private readonly kitchenService: KitchenService) { }
 
   @Get('branch/:branchId')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.COOK,
-  )
+  @Get('branch/:branchId')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get all kitchen orders for branch' })
   findAll(@Param('branchId') branchId: string, @Query('status') status?: string) {
     return this.kitchenService.findAll(branchId, status);
   }
 
   @Get('branch/:branchId/pending')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.COOK,
-  )
+  @Get('branch/:branchId/pending')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get pending orders' })
   findPending(@Param('branchId') branchId: string) {
     return this.kitchenService.findPending(branchId);
   }
 
   @Get('branch/:branchId/preparing')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.COOK,
-  )
+  @Get('branch/:branchId/preparing')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get orders being prepared' })
   findPreparing(@Param('branchId') branchId: string) {
     return this.kitchenService.findPreparing(branchId);
   }
 
   @Get('branch/:branchId/ready')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.WAITER,
-  )
+  @Get('branch/:branchId/ready')
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get ready orders' })
   findReady(@Param('branchId') branchId: string) {
     return this.kitchenService.findReady(branchId);
   }
 
   @Get('branch/:branchId/delayed')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.COOK,
-  )
+  @Get('branch/:branchId/delayed')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get delayed orders (> 30 min)' })
   findDelayed(@Param('branchId') branchId: string) {
     return this.kitchenService.findDelayed(branchId);
   }
 
   @Get('branch/:branchId/urgent')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.COOK,
-  )
+  @Get('branch/:branchId/urgent')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get urgent orders' })
   findUrgent(@Param('branchId') branchId: string) {
     return this.kitchenService.findUrgent(branchId);
   }
 
   @Get('branch/:branchId/stats')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.COOK,
-  )
+  @Get('branch/:branchId/stats')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get kitchen statistics' })
   getStats(@Param('branchId') branchId: string) {
     return this.kitchenService.getStats(branchId);
   }
 
   @Get('order/:orderId')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.WAITER,
-  )
+  @Get('order/:orderId')
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get kitchen order by order ID' })
   findByOrderId(@Param('orderId') orderId: string) {
     return this.kitchenService.findByOrderId(orderId);
   }
 
   @Get(':id')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.CHEF,
-    UserRole.COOK,
-  )
+  @Get(':id')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get kitchen order by ID' })
   findOne(@Param('id') id: string) {
     return this.kitchenService.findOne(id);
   }
 
   @Post(':id/start')
-  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER)
+  @Post(':id/start')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Start preparing order' })
   startOrder(@Param('id') id: string, @Body('chefId') chefId: string) {
     return this.kitchenService.startOrder(id, chefId);
   }
 
   @Post(':id/items/:itemId/start')
-  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER)
+  @Post(':id/items/:itemId/start')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Start preparing specific item' })
   startItem(
     @Param('id') id: string,
@@ -158,28 +118,35 @@ export class KitchenController {
   }
 
   @Post(':id/items/:itemId/complete')
-  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER)
+  @Post(':id/items/:itemId/complete')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Mark item as ready' })
   completeItem(@Param('id') id: string, @Param('itemId') itemId: string) {
     return this.kitchenService.completeItem(id, itemId);
   }
 
   @Post(':id/complete')
-  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER, UserRole.WAITER)
+  @Post(':id/complete')
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Mark entire order as served' })
   completeOrder(@Param('id') id: string) {
     return this.kitchenService.completeOrder(id);
   }
 
   @Patch(':id/urgent')
-  @Roles(UserRole.MANAGER, UserRole.OWNER)
+  @Patch(':id/urgent')
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Mark order as urgent' })
-  markUrgent(@Param('id') id: string, @Body('isUrgent') isUrgent: boolean) {
+  markUrgent(@Param('id') id: string, @Body('isUrgent') isUrgent: boolean, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Managers and Owners can mark orders as urgent');
+    }
     return this.kitchenService.markUrgent(id, isUrgent);
   }
 
   @Patch(':id/items/:itemId/priority')
-  @Roles(UserRole.OWNER, UserRole.CHEF, UserRole.COOK, UserRole.MANAGER)
+  @Patch(':id/items/:itemId/priority')
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Set item priority' })
   setPriority(
     @Param('id') id: string,
@@ -190,9 +157,13 @@ export class KitchenController {
   }
 
   @Post(':id/cancel')
-  @Roles(UserRole.MANAGER, UserRole.OWNER)
+  @Post(':id/cancel')
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Cancel kitchen order' })
-  cancelOrder(@Param('id') id: string, @Body('reason') reason?: string) {
+  cancelOrder(@Param('id') id: string, @Body('reason') reason?: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Managers and Owners can cancel kitchen orders');
+    }
     return this.kitchenService.cancelOrder(id, reason);
   }
 }

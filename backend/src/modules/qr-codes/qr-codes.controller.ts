@@ -4,6 +4,7 @@ import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CreateQRCodeDto } from './dto/create-qr-code.dto';
 import { UpdateQRCodeDto } from './dto/update-qr-code.dto';
@@ -11,11 +12,11 @@ import { QRCodesService } from './qr-codes.service';
 
 @ApiTags('QR Codes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.QR_MENUS)
 @Controller('qr-codes')
 export class QRCodesController {
-  constructor(private readonly qrCodesService: QRCodesService) {}
+  constructor(private readonly qrCodesService: QRCodesService) { }
 
   @Post('generate')
   @ApiOperation({ summary: 'Generate a new QR code for menu' })

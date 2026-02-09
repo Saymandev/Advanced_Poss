@@ -11,10 +11,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { EndWorkPeriodDto } from './dto/end-work-period.dto';
 import { StartWorkPeriodDto } from './dto/start-work-period.dto';
@@ -22,11 +20,11 @@ import { WorkPeriodsService } from './work-periods.service';
 
 @ApiTags('Work Periods')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.WORK_PERIODS)
 @Controller('work-periods')
 export class WorkPeriodsController {
-  constructor(private readonly workPeriodsService: WorkPeriodsService) {}
+  constructor(private readonly workPeriodsService: WorkPeriodsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all work periods' })
@@ -65,7 +63,6 @@ export class WorkPeriodsController {
   }
 
   @Post('start')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Start a new work period' })
   startWorkPeriod(
     @CurrentUser('id') userId: string,
@@ -82,7 +79,6 @@ export class WorkPeriodsController {
   }
 
   @Post(':id/end')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'End a work period' })
   endWorkPeriod(
     @Param('id') id: string,

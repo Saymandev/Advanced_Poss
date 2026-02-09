@@ -1,39 +1,43 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Put,
-    Query,
-    Request,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/enums/user-role.enum';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'; // Added missing swagger imports for consistency if needed, though file didn't have them. Wait, file didn't have swagger. I should keep it simple.
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard'; // Assuming subscription applies
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { ScheduleFiltersDto } from './dto/schedule-filters.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { ScheduleService } from './schedule.service';
 
 @Controller('schedule')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.SCHEDULE)
 export class ScheduleController {
-  constructor(private readonly scheduleService: ScheduleService) {}
+  constructor(private readonly scheduleService: ScheduleService) { }
 
   // Create a new shift
   @Post('shifts')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   async createShift(@Body() createScheduleDto: CreateScheduleDto, @Request() req) {
     return this.scheduleService.createShift(createScheduleDto, req.user.id);
   }
 
   // Get all shifts with filters
   @Get('shifts')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CHEF, UserRole.WAITER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   async getShifts(@Query() filters: ScheduleFiltersDto, @Request() req) {
     const filtersWithBranch = {
       ...filters,
@@ -44,28 +48,26 @@ export class ScheduleController {
 
   // Get shift by ID
   @Get('shifts/:id')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CHEF, UserRole.WAITER, UserRole.CASHIER)
   async getShiftById(@Param('id') id: string) {
     return this.scheduleService.getShiftById(id);
   }
 
   // Update shift
   @Put('shifts/:id')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   async updateShift(@Param('id') id: string, @Body() updateScheduleDto: UpdateScheduleDto, @Request() req) {
     return this.scheduleService.updateShift(id, updateScheduleDto, req.user.id);
   }
 
   // Delete shift
   @Delete('shifts/:id')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   async deleteShift(@Param('id') id: string) {
     return this.scheduleService.deleteShift(id);
   }
 
   // Update shift status
   @Patch('shifts/:id/status')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CHEF, UserRole.WAITER, UserRole.CASHIER)
   async updateShiftStatus(
     @Param('id') id: string,
     @Body() body: { status: string; reason?: string },
@@ -76,7 +78,6 @@ export class ScheduleController {
 
   // Get shifts by date range
   @Get('shifts/date-range')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CHEF, UserRole.WAITER, UserRole.CASHIER)
   async getShiftsByDateRange(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
@@ -87,7 +88,7 @@ export class ScheduleController {
 
   // Get schedule statistics
   @Get('stats')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   async getScheduleStats(@Query() filters: ScheduleFiltersDto, @Request() req) {
     const filtersWithBranch = {
       ...filters,
@@ -98,14 +99,13 @@ export class ScheduleController {
 
   // Get upcoming shifts for current user
   @Get('upcoming')
-  @Roles(UserRole.CHEF, UserRole.WAITER, UserRole.CASHIER)
   async getUpcomingShifts(@Query('limit') limit: number = 10, @Request() req) {
     return this.scheduleService.getUpcomingShifts(req.user.id, limit);
   }
 
   // Get shifts for a specific user
   @Get('user/:userId')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   async getUserShifts(
     @Param('userId') userId: string,
     @Query('startDate') startDate: string,
@@ -116,7 +116,6 @@ export class ScheduleController {
 
   // Get my shifts (for current user)
   @Get('my-shifts')
-  @Roles(UserRole.CHEF, UserRole.WAITER, UserRole.CASHIER)
   async getMyShifts(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,

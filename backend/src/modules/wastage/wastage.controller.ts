@@ -1,22 +1,20 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    Request,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CreateWastageDto } from './dto/create-wastage.dto';
 import { UpdateWastageDto } from './dto/update-wastage.dto';
@@ -25,14 +23,13 @@ import { WastageService } from './wastage.service';
 
 @ApiTags('Wastage')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.WASTAGE_MANAGEMENT)
 @Controller('wastage')
 export class WastageController {
-  constructor(private readonly wastageService: WastageService) {}
+  constructor(private readonly wastageService: WastageService) { }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create a wastage record' })
   create(@Body() createWastageDto: CreateWastageDto, @Request() req) {
     const companyId = req.user.companyId || req.user.company?._id || req.user.company?.id;
@@ -43,7 +40,6 @@ export class WastageController {
   }
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get all wastage records' })
   findAll(@Query() queryDto: WastageQueryDto, @Request() req) {
     const companyId = req.user.companyId || req.user.company?._id || req.user.company?.id;
@@ -51,7 +47,6 @@ export class WastageController {
   }
 
   @Get('stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get wastage statistics' })
   getStats(
     @Query('branchId') branchId?: string,
@@ -69,7 +64,6 @@ export class WastageController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get a wastage record by ID' })
   findOne(@Param('id') id: string, @Request() req) {
     const companyId = req.user.companyId || req.user.company?._id || req.user.company?.id;
@@ -77,7 +71,6 @@ export class WastageController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update a wastage record' })
   update(
     @Param('id') id: string,
@@ -90,11 +83,9 @@ export class WastageController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete a wastage record' })
   remove(@Param('id') id: string, @Request() req) {
     const companyId = req.user.companyId || req.user.company?._id || req.user.company?.id;
     return this.wastageService.remove(id, companyId);
   }
 }
-

@@ -15,28 +15,29 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { AttendanceFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 import { AttendanceService } from './attendance.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, RoleFeatureGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.ATTENDANCE)
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly rolePermissionsService: RolePermissionsService,
+  ) { }
 
   @Post('check-in')
-  @RequiresRoleFeature('attendance')
+  @RequiresFeature(FEATURES.ATTENDANCE)
   @ApiOperation({ summary: 'Check in for work' })
   checkIn(@Body() checkInDto: CheckInDto, @Request() req: any) {
     // Use authenticated user's ID (required)
@@ -50,7 +51,7 @@ export class AttendanceController {
   }
 
   @Post('check-out')
-  @RequiresRoleFeature('attendance')
+  @RequiresFeature(FEATURES.ATTENDANCE)
   @ApiOperation({ summary: 'Check out from work' })
   checkOut(@Body() checkOutDto: CheckOutDto, @Request() req: any) {
     // Use authenticated user's ID (required)
@@ -64,7 +65,7 @@ export class AttendanceController {
   }
 
   @Post(':userId/force-check-out')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Force check out for a user (Manager/Owner only)' })
   forceCheckOut(
     @Param('userId') userId: string,
@@ -74,36 +75,44 @@ export class AttendanceController {
     return this.attendanceService.checkOut({
       ...checkOutDto,
       userId,
-      notes: checkOutDto.notes 
+      notes: checkOutDto.notes
         ? `${checkOutDto.notes}\n[Force checked out by manager]`
         : '[Force checked out by manager]',
     });
   }
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Get all attendance records with pagination, filtering, and search' })
   findAll(@Query() filterDto: AttendanceFilterDto) {
     return this.attendanceService.findAll(filterDto);
   }
 
   @Get('branch/:branchId/today')
-  @RequiresRoleFeature('attendance')
+  @RequiresFeature(FEATURES.ATTENDANCE)
   @ApiOperation({ summary: 'Get today\'s attendance for branch' })
-  getTodayAttendance(
+  async getTodayAttendance(
     @Param('branchId') branchId: string,
     @Request() req: any,
   ) {
-    // Only owners/managers can see all employees, others see only their own
+    // Check if user has STAFF_MANAGEMENT permission to view all
     const userRole = req.user?.role;
-    const userId = (userRole === UserRole.OWNER || userRole === UserRole.MANAGER || userRole === UserRole.SUPER_ADMIN)
-      ? undefined
-      : req.user?.id;
+    let canViewAll = userRole === UserRole.SUPER_ADMIN;
+
+    if (!canViewAll) {
+      const permissions = await this.rolePermissionsService.getRolePermission(
+        req.user.companyId || req.user.company?._id,
+        userRole,
+      );
+      canViewAll = permissions?.features?.includes(FEATURES.STAFF_MANAGEMENT);
+    }
+
+    const userId = canViewAll ? undefined : req.user.id;
     return this.attendanceService.getTodayAttendance(branchId, userId);
   }
 
   @Get('branch/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Get attendance by branch' })
   findByBranch(
     @Param('branchId') branchId: string,
@@ -140,19 +149,27 @@ export class AttendanceController {
   }
 
   @Get('stats/:branchId')
-  @RequiresRoleFeature('attendance')
+  @RequiresFeature(FEATURES.ATTENDANCE)
   @ApiOperation({ summary: 'Get attendance statistics' })
-  getStats(
+  async getStats(
     @Param('branchId') branchId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
     @Request() req: any,
   ) {
-    // Only owners/managers can see all employees stats, others see only their own
+    // Check if user has STAFF_MANAGEMENT permission to view all stats
     const userRole = req.user?.role;
-    const userId = (userRole === UserRole.OWNER || userRole === UserRole.MANAGER || userRole === UserRole.SUPER_ADMIN)
-      ? undefined
-      : req.user?.id;
+    let canViewAll = userRole === UserRole.SUPER_ADMIN;
+
+    if (!canViewAll) {
+      const permissions = await this.rolePermissionsService.getRolePermission(
+        req.user.companyId || req.user.company?._id,
+        userRole,
+      );
+      canViewAll = permissions?.features?.includes(FEATURES.STAFF_MANAGEMENT);
+    }
+
+    const userId = canViewAll ? undefined : req.user.id;
     return this.attendanceService.getStats(
       branchId,
       new Date(startDate),
@@ -162,14 +179,14 @@ export class AttendanceController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Get attendance by ID' })
   findOne(@Param('id') id: string) {
     return this.attendanceService.findOne(id);
   }
 
   @Post('mark-absent')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Mark user as absent' })
   markAbsent(
     @Body('userId') userId: string,
@@ -180,21 +197,21 @@ export class AttendanceController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Update attendance record' })
   update(@Param('id') id: string, @Body() updateData: any) {
     return this.attendanceService.update(id, updateData);
   }
 
   @Post(':id/approve')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Approve attendance record' })
   approve(@Param('id') id: string, @Body('approverId') approverId: string) {
     return this.attendanceService.approve(id, approverId);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Delete attendance record' })
   remove(@Param('id') id: string) {
     return this.attendanceService.remove(id);

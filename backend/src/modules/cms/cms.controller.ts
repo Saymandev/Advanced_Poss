@@ -1,49 +1,49 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CmsService } from './cms.service';
 import { CreateContentPageDto } from './dto/create-content-page.dto';
 import { UpdateContentPageDto } from './dto/update-content-page.dto';
 import {
-    ContentPageStatus,
-    ContentPageType,
+  ContentPageStatus,
+  ContentPageType,
 } from './schemas/content-page.schema';
 
 @ApiTags('CMS')
 @Controller('cms')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class CmsController {
-  constructor(private readonly cmsService: CmsService) {}
+  constructor(private readonly cmsService: CmsService) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new content page (Super Admin only)' })
   create(
     @Body() createContentPageDto: CreateContentPageDto,
     @CurrentUser() user: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can create content pages');
+    }
     return this.cmsService.create(createContentPageDto, user.id);
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all content pages (Super Admin only)' })
   findAll(
@@ -51,7 +51,11 @@ export class CmsController {
     @Query('status') status?: ContentPageStatus,
     @Query('isActive') isActive?: string,
     @Query('search') search?: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can view all content pages');
+    }
     return this.cmsService.findAll({
       type,
       status,
@@ -90,17 +94,16 @@ export class CmsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get content page by ID (Super Admin only)' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can view content page details');
+    }
     return this.cmsService.findOne(id);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update content page (Super Admin only)' })
   update(
@@ -108,24 +111,29 @@ export class CmsController {
     @Body() updateContentPageDto: UpdateContentPageDto,
     @CurrentUser() user: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can update content pages');
+    }
     return this.cmsService.update(id, updateContentPageDto, user.id);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete content page (soft delete) (Super Admin only)' })
-  remove(@Param('id') id: string) {
+  remove(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can delete content pages');
+    }
     return this.cmsService.remove(id);
   }
 
   @Delete(':id/hard')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Permanently delete content page (Super Admin only)' })
-  hardDelete(@Param('id') id: string) {
+  hardDelete(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can permanently delete content pages');
+    }
     return this.cmsService.hardDelete(id);
   }
 }

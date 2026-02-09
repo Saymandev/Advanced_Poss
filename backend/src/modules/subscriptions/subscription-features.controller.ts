@@ -1,32 +1,35 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Post,
-    Put,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreateSubscriptionFeatureDto, UpdateSubscriptionFeatureDto } from './dto/subscription-feature.dto';
 import { SubscriptionFeaturesService } from './subscription-features.service';
 
 @Controller('subscription-features')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SubscriptionFeaturesController {
   constructor(
     private readonly featuresService: SubscriptionFeaturesService,
-  ) {}
+  ) { }
 
   // Super Admin only endpoints
   @Post()
-  @Roles(UserRole.SUPER_ADMIN)
-  async create(@Body() createDto: CreateSubscriptionFeatureDto) {
+  async create(@Body() createDto: CreateSubscriptionFeatureDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can create subscription features');
+    }
     return this.featuresService.create(createDto);
   }
 
@@ -44,8 +47,10 @@ export class SubscriptionFeaturesController {
   }
 
   @Get('seed')
-  @Roles(UserRole.SUPER_ADMIN)
-  async seedFeatures() {
+  async seedFeatures(@CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can seed features');
+    }
     const features = await this.featuresService.seedFeatures();
     return {
       success: true,
@@ -65,17 +70,22 @@ export class SubscriptionFeaturesController {
   }
 
   @Put(':id')
-  @Roles(UserRole.SUPER_ADMIN)
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateSubscriptionFeatureDto,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can update subscription features');
+    }
     return this.featuresService.update(id, updateDto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN)
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can delete subscription features');
+    }
     await this.featuresService.remove(id);
     return {
       success: true,

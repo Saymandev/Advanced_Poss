@@ -1,41 +1,43 @@
 import {
-    BadRequestException,
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    Req,
-    Res,
-    UseGuards,
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FEATURES } from '../../common/constants/features.constants';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { MarketingService } from './marketing.service';
 
 @Controller('marketing')
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.MARKETING)
 export class MarketingController {
-  constructor(private readonly marketingService: MarketingService) {}
+  constructor(private readonly marketingService: MarketingService) { }
 
   @Post('campaigns')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async create(
     @Body() createCampaignDto: CreateCampaignDto,
     @Req() req: any,
   ) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can create campaigns');
+    }
     const companyId = req.user?.companyId || req.user?.company?._id;
     const branchId = req.user?.branchId || req.user?.branch?._id;
     const userId = req.user?.userId || req.user?._id;
@@ -58,7 +60,6 @@ export class MarketingController {
   }
 
   @Get('campaigns')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async findAll(@Query('branchId') branchId: string, @Req() req: any) {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
@@ -76,7 +77,6 @@ export class MarketingController {
   }
 
   @Get('campaigns/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getStats(@Query('branchId') branchId: string, @Req() req: any) {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
@@ -93,7 +93,6 @@ export class MarketingController {
   }
 
   @Get('campaigns/:id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async findOne(@Param('id') id: string, @Req() req: any) {
     const companyId = req.user?.companyId || req.user?.company?._id;
 
@@ -110,12 +109,14 @@ export class MarketingController {
   }
 
   @Patch('campaigns/:id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async update(
     @Param('id') id: string,
     @Body() updateCampaignDto: UpdateCampaignDto,
     @Req() req: any,
   ) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can update campaigns');
+    }
     const companyId = req.user?.companyId || req.user?.company?._id;
     const userId = req.user?.userId || req.user?._id;
 
@@ -137,8 +138,10 @@ export class MarketingController {
   }
 
   @Delete('campaigns/:id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async remove(@Param('id') id: string, @Req() req: any) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can delete campaigns');
+    }
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
@@ -154,8 +157,10 @@ export class MarketingController {
   }
 
   @Post('campaigns/:id/pause')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async pause(@Param('id') id: string, @Req() req: any) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can pause campaigns');
+    }
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
@@ -171,8 +176,10 @@ export class MarketingController {
   }
 
   @Post('campaigns/:id/resume')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async resume(@Param('id') id: string, @Req() req: any) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can resume campaigns');
+    }
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
@@ -188,8 +195,10 @@ export class MarketingController {
   }
 
   @Post('campaigns/:id/send')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async send(@Param('id') id: string, @Req() req: any) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can send campaigns');
+    }
     const companyId = req.user?.companyId || req.user?.company?._id;
 
     if (!companyId) {
@@ -240,7 +249,6 @@ export class MarketingController {
   }
 
   @Get('campaigns/:id/analytics')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getAnalytics(@Param('id') id: string, @Req() req: any) {
     const companyId = req.user?.companyId || req.user?.company?._id;
 

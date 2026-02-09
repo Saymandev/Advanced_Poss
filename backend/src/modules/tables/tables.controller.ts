@@ -12,13 +12,11 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/enums/user-role.enum';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
-import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { CreateTableDto } from './dto/create-table.dto';
 import { ReserveTableDto } from './dto/reserve-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
@@ -27,14 +25,13 @@ import { TablesService } from './tables.service';
 
 @ApiTags('Tables')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.TABLE_MANAGEMENT)
 @Controller('tables')
 export class TablesController {
-  constructor(private readonly tablesService: TablesService) {}
+  constructor(private readonly tablesService: TablesService) { }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @RequiresLimit('maxTables')
   @ApiOperation({ summary: 'Create new table' })
   create(@Body() createTableDto: CreateTableDto) {
@@ -42,7 +39,6 @@ export class TablesController {
   }
 
   @Post('bulk')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @RequiresLimit('maxTables')
   @ApiOperation({ summary: 'Bulk create tables' })
   bulkCreate(
@@ -75,7 +71,6 @@ export class TablesController {
   }
 
   @Get('branch/:branchId/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get table statistics for branch' })
   getStats(@Param('branchId') branchId: string) {
     return this.tablesService.getStats(branchId);
@@ -94,14 +89,12 @@ export class TablesController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update table' })
   update(@Param('id') id: string, @Body() updateTableDto: UpdateTableDto) {
     return this.tablesService.update(id, updateTableDto);
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Update table status' })
   updateStatus(
     @Param('id') id: string,
@@ -111,21 +104,18 @@ export class TablesController {
   }
 
   @Post(':id/reserve')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Reserve table' })
   reserve(@Param('id') id: string, @Body() reserveDto: ReserveTableDto) {
     return this.tablesService.reserve(id, reserveDto);
   }
 
   @Post(':id/cancel-reservation')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Cancel table reservation' })
   cancelReservation(@Param('id') id: string) {
     return this.tablesService.cancelReservation(id);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete table' })
   remove(@Param('id') id: string) {
     return this.tablesService.remove(id);

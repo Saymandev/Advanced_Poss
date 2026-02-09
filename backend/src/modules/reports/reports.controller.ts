@@ -2,23 +2,20 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { ReportsService } from './reports.service';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.REPORTS)
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(private readonly reportsService: ReportsService) { }
 
   @Get('dashboard')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get dashboard statistics' })
   getDashboardStats(
     @Query('branchId') branchId?: string,
@@ -29,7 +26,7 @@ export class ReportsController {
 
 
   @Get('dashboard/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get dashboard statistics for specific branch' })
   getDashboardStatsByBranch(
     @Param('branchId') branchId: string,
@@ -39,7 +36,7 @@ export class ReportsController {
   }
 
   @Get('financial-summary')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get combined financial summary (sales, expenses, purchases, net)' })
   getFinancialSummary(
     @Query('branchId') branchId?: string,
@@ -51,7 +48,7 @@ export class ReportsController {
   }
 
   @Get('sales/summary/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get sales summary report' })
   getSalesSummary(
     @Param('branchId') branchId: string,
@@ -66,7 +63,7 @@ export class ReportsController {
   }
 
   @Get('sales/revenue/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get revenue breakdown' })
   getRevenueBreakdown(
     @Param('branchId') branchId: string,
@@ -81,7 +78,7 @@ export class ReportsController {
   }
 
   @Get('orders/analytics/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get orders analytics' })
   getOrdersAnalytics(
     @Param('branchId') branchId: string,
@@ -97,7 +94,7 @@ export class ReportsController {
 
 
   @Get('categories/performance/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get category performance' })
   getCategoryPerformance(
     @Param('branchId') branchId: string,
@@ -112,7 +109,7 @@ export class ReportsController {
   }
 
   @Get('customers/analytics/:companyId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get customer analytics' })
   getCustomerAnalytics(
     @Param('companyId') companyId: string,
@@ -127,7 +124,7 @@ export class ReportsController {
   }
 
   @Get('peak-hours/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get peak hours analysis' })
   getPeakHours(
     @Param('branchId') branchId: string,
@@ -142,14 +139,14 @@ export class ReportsController {
   }
 
   @Get('inventory/:companyId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get inventory report' })
   getInventoryReport(@Param('companyId') companyId: string) {
     return this.reportsService.getInventoryReport(companyId);
   }
 
   @Get('comparison/:branchId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get comparison report (period vs period)' })
   getComparisonReport(
     @Param('branchId') branchId: string,
@@ -168,7 +165,7 @@ export class ReportsController {
   }
 
   @Get('sales-analytics')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get sales analytics for charts' })
   getSalesAnalytics(
     @Query('period') period: string = 'week',
@@ -181,7 +178,7 @@ export class ReportsController {
 
 
   @Get('top-selling-items')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get top selling items' })
   getTopSellingItems(
     @Query('limit') limit?: number,
@@ -192,7 +189,7 @@ export class ReportsController {
 
 
   @Get('revenue-by-category')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get revenue by category' })
   getRevenueByCategorySimple(
     @Query('branchId') branchId?: string,
@@ -208,14 +205,14 @@ export class ReportsController {
 
 
   @Get('low-stock')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get low stock items' })
   getLowStockItems(@Query('companyId') companyId?: string) {
     return this.reportsService.getLowStockItems(companyId);
   }
 
   @Get('due-settlements')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get due settlements (pending payments)' })
   getDueSettlements(
     @Query('branchId') branchId?: string,
@@ -225,7 +222,7 @@ export class ReportsController {
   }
 
   @Get('wastage')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+
   @ApiOperation({ summary: 'Get wastage report' })
   getWastageReport(
     @Query('branchId') branchId?: string,

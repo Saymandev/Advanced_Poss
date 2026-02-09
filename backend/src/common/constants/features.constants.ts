@@ -22,6 +22,7 @@ export const FEATURES = {
   STAFF_MANAGEMENT: 'staff-management',
   ROLE_MANAGEMENT: 'role-management',
   ATTENDANCE: 'attendance',
+  SCHEDULE: 'schedule',
 
   // Menu & Products
   MENU_MANAGEMENT: 'menu-management',
@@ -46,6 +47,7 @@ export const FEATURES = {
   // AI Features
   AI_MENU_OPTIMIZATION: 'ai-menu-optimization',
   AI_CUSTOMER_LOYALTY: 'ai-customer-loyalty',
+  AI_INSIGHTS: 'ai-insights',
 
   // Inventory & Suppliers
   INVENTORY: 'inventory',
@@ -60,6 +62,7 @@ export const FEATURES = {
 
   // System & Settings
   SETTINGS: 'settings',
+  CMS: 'cms',
   BRANCHES: 'branches',
   NOTIFICATIONS: 'notifications',
 
@@ -180,6 +183,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.TABLE_MANAGEMENT,
     FEATURES.CUSTOMER_DISPLAY,
     FEATURES.CUSTOMER_MANAGEMENT,
+    FEATURES.LOYALTY_PROGRAM,
     FEATURES.NOTIFICATIONS,
   ],
   cashier: [

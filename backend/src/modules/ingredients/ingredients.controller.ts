@@ -12,11 +12,9 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { IngredientFilterDto } from '../../common/dto/pagination.dto';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
@@ -25,21 +23,19 @@ import { IngredientsService } from './ingredients.service';
 
 @ApiTags('Ingredients')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.INVENTORY)
 @Controller('ingredients')
 export class IngredientsController {
-  constructor(private readonly ingredientsService: IngredientsService) {}
+  constructor(private readonly ingredientsService: IngredientsService) { }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create new ingredient' })
   create(@Body() createIngredientDto: CreateIngredientDto) {
     return this.ingredientsService.create(createIngredientDto);
   }
 
   @Post('bulk-import')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Bulk import ingredients' })
   bulkImport(
     @Body('companyId') companyId: string,
@@ -91,14 +87,12 @@ export class IngredientsController {
   }
 
   @Get('company/:companyId/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get inventory statistics' })
   getStats(@Param('companyId') companyId: string) {
     return this.ingredientsService.getStats(companyId);
   }
 
   @Get('company/:companyId/valuation')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get inventory valuation' })
   getValuation(@Param('companyId') companyId: string) {
     return this.ingredientsService.getValuation(companyId);
@@ -111,7 +105,6 @@ export class IngredientsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update ingredient' })
   update(
     @Param('id') id: string,
@@ -121,7 +114,6 @@ export class IngredientsController {
   }
 
   @Post(':id/adjust-stock')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Adjust ingredient stock' })
   adjustStock(
     @Param('id') id: string,
@@ -131,35 +123,30 @@ export class IngredientsController {
   }
 
   @Post(':id/add-stock')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Add stock' })
   addStock(@Param('id') id: string, @Body('quantity') quantity: number) {
     return this.ingredientsService.addStock(id, quantity);
   }
 
   @Post(':id/remove-stock')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Remove stock' })
   removeStock(@Param('id') id: string, @Body('quantity') quantity: number) {
     return this.ingredientsService.removeStock(id, quantity);
   }
 
   @Post(':id/update-pricing')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update unit cost' })
   updatePricing(@Param('id') id: string, @Body('unitCost') unitCost: number) {
     return this.ingredientsService.updatePricing(id, unitCost);
   }
 
   @Patch(':id/deactivate')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Deactivate ingredient' })
   deactivate(@Param('id') id: string) {
     return this.ingredientsService.deactivate(id);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Delete ingredient' })
   remove(@Param('id') id: string) {
     return this.ingredientsService.remove(id);

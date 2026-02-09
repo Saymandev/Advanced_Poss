@@ -1,32 +1,32 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/enums/user-role.enum';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { DeliveryZonesService } from './delivery-zones.service';
 import { CreateDeliveryZoneDto } from './dto/create-delivery-zone.dto';
 import { UpdateDeliveryZoneDto } from './dto/update-delivery-zone.dto';
 
 @ApiTags('Delivery Zones')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
 @Controller('delivery-zones')
 export class DeliveryZonesController {
-  constructor(private readonly zonesService: DeliveryZonesService) {}
+  constructor(private readonly zonesService: DeliveryZonesService) { }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create delivery zone' })
   create(@Body() createZoneDto: CreateDeliveryZoneDto) {
     return this.zonesService.create(createZoneDto);
@@ -60,14 +60,12 @@ export class DeliveryZonesController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update delivery zone' })
   update(@Param('id') id: string, @Body() updateZoneDto: UpdateDeliveryZoneDto) {
     return this.zonesService.update(id, updateZoneDto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete delivery zone' })
   remove(@Param('id') id: string) {
     return this.zonesService.remove(id);

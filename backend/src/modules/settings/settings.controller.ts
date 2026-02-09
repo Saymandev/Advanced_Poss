@@ -8,12 +8,15 @@ import {
   Post,
   Query,
   UseGuards,
+  Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import {
   CreateServiceChargeSettingDto,
 } from './dto/create-service-charge-setting.dto';
@@ -34,23 +37,22 @@ import { SettingsService } from './settings.service';
 
 @ApiTags('Settings')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequiresFeature(FEATURES.SETTINGS)
 @Controller('settings')
 export class SettingsController {
   constructor(
     private readonly settingsService: SettingsService,
     private readonly loginSecurityService: LoginSecurityService,
-  ) {}
+  ) { }
 
   @Get('company')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get company level settings' })
   getCompanySettings(@Query('companyId') companyId: string) {
     return this.settingsService.getCompanySettings(companyId);
   }
 
   @Patch('company')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update company level settings' })
   updateCompanySettings(
     @Body() body: UpdateCompanySettingsRequestDto,
@@ -60,14 +62,12 @@ export class SettingsController {
   }
 
   @Get('invoice')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get invoice settings' })
   getInvoiceSettings(@Query('companyId') companyId: string) {
     return this.settingsService.getInvoiceSettings(companyId);
   }
 
   @Patch('invoice')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update invoice settings' })
   updateInvoiceSettings(
     @Body() body: UpdateInvoiceSettingsRequestDto,
@@ -77,21 +77,18 @@ export class SettingsController {
   }
 
   @Get('taxes')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'List tax settings' })
   listTaxes(@Query('companyId') companyId: string) {
     return this.settingsService.listTaxSettings(companyId);
   }
 
   @Post('taxes')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create tax setting' })
   createTax(@Body() payload: CreateTaxSettingDto) {
     return this.settingsService.createTaxSetting(payload);
   }
 
   @Patch('taxes/:id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update tax setting' })
   updateTax(
     @Param('id') id: string,
@@ -101,28 +98,24 @@ export class SettingsController {
   }
 
   @Delete('taxes/:id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete tax setting' })
   deleteTax(@Param('id') id: string) {
     return this.settingsService.deleteTaxSetting(id);
   }
 
   @Get('service-charges')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'List service charge settings' })
   listServiceCharges(@Query('companyId') companyId: string) {
     return this.settingsService.listServiceChargeSettings(companyId);
   }
 
   @Post('service-charges')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create service charge setting' })
   createServiceCharge(@Body() payload: CreateServiceChargeSettingDto) {
     return this.settingsService.createServiceChargeSetting(payload);
   }
 
   @Patch('service-charges/:id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update service charge setting' })
   updateServiceCharge(
     @Param('id') id: string,
@@ -132,24 +125,27 @@ export class SettingsController {
   }
 
   @Delete('service-charges/:id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete service charge setting' })
   deleteServiceCharge(@Param('id') id: string) {
     return this.settingsService.deleteServiceChargeSetting(id);
   }
 
   @Get('system')
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get system-wide settings (Super Admin only)' })
-  async getSystemSettings() {
+  async getSystemSettings(@Request() req: any) {
+    if (req.user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admin can access system-wide settings');
+    }
     // This will automatically migrate to BD defaults if needed
     return this.settingsService.getSystemSettings();
   }
 
   @Patch('system')
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update system-wide settings (Super Admin only)' })
-  async updateSystemSettings(@Body() payload: UpdateSystemSettingsDto) {
+  async updateSystemSettings(@Body() payload: UpdateSystemSettingsDto, @Request() req: any) {
+    if (req.user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admin can access system-wide settings');
+    }
     const updated = await this.settingsService.updateSystemSettings(payload);
     // Clear cache in LoginSecurityService to pick up new settings immediately
     this.loginSecurityService.clearCache();

@@ -30,5 +30,5 @@ import {
   providers: [MarketingService, MarketingSchedulerService, EmailService, SmsService],
   exports: [MarketingService],
 })
-export class MarketingModule {}
+export class MarketingModule { }
 

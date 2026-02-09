@@ -1,35 +1,40 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    Request,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreatePaymentMethodDto } from './dto/create-payment-method.dto';
 import { UpdatePaymentMethodDto } from './dto/update-payment-method.dto';
 import { PaymentMethodsService } from './payment-methods.service';
 
 @ApiTags('Payment Methods')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequiresFeature(FEATURES.SETTINGS)
 @Controller('payment-methods')
 export class PaymentMethodsController {
-  constructor(private readonly paymentMethodsService: PaymentMethodsService) {}
+  constructor(private readonly paymentMethodsService: PaymentMethodsService) { }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create payment method' })
   create(@Body() createDto: CreatePaymentMethodDto, @Request() req: any) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can create payment methods');
+    }
     const userId = req.user?.id || req.user?._id;
     return this.paymentMethodsService.create(createDto, userId);
   }
@@ -78,21 +83,25 @@ export class PaymentMethodsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update payment method' })
   update(
     @Param('id') id: string,
     @Body() updateDto: UpdatePaymentMethodDto,
     @Request() req: any,
   ) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can update payment methods');
+    }
     const userId = req.user?.id || req.user?._id;
     return this.paymentMethodsService.update(id, updateDto, userId);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete payment method' })
-  remove(@Param('id') id: string) {
+  remove(@Param('id') id: string, @Request() req: any) {
+    if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can delete payment methods');
+    }
     return this.paymentMethodsService.remove(id);
   }
 }

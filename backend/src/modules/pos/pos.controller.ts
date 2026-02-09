@@ -18,11 +18,8 @@ import {
 import { ApiOperation } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { RequiresRoleFeature } from '../../common/decorators/requires-role-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
@@ -34,18 +31,17 @@ import { POSService } from './pos.service';
 import { ReceiptService } from './receipt.service';
 
 @Controller('pos')
-@UseGuards(JwtAuthGuard, RoleFeatureGuard, SubscriptionFeatureGuard, WorkPeriodCheckGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, WorkPeriodCheckGuard)
 // Note: Feature requirements are now at endpoint level for flexibility
 export class POSController {
   constructor(
     private readonly posService: POSService,
     private readonly receiptService: ReceiptService,
-  ) {}
+  ) { }
 
   // POS Orders
   @Post('orders')
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
   async createOrder(@Body() createOrderDto: CreatePOSOrderDto, @Request() req) {
     const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
     // Use selected waiterId if provided, otherwise use logged-in user
@@ -55,8 +51,7 @@ export class POSController {
   }
 
   @Get('orders')
-  @RequiresFeature(FEATURES.DASHBOARD) // Dashboard feature allows access to orders
-  @RequiresRoleFeature(FEATURES.DASHBOARD)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async getOrders(@Query() filters: POSOrderFiltersDto, @Request() req) {
     const filtersWithBranch = {
       ...filters,
@@ -66,19 +61,19 @@ export class POSController {
   }
 
   @Get('orders/:id')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async getOrderById(@Param('id') id: string) {
     return this.posService.getOrderById(id);
   }
 
   @Put('orders/:id')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async updateOrder(@Param('id') id: string, @Body() updateOrderDto: UpdatePOSOrderDto, @Request() req) {
     return this.posService.updateOrder(id, updateOrderDto, req.user.id);
   }
 
   @Patch('orders/:id/cancel')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @HttpCode(HttpStatus.OK)
   async cancelOrder(@Param('id') id: string, @Body() body: { reason: string }, @Request() req) {
     return this.posService.cancelOrder(id, body.reason, req.user.id);
@@ -86,7 +81,7 @@ export class POSController {
 
   // Payments
   @Post('payments')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async processPayment(@Body() processPaymentDto: ProcessPaymentDto, @Request() req) {
     const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
     return this.posService.processPayment(processPaymentDto, req.user.id, req.user.branchId, companyId);
@@ -95,7 +90,6 @@ export class POSController {
   // Statistics
   @Get('stats')
   @RequiresFeature(FEATURES.DASHBOARD) // Dashboard feature allows access to stats
-  @RequiresRoleFeature(FEATURES.DASHBOARD)
   async getStats(@Query() filters: POSStatsFiltersDto, @Request() req) {
     const filtersWithBranch = {
       ...filters,
@@ -105,31 +99,31 @@ export class POSController {
   }
 
   @Get('quick-stats')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.DASHBOARD)
   async getQuickStats(@Request() req) {
     return this.posService.getQuickStats(req.user.branchId);
   }
 
   // Tables
   @Get('tables/available')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.TABLE_MANAGEMENT)
   async getAvailableTables(@Request() req) {
     return this.posService.getAvailableTables(req.user.branchId);
   }
 
   // Waiters
   @Get('waiters/active-orders')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async getWaiterActiveOrdersCount(@Request() req) {
     return this.posService.getWaiterActiveOrdersCount(req.user.branchId);
   }
 
   // Menu Items
   @Get('menu-items')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.MENU_MANAGEMENT)
   async getPOSMenuItems(@Query() filters: any, @Request() req) {
-    return this.posService.getPOSMenuItems({ 
-      ...filters, 
+    return this.posService.getPOSMenuItems({
+      ...filters,
       branchId: req.user.branchId,
       companyId: req.user.companyId || req.user.company?._id || req.user.company?.id,
     });
@@ -137,13 +131,13 @@ export class POSController {
 
   // Settings
   @Get('settings')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.POS_SETTINGS)
   async getPOSSettings(@Request() req) {
     return this.posService.getPOSSettings(req.user.branchId);
   }
 
   @Put('settings')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.POS_SETTINGS)
   async updatePOSSettings(@Body() updateSettingsDto: UpdatePOSSettingsDto, @Request() req) {
     return this.posService.updatePOSSettings(req.user.branchId, updateSettingsDto, req.user.id);
   }
@@ -152,33 +146,33 @@ export class POSController {
 
   // Additional POS endpoints
   @Post('orders/:id/split')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async splitOrder(@Param('id') id: string, @Body() body: { items: any[] }, @Request() req) {
     return this.posService.splitOrder(id, body.items, req.user.id, req.user.branchId);
   }
 
   @Post('refunds')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async refundOrder(@Body() body: { orderId: string; amount: number; reason: string }, @Request() req) {
     return this.posService.processRefund(body.orderId, body.amount, body.reason, req.user.id, req.user.branchId);
   }
 
   @Get('tables/:tableId/orders')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async getTableOrderHistory(@Param('tableId') tableId: string, @Query('limit') limit: number = 10) {
     return this.posService.getTableOrderHistory(tableId, limit);
   }
 
   // Receipt and Printing endpoints
   @Get('receipts/:orderId/html')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async getReceiptHTML(@Param('orderId') orderId: string) {
     const html = await this.receiptService.generateReceiptHTML(orderId);
     return { html };
   }
 
   @Get('receipts/:orderId/pdf')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async getReceiptPDF(@Param('orderId') orderId: string, @Res() res) {
     const pdfBuffer = await this.receiptService.generateReceiptPDF(orderId);
     res.set({
@@ -190,45 +184,45 @@ export class POSController {
   }
 
   @Post('receipts/:orderId/print')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async printReceipt(@Param('orderId') orderId: string, @Body('printerId') printerId?: string) {
     return this.receiptService.printReceipt(orderId, printerId);
   }
 
   @Post('receipts/:orderId/print-pdf')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async printReceiptPDF(@Param('orderId') orderId: string, @Body('printerId') printerId?: string) {
     return this.receiptService.printReceiptPDF(orderId, printerId);
   }
 
   // Printer management endpoints
   @Get('printers')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.PRINTER_MANAGEMENT)
   async getAvailablePrinters() {
     return this.receiptService.getAvailablePrinters();
   }
 
   @Post('printers/test')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.PRINTER_MANAGEMENT)
   async testPrinter(@Body('printerName') printerName: string) {
     const success = await this.receiptService.testPrinter(printerName);
     return { success, message: success ? 'Printer test successful' : 'Printer test failed' };
   }
 
   @Get('print-jobs')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.PRINTER_MANAGEMENT)
   async getPrintQueue() {
     return this.receiptService.getPrintQueue();
   }
 
   @Get('print-jobs/:jobId')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.PRINTER_MANAGEMENT)
   async getPrintJobStatus(@Param('jobId') jobId: string) {
     return this.receiptService.getPrintJobStatus(jobId);
   }
 
   @Delete('print-jobs/:jobId')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @RequiresFeature(FEATURES.PRINTER_MANAGEMENT)
   async cancelPrintJob(@Param('jobId') jobId: string) {
     const success = await this.receiptService.cancelPrintJob(jobId);
     return { success, message: success ? 'Print job cancelled' : 'Failed to cancel print job' };
@@ -237,8 +231,7 @@ export class POSController {
   // ========== DELIVERY MANAGEMENT ENDPOINTS ==========
 
   @Get('delivery-orders')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER, UserRole.WAITER)
-  @RequiresRoleFeature('delivery-management')
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
   @ApiOperation({ summary: 'Get delivery orders' })
   async getDeliveryOrders(
     @Query('deliveryStatus') deliveryStatus: string | undefined,
@@ -258,8 +251,7 @@ export class POSController {
   }
 
   @Post('orders/:orderId/assign-driver')
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
-  @RequiresRoleFeature('delivery-management')
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
   @ApiOperation({ summary: 'Assign driver to delivery order' })
   async assignDriver(
     @Param('orderId') orderId: string,
@@ -270,8 +262,7 @@ export class POSController {
   }
 
   @Patch('orders/:orderId/delivery-status')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER, UserRole.WAITER)
-  @RequiresRoleFeature('delivery-management')
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
   @ApiOperation({ summary: 'Update delivery status' })
   async updateDeliveryStatus(
     @Param('orderId') orderId: string,

@@ -1,21 +1,22 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -24,11 +25,11 @@ import { CATEGORY_TYPES, CATEGORY_TYPE_LABELS } from './constants/category-types
 
 @ApiTags('Menu')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.CATEGORIES)
 @Controller('categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(private readonly categoriesService: CategoriesService) { }
 
   @Get('types')
   @ApiOperation({ summary: 'Get available category types' })
@@ -42,9 +43,11 @@ export class CategoriesController {
   }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create new category' })
-  create(@Body() createCategoryDto: CreateCategoryDto) {
+  create(@Body() createCategoryDto: CreateCategoryDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can create categories');
+    }
     return this.categoriesService.create(createCategoryDto);
   }
 
@@ -84,36 +87,46 @@ export class CategoriesController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update category' })
   update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can update categories');
+    }
     return this.categoriesService.update(id, updateCategoryDto);
   }
 
   @Patch(':id/toggle-status')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Toggle category active status' })
-  toggleStatus(@Param('id') id: string) {
+  toggleStatus(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can toggle category status');
+    }
     return this.categoriesService.toggleStatus(id);
   }
 
   @Patch(':id/sort-order')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update category sort order' })
   updateSortOrder(
     @Param('id') id: string,
     @Body('sortOrder') sortOrder: number,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can update category sort order');
+    }
     return this.categoriesService.updateSortOrder(id, sortOrder);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete category' })
-  remove(@Param('id') id: string) {
+  remove(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can delete categories');
+    }
     return this.categoriesService.remove(id);
   }
 }

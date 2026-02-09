@@ -1,12 +1,13 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreateSubscriptionPaymentMethodDto } from './dto/create-subscription-payment-method.dto';
 import { CreateSubscriptionPaymentDto } from './dto/create-subscription-payment.dto';
 import { ManualActivationDto } from './dto/manual-activation.dto';
@@ -18,9 +19,10 @@ import { SubscriptionPaymentsService } from './subscription-payments.service';
 
 @ApiTags('Subscription Payments')
 @Controller('subscription-payments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequiresFeature(FEATURES.SETTINGS)
 export class SubscriptionPaymentsController {
-  constructor(private readonly paymentsService: SubscriptionPaymentsService) {}
+  constructor(private readonly paymentsService: SubscriptionPaymentsService) { }
 
   @Get('methods')
   @ApiOperation({ summary: 'Get available payment methods for subscriptions' })
@@ -35,29 +37,37 @@ export class SubscriptionPaymentsController {
   @Post('initialize')
   @ApiOperation({ summary: 'Initialize subscription payment' })
   @ApiResponse({ status: 200, description: 'Payment initialized successfully' })
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
-  async initializePayment(@Body() dto: CreateSubscriptionPaymentDto) {
+  async initializePayment(@Body() dto: CreateSubscriptionPaymentDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Owners and Super Admins can initialize payments');
+    }
     return this.paymentsService.initializePayment(dto);
   }
 
   @Post('manual-activation')
   @ApiOperation({ summary: 'Manually activate subscription (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Subscription activated successfully' })
-  @Roles(UserRole.SUPER_ADMIN)
   async manualActivation(
     @Body() dto: ManualActivationDto,
     @CurrentUser('id') adminId: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can manually activate subscriptions');
+    }
     return this.paymentsService.manualActivation(dto);
   }
 
   @Post('verify')
   @ApiOperation({ summary: 'Verify payment transaction' })
   @ApiResponse({ status: 200, description: 'Payment verified' })
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async verifyPayment(
     @Body() body: { paymentId: string; transactionId: string },
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Owners and Super Admins can verify payments');
+    }
     return this.paymentsService.verifyPayment(body.paymentId, body.transactionId);
   }
 
@@ -66,61 +76,77 @@ export class SubscriptionPaymentsController {
   @Get('admin/methods')
   @ApiOperation({ summary: 'Get all payment methods (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'List of all payment methods' })
-  @Roles(UserRole.SUPER_ADMIN)
-  async getAllPaymentMethods() {
+  async getAllPaymentMethods(@CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can access all payment methods');
+    }
     return this.paymentsService.getAllPaymentMethods();
   }
 
   @Get('admin/methods/:id')
   @ApiOperation({ summary: 'Get payment method by ID (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Payment method details' })
-  @Roles(UserRole.SUPER_ADMIN)
-  async getPaymentMethodById(@Param('id') id: string) {
+  async getPaymentMethodById(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can access payment method details');
+    }
     return this.paymentsService.getPaymentMethodById(id);
   }
 
   @Post('admin/methods')
   @ApiOperation({ summary: 'Create a new payment method (Super Admin only)' })
   @ApiResponse({ status: 201, description: 'Payment method created successfully' })
-  @Roles(UserRole.SUPER_ADMIN)
   async createPaymentMethod(
     @Body() dto: CreateSubscriptionPaymentMethodDto,
     @CurrentUser('id') adminId: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can create payment methods');
+    }
     return this.paymentsService.createPaymentMethod(dto);
   }
 
   @Put('admin/methods/:id')
   @ApiOperation({ summary: 'Update payment method (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Payment method updated successfully' })
-  @Roles(UserRole.SUPER_ADMIN)
   async updatePaymentMethod(
     @Param('id') id: string,
     @Body() dto: UpdateSubscriptionPaymentMethodDto,
     @CurrentUser('id') adminId: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can update payment methods');
+    }
     return this.paymentsService.updatePaymentMethod(id, dto);
   }
 
   @Delete('admin/methods/:id')
   @ApiOperation({ summary: 'Delete payment method (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Payment method deleted successfully' })
-  @Roles(UserRole.SUPER_ADMIN)
   async deletePaymentMethod(
     @Param('id') id: string,
     @CurrentUser('id') adminId: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can delete payment methods');
+    }
     return this.paymentsService.deletePaymentMethod(id);
   }
 
   @Patch('admin/methods/:id/toggle')
   @ApiOperation({ summary: 'Toggle payment method active status (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Payment method status toggled successfully' })
-  @Roles(UserRole.SUPER_ADMIN)
   async togglePaymentMethodStatus(
     @Param('id') id: string,
     @CurrentUser('id') adminId: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can toggle payment methods');
+    }
     return this.paymentsService.togglePaymentMethodStatus(id);
   }
 
@@ -157,39 +183,49 @@ export class SubscriptionPaymentsController {
   @Post('requests')
   @ApiOperation({ summary: 'Submit payment request for manual payment methods' })
   @ApiResponse({ status: 201, description: 'Payment request submitted successfully' })
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
-  async submitPaymentRequest(@Body() dto: SubmitPaymentRequestDto) {
+  async submitPaymentRequest(@Body() dto: SubmitPaymentRequestDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Owners and Super Admins can submit payment requests');
+    }
     return this.paymentsService.submitPaymentRequest(dto);
   }
 
   @Get('requests')
   @ApiOperation({ summary: 'Get payment requests (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'List of payment requests' })
-  @Roles(UserRole.SUPER_ADMIN)
   async getPaymentRequests(
     @Query('status') status?: PaymentRequestStatus,
     @Query('companyId') companyId?: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can view payment requests');
+    }
     return this.paymentsService.getPaymentRequests(status, companyId);
   }
 
   @Get('requests/:id')
   @ApiOperation({ summary: 'Get payment request by ID' })
   @ApiResponse({ status: 200, description: 'Payment request details' })
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
-  async getPaymentRequestById(@Param('id') id: string) {
+  async getPaymentRequestById(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Owners and Super Admins can view payment requests');
+    }
     return this.paymentsService.getPaymentRequestById(id);
   }
 
   @Post('requests/:id/verify')
   @ApiOperation({ summary: 'Verify payment request (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Payment request verified' })
-  @Roles(UserRole.SUPER_ADMIN)
   async verifyPaymentRequest(
     @Param('id') id: string,
     @Body() dto: Omit<VerifyPaymentRequestDto, 'requestId'>,
     @CurrentUser('id') adminId: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can verify payment requests');
+    }
     return this.paymentsService.verifyPaymentRequest(
       { ...dto, requestId: id },
       adminId,

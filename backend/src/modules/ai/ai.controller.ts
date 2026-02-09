@@ -7,30 +7,35 @@ import {
   Post,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Schema as MongooseSchema } from 'mongoose';
 import { FEATURES } from '../../common/constants/features.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { AiService } from './ai.service';
 
 @Controller('ai')
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
+@RequiresFeature(FEATURES.AI_INSIGHTS)
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(private readonly aiService: AiService) { }
 
   // Predict sales for upcoming days
   @Get('predict-sales')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async predictSales(
     @Query('companyId') companyId: string,
     @Query('branchId') branchId?: string,
     @Query('daysAhead') daysAhead?: number,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can predict sales');
+    }
     return await this.aiService.predictSales(
       companyId as unknown as MongooseSchema.Types.ObjectId,
       branchId ? (branchId as unknown as MongooseSchema.Types.ObjectId) : undefined,
@@ -40,8 +45,10 @@ export class AiController {
 
   // Get pricing recommendations for a menu item
   @Get('pricing-recommendations/:menuItemId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
-  async recommendPricing(@Param('menuItemId') menuItemId: string) {
+  async recommendPricing(@Param('menuItemId') menuItemId: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can view pricing recommendations');
+    }
     return await this.aiService.recommendPricing(
       menuItemId as unknown as MongooseSchema.Types.ObjectId,
     );
@@ -49,11 +56,14 @@ export class AiController {
 
   // Analyze peak hours and get staffing recommendations
   @Get('peak-hours')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async analyzePeakHours(
     @Query('companyId') companyId: string,
     @Query('branchId') branchId?: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can analyze peak hours');
+    }
     return await this.aiService.analyzePeakHours(
       companyId as unknown as MongooseSchema.Types.ObjectId,
       branchId ? (branchId as unknown as MongooseSchema.Types.ObjectId) : undefined,
@@ -63,13 +73,10 @@ export class AiController {
   // Get personalized menu recommendations for a customer
   @Get('customer-recommendations/:customerId')
   @RequiresFeature(FEATURES.AI_CUSTOMER_LOYALTY)
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.WAITER,
-  )
-  async getCustomerRecommendations(@Param('customerId') customerId: string) {
+  async getCustomerRecommendations(@Param('customerId') customerId: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.WAITER && user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Waiters, Managers and Owners can view customer recommendations');
+    }
     return await this.aiService.getCustomerRecommendations(
       customerId as unknown as MongooseSchema.Types.ObjectId,
     );
@@ -77,11 +84,14 @@ export class AiController {
 
   // Analyze menu performance and get improvement suggestions
   @Get('menu-analysis')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async analyzeMenuPerformance(
     @Query('companyId') companyId: string,
     @Query('branchId') branchId?: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can analyze menu performance');
+    }
     return await this.aiService.analyzeMenuPerformance(
       companyId as unknown as MongooseSchema.Types.ObjectId,
       branchId ? (branchId as unknown as MongooseSchema.Types.ObjectId) : undefined,
@@ -90,12 +100,15 @@ export class AiController {
 
   // Generate comprehensive business insights
   @Get('business-insights')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async generateBusinessInsights(
     @Query('companyId') companyId: string,
     @Query('branchId') branchId?: string,
     @Query('period') period?: 'week' | 'month' | 'quarter',
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can generate business insights');
+    }
     return await this.aiService.generateBusinessInsights(
       companyId as unknown as MongooseSchema.Types.ObjectId,
       branchId ? (branchId as unknown as MongooseSchema.Types.ObjectId) : undefined,
@@ -105,12 +118,15 @@ export class AiController {
 
   // Generate AI-powered sales analytics
   @Get('sales-analytics')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getSalesAnalytics(
     @Query('branchId') branchId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can view sales analytics');
+    }
     return this.aiService.generateSalesAnalytics(
       branchId,
       new Date(startDate),
@@ -120,12 +136,15 @@ export class AiController {
 
   // Generate AI-powered order analytics
   @Get('order-analytics')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getOrderAnalytics(
     @Query('branchId') branchId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can view order analytics');
+    }
     return this.aiService.generateOrderAnalytics(
       branchId,
       new Date(startDate),
@@ -136,11 +155,14 @@ export class AiController {
   // Get menu optimization suggestions
   @Get('menu-optimization')
   @RequiresFeature(FEATURES.AI_MENU_OPTIMIZATION)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getMenuOptimization(
-    @Query('branchId') branchId?: string,
-    @Query('category') category?: string,
+    @Query('branchId') branchId: string,
+    @Query('category') category: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can view menu optimization');
+    }
     if (!branchId) {
       throw new BadRequestException('Branch ID is required');
     }
@@ -157,10 +179,13 @@ export class AiController {
 
   // Get demand predictions
   @Get('demand-predictions')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getDemandPredictions(
     @Query('branchId') branchId?: string,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can view demand predictions');
+    }
     if (!branchId) {
       throw new BadRequestException('Branch ID is required');
     }
@@ -175,10 +200,13 @@ export class AiController {
   // Generate personalized offers for a customer
   @Post('personalized-offers')
   @RequiresFeature(FEATURES.AI_CUSTOMER_LOYALTY)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getPersonalizedOffers(
     @Body() body: { customerId: string; branchId: string },
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can generate personalized offers');
+    }
     if (!body.customerId) {
       throw new BadRequestException('Customer ID is required');
     }

@@ -1,22 +1,21 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { OrderFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -26,19 +25,13 @@ import { OrdersService } from './orders.service';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.WAITER,
-  )
   @ApiOperation({ summary: 'Create new order' })
   create(@Body() createOrderDto: CreateOrderDto) {
     return this.ordersService.create(createOrderDto);
@@ -73,7 +66,6 @@ export class OrdersController {
   }
 
   @Get('branch/:branchId/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get sales statistics' })
   getSalesStats(
     @Param('branchId') branchId: string,
@@ -88,7 +80,6 @@ export class OrdersController {
   }
 
   @Get('branch/:branchId/series')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get daily series of orders and revenue' })
   getDailySeries(
     @Param('branchId') branchId: string,
@@ -103,7 +94,6 @@ export class OrdersController {
   }
 
   @Get('branch/:branchId/top-products')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get top selling products' })
   getTopProducts(
     @Param('branchId') branchId: string,
@@ -120,7 +110,6 @@ export class OrdersController {
   }
 
   @Get('branch/:branchId/top-employees')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get best employees by orders served' })
   getTopEmployees(
     @Param('branchId') branchId: string,
@@ -149,25 +138,12 @@ export class OrdersController {
   }
 
   @Patch(':id')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.WAITER,
-  )
   @ApiOperation({ summary: 'Update order' })
   update(@Param('id') id: string, @Body() updateOrderDto: UpdateOrderDto) {
     return this.ordersService.update(id, updateOrderDto);
   }
 
   @Patch(':id/status')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.WAITER,
-    UserRole.CHEF,
-  )
   @ApiOperation({ summary: 'Update order status' })
   updateStatus(
     @Param('id') id: string,
@@ -177,31 +153,18 @@ export class OrdersController {
   }
 
   @Post(':id/payment')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.WAITER,
-  )
   @ApiOperation({ summary: 'Add payment to order' })
   addPayment(@Param('id') id: string, @Body() addPaymentDto: AddPaymentDto) {
     return this.ordersService.addPayment(id, addPaymentDto);
   }
 
   @Post(':id/split')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.WAITER,
-  )
   @ApiOperation({ summary: 'Split order' })
   splitOrder(@Param('id') id: string, @Body() splitData: any) {
     return this.ordersService.splitOrder(id, splitData);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete order' })
   remove(@Param('id') id: string) {
     return this.ordersService.remove(id);

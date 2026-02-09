@@ -1,46 +1,48 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    FileTypeValidator,
-    Get,
-    MaxFileSizeValidator,
-    Param,
-    ParseFilePipe,
-    Patch,
-    Post,
-    Query,
-    UploadedFile,
-    UseGuards,
-    UseInterceptors,
+  Body,
+  Controller,
+  Delete,
+  FileTypeValidator,
+  Get,
+  MaxFileSizeValidator,
+  Param,
+  ParseFilePipe,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreateGalleryDto } from './dto/create-gallery.dto';
 import { UpdateGalleryDto } from './dto/update-gallery.dto';
 import { GalleryService } from './gallery.service';
 
 @ApiTags('Gallery')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequiresFeature(FEATURES.CMS)
 @Controller('gallery')
 export class GalleryController {
-  constructor(private readonly galleryService: GalleryService) {}
+  constructor(private readonly galleryService: GalleryService) { }
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get all gallery images for company' })
   async findAll(
     @CurrentUser() user: any,
     @Query('isActive') isActive?: string,
   ) {
     const companyId = (user as any).companyId || (user as any).company?.id;
-    
+
     if (!companyId) {
       throw new Error('Company ID not found');
     }
@@ -50,7 +52,6 @@ export class GalleryController {
   }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Upload a new gallery image' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -91,16 +92,19 @@ export class GalleryController {
     @Body() createGalleryDto: CreateGalleryDto,
   ) {
     const companyId = (user as any).companyId || (user as any).company?.id;
-    
+
     if (!companyId) {
       throw new Error('Company ID not found');
+    }
+
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can upload gallery images');
     }
 
     return this.galleryService.create(companyId, file, createGalleryDto);
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update gallery image metadata' })
   async update(
     @CurrentUser() user: any,
@@ -108,22 +112,29 @@ export class GalleryController {
     @Body() updateGalleryDto: UpdateGalleryDto,
   ) {
     const companyId = (user as any).companyId || (user as any).company?.id;
-    
+
     if (!companyId) {
       throw new Error('Company ID not found');
+    }
+
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can update gallery images');
     }
 
     return this.galleryService.update(id, companyId, updateGalleryDto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete a gallery image' })
   async remove(@CurrentUser() user: any, @Param('id') id: string) {
     const companyId = (user as any).companyId || (user as any).company?.id;
-    
+
     if (!companyId) {
       throw new Error('Company ID not found');
+    }
+
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can delete gallery images');
     }
 
     await this.galleryService.remove(id, companyId);
@@ -131,16 +142,19 @@ export class GalleryController {
   }
 
   @Post('reorder')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Reorder gallery images' })
   async reorder(
     @CurrentUser() user: any,
     @Body('imageIds') imageIds: string[],
   ) {
     const companyId = (user as any).companyId || (user as any).company?.id;
-    
+
     if (!companyId) {
       throw new Error('Company ID not found');
+    }
+
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can reorder gallery images');
     }
 
     await this.galleryService.reorder(companyId, imageIds);

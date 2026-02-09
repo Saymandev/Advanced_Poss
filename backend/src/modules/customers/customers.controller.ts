@@ -1,44 +1,39 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator'; // Need this for manual checks
 import { CustomerFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
-import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @ApiTags('Customers')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
 @Controller('customers')
 export class CustomersController {
-  constructor(private readonly customersService: CustomersService) {}
+  constructor(private readonly customersService: CustomersService) { }
 
   @Post()
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.WAITER,
-  )
   @RequiresLimit('maxCustomers')
   @ApiOperation({ summary: 'Create new customer' })
   create(@Body() createCustomerDto: CreateCustomerDto) {
@@ -83,9 +78,11 @@ export class CustomersController {
   }
 
   @Get('company/:companyId/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get customer statistics' })
-  getStats(@Param('companyId') companyId: string) {
+  getStats(@Param('companyId') companyId: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('You do not have permission to view customer stats');
+    }
     return this.customersService.getStats(companyId);
   }
 
@@ -102,29 +99,30 @@ export class CustomersController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update customer' })
   update(
     @Param('id') id: string,
     @Body() updateCustomerDto: UpdateCustomerDto,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('You do not have permission to update customers');
+    }
     return this.customersService.update(id, updateCustomerDto);
   }
 
   @Post(':id/loyalty/add')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.LOYALTY_PROGRAM)
   @ApiOperation({ summary: 'Add loyalty points' })
-  addLoyaltyPoints(@Param('id') id: string, @Body('points') points: number) {
+  addLoyaltyPoints(@Param('id') id: string, @Body('points') points: number, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('You do not have permission to add loyalty points manually');
+    }
     return this.customersService.addLoyaltyPoints(id, points);
   }
 
   @Post(':id/loyalty/redeem')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.OWNER,
-    UserRole.MANAGER,
-    UserRole.WAITER,
-  )
+  @RequiresFeature(FEATURES.LOYALTY_PROGRAM)
   @ApiOperation({ summary: 'Redeem loyalty points' })
   redeemLoyaltyPoints(
     @Param('id') id: string,
@@ -134,12 +132,16 @@ export class CustomersController {
   }
 
   @Patch(':id/loyalty')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.LOYALTY_PROGRAM)
   @ApiOperation({ summary: 'Update loyalty points (add or subtract)' })
   updateLoyaltyPoints(
     @Param('id') id: string,
     @Body() body: { points: number; type: 'add' | 'subtract'; description?: string },
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('You do not have permission to update loyalty points manually');
+    }
     if (body.type === 'add') {
       return this.customersService.addLoyaltyPoints(id, body.points);
     } else {
@@ -148,30 +150,40 @@ export class CustomersController {
   }
 
   @Post(':id/vip')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.LOYALTY_PROGRAM)
   @ApiOperation({ summary: 'Make customer VIP' })
-  makeVIP(@Param('id') id: string) {
+  makeVIP(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('You do not have permission to manage VIP status');
+    }
     return this.customersService.makeVIP(id);
   }
 
   @Delete(':id/vip')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @RequiresFeature(FEATURES.LOYALTY_PROGRAM)
   @ApiOperation({ summary: 'Remove VIP status' })
-  removeVIP(@Param('id') id: string) {
+  removeVIP(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('You do not have permission to manage VIP status');
+    }
     return this.customersService.removeVIP(id);
   }
 
   @Patch(':id/deactivate')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Deactivate customer' })
-  deactivate(@Param('id') id: string) {
+  deactivate(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('You do not have permission to deactivate customers');
+    }
     return this.customersService.deactivate(id);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Delete customer' })
-  remove(@Param('id') id: string) {
+  remove(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Owners and Super Admins can delete customers');
+    }
     return this.customersService.remove(id);
   }
 }

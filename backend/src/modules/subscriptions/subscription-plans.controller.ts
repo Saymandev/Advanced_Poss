@@ -10,12 +10,13 @@ import {
   Post,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreateSubscriptionPlanDto, UpdateSubscriptionPlanDto } from './dto/subscription-plan.dto';
 import { SubscriptionPlansService } from './subscription-plans.service';
 import { ALL_FEATURE_KEYS, getFeaturesByCategory } from './utils/plan-features.helper';
@@ -23,18 +24,20 @@ import { ALL_FEATURE_KEYS, getFeaturesByCategory } from './utils/plan-features.h
 @ApiTags('subscription-plans')
 @Controller('subscription-plans')
 export class SubscriptionPlansController {
-  constructor(private readonly subscriptionPlansService: SubscriptionPlansService) {}
+  constructor(private readonly subscriptionPlansService: SubscriptionPlansService) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new subscription plan (Super Admin only)' })
   @ApiResponse({ status: 201, description: 'Subscription plan created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  create(@Body() createSubscriptionPlanDto: CreateSubscriptionPlanDto) {
+  create(@Body() createSubscriptionPlanDto: CreateSubscriptionPlanDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can create subscription plans');
+    }
     return this.subscriptionPlansService.create(createSubscriptionPlanDto);
   }
 
@@ -73,13 +76,15 @@ export class SubscriptionPlansController {
   }
 
   @Post(':id/migrate-features')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Migrate legacy plan features to new enabledFeatureKeys format (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Plan migrated successfully' })
   @ApiResponse({ status: 404, description: 'Subscription plan not found' })
-  async migratePlanFeatures(@Param('id') id: string) {
+  async migratePlanFeatures(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can migrate plan features');
+    }
     return this.subscriptionPlansService.migrateToEnabledFeatureKeys(id);
   }
 
@@ -92,21 +97,22 @@ export class SubscriptionPlansController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a subscription plan (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Subscription plan updated successfully' })
   @ApiResponse({ status: 404, description: 'Subscription plan not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  update(@Param('id') id: string, @Body() updateSubscriptionPlanDto: UpdateSubscriptionPlanDto) {
+  update(@Param('id') id: string, @Body() updateSubscriptionPlanDto: UpdateSubscriptionPlanDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can update subscription plans');
+    }
     return this.subscriptionPlansService.update(id, updateSubscriptionPlanDto);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a subscription plan (Super Admin only)' })
@@ -114,19 +120,24 @@ export class SubscriptionPlansController {
   @ApiResponse({ status: 404, description: 'Subscription plan not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  remove(@Param('id') id: string) {
+  remove(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can delete subscription plans');
+    }
     return this.subscriptionPlansService.remove(id);
   }
 
   @Post('initialize')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Initialize default subscription plans (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Default subscription plans initialized successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  initializeDefaultPlans() {
+  initializeDefaultPlans(@CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can initialize default plans');
+    }
     return this.subscriptionPlansService.initializeDefaultPlans();
   }
 }

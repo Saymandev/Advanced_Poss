@@ -1,30 +1,34 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreateLoginActivityDto, CreateLoginSessionDto, LoginActivityFilterDto, SessionFilterDto, TerminateSessionDto, UpdateSessionActivityDto } from './dto/login-activity.dto';
 import { LoginActivityService } from './login-activity.service';
 
 @Controller('login-activity')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequiresFeature(FEATURES.SETTINGS)
 export class LoginActivityController {
-  constructor(private readonly loginActivityService: LoginActivityService) {}
+  constructor(private readonly loginActivityService: LoginActivityService) { }
 
   @Get('activities')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async getLoginActivities(
     @Query() filterDto: LoginActivityFilterDto,
     @CurrentUser() user: any,
   ) {
+    if (user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Owners and Super Admins can view login activities');
+    }
     // If user is not SUPER_ADMIN, filter by their company
     if (user.role !== UserRole.SUPER_ADMIN) {
       filterDto.companyId = user.companyId;
     }
 
     const result = await this.loginActivityService.getLoginActivities(filterDto);
-    
+
     return {
       success: true,
       data: result,
@@ -33,18 +37,20 @@ export class LoginActivityController {
   }
 
   @Get('sessions')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async getActiveSessions(
     @Query() filterDto: SessionFilterDto,
     @CurrentUser() user: any,
   ) {
+    if (user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Owners and Super Admins can view active sessions');
+    }
     // If user is not SUPER_ADMIN, filter by their company
     if (user.role !== UserRole.SUPER_ADMIN) {
       filterDto.companyId = user.companyId;
     }
 
     const result = await this.loginActivityService.getActiveSessions(filterDto);
-    
+
     return {
       success: true,
       data: result,
@@ -53,16 +59,18 @@ export class LoginActivityController {
   }
 
   @Get('stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async getLoginStats(
     @CurrentUser() user: any,
     @Query('companyId') companyId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
+    if (user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Owners and Super Admins can view login stats');
+    }
     // If user is not SUPER_ADMIN, use their company
     const targetCompanyId = user.role === UserRole.SUPER_ADMIN ? companyId : user.companyId;
-    
+
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
 
@@ -82,10 +90,12 @@ export class LoginActivityController {
   }
 
   @Post('activities')
-  @Roles(UserRole.SUPER_ADMIN)
-  async createLoginActivity(@Body() createDto: CreateLoginActivityDto) {
+  async createLoginActivity(@Body() createDto: CreateLoginActivityDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can create login activities');
+    }
     const activity = await this.loginActivityService.createLoginActivity(createDto);
-    
+
     return {
       success: true,
       data: activity,
@@ -94,10 +104,12 @@ export class LoginActivityController {
   }
 
   @Post('sessions')
-  @Roles(UserRole.SUPER_ADMIN)
-  async createLoginSession(@Body() createDto: CreateLoginSessionDto) {
+  async createLoginSession(@Body() createDto: CreateLoginSessionDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can create login sessions');
+    }
     const session = await this.loginActivityService.createLoginSession(createDto);
-    
+
     return {
       success: true,
       data: session,
@@ -106,13 +118,16 @@ export class LoginActivityController {
   }
 
   @Put('sessions/:sessionId/activity')
-  @Roles(UserRole.SUPER_ADMIN)
   async updateSessionActivity(
     @Param('sessionId') sessionId: string,
     @Body() updateDto: UpdateSessionActivityDto,
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can update session activity');
+    }
     const session = await this.loginActivityService.updateSessionActivity(sessionId, updateDto);
-    
+
     return {
       success: true,
       data: session,
@@ -121,17 +136,19 @@ export class LoginActivityController {
   }
 
   @Put('sessions/:sessionId/terminate')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async terminateSession(
     @Param('sessionId') sessionId: string,
     @Body() terminateDto: TerminateSessionDto,
     @CurrentUser() user: any,
   ) {
+    if (user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Owners and Super Admins can terminate sessions');
+    }
     const session = await this.loginActivityService.terminateSession(sessionId, {
       ...terminateDto,
       terminatedBy: terminateDto.terminatedBy || user.id,
     });
-    
+
     return {
       success: true,
       data: session,
@@ -140,18 +157,20 @@ export class LoginActivityController {
   }
 
   @Delete('sessions/user/:userId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async terminateAllUserSessions(
     @CurrentUser() user: any,
     @Param('userId') userId: string,
     @Body('reason') reason?: string,
   ) {
+    if (user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Owners and Super Admins can terminate all user sessions');
+    }
     const terminatedCount = await this.loginActivityService.terminateAllUserSessions(
       userId,
       user.id,
       reason,
     );
-    
+
     return {
       success: true,
       data: { terminatedCount },
@@ -160,18 +179,20 @@ export class LoginActivityController {
   }
 
   @Delete('sessions/company/:companyId')
-  @Roles(UserRole.SUPER_ADMIN)
   async terminateAllCompanySessions(
     @CurrentUser() user: any,
     @Param('companyId') companyId: string,
     @Body('reason') reason?: string,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can terminate all company sessions');
+    }
     const terminatedCount = await this.loginActivityService.terminateAllCompanySessions(
       companyId,
       user.id,
       reason,
     );
-    
+
     return {
       success: true,
       data: { terminatedCount },
@@ -180,10 +201,12 @@ export class LoginActivityController {
   }
 
   @Post('cleanup/expired-sessions')
-  @Roles(UserRole.SUPER_ADMIN)
-  async cleanupExpiredSessions() {
+  async cleanupExpiredSessions(@CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can cleanup expired sessions');
+    }
     const cleanedCount = await this.loginActivityService.cleanupExpiredSessions();
-    
+
     return {
       success: true,
       data: { cleanedCount },
@@ -192,24 +215,26 @@ export class LoginActivityController {
   }
 
   @Get('dashboard')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   async getDashboardData(
     @CurrentUser() user: any,
     @Query('companyId') companyId?: string,
   ) {
+    if (user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Owners and Super Admins can view dashboard data');
+    }
     const targetCompanyId = user.role === UserRole.SUPER_ADMIN ? companyId : user.companyId;
-    
+
     const [loginStats, sessionStats, recentActivities, activeSessions] = await Promise.all([
       this.loginActivityService.getLoginStats(targetCompanyId),
       this.loginActivityService.getSessionStats(targetCompanyId),
-      this.loginActivityService.getLoginActivities({ 
-        companyId: targetCompanyId, 
-        limit: 10 
+      this.loginActivityService.getLoginActivities({
+        companyId: targetCompanyId,
+        limit: 10
       }),
-      this.loginActivityService.getActiveSessions({ 
-        companyId: targetCompanyId, 
+      this.loginActivityService.getActiveSessions({
+        companyId: targetCompanyId,
         activeOnly: true,
-        limit: 10 
+        limit: 10
       }),
     ]);
 

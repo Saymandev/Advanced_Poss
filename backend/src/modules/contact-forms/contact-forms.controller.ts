@@ -1,27 +1,31 @@
+
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Patch,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { UserDocument } from '../users/schemas/user.schema';
 import { ContactFormsService } from './contact-forms.service';
 import { UpdateContactFormDto } from './dto/update-contact-form.dto';
 @ApiTags('Contact Forms')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequiresFeature(FEATURES.NOTIFICATIONS)
 @Controller('contact-forms')
 export class ContactFormsController {
-  constructor(private readonly contactFormsService: ContactFormsService) {}
+  constructor(private readonly contactFormsService: ContactFormsService) { }
   @Get()
   @ApiOperation({ summary: 'Get all contact forms (filtered by company for non-super-admin)' })
   @ApiQuery({ name: 'companyId', required: false, description: 'Filter by company ID (null for general inquiries)' })
@@ -29,7 +33,7 @@ export class ContactFormsController {
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   async findAll(
     @Query('companyId') companyId?: string,
     @Query('status') status?: string,
@@ -55,7 +59,6 @@ export class ContactFormsController {
   @Get('stats')
   @ApiOperation({ summary: 'Get contact form statistics' })
   @ApiQuery({ name: 'companyId', required: false, description: 'Filter by company ID (null for general inquiries)' })
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async getStats(
     @Query('companyId') companyId?: string,
     @CurrentUser() user?: UserDocument,
@@ -70,18 +73,19 @@ export class ContactFormsController {
   }
   @Get(':id')
   @ApiOperation({ summary: 'Get contact form by ID' })
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async findOne(@Param('id') id: string) {
     return this.contactFormsService.findOne(id);
   }
   @Patch(':id')
   @ApiOperation({ summary: 'Update contact form (status, notes)' })
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateContactFormDto,
     @CurrentUser() user: UserDocument,
   ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Managers and Owners can update contact forms');
+    }
     return this.contactFormsService.update(id, updateDto, user.id);
   }
-}
+}

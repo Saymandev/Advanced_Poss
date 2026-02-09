@@ -1,28 +1,32 @@
 import {
-    BadRequestException,
-    Body,
-    Controller,
-    Headers,
-    HttpCode,
-    HttpStatus,
-    Post,
-    RawBodyRequest,
-    Req,
-    UseGuards
+  BadRequestException,
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Post,
+  RawBodyRequest,
+  Req,
+  UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { FEATURES } from '../../common/constants/features.constants';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreateCheckoutSessionDto, CreatePaymentIntentDto } from './dto/payment.dto';
 import { PaymentsService } from './payments.service';
 
 @ApiTags('payments')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequiresFeature(FEATURES.SETTINGS)
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(private readonly paymentsService: PaymentsService) { }
 
   @Post('create-payment-intent')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create Stripe payment intent for subscription' })
   @ApiResponse({ status: 201, description: 'Payment intent created successfully' })
@@ -37,7 +41,6 @@ export class PaymentsController {
   }
 
   @Post('create-checkout-session')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create Stripe checkout session for subscription' })
   @ApiResponse({ status: 201, description: 'Checkout session created successfully' })
@@ -49,16 +52,16 @@ export class PaymentsController {
     @Req() req: Request,
   ) {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    
+
     // Validate and construct URLs - ensure they're valid URLs or use defaults
     let successUrl = createCheckoutSessionDto.successUrl;
     let cancelUrl = createCheckoutSessionDto.cancelUrl;
-    
+
     // Validate URLs are properly formatted, fallback to defaults if invalid
     if (!successUrl || (!successUrl.startsWith('http://') && !successUrl.startsWith('https://'))) {
       successUrl = `${baseUrl}/payment/success`;
     }
-    
+
     if (!cancelUrl || (!cancelUrl.startsWith('http://') && !cancelUrl.startsWith('https://'))) {
       cancelUrl = `${baseUrl}/payment/cancel`;
     }
@@ -72,7 +75,6 @@ export class PaymentsController {
   }
 
   @Post('confirm-payment')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Confirm payment and activate subscription' })
   @ApiResponse({ status: 200, description: 'Payment confirmed successfully' })
@@ -95,7 +97,6 @@ export class PaymentsController {
   }
 
   @Post('activate-subscription')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Manually activate subscription from Stripe session ID (fallback for local dev)' })
   @ApiResponse({ status: 200, description: 'Subscription activated successfully' })

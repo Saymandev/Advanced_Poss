@@ -1,28 +1,26 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UploadedFiles,
-    UseGuards,
-    UseInterceptors
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { MenuItemFilterDto } from '../../common/dto/pagination.dto';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
-import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
 import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
@@ -30,17 +28,16 @@ import { MenuItemsService } from './menu-items.service';
 
 @ApiTags('Menu')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.MENU_MANAGEMENT)
 @Controller('menu-items')
 export class MenuItemsController {
   constructor(
     private readonly menuItemsService: MenuItemsService,
     private readonly cloudinaryService: CloudinaryService,
-  ) {}
+  ) { }
 
   @Post('upload-images')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Upload images for menu items to Cloudinary' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FilesInterceptor('images', 10)) // Allow up to 10 images
@@ -70,7 +67,6 @@ export class MenuItemsController {
   }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @RequiresLimit('maxMenuItems')
   @ApiOperation({ summary: 'Create new menu item' })
   create(@Body() createMenuItemDto: CreateMenuItemDto) {
@@ -117,7 +113,6 @@ export class MenuItemsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update menu item' })
   update(
     @Param('id') id: string,
@@ -127,14 +122,12 @@ export class MenuItemsController {
   }
 
   @Patch(':id/toggle-availability')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Toggle menu item availability' })
   toggleAvailability(@Param('id') id: string) {
     return this.menuItemsService.toggleAvailability(id);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete menu item' })
   remove(@Param('id') id: string) {
     return this.menuItemsService.remove(id);

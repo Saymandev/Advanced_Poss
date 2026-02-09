@@ -1,21 +1,19 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-    UseGuards
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { BookingsService } from './bookings.service';
 import { CheckInDto } from './dto/check-in.dto';
@@ -25,14 +23,12 @@ import { UpdateBookingDto } from './dto/update-booking.dto';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard)
-@RequiresFeature(FEATURES.BOOKING_MANAGEMENT)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @Controller('bookings')
 export class BookingsController {
-  constructor(private readonly bookingsService: BookingsService) {}
+  constructor(private readonly bookingsService: BookingsService) { }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create new booking' })
   create(
     @Body() createBookingDto: CreateBookingDto,
@@ -62,7 +58,6 @@ export class BookingsController {
   }
 
   @Get('branch/:branchId/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get booking statistics for branch' })
   getStats(
     @Param('branchId') branchId: string,
@@ -95,7 +90,6 @@ export class BookingsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update booking' })
   update(
     @Param('id') id: string,
@@ -105,7 +99,6 @@ export class BookingsController {
   }
 
   @Post(':id/check-in')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Check in guest' })
   checkIn(
     @Param('id') id: string,
@@ -116,7 +109,6 @@ export class BookingsController {
   }
 
   @Post(':id/check-out')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Check out guest' })
   checkOut(
     @Param('id') id: string,
@@ -127,7 +119,6 @@ export class BookingsController {
   }
 
   @Post(':id/cancel')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Cancel booking' })
   cancel(
     @Param('id') id: string,

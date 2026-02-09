@@ -8,32 +8,32 @@ import {
   Post,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { BranchFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 
 @ApiTags('Branches')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.BRANCHES)
 @Controller('branches')
 export class BranchesController {
-  constructor(private readonly branchesService: BranchesService) {}
+  constructor(private readonly branchesService: BranchesService) { }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   @RequiresLimit('maxBranches')
   @ApiOperation({ summary: 'Create new branch' })
   create(@Body() createBranchDto: CreateBranchDto) {
@@ -47,13 +47,15 @@ export class BranchesController {
   }
 
   @Get('deleted')
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all soft deleted branches' })
   @ApiResponse({
     status: 200,
     description: 'List of soft deleted branches',
   })
-  findDeleted(@Query() filter: BranchFilterDto) {
+  findDeleted(@Query() filter: BranchFilterDto, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can access deleted branches');
+    }
     return this.branchesService.findDeleted(filter);
   }
 
@@ -70,35 +72,30 @@ export class BranchesController {
   }
 
   @Get(':id/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get branch statistics' })
   getStats(@Param('id') id: string) {
     return this.branchesService.getStats(id);
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update branch' })
   update(@Param('id') id: string, @Body() updateBranchDto: UpdateBranchDto) {
     return this.branchesService.update(id, updateBranchDto);
   }
 
   @Patch(':id/toggle-status')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Toggle branch status' })
   toggleStatus(@Param('id') id: string) {
     return this.branchesService.toggleStatus(id);
   }
 
   @Patch(':id/settings')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update branch settings' })
   updateSettings(@Param('id') id: string, @Body() settings: any) {
     return this.branchesService.updateSettings(id, settings);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Soft delete branch (moves to trash)' })
   @ApiResponse({
     status: 200,
@@ -109,41 +106,47 @@ export class BranchesController {
   }
 
   @Patch(':id/restore')
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Restore soft deleted branch' })
   @ApiResponse({
     status: 200,
     description: 'Branch restored successfully',
   })
-  restore(@Param('id') id: string) {
+  restore(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can restore branches');
+    }
     return this.branchesService.restore(id);
   }
 
   @Delete(':id/permanent')
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Permanently delete branch and all related data' })
   @ApiResponse({
     status: 200,
     description: 'Branch permanently deleted with all related data',
   })
-  permanentDelete(@Param('id') id: string) {
+  permanentDelete(@Param('id') id: string, @CurrentUser() user?: any) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can permanently delete branches');
+    }
     return this.branchesService.permanentDeleteWithCascade(id);
   }
 
   @Patch(':id/deactivate')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Deactivate branch' })
   deactivate(@Param('id') id: string) {
     return this.branchesService.deactivate(id);
   }
 
   @Patch(':id/public-url')
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update branch public URL (Super Admin only)' })
   updatePublicUrl(
     @Param('id') id: string,
     @Body() body: { publicUrl: string },
+    @CurrentUser() user?: any,
   ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can update public URL');
+    }
     return this.branchesService.updatePublicUrl(id, body.publicUrl);
   }
 }
