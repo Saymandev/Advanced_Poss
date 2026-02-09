@@ -411,7 +411,7 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const { user } = useAppSelector((state) => state.auth);
-  const { hasAnyFeature, isLoading: permissionsLoading, permissions: userPermissions } = useRolePermissions();
+  const { hasAnyFeature, isLoading: permissionsLoading, permissions: userPermissions, userFeatures } = useRolePermissions();
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>(['POS System']);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -437,7 +437,7 @@ export function Sidebar({ className }: SidebarProps) {
   const toggleCollapsed = () => {
     const newCollapsed = !isCollapsed;
     setIsCollapsed(newCollapsed);
-    
+
     // Dispatch custom event to notify layout
     window.dispatchEvent(new CustomEvent('sidebar-toggle', {
       detail: { collapsed: newCollapsed }
@@ -464,12 +464,12 @@ export function Sidebar({ className }: SidebarProps) {
       return true;
     }
 
-    // If permissions finished loading but userPermissions is null, 
-    // it means no permissions were found for this role
+    // If permissions finished loading but no features were found, 
+    // it means no permissions were assigned for this role/user
     // In this case, only show items without requiredFeature (or dashboard as fallback)
     const permissionsLoaded = !permissionsLoading;
-    const hasNoPermissions = permissionsLoaded && !userPermissions;
-    
+    const hasNoPermissions = permissionsLoaded && userFeatures.length === 0;
+
     // Check role-based access (legacy support)
     if (item.roles && item.roles.length > 0) {
       if (!user) return false;
@@ -486,11 +486,11 @@ export function Sidebar({ className }: SidebarProps) {
         }
         return false;
       }
-      
-      const features = Array.isArray(item.requiredFeature) 
-        ? item.requiredFeature 
+
+      const features = Array.isArray(item.requiredFeature)
+        ? item.requiredFeature
         : [item.requiredFeature];
-      
+
       // User needs at least ONE of the required features
       return hasAnyFeature(features);
     }
@@ -502,15 +502,15 @@ export function Sidebar({ className }: SidebarProps) {
   // Flatten navigation items for collapsed sidebar (show all children as flat items)
   const flattenNavigationItems = (items: NavigationItem[]): NavigationItem[] => {
     const flattened: NavigationItem[] = [];
-    
+
     items.forEach((item) => {
       if (!hasAccess(item)) return;
-      
+
       const hasChildren = item.children && item.children.length > 0;
-      const accessibleChildren = hasChildren 
+      const accessibleChildren = hasChildren
         ? item.children?.filter(child => hasAccess(child)) || []
         : [];
-      
+
       // If parent has children, add all children as flat items (skip parent)
       if (hasChildren && accessibleChildren.length > 0) {
         flattened.push(...accessibleChildren);
@@ -520,7 +520,7 @@ export function Sidebar({ className }: SidebarProps) {
       }
       // If parent has children but none accessible, skip it entirely
     });
-    
+
     return flattened;
   };
 
@@ -530,17 +530,17 @@ export function Sidebar({ className }: SidebarProps) {
 
     const active = isActive(item.href);
     const hasChildren = item.children && item.children.length > 0;
-    
+
     // Filter children based on feature access
-    const accessibleChildren = hasChildren 
+    const accessibleChildren = hasChildren
       ? item.children?.filter(child => hasAccess(child)) || []
       : [];
-    
+
     // If parent has children but none are accessible, hide the parent too
     if (hasChildren && accessibleChildren.length === 0) {
       return null;
     }
-    
+
     const isExpanded = expandedItems.includes(item.name);
 
     return (
@@ -682,14 +682,14 @@ export function Sidebar({ className }: SidebarProps) {
           </div>
         </div>
 
-        
+
 
         {/* Navigation */}
         <nav className={cn(
           "flex-1 px-3 py-4 space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent transition-all duration-300",
           isCollapsed ? "px-2" : ""
         )}>
-          {isCollapsed 
+          {isCollapsed
             ? flattenNavigationItems(allNavigationItems).map((item: NavigationItem) => renderNavigationItem(item))
             : allNavigationItems.map((item: NavigationItem) => renderNavigationItem(item))
           }

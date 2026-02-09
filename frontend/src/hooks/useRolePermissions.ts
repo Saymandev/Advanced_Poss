@@ -32,12 +32,14 @@ export function useRolePermissions() {
 
   // Check if user has access to a specific feature
   const hasFeature = (featureId: string): boolean => {
-    return can(featureId);
+    if (isSuperAdmin) return true;
+    return userFeatures.includes(featureId);
   };
 
   // Check if user has access to any of the provided features
   const hasAnyFeature = (featureIds: string[]): boolean => {
-    return canAny(featureIds);
+    if (isSuperAdmin) return true;
+    return featureIds.some(id => userFeatures.includes(id));
   };
 
   const refetch = () => {
