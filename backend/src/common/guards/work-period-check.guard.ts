@@ -10,7 +10,7 @@ import { isSuperAdmin } from '../utils/query.utils';
  */
 @Injectable()
 export class WorkPeriodCheckGuard implements CanActivate {
-  constructor(private workPeriodsService: WorkPeriodsService) {}
+  constructor(private workPeriodsService: WorkPeriodsService) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -20,13 +20,10 @@ export class WorkPeriodCheckGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    // Allow read-only POS stats endpoints for any authenticated role.
-    // These are used by the dashboard and should not require an active work period.
-    const originalUrl = (request as any).originalUrl || request.url || '';
-    if (
-      request.method === 'GET' &&
-      (originalUrl.includes('/pos/stats') || originalUrl.includes('/pos/quick-stats'))
-    ) {
+    // Allow all read-only GET requests for any authenticated role.
+    // Dashboard and reports need access to various data (stats, orders, etc.) without an active work period session.
+    // Transactional operations (POST, PUT, PATCH, DELETE) still require an active work period.
+    if (request.method === 'GET') {
       return true;
     }
 
