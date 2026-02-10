@@ -72,30 +72,30 @@ export const useSocket = (): UseSocketReturn => {
   const [isConnected, setIsConnected] = useState(false);
   const branchIdRef = useRef<string | null>(null);
   const tableIdRef = useRef<string | null>(null);
-  
+
   // Memoize computed values to prevent infinite re-renders
   const userRole = useMemo(() => (user as any)?.role?.toLowerCase(), [user]);
   const isWaiter = useMemo(() => userRole === 'waiter' || userRole === 'server', [userRole]);
   const isSuperAdmin = useMemo(() => userRole === 'super_admin', [userRole]);
-  
+
   const branchId = useMemo(() => {
-    return (user as any)?.branchId || 
-           (companyContext as any)?.branchId || 
-           (companyContext as any)?.branches?.[0]?._id ||
-           (companyContext as any)?.branches?.[0]?.id;
+    return (user as any)?.branchId ||
+      (companyContext as any)?.branchId ||
+      (companyContext as any)?.branches?.[0]?._id ||
+      (companyContext as any)?.branches?.[0]?.id;
   }, [user, companyContext]);
-  
+
   const companyId = useMemo(() => {
-    return (user as any)?.companyId || 
-           (companyContext as any)?.companyId || 
-           (companyContext as any)?._id || 
-           (companyContext as any)?.id;
+    return (user as any)?.companyId ||
+      (companyContext as any)?.companyId ||
+      (companyContext as any)?._id ||
+      (companyContext as any)?.id;
   }, [user, companyContext]);
-  
+
   const userId = useMemo(() => {
     return (user as any)?.id || (user as any)?._id;
   }, [user]);
-  
+
   const features = useMemo(() => {
     const userFeatures = (user as any)?.enabledFeatures || [];
     const contextFeatures = (companyContext as any)?.enabledFeatures || [];
@@ -108,13 +108,9 @@ export const useSocket = (): UseSocketReturn => {
     if (!user && !isSuperAdmin) return;
     // Don't initialize if no branchId and not super admin
     if (!branchId && !isSuperAdmin) return;
-    const token = typeof window !== 'undefined' 
-      ? localStorage.getItem('token') || sessionStorage.getItem('token')
-      : null;
     const newSocket = io(`${SOCKET_URL}/ws`, {
       transports: ['websocket', 'polling'],
       auth: {
-        ...(token ? { token } : {}),
         userId,
         branchId,
         companyId,
@@ -145,23 +141,19 @@ export const useSocket = (): UseSocketReturn => {
       }
       // Hydrate notifications from server on connect
       try {
-        if (token) {
-          const params = new URLSearchParams();
-          if (companyId) params.append('companyId', companyId);
-          if (branchId) params.append('branchId', branchId);
-          if (userRole) params.append('role', userRole);
-          if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
-          if (features && features.length > 0) params.append('features', features.join(','));
-          const res = await fetch(`${API_URL}/notifications?${params.toString()}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          const body = await res.json();
-          const items = body?.data?.items || body?.items || body || [];
-          if (Array.isArray(items)) {
-            hydrateNotifications(items);
-          }
+        const params = new URLSearchParams();
+        if (companyId) params.append('companyId', companyId);
+        if (branchId) params.append('branchId', branchId);
+        if (userRole) params.append('role', userRole);
+        if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
+        if (features && features.length > 0) params.append('features', features.join(','));
+        const res = await fetch(`${API_URL}/notifications?${params.toString()}`, {
+          credentials: 'include', // Important: send httpOnly cookies
+        });
+        const body = await res.json();
+        const items = body?.data?.items || body?.items || body || [];
+        if (Array.isArray(items)) {
+          hydrateNotifications(items);
         }
       } catch (err) {
         console.warn('Failed to hydrate notifications from server:', err);
@@ -249,9 +241,9 @@ export const useSocket = (): UseSocketReturn => {
     newSocket.on('order:assigned', (data: any) => {
       const orderNumber = data.orderNumber || data.order?.orderNumber || 'N/A';
       // Extract table number from multiple possible locations
-      const tableNumber = data.tableNumber 
-        || data.order?.tableNumber 
-        || data.order?.tableId?.tableNumber 
+      const tableNumber = data.tableNumber
+        || data.order?.tableNumber
+        || data.order?.tableId?.tableNumber
         || data.order?.tableId?.number
         || (typeof data.order?.tableId === 'object' && data.order.tableId ? (data.order.tableId as any).tableNumber || (data.order.tableId as any).number : undefined)
         || undefined;
@@ -343,7 +335,7 @@ export const useSocket = (): UseSocketReturn => {
               position: 'top-right',
             }
           );
-          } catch (toastError) {
+        } catch (toastError) {
           console.error('🛎️ [WAITER] Failed to show toast:', toastError);
         }
       }, 100);

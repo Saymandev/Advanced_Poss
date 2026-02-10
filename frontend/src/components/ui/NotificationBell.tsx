@@ -30,9 +30,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const [hasLoaded, setHasLoaded] = useState(false);
 
   const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1').replace(/\/$/, '');
-  const token = typeof window !== 'undefined'
-    ? (localStorage.getItem('token') || sessionStorage.getItem('token') || undefined)
-    : undefined;
+  // Tokens are now in httpOnly cookies, so we don't need to manually extract them
 
   const branchId = (user as any)?.branchId;
   const companyId = (user as any)?.companyId;
@@ -42,11 +40,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
   // Super-admin endpoints for mark-read / mark-all
   const markSuperAdminRead = async (id: string) => {
-    if (!token) return;
     try {
       await fetch(`${apiBase}/super-admin/notifications/${id}/read`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include', // Important: send httpOnly cookies
       });
     } catch (err) {
       console.warn('Failed to mark super-admin notification read on server:', err);
@@ -54,11 +51,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
   };
 
   const markSuperAdminAllRead = async () => {
-    if (!token) return;
     try {
       await fetch(`${apiBase}/super-admin/notifications/read-all`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include', // Important: send httpOnly cookies
       });
     } catch (err) {
       console.warn('Failed to mark all super-admin notifications read on server:', err);
@@ -66,7 +62,6 @@ export function NotificationBell({ className }: NotificationBellProps) {
   };
 
   const fetchFallbackNotifications = async () => {
-    if (!token) return;
     setIsFetchingFallback(true);
     try {
       const params = new URLSearchParams();
@@ -77,7 +72,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
       if (features.length > 0) params.append('features', features.join(','));
 
       const res = await fetch(`${apiBase}/notifications?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include', // Important: send httpOnly cookies
       });
       const body = await res.json();
       const items = body?.data?.items || body?.items || body || [];
@@ -93,11 +88,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
   };
 
   const markReadServer = async (id: string) => {
-    if (!token) return;
     try {
       await fetch(`${apiBase}/notifications/${id}/read`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include', // Important: send httpOnly cookies
       });
     } catch (err) {
       console.warn('Failed to mark notification read on server:', err);
@@ -105,7 +99,6 @@ export function NotificationBell({ className }: NotificationBellProps) {
   };
 
   const markAllReadServer = async () => {
-    if (!token) return;
     try {
       const params = new URLSearchParams();
       if (companyId) params.append('companyId', companyId);
@@ -114,7 +107,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
       if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
       await fetch(`${apiBase}/notifications/read-all?${params.toString()}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include', // Important: send httpOnly cookies
       });
     } catch (err) {
       console.warn('Failed to mark all notifications read on server:', err);

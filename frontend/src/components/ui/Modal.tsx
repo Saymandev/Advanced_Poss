@@ -63,7 +63,7 @@ export function Modal({
               </button>
             </div>
           )}
-          <div className="p-6">
+          <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
             {children}
           </div>
         </div>
@@ -107,10 +107,10 @@ export function ConfirmModal({
           <button
             onClick={onConfirm}
             className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors ${variant === 'danger'
-                ? 'bg-red-600 hover:bg-red-700'
-                : variant === 'warning'
-                  ? 'bg-yellow-600 hover:bg-yellow-700'
-                  : 'bg-blue-600 hover:bg-blue-700'
+              ? 'bg-red-600 hover:bg-red-700'
+              : variant === 'warning'
+                ? 'bg-yellow-600 hover:bg-yellow-700'
+                : 'bg-blue-600 hover:bg-blue-700'
               }`}
           >
             {confirmText}

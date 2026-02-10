@@ -397,12 +397,9 @@ export default function WorkPeriodsPage() {
     try {
       toast.loading('Generating PDF...', { id: 'download-pdf' });
       // We use direct fetch here to handle the blob response easily
-      const token = localStorage.getItem('token'); // Or however you store the token
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/work-periods/${id}/pdf`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include', // Important: send httpOnly cookies
       });
 
       if (!response.ok) throw new Error('Failed to generate PDF');
