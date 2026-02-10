@@ -15,14 +15,17 @@ export class PermissionsGuard implements CanActivate {
     ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const requiredFeature = this.reflector.getAllAndOverride<string>(REQUIRES_FEATURE, [
+        const requiredFeatures = this.reflector.getAllAndOverride<string | string[]>(REQUIRES_FEATURE, [
             context.getHandler(),
             context.getClass(),
         ]);
 
-        if (!requiredFeature) {
+        if (!requiredFeatures) {
             return true; // No feature requirement, allow access
         }
+
+        // Convert to array if it's a single string for backward compatibility
+        const features = Array.isArray(requiredFeatures) ? requiredFeatures : [requiredFeatures];
 
         const request = context.switchToHttp().getRequest();
         const user = request.user;
@@ -56,12 +59,15 @@ export class PermissionsGuard implements CanActivate {
                 return false;
             }
 
-            if (rolePermission.features.includes(requiredFeature)) {
+            // Check if user has ANY of the required features
+            const hasAccess = features.some(feature => rolePermission.features.includes(feature));
+
+            if (hasAccess) {
                 return true;
             }
 
-            this.logger.warn(`User ${user.id} (Role: ${user.role}) denied access to ${requiredFeature}`);
-            throw new ForbiddenException(`You do not have permission to access ${requiredFeature}`);
+            this.logger.warn(`User ${user.id} (Role: ${user.role}) denied access to ${features.join(' or ')}`);
+            throw new ForbiddenException(`You do not have permission to access ${features.join(' or ')}`);
 
         } catch (error) {
             if (error instanceof ForbiddenException) throw error;

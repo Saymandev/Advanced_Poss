@@ -3,12 +3,12 @@ import { SetMetadata } from '@nestjs/common';
 export const REQUIRES_FEATURE = 'requiresFeature';
 
 /**
- * Decorator to mark routes that require a specific subscription feature
- * @param feature - Feature name to check (e.g., 'aiInsights', 'multiBranch', 'inventory')
+ * Decorator to mark routes that require specific subscription features
+ * @param features - One or more feature names to check. If multiple features are provided, access is granted if ANY of them are enabled.
  * @example
- * @RequiresFeature('aiInsights')
- * @Get('ai-insights')
- * async getAIInsights() { ... }
+ * @RequiresFeature('order-management', 'dashboard')
+ * @Get('orders')
+ * async getOrders() { ... }
  */
-export const RequiresFeature = (feature: string) => SetMetadata(REQUIRES_FEATURE, feature);
+export const RequiresFeature = (...features: string[]) => SetMetadata(REQUIRES_FEATURE, features);
 

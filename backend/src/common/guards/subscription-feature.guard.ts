@@ -16,17 +16,20 @@ export class SubscriptionFeatureGuard implements CanActivate {
     private subscriptionPlansService: SubscriptionPlansService,
     @InjectModel(Subscription.name)
     private subscriptionModel: Model<SubscriptionDocument>,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredFeature = this.reflector.get<string>(
+    const requiredFeatures = this.reflector.get<string | string[]>(
       REQUIRES_FEATURE,
       context.getHandler(),
     );
 
-    if (!requiredFeature) {
+    if (!requiredFeatures) {
       return true; // No feature requirement, allow access
     }
+
+    // Convert to array if it's a single string for backward compatibility
+    const features = Array.isArray(requiredFeatures) ? requiredFeatures : [requiredFeatures];
 
     const request = context.switchToHttp().getRequest<Request>();
     const user = (request as any).user;
@@ -45,7 +48,6 @@ export class SubscriptionFeatureGuard implements CanActivate {
     }
 
     // Fetch the actual subscription document
-    // CRITICAL: Only allow ACTIVE or TRIAL subscriptions, exclude EXPIRED, CANCELLED, PAST_DUE, PAUSED
     const companyId = new Types.ObjectId(user.companyId);
     const subscription = await this.subscriptionModel
       .findOne({
@@ -60,33 +62,39 @@ export class SubscriptionFeatureGuard implements CanActivate {
       throw new ForbiddenException('Active subscription not found. Your subscription may have expired or been cancelled.');
     }
 
-    // Check if feature-based subscription (new flexible model)
-    let isFeatureEnabled = false;
-    if (subscription.enabledFeatures && subscription.enabledFeatures.length > 0) {
-      // Feature-based: Check if required feature is in enabledFeatures array
-      isFeatureEnabled = subscription.enabledFeatures.includes(requiredFeature);
-    }
+    // Check if user has ANY of the required features enabled in their subscription
+    let isAnyFeatureEnabled = false;
 
-    // If not found in subscription.enabledFeatures, check the plan
-    if (!isFeatureEnabled && subscription.plan) {
-      // Get plan details
-      const plan = await this.subscriptionPlansService.findByName(subscription.plan);
-      if (plan) {
-        // Check if feature is enabled in plan (using new enabledFeatureKeys or legacy features)
-        isFeatureEnabled = isFeatureEnabledInPlan(plan, requiredFeature);
+    for (const feature of features) {
+      let isFeatureEnabled = false;
+      if (subscription.enabledFeatures && subscription.enabledFeatures.length > 0) {
+        isFeatureEnabled = subscription.enabledFeatures.includes(feature);
+      }
+
+      if (!isFeatureEnabled && subscription.plan) {
+        const plan = await this.subscriptionPlansService.findByName(subscription.plan);
+        if (plan) {
+          isFeatureEnabled = isFeatureEnabledInPlan(plan, feature);
+        }
+      }
+
+      if (isFeatureEnabled) {
+        isAnyFeatureEnabled = true;
+        break;
       }
     }
 
-    // If still not found, block access
-    if (!isFeatureEnabled) {
+    // If none of the required features are found, block access
+    if (!isAnyFeatureEnabled) {
+      const featureList = features.join(' or ');
       if (subscription.plan) {
         const plan = await this.subscriptionPlansService.findByName(subscription.plan);
         throw new ForbiddenException(
-          `Feature '${requiredFeature}' is not available in your ${plan?.displayName || subscription.plan} plan. Please upgrade to access this feature.`,
+          `Feature(s) '${featureList}' is not available in your ${plan?.displayName || subscription.plan} plan. Please upgrade to access this feature.`,
         );
       } else {
         throw new ForbiddenException(
-          `Feature '${requiredFeature}' is not enabled in your subscription. Please contact support to enable this feature.`,
+          `Feature(s) '${featureList}' is not enabled in your subscription. Please contact support to enable this feature.`,
         );
       }
     }

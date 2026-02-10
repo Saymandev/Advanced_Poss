@@ -51,7 +51,7 @@ export class POSController {
   }
 
   @Get('orders')
-  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
   async getOrders(@Query() filters: POSOrderFiltersDto, @Request() req) {
     const filtersWithBranch = {
       ...filters,
@@ -61,7 +61,7 @@ export class POSController {
   }
 
   @Get('orders/:id')
-  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
   async getOrderById(@Param('id') id: string) {
     return this.posService.getOrderById(id);
   }
