@@ -21,7 +21,7 @@ export class RolePermissionsService {
     @InjectModel(Subscription.name)
     private subscriptionModel: Model<SubscriptionDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
-  ) {}
+  ) { }
   async getRolePermissions(companyId: string): Promise<RolePermission[]> {
     if (!Types.ObjectId.isValid(companyId)) {
       throw new BadRequestException('Invalid company ID');
@@ -67,6 +67,15 @@ export class RolePermissionsService {
     } else {
       roleFeatures = permission.features || [];
     }
+
+    // CRITICAL: Merge default features into roleFeatures if they are missing
+    // This ensures newly added system features are available to existing roles without manual migration
+    const defaultFeatures = DEFAULT_ROLE_FEATURES[role] || [];
+    const missingDefaults = defaultFeatures.filter(f => !roleFeatures.includes(f));
+    if (missingDefaults.length > 0) {
+      roleFeatures = [...roleFeatures, ...missingDefaults];
+    }
+
     // Filter features based on subscription - only return features enabled in subscription
     // CRITICAL: Query for active subscriptions that are NOT expired
     // This prevents expired subscriptions from being used even if isActive hasn't been fixed yet
@@ -74,7 +83,7 @@ export class RolePermissionsService {
       .findOne({
         companyId: new Types.ObjectId(companyId),
         isActive: true,
-        status: { 
+        status: {
           $nin: [SubscriptionStatus.EXPIRED, 'expired', SubscriptionStatus.CANCELLED, 'cancelled'] // Exclude expired/cancelled
         },
       })
@@ -92,9 +101,9 @@ export class RolePermissionsService {
     }
     // CRITICAL: Check if subscription is expired or inactive
     const subscriptionStatus = subscription.status as string;
-    const isExpired = subscriptionStatus === SubscriptionStatus.EXPIRED || 
-                     subscriptionStatus === 'expired' ||
-                     subscription.isActive === false;
+    const isExpired = subscriptionStatus === SubscriptionStatus.EXPIRED ||
+      subscriptionStatus === 'expired' ||
+      subscription.isActive === false;
     // If subscription is expired or inactive, return only core features
     if (isExpired) {
       return {
@@ -106,10 +115,10 @@ export class RolePermissionsService {
       } as RolePermission;
     }
     // Check subscription status for active/trial
-    const isActiveOrTrial = subscriptionStatus === SubscriptionStatus.ACTIVE || 
-                            subscriptionStatus === SubscriptionStatus.TRIAL ||
-                            subscriptionStatus === 'active' || 
-                            subscriptionStatus === 'trial';
+    const isActiveOrTrial = subscriptionStatus === SubscriptionStatus.ACTIVE ||
+      subscriptionStatus === SubscriptionStatus.TRIAL ||
+      subscriptionStatus === 'active' ||
+      subscriptionStatus === 'trial';
     // Get enabled features from subscription
     let enabledFeatures: string[] = [];
     // Priority 1: Check if feature-based subscription (new flexible model)
@@ -126,15 +135,15 @@ export class RolePermissionsService {
     if (enabledFeatures.length < 5 && subscription.plan) {
       try {
         // Handle both string and object (in case plan is populated)
-        const planName = typeof subscription.plan === 'string' 
-          ? subscription.plan 
+        const planName = typeof subscription.plan === 'string'
+          ? subscription.plan
           : (subscription.plan as any)?.name || subscription.plan;
         const plan = await this.subscriptionPlansService.findByName(planName);
         if (plan) {
           // Check new enabledFeatureKeys first
           if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
             enabledFeatures = plan.enabledFeatureKeys;
-            } 
+          }
           // Fallback to legacy features object
           else if (plan.features) {
             enabledFeatures = convertLegacyFeaturesToKeys(plan.features);

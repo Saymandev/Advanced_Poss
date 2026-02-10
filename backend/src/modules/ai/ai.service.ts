@@ -15,7 +15,7 @@ export class AiService {
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     private openAIService: OpenAIService,
-  ) {}
+  ) { }
   async generateSalesAnalytics(
     branchId: string,
     startDate: Date,
@@ -95,9 +95,9 @@ export class AiService {
     const firstHalfAvg = firstHalf.reduce((sum, day) => sum + day.totalRevenue, 0) / firstHalf.length;
     const secondHalfAvg = secondHalf.reduce((sum, day) => sum + day.totalRevenue, 0) / secondHalf.length;
     const trendPercentage = firstHalfAvg > 0 ? ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100 : 0;
-    const trend: 'up' | 'down' | 'stable' = 
-      trendPercentage > 5 ? 'up' : 
-      trendPercentage < -5 ? 'down' : 'stable';
+    const trend: 'up' | 'down' | 'stable' =
+      trendPercentage > 5 ? 'up' :
+        trendPercentage < -5 ? 'down' : 'stable';
     // Generate insights
     const insights = [];
     const recommendations = [];
@@ -593,7 +593,7 @@ export class AiService {
       .filter(item => item.totalRevenue < totalRevenue / menuPerformance.length)
       .slice(0, 5);
     // Calculate menu efficiency
-    const menuEfficiency = menuPerformance.length > 0 ? 
+    const menuEfficiency = menuPerformance.length > 0 ?
       (topPerformers.reduce((sum, item) => sum + item.totalRevenue, 0) / totalRevenue) * 100 : 0;
     return {
       totalItems: menuPerformance.length,
@@ -688,9 +688,9 @@ export class AiService {
     const orders = orderData;
     const customers = customerData[0] || { uniqueCustomers: 0, avgOrdersPerCustomer: 0, avgSpentPerCustomer: 0 };
     // Calculate trends
-    const revenueTrend = orders.length > 1 ? 
+    const revenueTrend = orders.length > 1 ?
       ((orders[orders.length - 1].dailyRevenue - orders[0].dailyRevenue) / orders[0].dailyRevenue) * 100 : 0;
-    const orderTrend = orders.length > 1 ? 
+    const orderTrend = orders.length > 1 ?
       ((orders[orders.length - 1].dailyOrders - orders[0].dailyOrders) / orders[0].dailyOrders) * 100 : 0;
     // Generate insights
     const insights = [];
@@ -829,11 +829,11 @@ export class AiService {
       const orderCount = itemOrderData?.orderCount || 0;
       const avgPrice = itemOrderData?.avgPrice || currentPrice;
       // Calculate metrics
-      const daysSinceLastOrder = itemOrderData?.lastOrderDate 
+      const daysSinceLastOrder = itemOrderData?.lastOrderDate
         ? Math.floor((endDate.getTime() - new Date(itemOrderData.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
         : 999; // Never ordered
       // Calculate demand score (0-10)
-      const demandScore = Math.min(10, Math.max(0, 
+      const demandScore = Math.min(10, Math.max(0,
         (totalQuantity / 10) + // Base on quantity
         (orderCount / 5) + // Base on order frequency
         (daysSinceLastOrder < 7 ? 3 : daysSinceLastOrder < 30 ? 1 : -2) // Recency bonus
@@ -893,7 +893,7 @@ export class AiService {
             this.logger.log(`✅ Using AI recommendation for ${menuItem.name}`);
             recommendation = aiRecommendation.recommendation;
             suggestedPrice = Math.round(aiRecommendation.suggestedPrice * 100) / 100;
-            priceChange = suggestedPrice !== currentPrice 
+            priceChange = suggestedPrice !== currentPrice
               ? Math.round(((suggestedPrice - currentPrice) / currentPrice) * 100 * 10) / 10
               : 0;
             reasoning = aiRecommendation.reasoning;
@@ -998,7 +998,7 @@ export class AiService {
     }
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30); // Last 30 days
+    startDate.setDate(startDate.getDate() - 90); // Last 90 days (matched with menu optimization)
     // Get menu items - match the same logic as menu-items service
     const branchIdObj = new Types.ObjectId(branchId);
     let menuItems = await this.menuItemModel.find({
@@ -1074,7 +1074,7 @@ export class AiService {
       }
       // Calculate average daily demand
       const totalQuantity = itemOrders.reduce((sum, o) => sum + o.quantity, 0);
-      const avgDailyDemand = totalQuantity / 30;
+      const avgDailyDemand = totalQuantity / 90;
       // Predict next 7 days (simple average)
       const predictedDemand = Math.round(avgDailyDemand * 7);
       // Calculate factors
@@ -1160,9 +1160,9 @@ export class AiService {
     const totalOrders = customerOrders.length;
     const daysSinceLastOrder = customer.lastOrderDate
       ? Math.floor(
-          (new Date().getTime() - new Date(customer.lastOrderDate).getTime()) /
-            (1000 * 60 * 60 * 24),
-        )
+        (new Date().getTime() - new Date(customer.lastOrderDate).getTime()) /
+        (1000 * 60 * 60 * 24),
+      )
       : 999;
     const avgOrderValue =
       totalOrders > 0

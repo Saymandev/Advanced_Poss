@@ -21,7 +21,7 @@ import { AiService } from './ai.service';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
-@RequiresFeature(FEATURES.AI_INSIGHTS)
+@RequiresFeature(FEATURES.AI_INSIGHTS, FEATURES.AI_MENU_OPTIMIZATION)
 export class AiController {
   constructor(private readonly aiService: AiService) { }
 

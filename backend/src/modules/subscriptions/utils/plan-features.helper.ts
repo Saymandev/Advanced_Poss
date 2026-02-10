@@ -37,6 +37,7 @@ export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
   aiInsights: [
     FEATURES.AI_MENU_OPTIMIZATION,
     FEATURES.AI_CUSTOMER_LOYALTY,
+    FEATURES.AI_INSIGHTS,
   ],
   multiBranch: [
     FEATURES.BRANCHES,
@@ -161,12 +162,13 @@ export function getFeaturesByCategory() {
     'AI Features': [
       { key: FEATURES.AI_MENU_OPTIMIZATION, name: 'AI Menu Optimization' },
       { key: FEATURES.AI_CUSTOMER_LOYALTY, name: 'AI Customer Loyalty' },
+      { key: FEATURES.AI_INSIGHTS, name: 'AI Business Insights' },
     ],
     Inventory: [
       { key: FEATURES.INVENTORY, name: 'Inventory Management' },
       { key: FEATURES.SUPPLIERS, name: 'Suppliers' },
       { key: FEATURES.PURCHASE_ORDERS, name: 'Purchase Orders' },
-    { key: FEATURES.WASTAGE_MANAGEMENT, name: 'Wastage Management' },
+      { key: FEATURES.WASTAGE_MANAGEMENT, name: 'Wastage Management' },
     ],
     Financial: [
       { key: FEATURES.EXPENSES, name: 'Expense Management' },
