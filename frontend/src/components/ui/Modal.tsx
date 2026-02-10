@@ -63,7 +63,7 @@ export function Modal({
               </button>
             </div>
           )}
-          <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+          <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary-500/50 scrollbar-track-transparent hover:scrollbar-thumb-primary-600/70">
             {children}
           </div>
         </div>

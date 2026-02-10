@@ -6,7 +6,8 @@ import { ExportOptions } from '@/lib/utils/export';
 import {
   ChevronDownIcon,
   ChevronUpIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Checkbox } from './Checkbox';
@@ -205,20 +206,45 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Header with search and export */}
+      {/* Header with search, indicators and export */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        {searchable && (
-          <div className="w-full sm:w-64 lg:w-80">
-            <SearchBar
-              value={searchQuery}
-              onChange={(query) => {
-                setSearchQuery(query);
-                onSearch?.(query);
-              }}
-              placeholder={searchPlaceholder}
-            />
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center w-full sm:w-auto">
+          {searchable && (
+            <div className="w-full sm:w-64 lg:w-80">
+              <SearchBar
+                value={searchQuery}
+                onChange={(query) => {
+                  setSearchQuery(query);
+                  onSearch?.(query);
+                }}
+                placeholder={searchPlaceholder}
+              />
+            </div>
+          )}
+
+          {/* Records Indicator */}
+          <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span className="text-gray-500 dark:text-gray-400">Total:</span>
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {pagination?.totalItems ?? safeData.length}
+              </span>
+            </div>
+            {selectedItems.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800 animate-fade-in">
+                <span className="text-primary-600 dark:text-primary-400 font-medium">
+                  {selectedItems.length} selected
+                </span>
+                <button
+                  onClick={() => onSelectionChange?.([])}
+                  className="text-primary-400 hover:text-primary-600 transition-colors"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {exportable && (
           <div className="w-full sm:w-auto flex justify-end">
@@ -308,9 +334,16 @@ export function DataTable<T extends Record<string, any>>({
                     colSpan={columns.length + (selectable ? 1 : 0)}
                     className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"
                   >
-                    <div className="flex flex-col items-center gap-2">
-                      <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
-                      <p>{emptyMessage}</p>
+                    <div className="flex flex-col items-center gap-3 py-6">
+                      <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-full border border-gray-100 dark:border-gray-600/50">
+                        <MagnifyingGlassIcon className="w-10 h-10 text-gray-400 dark:text-gray-500" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-medium text-gray-900 dark:text-white">{emptyMessage}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs mx-auto">
+                          Try adjusting your search or filters to find what you're looking for.
+                        </p>
+                      </div>
                     </div>
                   </td>
                 </tr>
