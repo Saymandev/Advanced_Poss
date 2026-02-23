@@ -1,19 +1,23 @@
 import {
-  IsNotEmpty,
-  IsString,
-  IsNumber,
-  IsEnum,
-  IsOptional,
-  IsDateString,
-  Min,
-  IsArray,
+    IsArray,
+    IsDateString,
+    IsEnum,
+    IsNotEmpty,
+    IsNumber,
+    IsOptional,
+    IsString,
+    Min,
 } from 'class-validator';
 import { WastageReason } from '../schemas/wastage.schema';
 
 export class CreateWastageDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  ingredientId: string;
+  ingredientId?: string;
+
+  @IsOptional()
+  @IsString()
+  menuItemId?: string;
 
   @IsNotEmpty()
   @IsNumber()

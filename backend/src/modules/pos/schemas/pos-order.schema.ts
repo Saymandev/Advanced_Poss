@@ -96,7 +96,7 @@ export class POSOrder {
   @Prop({ required: true, enum: ['pending', 'paid', 'cancelled'] })
   status: string;
 
-  @Prop()
+  @Prop({ default: 'cash' })
   paymentMethod?: string;
 
   @Prop()

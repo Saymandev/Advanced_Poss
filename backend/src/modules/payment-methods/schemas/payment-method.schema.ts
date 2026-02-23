@@ -51,6 +51,10 @@ export class PaymentMethod {
   @Prop({ default: 0 })
   sortOrder: number; // Display order
 
+  // Ledger tracking
+  @Prop({ default: 0 })
+  currentBalance: number; // Real-time tracked balance for this payment method
+
   // Settings
   @Prop({ default: false })
   requiresReference: boolean; // Whether transaction reference is required

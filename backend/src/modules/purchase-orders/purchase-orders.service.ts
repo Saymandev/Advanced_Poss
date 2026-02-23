@@ -1,18 +1,20 @@
 import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-  forwardRef,
+    BadRequestException,
+    Inject,
+    Injectable,
+    NotFoundException,
+    forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import * as fs from 'fs';
 import { Model, Types } from 'mongoose';
+import * as path from 'path';
 import { PurchaseOrderFilterDto } from '../../common/dto/pagination.dto';
 import { PurchaseOrderStatus } from '../../common/enums/purchase-order-status.enum';
 import { ExpensesService } from '../expenses/expenses.service';
 import {
-  Ingredient,
-  IngredientDocument,
+    Ingredient,
+    IngredientDocument,
 } from '../ingredients/schemas/ingredient.schema';
 import { Supplier, SupplierDocument } from '../suppliers/schemas/supplier.schema';
 import { ApprovePurchaseOrderDto } from './dto/approve-purchase-order.dto';
@@ -21,8 +23,8 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import {
-  PurchaseOrder,
-  PurchaseOrderDocument,
+    PurchaseOrder,
+    PurchaseOrderDocument,
 } from './schemas/purchase-order.schema';
 
 @Injectable()
@@ -135,6 +137,7 @@ export class PurchaseOrdersService {
       taxAmount: 0,
       discountAmount: 0,
       items,
+      paymentMethod: createPurchaseOrderDto.paymentMethod,
     });
 
     const savedOrder = await purchaseOrder.save();
@@ -319,6 +322,8 @@ export class PurchaseOrdersService {
   }
 
   async receive(id: string, dto: ReceivePurchaseOrderDto) {
+    console.log(`[DEBUG] PurchaseOrdersService.receive called for ID: ${id}`);
+    console.log(`[DEBUG] Received items: ${JSON.stringify(dto.receivedItems)}`);
     const order = await this.purchaseOrderModel.findById(id);
     if (!order) {
       throw new NotFoundException('Purchase order not found');
@@ -333,18 +338,47 @@ export class PurchaseOrdersService {
       );
     }
 
-    dto.receivedItems.forEach((item) => {
+    let totalReceivedAmountInThisCall = 0;
+    const logPath = path.join(process.cwd(), 'txn-debug.log');
+    const receivedItemsDetails: string[] = [];
+
+    for (const item of dto.receivedItems) {
       const orderItem = order.items.find(
         (oi) => oi._id?.toString() === item.itemId,
       );
       if (!orderItem) {
         throw new BadRequestException(`Order item ${item.itemId} not found`);
       }
-      orderItem.receivedQuantity = Math.min(
-        orderItem.quantity,
-        item.receivedQuantity,
-      );
-    });
+
+      const oldReceivedQty = orderItem.receivedQuantity || 0;
+      const newReceivedQtyTotal = Math.min(orderItem.quantity, item.receivedQuantity);
+      const deltaQty = newReceivedQtyTotal - oldReceivedQty;
+
+      if (deltaQty > 0) {
+        orderItem.receivedQuantity = newReceivedQtyTotal;
+        const itemTotal = deltaQty * orderItem.unitPrice;
+        totalReceivedAmountInThisCall += itemTotal;
+        receivedItemsDetails.push(`${orderItem.ingredientName} (${deltaQty} ${orderItem.unit})`);
+
+        // Update Ingredient Inventory
+        try {
+          await this.ingredientModel.findByIdAndUpdate(orderItem.ingredientId, {
+            $inc: { 
+              currentStock: deltaQty,
+              totalPurchased: deltaQty
+            },
+            $set: { 
+              lastPurchasePrice: orderItem.unitPrice,
+              lastRestockedDate: new Date()
+            }
+          });
+          fs.appendFileSync(logPath, `[PO-RECEIVE] Updated inventory for ${orderItem.ingredientName}: +${deltaQty}\n`);
+        } catch (invError) {
+          console.error(`❌ Failed to update inventory for ingredient ${orderItem.ingredientName}:`, invError);
+          fs.appendFileSync(logPath, `[PO-RECEIVE] Inventory Update FAILED for ${orderItem.ingredientName}\n`);
+        }
+      }
+    }
 
     const fullyReceived = order.items.every(
       (item) => item.receivedQuantity >= item.quantity,
@@ -353,45 +387,42 @@ export class PurchaseOrdersService {
     if (fullyReceived) {
       order.status = PurchaseOrderStatus.RECEIVED;
       order.actualDeliveryDate = new Date();
+    } else {
+      order.status = PurchaseOrderStatus.ORDERED;
+    }
 
-      // Automatically create an expense entry when purchase order is fully received
+    // Automatically create an expense entry if anything was received in this call
+    if (totalReceivedAmountInThisCall > 0) {
       try {
         const supplier = await this.supplierModel.findById(order.supplierId).lean();
-        const receivedAmount = order.items.reduce((sum, item) => {
-          const receivedQty = item.receivedQuantity || item.quantity;
-          return sum + (receivedQty * item.unitPrice);
-        }, 0);
+        
+        fs.appendFileSync(logPath, `[PO-RECEIVE] Creating partial expense for ${order.orderNumber}, Amount: ${totalReceivedAmountInThisCall}\n`);
 
         const expenseData = {
           companyId: order.companyId.toString(),
-          branchId: order.branchId?.toString() || order.companyId.toString(), // Use companyId as fallback if no branchId
-          title: `Purchase Order ${order.orderNumber}`,
-          description: `Purchase order received from ${supplier?.name || 'Supplier'}. Items: ${order.items.map(i => `${i.ingredientName} (${i.receivedQuantity || i.quantity} ${i.unit})`).join(', ')}`,
-          amount: receivedAmount,
-          category: 'ingredient', // Purchase orders are typically for ingredients
+          branchId: order.branchId?.toString() || order.companyId.toString(),
+          title: `Purchase Receipt: ${order.orderNumber}`,
+          description: `Partial receipt from ${supplier?.name || 'Supplier'}. Items: ${receivedItemsDetails.join(', ')}`,
+          amount: totalReceivedAmountInThisCall,
+          category: 'ingredient',
           date: new Date().toISOString().split('T')[0],
-          paymentMethod: 'other', // Default, can be updated later
           vendorName: supplier?.name,
           invoiceNumber: order.orderNumber,
           supplierId: order.supplierId.toString(),
-          notes: `Auto-created from Purchase Order ${order.orderNumber}. ${order.notes || ''}`,
-          createdBy: order.approvedBy?.toString() || order.companyId.toString(), // Use approvedBy if available, otherwise companyId
+          paymentMethod: (order as any).paymentMethod || 'cash',
+          status: 'paid', // Mark as paid to trigger ledger transaction
+          notes: `Auto-created from receipt update of PO ${order.orderNumber}.`,
+          createdBy: order.approvedBy?.toString() || (order as any).createdBy?.toString() || (order as any).companyId?.toString(),
           isRecurring: false,
-          purchaseOrderId: order._id.toString(), // Link expense to purchase order
+          purchaseOrderId: order._id.toString(),
         };
 
         const createdExpense = await this.expensesService.create(expenseData);
+        fs.appendFileSync(logPath, `[PO-RECEIVE] SUCCESS: Created partial expense ${createdExpense.expenseNumber}\n`);
       } catch (expenseError: any) {
-        // Log error but don't fail the receive operation
-        console.error('❌ Failed to create expense from purchase order:', {
-          error: expenseError?.message || expenseError,
-          stack: expenseError?.stack,
-          orderNumber: order.orderNumber,
-          orderId: order._id.toString(),
-        });
+        console.error('❌ Failed to create partial expense from purchase order:', expenseError);
+        fs.appendFileSync(logPath, `[PO-RECEIVE] Expense Creation FAILED: ${expenseError.message}\n`);
       }
-    } else {
-      order.status = PurchaseOrderStatus.ORDERED;
     }
 
     await order.save();

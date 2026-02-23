@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RoleFeatureGuard } from '../../common/guards/role-feature.guard';
 import { IngredientsModule } from '../ingredients/ingredients.module';
+import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
@@ -13,6 +14,7 @@ import { WastageService } from './wastage.service';
   imports: [
     MongooseModule.forFeature([{ name: Wastage.name, schema: WastageSchema }]),
     IngredientsModule,
+    forwardRef(() => MenuItemsModule),
     RolePermissionsModule, // Import to use RolePermissionsService in RoleFeatureGuard
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard

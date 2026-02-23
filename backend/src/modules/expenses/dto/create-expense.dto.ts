@@ -69,10 +69,10 @@ export class CreateExpenseDto {
   date: string;
 
   @ApiProperty({
-    enum: ['cash', 'card', 'bank-transfer', 'cheque', 'online', 'other'],
     example: 'bank-transfer',
   })
-  @IsEnum(['cash', 'card', 'bank-transfer', 'cheque', 'online', 'other'])
+  @IsString()
+  @IsNotEmpty()
   paymentMethod: string;
 
   @ApiPropertyOptional({ example: 'INV-2024-001' })
@@ -129,6 +129,11 @@ export class CreateExpenseDto {
   @IsOptional()
   @IsArray()
   tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  @IsEnum(['pending', 'approved', 'rejected', 'paid'])
+  status?: string;
 
   @ApiPropertyOptional({ example: '507f1f77bcf86cd799439015' })
   @IsOptional()

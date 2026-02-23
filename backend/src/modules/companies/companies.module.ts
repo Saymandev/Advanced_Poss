@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
 import { Customer, CustomerSchema } from '../customers/schemas/customer.schema';
+import { PaymentMethod, PaymentMethodSchema } from '../payment-methods/schemas/payment-method.schema';
 import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
 import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
@@ -19,6 +20,7 @@ import { Company, CompanySchema } from './schemas/company.schema';
       { name: POSOrder.name, schema: POSOrderSchema },
       { name: User.name, schema: UserSchema },
       { name: Customer.name, schema: CustomerSchema },
+      { name: PaymentMethod.name, schema: PaymentMethodSchema },
     ]),
     forwardRef(() => UsersModule),
     forwardRef(() => SubscriptionPlansModule),

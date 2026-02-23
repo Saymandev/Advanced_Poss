@@ -372,16 +372,24 @@ export class ReceiptService {
     // Get waiter name if userId is populated
     let waiterName = 'Default Waiter';
     if (order.userId) {
-      const userIdValue = order.userId as any;
-      if (typeof userIdValue === 'object' && userIdValue !== null && userIdValue.name) {
-        waiterName = userIdValue.name || 'Default Waiter';
+      const userObj = order.userId as any;
+      if (typeof userObj === 'object' && userObj !== null) {
+        // If it's populated (object), use its properties directly
+        waiterName = userObj.name || 
+                     `${userObj.firstName || ''} ${userObj.lastName || ''}`.trim() || 
+                     userObj.email || 
+                     'Default Waiter';
       } else {
+        // If it's NOT populated (string or ObjectId), try to fetch it
         try {
-          const userIdStr = userIdValue?.toString() || (order as any).userId?.toString();
-          if (userIdStr) {
-            const user = await this.userModel.findById(userIdStr).select('firstName lastName name').lean().exec();
+          const userIdStr = userObj.toString();
+          if (userIdStr && Types.ObjectId.isValid(userIdStr)) {
+            const user: any = await this.userModel.findById(userIdStr).select('firstName lastName name email').lean().exec();
             if (user) {
-              waiterName = (user as any).name || `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() || 'Default Waiter';
+              waiterName = user.name || 
+                           `${user.firstName || ''} ${user.lastName || ''}`.trim() || 
+                           user.email || 
+                           'Default Waiter';
             }
           }
         } catch (error) {

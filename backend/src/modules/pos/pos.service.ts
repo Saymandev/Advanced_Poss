@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import * as fs from 'fs';
 import { Model, Types } from 'mongoose';
+import * as path from 'path';
 import { EmailService } from '../../common/services/email.service';
 import { SmsService } from '../../common/services/sms.service';
 import { BookingsService } from '../bookings/bookings.service';
@@ -13,6 +15,8 @@ import { ServiceChargeSetting, ServiceChargeSettingDocument } from '../settings/
 import { TaxSetting, TaxSettingDocument } from '../settings/schemas/tax-setting.schema';
 import { SettingsService } from '../settings/settings.service';
 import { TablesService } from '../tables/tables.service';
+import { TransactionCategory, TransactionType } from '../transactions/schemas/transaction.schema';
+import { TransactionsService } from '../transactions/transactions.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { WorkPeriodsService } from '../work-periods/work-periods.service';
@@ -52,6 +56,8 @@ export class POSService {
     private bookingsService: BookingsService,
     @Inject(forwardRef(() => WorkPeriodsService))
     private workPeriodsService: WorkPeriodsService,
+    @Inject(forwardRef(() => TransactionsService))
+    private transactionsService: TransactionsService,
   ) {}
   // Generate unique order number
   private async generateOrderNumber(branchId: string): Promise<string> {
@@ -73,7 +79,7 @@ export class POSService {
   // Create POS order
   async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string, companyId?: string, userBranchId?: string): Promise<POSOrder> {
     // Validate the user creating the order is assigned to the branch (owners can work across branches)
-    const creatingUser = await this.userModel.findById(userId).select('role branchId companyId');
+    const creatingUser: any = await this.userModel.findById(userId).select('role branchId companyId');
     if (!creatingUser) {
       throw new NotFoundException('User not found');
     }
@@ -413,6 +419,109 @@ export class POSService {
               paymentId: savedPayment._id,
               completedAt: new Date(),
             }).exec();
+            
+            // Record transaction in ledger
+            try {
+              const resolvedCompanyId = companyId || (creatingUser as any)?.companyId?.toString() || branchId;
+
+              if (createOrderDto.paymentMethod === 'split') {
+                // For pay-first split: parse breakdown from transactionId string "method:amount|method:amount"
+                const breakdownStr = createOrderDto.transactionId || '';
+                const entries = breakdownStr.split('|').filter(Boolean);
+
+                if (entries.length > 0) {
+                  let recordedAny = false;
+                  for (const entry of entries) {
+                    const colonIdx = entry.lastIndexOf(':');
+                    if (colonIdx === -1) continue;
+                    const subMethod = entry.substring(0, colonIdx).trim();
+                    const subAmount = parseFloat(entry.substring(colonIdx + 1).trim());
+                    if (subMethod && Number.isFinite(subAmount) && subAmount > 0) {
+                      try {
+                        await this.transactionsService.recordTransaction(
+                          {
+                            paymentMethodId: subMethod,
+                            type: TransactionType.IN,
+                            category: TransactionCategory.SALE,
+                            amount: subAmount,
+                            date: new Date().toISOString(),
+                            referenceId: savedOrder._id.toString(),
+                            referenceModel: 'POSOrder',
+                            description: `Split payment (${subMethod}) for POS order ${savedOrder.orderNumber}`,
+                            notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
+                          },
+                          resolvedCompanyId,
+                          branchId,
+                          userId,
+                        );
+                        recordedAny = true;
+                      } catch (subTxnError) {
+                        console.error(`❌ Failed to record split transaction for method ${subMethod}:`, subTxnError);
+                      }
+                    }
+                  }
+                  if (!recordedAny) {
+                    // Fallback: record full amount under cash if parsing failed
+                    await this.transactionsService.recordTransaction(
+                      {
+                        paymentMethodId: 'cash',
+                        type: TransactionType.IN,
+                        category: TransactionCategory.SALE,
+                        amount: savedOrder.totalAmount,
+                        date: new Date().toISOString(),
+                        referenceId: savedOrder._id.toString(),
+                        referenceModel: 'POSOrder',
+                        description: `Split payment for POS order ${savedOrder.orderNumber}`,
+                        notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
+                      },
+                      resolvedCompanyId,
+                      branchId,
+                      userId,
+                    );
+                  }
+                } else {
+                  // Fallback: no breakdown string — record as single cash entry
+                  await this.transactionsService.recordTransaction(
+                    {
+                      paymentMethodId: 'cash',
+                      type: TransactionType.IN,
+                      category: TransactionCategory.SALE,
+                      amount: savedOrder.totalAmount,
+                      date: new Date().toISOString(),
+                      referenceId: savedOrder._id.toString(),
+                      referenceModel: 'POSOrder',
+                      description: `Split payment for POS order ${savedOrder.orderNumber}`,
+                      notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
+                    },
+                    resolvedCompanyId,
+                    branchId,
+                    userId,
+                  );
+                }
+              } else {
+                const logMsg = `[POSService] Recording transaction for order ${savedOrder.orderNumber}, Method: ${createOrderDto.paymentMethod}, Amount: ${savedOrder.totalAmount}, Company: ${resolvedCompanyId}\n`;
+                fs.appendFileSync(path.join(process.cwd(), 'txn-debug.log'), logMsg);
+
+                await this.transactionsService.recordTransaction(
+                  {
+                    paymentMethodId: createOrderDto.paymentMethod,
+                    type: TransactionType.IN,
+                    category: TransactionCategory.SALE,
+                    amount: savedOrder.totalAmount,
+                    date: new Date().toISOString(),
+                    referenceId: savedOrder._id.toString(),
+                    referenceModel: 'POSOrder',
+                    description: `Payment for POS order ${savedOrder.orderNumber}`,
+                    notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
+                  },
+                  resolvedCompanyId,
+                  branchId,
+                  userId,
+                );
+              }
+            } catch (txnError) {
+              console.error('❌ Failed to record transaction in ledger for pay-first order:', txnError);
+            }
             } catch (paymentError) {
             // Log error but don't fail order creation
             console.error('Failed to create payment record for paid order:', paymentError);
@@ -720,7 +829,7 @@ export class POSService {
   // Process payment
   async processPayment(processPaymentDto: ProcessPaymentDto, userId: string, branchId: string, companyId?: string): Promise<POSPayment> {
     // Validate active work period for non-owner users (only owners can process payments without active work period)
-    const processingUser = await this.userModel.findById(userId).select('role');
+    const processingUser = await this.userModel.findById(userId).select('role companyId');
     if (processingUser && processingUser.role !== 'owner') {
       if (!companyId) {
         throw new BadRequestException('Company ID is required to validate work period');
@@ -732,7 +841,7 @@ export class POSService {
         );
       }
     }
-    const order = await this.posOrderModel.findById(processPaymentDto.orderId).exec();
+    const order: any = await this.posOrderModel.findById(processPaymentDto.orderId).exec();
     if (!order) {
       throw new NotFoundException('POS order not found');
     }
@@ -846,6 +955,90 @@ export class POSService {
         console.error('❌ Failed to send purchase notifications:', notificationError);
       }
     }
+    
+    // Record transaction in ledger
+    try {
+      const resolvedCompanyId = companyId || order.companyId?.toString() || branchId;
+
+      if (processPaymentDto.method === 'split') {
+        // Parse breakdown from transactionId string: "method:amount|method:amount"
+        const breakdownStr = processPaymentDto.transactionId || '';
+        const entries = breakdownStr.split('|').filter(Boolean);
+
+        if (entries.length > 0) {
+          for (const entry of entries) {
+            const colonIdx = entry.lastIndexOf(':');
+            if (colonIdx === -1) continue;
+            const subMethod = entry.substring(0, colonIdx).trim();
+            const subAmount = parseFloat(entry.substring(colonIdx + 1).trim());
+            if (!subMethod || !Number.isFinite(subAmount) || subAmount <= 0) continue;
+
+            try {
+              await this.transactionsService.recordTransaction(
+                {
+                  paymentMethodId: subMethod,
+                  type: TransactionType.IN,
+                  category: TransactionCategory.SALE,
+                  amount: subAmount,
+                  date: new Date().toISOString(),
+                  referenceId: order._id.toString(),
+                  referenceModel: 'POSOrder',
+                  description: `Split payment (${subMethod}) for POS order ${order.orderNumber}`,
+                  notes: `Split txn ID: ${savedPayment._id}`,
+                },
+                resolvedCompanyId,
+                branchId,
+                userId,
+              );
+            } catch (subTxnError) {
+              console.error(`❌ Failed to record split transaction for method ${subMethod}:`, subTxnError);
+            }
+          }
+        } else {
+          // Fallback: no breakdown string — record as single cash entry
+          console.warn('[processPayment] Split payment but no breakdown in transactionId. Recording as single entry.');
+          await this.transactionsService.recordTransaction(
+            {
+              paymentMethodId: 'cash',
+              type: TransactionType.IN,
+              category: TransactionCategory.SALE,
+              amount: processPaymentDto.amount,
+              date: new Date().toISOString(),
+              referenceId: order._id.toString(),
+              referenceModel: 'POSOrder',
+              description: `Split payment for POS order ${order.orderNumber}`,
+              notes: `Txn ID: ${savedPayment._id}`,
+            },
+            resolvedCompanyId,
+            branchId,
+            userId,
+          );
+        }
+      } else if (processPaymentDto.method) {
+        const logMsg = `[POSService] (processPayment) Recording transaction for order ${order.orderNumber}, Method: ${processPaymentDto.method}, Amount: ${processPaymentDto.amount}, Company: ${resolvedCompanyId}\n`;
+        fs.appendFileSync(path.join(process.cwd(), 'txn-debug.log'), logMsg);
+
+        await this.transactionsService.recordTransaction(
+          {
+            paymentMethodId: processPaymentDto.method,
+            type: TransactionType.IN,
+            category: TransactionCategory.SALE,
+            amount: processPaymentDto.amount,
+            date: new Date().toISOString(),
+            referenceId: order._id.toString(),
+            referenceModel: 'POSOrder',
+            description: `Payment for POS order ${order.orderNumber}`,
+            notes: `Txn ID: ${savedPayment._id}`,
+          },
+          resolvedCompanyId,
+          branchId,
+          userId,
+        );
+      }
+    } catch (txnError) {
+      console.error('❌ Failed to record transaction in ledger:', txnError);
+    }
+    
     // Notify via WebSocket: payment received
     try {
       this.websocketsGateway.notifyPaymentReceived(

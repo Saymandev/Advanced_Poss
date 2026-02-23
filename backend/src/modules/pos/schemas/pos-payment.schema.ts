@@ -11,7 +11,7 @@ export class POSPayment {
   @Prop({ required: true })
   amount: number;
 
-  @Prop({ required: true, enum: ['cash', 'card', 'split'] })
+  @Prop({ required: true }) // Accepts any method: 'cash', 'card', 'split', 'bkash', 'nagad', etc.
   method: string;
 
   @Prop({ required: true, enum: ['pending', 'completed', 'failed', 'refunded'] })

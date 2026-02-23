@@ -4,6 +4,7 @@ import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { TablesModule } from '../tables/tables.module';
+import { TransactionsModule } from '../transactions/transactions.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { Order, OrderSchema } from './schemas/order.schema';
@@ -15,6 +16,7 @@ import { Order, OrderSchema } from './schemas/order.schema';
     forwardRef(() => MenuItemsModule), // Circular dependency through SubscriptionsModule
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
+    forwardRef(() => TransactionsModule), // Used to record payments in accounting ledger
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

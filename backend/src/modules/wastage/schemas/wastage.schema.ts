@@ -22,8 +22,11 @@ export class Wastage {
   @Prop({ type: Types.ObjectId, ref: 'Branch', required: true })
   branchId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Ingredient', required: true })
-  ingredientId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Ingredient', required: false })
+  ingredientId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'MenuItem', required: false })
+  menuItemId?: Types.ObjectId;
 
   @Prop({ required: true, min: 0 })
   quantity: number;

@@ -1,12 +1,18 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import * as fs from 'fs';
 import { Model, Types } from 'mongoose';
+import * as path from 'path';
 import { ExpenseFilterDto } from '../../common/dto/pagination.dto';
 import { isSuperAdmin } from '../../common/utils/query.utils';
+import { TransactionCategory, TransactionType } from '../transactions/schemas/transaction.schema';
+import { TransactionsService } from '../transactions/transactions.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { Expense, ExpenseDocument } from './schemas/expense.schema';
@@ -15,6 +21,8 @@ export class ExpensesService {
   constructor(
     @InjectModel(Expense.name)
     private expenseModel: Model<ExpenseDocument>,
+    @Inject(forwardRef(() => TransactionsService))
+    private transactionsService: TransactionsService,
   ) {}
   async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
     const expenseNumber = await this.generateExpenseNumber(
@@ -23,7 +31,7 @@ export class ExpensesService {
     const expenseData: any = {
       ...createExpenseDto,
       expenseNumber,
-      status: 'pending',
+      status: (createExpenseDto as any).status || 'pending',
     };
     // Convert string IDs to ObjectIds
     if (expenseData.companyId && typeof expenseData.companyId === 'string') {
@@ -42,7 +50,14 @@ export class ExpensesService {
       expenseData.purchaseOrderId = new Types.ObjectId(expenseData.purchaseOrderId);
     }
     const expense = new this.expenseModel(expenseData);
-    return expense.save();
+    const savedExpense = await expense.save();
+
+    // If already paid, record transaction
+    if (savedExpense.status === 'paid') {
+      await this.recordLedgerTransaction(savedExpense);
+    }
+
+    return savedExpense;
   }
   async findAll(filterDto: ExpenseFilterDto, userRole?: string): Promise<{ expenses: Expense[], total: number, page: number, limit: number }> {
     const { 
@@ -224,15 +239,26 @@ export class ExpensesService {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid expense ID');
     }
-    const expense = await this.expenseModel.findByIdAndUpdate(
+    
+    const existingExpense = await this.expenseModel.findById(id);
+    if (!existingExpense) {
+      throw new NotFoundException('Expense not found');
+    }
+
+    const originalStatus = existingExpense.status;
+    
+    const updatedExpense = await this.expenseModel.findByIdAndUpdate(
       id,
       updateExpenseDto,
       { new: true },
     );
-    if (!expense) {
-      throw new NotFoundException('Expense not found');
+
+    // If status changed to 'paid', record transaction
+    if (updatedExpense.status === 'paid' && originalStatus !== 'paid') {
+      await this.recordLedgerTransaction(updatedExpense as any);
     }
-    return expense;
+
+    return updatedExpense;
   }
   async approve(id: string, approverId: string): Promise<Expense> {
     if (!Types.ObjectId.isValid(id)) {
@@ -277,11 +303,51 @@ export class ExpensesService {
     if (!expense) {
       throw new NotFoundException('Expense not found');
     }
+    if (expense.status === 'paid') {
+        return expense;
+    }
     if (expense.status !== 'approved') {
       throw new BadRequestException('Expense must be approved before marking as paid');
     }
     expense.status = 'paid';
-    return expense.save();
+    const savedExpense = await expense.save();
+
+    // Record transaction in ledger
+    await this.recordLedgerTransaction(savedExpense);
+
+    return savedExpense;
+  }
+
+  private async recordLedgerTransaction(expense: ExpenseDocument) {
+    console.log(`[DEBUG] recordLedgerTransaction called for expense: ${expense.expenseNumber}`);
+    const logPath = path.join(process.cwd(), 'txn-debug.log');
+    try {
+      const companyId = (expense as any).companyId?.toString();
+      const branchId = (expense as any).branchId?.toString();
+      const userId = (expense as any).createdBy?.toString();
+
+      fs.appendFileSync(logPath, `[EXPENSE] Recording txn for ${expense.expenseNumber}, Method: ${expense.paymentMethod}, Amount: ${expense.amount}, Company: ${companyId}\n`);
+
+      await this.transactionsService.recordTransaction(
+        {
+          paymentMethodId: expense.paymentMethod || 'cash',
+          type: TransactionType.OUT,
+          category: TransactionCategory.EXPENSE,
+          amount: expense.amount,
+          date: expense.date ? new Date(expense.date).toISOString() : new Date().toISOString(),
+          referenceId: expense._id.toString(),
+          referenceModel: 'Expense',
+          description: `Expense: ${expense.title}`,
+          notes: expense.expenseNumber,
+        },
+        companyId,
+        branchId,
+        userId,
+      );
+    } catch (txnError) {
+      fs.appendFileSync(logPath, `[EXPENSE] Error recorded: ${txnError.message}\n`);
+      console.error('❌ Failed to record transaction in ledger for expense:', txnError);
+    }
   }
   async remove(id: string): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {

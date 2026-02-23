@@ -1,13 +1,17 @@
 import {
     BadRequestException,
+    Inject,
     Injectable,
     NotFoundException,
+    forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { OrderFilterDto } from '../../common/dto/pagination.dto';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { TablesService } from '../tables/tables.service';
+import { TransactionCategory, TransactionType } from '../transactions/schemas/transaction.schema';
+import { TransactionsService } from '../transactions/transactions.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -21,6 +25,8 @@ export class OrdersService {
     private orderModel: Model<OrderDocument>,
     private tablesService: TablesService,
     private menuItemsService: MenuItemsService,
+    @Inject(forwardRef(() => TransactionsService))
+    private transactionsService: TransactionsService,
   ) {}
 
   async create(createOrderDto: CreateOrderDto): Promise<Order> {
@@ -391,6 +397,34 @@ export class OrdersService {
     }
 
     await order.save();
+    
+    // Record transaction in ledger
+    try {
+      if (addPaymentDto.method && addPaymentDto.method !== 'split') {
+        const companyId = order.companyId.toString();
+        const branchId = order.branchId.toString();
+        const userId = addPaymentDto.processedBy;
+
+        await this.transactionsService.recordTransaction(
+          {
+            paymentMethodId: addPaymentDto.method,
+            type: TransactionType.IN,
+            category: TransactionCategory.SALE,
+            amount: addPaymentDto.amount,
+            date: new Date().toISOString(),
+            referenceId: order._id.toString(),
+            referenceModel: 'Order',
+            description: `Payment for order ${order.orderNumber}`,
+            notes: addPaymentDto.transactionId ? `Txn ID: ${addPaymentDto.transactionId}` : '',
+          },
+          companyId,
+          branchId,
+          userId,
+        );
+      }
+    } catch (txnError) {
+      console.error('❌ Failed to record transaction in ledger:', txnError);
+    }
 
     return this.findOne(id);
   }

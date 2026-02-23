@@ -1,16 +1,11 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-  forwardRef,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as crypto from 'crypto';
 import { Model, Types } from 'mongoose';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
 import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
+import { PaymentMethod, PaymentMethodDocument } from '../payment-methods/schemas/payment-method.schema';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { SettingsService } from '../settings/settings.service';
 import { SubscriptionPlansService } from '../subscriptions/subscription-plans.service';
@@ -28,6 +23,7 @@ export class CompaniesService {
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
+    @InjectModel(PaymentMethod.name) private paymentMethodModel: Model<PaymentMethodDocument>,
     private subscriptionPlansService: SubscriptionPlansService,
     @Inject(forwardRef(() => SettingsService))
     private settingsService: SettingsService,
@@ -97,7 +93,27 @@ export class CompaniesService {
         features: subscriptionPlan.features,
       },
     });
-    return company.save();
+    return company.save().then(async (savedCompany) => {
+      // Seed default payment methods for the new company (SaaS isolation)
+      const companyId = (savedCompany as any)._id;
+      const defaultMethods = [
+        { name: 'Cash', code: 'cash', type: 'cash', sortOrder: 1, allowsPartialPayment: true, allowsChangeDue: true },
+        { name: 'Bkash', code: 'bkash', type: 'mobile_wallet', sortOrder: 2, allowsPartialPayment: true, allowsChangeDue: false },
+        { name: 'Nagad', code: 'nagad', type: 'mobile_wallet', sortOrder: 3, allowsPartialPayment: true, allowsChangeDue: false },
+        { name: 'Card', code: 'card', type: 'card', sortOrder: 4, allowsPartialPayment: true, allowsChangeDue: false },
+      ];
+      try {
+        for (const method of defaultMethods) {
+          const exists = await this.paymentMethodModel.findOne({ code: method.code, companyId });
+          if (!exists) {
+            await this.paymentMethodModel.create({ ...method, companyId, currentBalance: 0, isActive: true });
+          }
+        }
+      } catch (seedErr) {
+        console.error('Failed to seed default payment methods for company:', seedErr);
+      }
+      return savedCompany;
+    });
   }
   async findAll(filter: any = {}): Promise<Company[]> {
     // NOTE:

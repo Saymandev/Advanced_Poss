@@ -65,4 +65,9 @@ export class CreatePurchaseOrderDto {
   @ValidateNested({ each: true })
   @Type(() => PurchaseOrderItemDto)
   items: PurchaseOrderItemDto[];
+
+  @ApiPropertyOptional({ example: 'cash' })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }

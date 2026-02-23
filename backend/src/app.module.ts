@@ -65,6 +65,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
 import { SubscriptionLockMiddleware } from './common/middleware/subscription-lock.middleware';
+import { TransactionsModule } from './modules/transactions/transactions.module';
 
 @Module({
   imports: [
@@ -180,6 +181,7 @@ import { SubscriptionLockMiddleware } from './common/middleware/subscription-loc
     NotificationsModule,
     PurchaseOrdersModule,
     SystemFeedbackModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService, SubscriptionLockMiddleware],

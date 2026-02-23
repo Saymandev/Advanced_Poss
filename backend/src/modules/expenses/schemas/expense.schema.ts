@@ -45,7 +45,6 @@ export class Expense {
 
   @Prop({
     type: String,
-    enum: ['cash', 'card', 'bank-transfer', 'cheque', 'online', 'other'],
     default: 'cash',
   })
   paymentMethod: string;
@@ -66,7 +65,7 @@ export class Expense {
   createdBy: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
-  approvedBy?: Types.ObjectId;
+  approvedBy: Types.ObjectId;
 
   @Prop()
   approvedAt?: Date;
@@ -77,9 +76,6 @@ export class Expense {
     default: 'pending',
   })
   status: string;
-
-  @Prop([String])
-  attachments?: string[];
 
   @Prop()
   receiptUrl?: string;

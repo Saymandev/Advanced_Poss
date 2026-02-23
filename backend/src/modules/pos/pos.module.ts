@@ -20,6 +20,7 @@ import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.mod
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { Table, TableSchema } from '../tables/schemas/table.schema';
 import { TablesModule } from '../tables/tables.module';
+import { TransactionsModule } from '../transactions/transactions.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { UsersModule } from '../users/users.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
@@ -65,6 +66,7 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
     DeliveryZonesModule,
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
+    forwardRef(() => TransactionsModule), // Used to record POS payments in accounting ledger
   ],
   controllers: [POSController, PrinterManagementController],
   providers: [POSService, ReceiptService, PDFGeneratorService, PrinterService, EmailService, SmsService],

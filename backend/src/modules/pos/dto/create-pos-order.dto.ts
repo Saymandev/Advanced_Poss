@@ -160,7 +160,11 @@ export class CreatePOSOrderDto {
 
   @IsOptional()
   @IsString()
-  paymentMethod?: string;
+  paymentMethod?: string; // Method code or "split"
+
+  @IsOptional()
+  @IsString()
+  transactionId?: string; // Carry split breakdown string or card auth code
 
   @IsOptional()
   @IsString()

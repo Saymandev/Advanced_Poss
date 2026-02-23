@@ -106,6 +106,9 @@ export class PurchaseOrder {
 
   @Prop({ type: [PurchaseOrderItemSchema], required: true })
   items: PurchaseOrderItem[];
+
+  @Prop({ type: String, default: 'cash' })
+  paymentMethod?: string;
 }
 
 export const PurchaseOrderSchema = SchemaFactory.createForClass(PurchaseOrder);

@@ -55,7 +55,7 @@ export class PaymentMethodsService {
     if (filter.companyId) {
       query.companyId = new Types.ObjectId(filter.companyId);
     } else if (filter.systemOnly) {
-      query.companyId = { $exists: false };
+      query.$or = [{ companyId: { $exists: false } }, { companyId: null }];
     }
 
     if (filter.branchId) {
@@ -74,7 +74,10 @@ export class PaymentMethodsService {
 
   async findSystemPaymentMethods(): Promise<PaymentMethod[]> {
     return this.paymentMethodModel
-      .find({ companyId: { $exists: false }, isActive: true })
+      .find({
+        $or: [{ companyId: { $exists: false } }, { companyId: null }],
+        isActive: true,
+      })
       .sort({ sortOrder: 1, name: 1 })
       .exec();
   }
@@ -82,7 +85,10 @@ export class PaymentMethodsService {
   async findByCompany(companyId: string): Promise<PaymentMethod[]> {
     // Get both system-wide and company-specific payment methods
     const systemMethods = await this.paymentMethodModel
-      .find({ companyId: { $exists: false }, isActive: true })
+      .find({
+        $or: [{ companyId: { $exists: false } }, { companyId: null }],
+        isActive: true,
+      })
       .sort({ sortOrder: 1, name: 1 })
       .exec();
 
@@ -140,6 +146,7 @@ export class PaymentMethodsService {
       (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.name.localeCompare(b.name),
     );
   }
+
 
   async findOne(id: string): Promise<PaymentMethod> {
     if (!Types.ObjectId.isValid(id)) {
