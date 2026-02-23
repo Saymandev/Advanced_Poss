@@ -40,7 +40,8 @@ export interface CreatePOSOrderRequest {
   };
   totalAmount: number;
   status: 'pending' | 'paid' | 'cancelled';
-  paymentMethod?: string;
+  paymentMethod?: string; // e.g. 'cash', 'card', 'split'
+  transactionId?: string; // used for split breakdowns
   notes?: string;
   guestCount?: number;
   waiterId?: string; // Optional waiter/user ID to assign the order to
@@ -65,7 +66,7 @@ export interface POSPayment {
   id: string;
   orderId: string;
   amount: number;
-  method: 'cash' | 'card' | 'split';
+  method: string; // 'cash' | 'card' | 'split' | 'bkash' | 'nagad' | etc.
   status: 'pending' | 'completed' | 'failed' | 'refunded';
   transactionId?: string;
   createdAt: string;
@@ -169,7 +170,7 @@ export const posApi = apiSlice.injectEndpoints({
     processPayment: builder.mutation<POSPayment, {
       orderId: string;
       amount: number;
-      method: 'cash' | 'card' | 'split';
+      method: string; // 'cash' | 'card' | 'split' | 'bkash' | 'nagad' | etc.
       transactionId?: string;
     }>({
       query: (data) => ({

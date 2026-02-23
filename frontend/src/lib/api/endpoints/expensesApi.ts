@@ -7,7 +7,7 @@ export interface Expense {
   description?: string;
   amount: number;
   category: 'ingredient' | 'utility' | 'rent' | 'salary' | 'maintenance' | 'marketing' | 'equipment' | 'transport' | 'other';
-  paymentMethod: 'cash' | 'card' | 'bank-transfer' | 'cheque' | 'online' | 'other';
+  paymentMethod: string;
   vendorName?: string;
   vendorPhone?: string;
   invoiceNumber?: string;
@@ -35,7 +35,7 @@ export interface CreateExpenseRequest {
   description?: string;
   amount: number;
   category: 'ingredient' | 'utility' | 'rent' | 'salary' | 'maintenance' | 'marketing' | 'equipment' | 'transport' | 'other';
-  paymentMethod: 'cash' | 'card' | 'bank-transfer' | 'cheque' | 'online' | 'other';
+  paymentMethod: string;
   vendorName?: string;
   vendorPhone?: string;
   invoiceNumber?: string;
@@ -50,6 +50,7 @@ export interface CreateExpenseRequest {
 
 export interface UpdateExpenseRequest extends Partial<CreateExpenseRequest> {
   id: string;
+  status?: 'pending' | 'approved' | 'rejected' | 'paid';
 }
 
 export interface ExpenseCategory {

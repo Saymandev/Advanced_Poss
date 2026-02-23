@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
+import { useGetMenuItemsQuery } from '@/lib/api/endpoints/menuItemsApi';
 import {
   Wastage,
   WastageReason,
@@ -127,6 +128,11 @@ export default function WastagePage() {
     { skip: !companyId }
   );
 
+  const { data: menuItemsResponse } = useGetMenuItemsQuery(
+    { companyId, branchId },
+    { skip: !companyId }
+  );
+
   const [createWastage, { isLoading: isCreating }] = useCreateWastageMutation();
   const [updateWastage, { isLoading: isUpdating }] = useUpdateWastageMutation();
   const [deleteWastage, { isLoading: isDeleting }] = useDeleteWastageMutation();
@@ -155,6 +161,22 @@ export default function WastagePage() {
         currentStock: ingredient.currentStock,
       })),
     [ingredients],
+  );
+
+  const menuItems = useMemo(() => {
+    if (!menuItemsResponse) return [];
+    return (menuItemsResponse as any).menuItems || (menuItemsResponse as any).items || [];
+  }, [menuItemsResponse]);
+
+  const menuItemOptions = useMemo(
+    () =>
+      menuItems.map((item: any) => ({
+        value: item.id || item._id,
+        label: `${item.name} (${formatCurrency(item.price || item.cost || 0)})`,
+        unit: 'item',
+        unitCost: item.cost || item.price || 0,
+      })),
+    [menuItems],
   );
 
   const reasonOptions = useMemo(
@@ -195,13 +217,18 @@ export default function WastagePage() {
       const ingredientName = typeof w.ingredientId === 'object' 
         ? w.ingredientId.name?.toLowerCase() || ''
         : '';
+      const menuItemName = typeof w.menuItemId === 'object' 
+        ? w.menuItemId.name?.toLowerCase() || ''
+        : '';
       const notes = w.notes?.toLowerCase() || '';
-      return ingredientName.includes(query) || notes.includes(query);
+      return ingredientName.includes(query) || menuItemName.includes(query) || notes.includes(query);
     });
   }, [wastages, searchQuery]);
 
   const [formData, setFormData] = useState<any>({
+    type: 'ingredient',
     ingredientId: '',
+    menuItemId: '',
     quantity: 0,
     unit: '',
     reason: WastageReason.OTHER,
@@ -220,7 +247,9 @@ export default function WastagePage() {
 
   const resetForm = () => {
     setFormData({
+      type: 'ingredient',
       ingredientId: '',
+      menuItemId: '',
       quantity: 0,
       unit: '',
       reason: WastageReason.OTHER,
@@ -235,24 +264,41 @@ export default function WastagePage() {
 
   const handleCreate = async () => {
     try {
-      if (!formData.ingredientId || formData.quantity <= 0) {
+      if ((formData.type === 'ingredient' && !formData.ingredientId) || 
+          (formData.type === 'menuItem' && !formData.menuItemId) || 
+          formData.quantity <= 0) {
         toast.error('Please fill in all required fields');
         return;
       }
 
-      const selectedIngredient = ingredients.find(
-        (i: any) => i.id === formData.ingredientId || i._id === formData.ingredientId,
-      );
-      if (!selectedIngredient) {
-        toast.error('Ingredient not found');
-        return;
+      const payload = { ...formData };
+      
+      if (formData.type === 'ingredient') {
+        const selectedIngredient = ingredients.find(
+          (i: any) => i.id === formData.ingredientId || i._id === formData.ingredientId,
+        );
+        if (!selectedIngredient) {
+          toast.error('Ingredient not found');
+          return;
+        }
+        payload.unit = selectedIngredient.unit;
+        payload.unitCost = formData.unitCost || selectedIngredient.unitCost || 0;
+        delete payload.menuItemId;
+      } else {
+        const selectedMenuItem = menuItems.find(
+          (i: any) => i.id === formData.menuItemId || i._id === formData.menuItemId,
+        );
+        if (!selectedMenuItem) {
+          toast.error('Menu Item not found');
+          return;
+        }
+        payload.unit = 'item';
+        payload.unitCost = formData.unitCost || selectedMenuItem.cost || selectedMenuItem.price || 0;
+        delete payload.ingredientId;
       }
+      delete payload.type;
 
-      await createWastage({
-        ...formData,
-        unit: selectedIngredient.unit,
-        unitCost: formData.unitCost || selectedIngredient.unitCost || 0,
-      }).unwrap();
+      await createWastage(payload).unwrap();
 
       toast.success('Wastage record created successfully');
       setIsCreateModalOpen(false);
@@ -267,9 +313,17 @@ export default function WastagePage() {
     if (!selectedWastage) return;
 
     try {
+      const payload = { ...formData };
+      if (payload.type === 'ingredient') {
+        delete payload.menuItemId;
+      } else {
+        delete payload.ingredientId;
+      }
+      delete payload.type;
+
       await updateWastage({
         id: selectedWastage._id || selectedWastage.id || '',
-        data: formData,
+        data: payload,
       }).unwrap();
 
       toast.success('Wastage record updated successfully');
@@ -326,12 +380,18 @@ export default function WastagePage() {
   }, [updateWastage, refetch]);
 
   const openEditModal = useCallback((wastage: Wastage) => {
-    const ingredientId = typeof wastage.ingredientId === 'object' 
-      ? wastage.ingredientId._id 
-      : wastage.ingredientId;
+    const isMenuItem = !!wastage.menuItemId;
+    const ingredientId = wastage.ingredientId 
+      ? (typeof wastage.ingredientId === 'object' ? wastage.ingredientId._id : wastage.ingredientId)
+      : '';
+    const menuItemId = wastage.menuItemId 
+      ? (typeof wastage.menuItemId === 'object' ? wastage.menuItemId._id : wastage.menuItemId)
+      : '';
 
     setFormData({
+      type: isMenuItem ? 'menuItem' : 'ingredient',
       ingredientId,
+      menuItemId,
       quantity: wastage.quantity,
       unit: wastage.unit,
       reason: wastage.reason,
@@ -352,11 +412,15 @@ export default function WastagePage() {
 
   const columns = useMemo(() => [
     {
-      key: 'ingredient',
-      title: 'Ingredient',
+      key: 'itemWasted',
+      title: 'Item Wasted',
       render: (_: any, w: Wastage) => {
+        if (w.menuItemId) {
+          const menuItem = typeof w.menuItemId === 'object' ? w.menuItemId : null;
+          return <span className="font-medium text-blue-600 dark:text-blue-400">{menuItem?.name || 'Unknown Menu Item'} (Menu Item)</span>;
+        }
         const ingredient = typeof w.ingredientId === 'object' ? w.ingredientId : null;
-        return ingredient?.name || 'Unknown';
+        return ingredient?.name || 'Unknown Ingredient';
       },
     },
     {
@@ -622,26 +686,65 @@ export default function WastagePage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Ingredient *
+              Wastage Type *
             </label>
             <Select
-              options={ingredientOptions.map((ing: any) => ({
-                value: ing.value,
-                label: ing.label,
-              }))}
-              value={formData.ingredientId}
-              onChange={(val) => {
-                const ingredient = ingredientOptions.find((i) => i.value === val);
-                setFormData({
-                  ...formData,
-                  ingredientId: val,
-                  unit: (ingredient as any)?.unit || '',
-                  unitCost: (ingredient as any)?.unitCost || 0,
-                });
-              }}
-              placeholder="Select ingredient"
+              options={[
+                { value: 'ingredient', label: 'Raw Ingredient' },
+                { value: 'menuItem', label: 'Menu Item' },
+              ]}
+              value={formData.type}
+              onChange={(val) => setFormData({ ...formData, type: val })}
             />
           </div>
+
+          {formData.type === 'ingredient' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Ingredient *
+              </label>
+              <Select
+                options={ingredientOptions.map((ing: any) => ({
+                  value: ing.value,
+                  label: ing.label,
+                }))}
+                value={formData.ingredientId}
+                onChange={(val) => {
+                  const ingredient = ingredientOptions.find((i) => i.value === val);
+                  setFormData({
+                    ...formData,
+                    ingredientId: val,
+                    unit: (ingredient as any)?.unit || '',
+                    unitCost: (ingredient as any)?.unitCost || 0,
+                  });
+                }}
+                placeholder="Select ingredient"
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Menu Item *
+              </label>
+              <Select
+                options={menuItemOptions.map((item: any) => ({
+                  value: item.value,
+                  label: item.label,
+                }))}
+                value={formData.menuItemId}
+                onChange={(val) => {
+                  const menuItem = menuItemOptions.find((i: any) => i.value === val);
+                  setFormData({
+                    ...formData,
+                    menuItemId: val,
+                    unit: 'item',
+                    unitCost: (menuItem as any)?.unitCost || 0,
+                  });
+                }}
+                placeholder="Select menu item"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -750,24 +853,46 @@ export default function WastagePage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Ingredient
+              Wastage Type *
             </label>
             <Select
-              options={ingredientOptions}
-              value={formData.ingredientId}
-              onChange={(val) => {
-                const ingredient = ingredientOptions.find((i) => i.value === val);
-                setFormData({
-                  ...formData,
-                  ingredientId: val,
-                  unit: (ingredient as any)?.unit || formData.unit,
-                  unitCost: (ingredient as any)?.unitCost || formData.unitCost,
-                });
-              }}
-              placeholder="Select ingredient"
+              options={[
+                { value: 'ingredient', label: 'Raw Ingredient' },
+                { value: 'menuItem', label: 'Menu Item' },
+              ]}
+              value={formData.type}
+              onChange={() => {}}
               disabled
             />
           </div>
+
+          {formData.type === 'ingredient' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Ingredient
+              </label>
+              <Select
+                options={ingredientOptions}
+                value={formData.ingredientId}
+                onChange={() => {}}
+                placeholder="Select ingredient"
+                disabled
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Menu Item
+              </label>
+              <Select
+                options={menuItemOptions}
+                value={formData.menuItemId}
+                onChange={() => {}}
+                placeholder="Select menu item"
+                disabled
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -893,11 +1018,12 @@ export default function WastagePage() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Ingredient</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Wasted Item</p>
                 <p className="text-gray-900 dark:text-white">
-                  {typeof selectedWastage.ingredientId === 'object' 
-                    ? selectedWastage.ingredientId.name 
-                    : 'Unknown'}
+                  {selectedWastage.menuItemId 
+                    ? (typeof selectedWastage.menuItemId === 'object' ? selectedWastage.menuItemId.name : 'Menu Item')
+                    : (typeof selectedWastage.ingredientId === 'object' ? selectedWastage.ingredientId.name : 'Ingredient')}
+                  {selectedWastage.menuItemId && <span className="ml-2 text-xs text-blue-500">(Menu Item)</span>}
                 </p>
               </div>
               <div>

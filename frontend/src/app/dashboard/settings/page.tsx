@@ -9,52 +9,52 @@ import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetBranchesQuery, useUpdateBranchPublicUrlMutation } from '@/lib/api/endpoints/branchesApi';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import {
-  useAddCustomDomainMutation,
-  useGetCompaniesQuery,
-  useGetCompanyByIdQuery,
-  useGetCustomDomainInfoQuery,
-  useRemoveCustomDomainMutation,
-  useUploadCompanyLogoMutation,
-  useVerifyCustomDomainMutation,
+    useAddCustomDomainMutation,
+    useGetCompaniesQuery,
+    useGetCompanyByIdQuery,
+    useGetCustomDomainInfoQuery,
+    useRemoveCustomDomainMutation,
+    useUploadCompanyLogoMutation,
+    useVerifyCustomDomainMutation,
 } from '@/lib/api/endpoints/companiesApi';
 import {
-  useCreatePaymentMethodMutation,
-  useDeletePaymentMethodMutation,
-  useGetPaymentMethodsByCompanyQuery,
-  useUpdatePaymentMethodMutation,
-  type PaymentMethod,
+    useCreatePaymentMethodMutation,
+    useDeletePaymentMethodMutation,
+    useGetPaymentMethodsByCompanyQuery,
+    useUpdatePaymentMethodMutation,
+    type PaymentMethod,
 } from '@/lib/api/endpoints/paymentMethodsApi';
 import {
-  useCreateServiceChargeSettingMutation,
-  useCreateTaxSettingMutation,
-  useDeleteServiceChargeSettingMutation,
-  useDeleteTaxSettingMutation,
-  useGetCompanySettingsQuery,
-  useGetInvoiceSettingsQuery,
-  useGetServiceChargeSettingsQuery,
-  useGetTaxSettingsQuery,
-  useUpdateCompanySettingsMutation,
-  useUpdateInvoiceSettingsMutation,
-  useUpdateServiceChargeSettingMutation,
-  useUpdateTaxSettingMutation,
-  type InvoiceSettings,
+    useCreateServiceChargeSettingMutation,
+    useCreateTaxSettingMutation,
+    useDeleteServiceChargeSettingMutation,
+    useDeleteTaxSettingMutation,
+    useGetCompanySettingsQuery,
+    useGetInvoiceSettingsQuery,
+    useGetServiceChargeSettingsQuery,
+    useGetTaxSettingsQuery,
+    useUpdateCompanySettingsMutation,
+    useUpdateInvoiceSettingsMutation,
+    useUpdateServiceChargeSettingMutation,
+    useUpdateTaxSettingMutation,
+    type InvoiceSettings,
 } from '@/lib/api/endpoints/settingsApi';
 import { useGetSubscriptionByCompanyQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { useAppSelector } from '@/lib/store';
 import {
-  ClipboardDocumentIcon,
-  CogIcon,
-  CreditCardIcon,
-  CurrencyDollarIcon,
-  DocumentIcon,
-  GlobeAltIcon,
-  LinkIcon,
-  PencilIcon,
-  PhotoIcon,
-  PlusIcon,
-  ReceiptPercentIcon,
-  TrashIcon,
-  XMarkIcon
+    ClipboardDocumentIcon,
+    CogIcon,
+    CreditCardIcon,
+    CurrencyDollarIcon,
+    DocumentIcon,
+    GlobeAltIcon,
+    LinkIcon,
+    PencilIcon,
+    PhotoIcon,
+    PlusIcon,
+    ReceiptPercentIcon,
+    TrashIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -295,6 +295,7 @@ export default function SettingsPage() {
     requiresAuthorization: false,
     allowsPartialPayment: false,
     allowsChangeDue: true,
+    branchId: '', // Optional: null/empty means company-wide
   });
   // Modal states
   const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
@@ -1796,6 +1797,7 @@ export default function SettingsPage() {
                     requiresAuthorization: false,
                     allowsPartialPayment: false,
                     allowsChangeDue: true,
+                    branchId: '',
                   });
                   setIsPaymentMethodModalOpen(true);
                 }}
@@ -1847,6 +1849,11 @@ export default function SettingsPage() {
                           {!method.companyId && (
                             <Badge className="bg-blue-100 text-blue-800">System</Badge>
                           )}
+                          {method.branchId && (
+                            <Badge className="bg-purple-100 text-purple-800">
+                              {branches.find(b => b.id === method.branchId)?.name || 'Branch Specific'}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-gray-500">{method.code}</p>
                         {method.description && (
@@ -1877,6 +1884,7 @@ export default function SettingsPage() {
                                 requiresAuthorization: method.requiresAuthorization,
                                 allowsPartialPayment: method.allowsPartialPayment,
                                 allowsChangeDue: method.allowsChangeDue,
+                                branchId: method.branchId || '',
                               });
                               setIsPaymentMethodModalOpen(true);
                             }}
@@ -2111,6 +2119,15 @@ export default function SettingsPage() {
               { value: 'other', label: 'Other' },
             ]}
           />
+          <Select
+            label="Branch (Optional)"
+            value={paymentMethodForm.branchId}
+            onChange={(value) => setPaymentMethodForm({ ...paymentMethodForm, branchId: value })}
+            options={[
+              { value: '', label: 'All Branches (Company-wide)' },
+              ...branches.map((b: any) => ({ value: b.id, label: b.name }))
+            ]}
+          />
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Icon (Optional)"
@@ -2200,14 +2217,19 @@ export default function SettingsPage() {
                   return;
                 }
                 try {
+                  const payload = {
+                    ...paymentMethodForm,
+                    branchId: paymentMethodForm.branchId || undefined,
+                  };
+
                   if (editingPaymentMethod) {
                     await updatePaymentMethod({
                       id: editingPaymentMethod.id,
-                      data: paymentMethodForm,
+                      data: payload,
                     }).unwrap();
                     toast.success('Payment method updated');
                   } else {
-                    await createPaymentMethod(paymentMethodForm).unwrap();
+                    await createPaymentMethod(payload).unwrap();
                     toast.success('Payment method created');
                   }
                   setIsPaymentMethodModalOpen(false);

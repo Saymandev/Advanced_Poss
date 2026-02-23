@@ -12,12 +12,15 @@ export function cn(...inputs: ClassValue[]) {
  * @returns Formatted currency string
  */
 export function formatCurrency(amount: number, currency?: string): string {
+  // Handle invalid numbers or NaN
+  const safeAmount = isNaN(amount) || typeof amount !== 'number' ? 0 : amount;
+
   // If currency is explicitly provided, use it
   if (currency) {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-    }).format(amount);
+    }).format(safeAmount);
   }
 
   // Try to get currency from window context (set by CurrencyProvider)
@@ -26,14 +29,14 @@ export function formatCurrency(amount: number, currency?: string): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: globalCurrency,
-    }).format(amount);
+    }).format(safeAmount);
   }
 
   // Fallback to USD if no global currency is set
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-  }).format(amount);
+  }).format(safeAmount);
 }
 
 export function formatDate(date: string | Date | null | undefined, _format: string = 'PPP'): string {

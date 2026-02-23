@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
+import { useGetPaymentMethodsByCompanyQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { CreatePurchaseOrderRequest, PurchaseOrder, useApprovePurchaseOrderMutation, useCancelPurchaseOrderMutation, useCreatePurchaseOrderMutation, useGetPurchaseOrdersQuery, useReceivePurchaseOrderMutation } from '@/lib/api/endpoints/purchaseOrdersApi';
 import { useGetSuppliersQuery } from '@/lib/api/endpoints/suppliersApi';
 import { useAppSelector } from '@/lib/store';
@@ -62,6 +63,21 @@ export default function PurchaseOrdersPage() {
     companyId: companyId || undefined,
     branchId: branchId || undefined,
   }, { skip: !companyId });
+
+  const { data: paymentMethodsData } = useGetPaymentMethodsByCompanyQuery(companyId || '', {
+    skip: !companyId,
+  });
+  const activeMethods = paymentMethodsData || [];
+  const paymentMethodOptions = activeMethods
+    .filter((m: any) => m.isActive && (!m.branchId || m.branchId === branchId))
+    .map((m: any) => ({
+      value: m.code,
+      label: m.displayName || m.name,
+    }));
+
+  if (paymentMethodOptions.length === 0) {
+    paymentMethodOptions.push({ value: 'cash', label: 'Cash' });
+  }
   const [createOrder] = useCreatePurchaseOrderMutation();
   const [approveOrder] = useApprovePurchaseOrderMutation();
   const [receiveOrder] = useReceivePurchaseOrderMutation();
@@ -73,6 +89,7 @@ export default function PurchaseOrdersPage() {
     expectedDeliveryDate: '',
     notes: '',
     items: [],
+    paymentMethod: 'cash',
   });
   const [newItem, setNewItem] = useState({
     ingredientId: '',
@@ -95,6 +112,7 @@ export default function PurchaseOrdersPage() {
       expectedDeliveryDate: '',
       notes: '',
       items: [],
+      paymentMethod: 'cash',
     });
     setNewItem({
       ingredientId: '',
@@ -672,6 +690,17 @@ export default function PurchaseOrdersPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Payment Account (Source of Funds)
+            </label>
+            <Select
+              options={paymentMethodOptions}
+              value={formData.paymentMethod || 'cash'}
+              onChange={(value) => setFormData({ ...formData, paymentMethod: value })}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Notes (Optional)
             </label>
             <textarea
@@ -734,6 +763,12 @@ export default function PurchaseOrdersPage() {
                     <span className="text-gray-600 dark:text-gray-400">Expected Delivery:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
                       {formatDateTime(selectedOrder.expectedDeliveryDate)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Account:</span>
+                    <span className="font-medium text-gray-900 dark:text-white uppercase">
+                      {selectedOrder.paymentMethod || 'Not Selected'}
                     </span>
                   </div>
                 </div>

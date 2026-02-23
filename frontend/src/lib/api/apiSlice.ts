@@ -1,5 +1,13 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { enqueueOfflineOrder, getFromCache, saveToCache } from '../offline/db';
 import { logout } from '../slices/authSlice';
+
+const OFFLINE_CACHE_ENDPOINTS = [
+  '/categories',
+  '/pos/menu-items',
+  '/payment-methods',
+  '/customers',
+];
 // Helper to transparently decrypt AES-encrypted API responses
 const decryptIfNeeded = async (response: any) => {
   try {
@@ -105,10 +113,60 @@ let isRefreshing = false;
 let refreshPromise: Promise<any> | null = null;
 // Wrapper to handle token refresh and subscription expiry errors
 const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
+  const requestUrl = typeof args === 'string' ? args : args?.url || '';
+  const isCacheable = args?.method === 'GET' || !args?.method;
+  const shouldCache = OFFLINE_CACHE_ENDPOINTS.some(endpoint => requestUrl.includes(endpoint));
+  
+  let cacheKey = requestUrl;
+  if (typeof args === 'object' && args.params) {
+    const paramsString = new URLSearchParams(args.params as Record<string, string>).toString();
+    if (paramsString) cacheKey = `${requestUrl}?${paramsString}`;
+  }
+
+  // Intercept when offline
+  if (typeof window !== 'undefined' && !window.navigator.onLine) {
+    // 1. Return Cache for GET
+    if (isCacheable && shouldCache) {
+      const cachedData = await getFromCache(cacheKey);
+      if (cachedData) {
+        console.log(`[Offline Mode] Served ${cacheKey} from Local DB cache`);
+        return { data: cachedData };
+      }
+    }
+
+    // 2. Queue POS Orders for POST
+    if (requestUrl.includes('/pos/orders') && args?.method === 'POST') {
+      console.log('[Offline Mode] Intercepting POS order creation');
+      try {
+        const orderPayload = args.body;
+        const offlineId = await enqueueOfflineOrder(orderPayload);
+        
+        return {
+          data: {
+            ...orderPayload,
+            id: offlineId,
+            orderNumber: `OFF-${Math.floor(1000 + Math.random() * 9000).toString()}`,
+            createdAt: new Date().toISOString(),
+            status: orderPayload.paymentMethod ? 'paid' : 'pending',
+            isOffline: true, // Flag to identify it in UI
+          }
+        };
+      } catch (error) {
+        return { error: { status: 503, data: { message: 'Failed to queue offline order' } } };
+      }
+    }
+  }
+
   let result = await baseQuery(args, api, extraOptions);
+  
   // Try to decrypt encrypted successful responses
   if (result && !result.error) {
     result = await decryptIfNeeded(result);
+  }
+
+  // Save successful reads to cache for future offline access
+  if (typeof window !== 'undefined' && window.navigator.onLine && result && !result.error && isCacheable && shouldCache) {
+    await saveToCache(cacheKey, result.data);
   }
   // Handle 401 unauthorized errors (token expired)
   if (result.error && result.error.status === 401) {
@@ -304,6 +362,8 @@ export const apiSlice = createApi({
     'ContentPages',
     'SystemFeedback',
     'ContactForm',
+    'Transactions',
+    'PaymentMethods',
   ],
   endpoints: () => ({}),
 });

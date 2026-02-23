@@ -10,20 +10,21 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { CreateExpenseRequest, Expense, useApproveExpenseMutation, useCreateExpenseMutation, useDeleteExpenseMutation, useGetExpensesQuery, useRejectExpenseMutation, useUpdateExpenseMutation } from '@/lib/api/endpoints/expensesApi';
+import { useGetPaymentMethodsByCompanyQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    CalendarIcon,
-    CheckCircleIcon,
-    ClockIcon,
-    CurrencyDollarIcon,
-    EyeIcon,
-    PencilIcon,
-    PlusIcon,
-    ReceiptRefundIcon,
-    TrashIcon,
-    UserIcon,
-    XCircleIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  ReceiptRefundIcon,
+  TrashIcon,
+  UserIcon,
+  XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -105,6 +106,29 @@ export default function ExpensesPage() {
     skip: !branchId && !companyId,
     refetchOnMountOrArgChange: true,
   });
+
+  const { data: paymentMethodsData } = useGetPaymentMethodsByCompanyQuery(companyId || '', {
+    skip: !companyId,
+  });
+
+  const dynamicPaymentMethods = useMemo(() => {
+    const methods = paymentMethodsData || [];
+    if (!Array.isArray(methods) || methods.length === 0) return PAYMENT_METHODS;
+    
+    // Filter out inactive methods and methods that shouldn't appear for this branch
+    const activeMethods = methods.filter((m: any) => {
+      if (!m.isActive) return false;
+      if (m.branchId && m.branchId !== branchId) return false;
+      return true;
+    });
+    
+    if (activeMethods.length === 0) return PAYMENT_METHODS;
+
+    return activeMethods.map((method: any) => ({
+      value: method.code,
+      label: method.displayName || method.name,
+    }));
+  }, [paymentMethodsData, branchId]);
 
   const [createExpense] = useCreateExpenseMutation();
   const [updateExpense] = useUpdateExpenseMutation();
@@ -331,6 +355,20 @@ export default function ExpensesPage() {
     }
   };
 
+  const handleMarkAsPaid = async (expense: Expense) => {
+    if (!confirm(`Mark "${expense.title}" as Paid? This will record it in the accounting ledger.`)) return;
+    try {
+      await updateExpense({
+        id: expense.id,
+        status: 'paid',
+      }).unwrap();
+      toast.success('Expense marked as paid and recorded in ledger!');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to mark expense as paid');
+    }
+  };
+
   const openEditModal = (expense: Expense) => {
     setSelectedExpense(expense);
     setFormData({
@@ -379,6 +417,9 @@ export default function ExpensesPage() {
   };
 
   const getPaymentMethodLabel = (method: string) => {
+    const dynamicMethod = dynamicPaymentMethods.find(m => m.value === method);
+    if (dynamicMethod) return dynamicMethod.label;
+
     const methodMap: Record<string, string> = {
       'cash': 'Cash',
       'card': 'Card',
@@ -507,6 +548,17 @@ export default function ExpensesPage() {
                 <XCircleIcon className="w-4 h-4" />
               </Button>
             </>
+          )}
+          {row.status === 'approved' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleMarkAsPaid(row)}
+              title="Mark as Paid (records in ledger)"
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            >
+              <CurrencyDollarIcon className="w-4 h-4" />
+            </Button>
           )}
           <Button
             variant="ghost"
@@ -867,7 +919,7 @@ export default function ExpensesPage() {
           <div>
             <Select
               label="Payment Method *"
-              options={PAYMENT_METHODS}
+              options={dynamicPaymentMethods}
               value={formData.paymentMethod}
               onChange={(value) => {
                 setFormData({ ...formData, paymentMethod: value as any });
@@ -1035,7 +1087,7 @@ export default function ExpensesPage() {
           <div>
             <Select
               label="Payment Method *"
-              options={PAYMENT_METHODS}
+              options={dynamicPaymentMethods}
               value={formData.paymentMethod}
               onChange={(value) => {
                 setFormData({ ...formData, paymentMethod: value as any });

@@ -16,10 +16,15 @@ export interface Wastage {
   id?: string;
   companyId: string;
   branchId: string;
-  ingredientId: string | {
+  ingredientId?: string | {
     _id: string;
     name: string;
     unit: string;
+    category?: string;
+  };
+  menuItemId?: string | {
+    _id: string;
+    name: string;
     category?: string;
   };
   quantity: number;
@@ -52,7 +57,8 @@ export interface Wastage {
 }
 
 export interface CreateWastageRequest {
-  ingredientId: string;
+  ingredientId?: string;
+  menuItemId?: string;
   quantity: number;
   unit: string;
   reason: WastageReason;

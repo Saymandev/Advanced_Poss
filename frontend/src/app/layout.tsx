@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: 'RESTOGO Management System',
   description: 'RESTOGO – modern restaurant management system for bars, cafes, and restaurants',
   applicationName: 'RESTOGO',
+  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png', type: 'image/png', sizes: '32x32' },

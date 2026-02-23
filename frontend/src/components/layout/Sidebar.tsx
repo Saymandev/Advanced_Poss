@@ -6,33 +6,33 @@ import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { useAppSelector } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-  Bars3Icon,
-  BeakerIcon,
-  BuildingOfficeIcon,
-  ChartBarIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  CogIcon,
-  ComputerDesktopIcon,
-  CurrencyDollarIcon,
-  DocumentTextIcon,
-  EnvelopeIcon,
-  ExclamationTriangleIcon,
-  GiftIcon,
-  HomeIcon,
-  PhotoIcon,
-  PrinterIcon,
-  ReceiptPercentIcon,
-  ShieldCheckIcon,
-  ShoppingBagIcon,
-  SparklesIcon,
-  TableCellsIcon,
-  TagIcon,
-  TruckIcon,
-  UserCircleIcon,
-  UserGroupIcon,
-  UsersIcon,
-  XMarkIcon
+    Bars3Icon,
+    BeakerIcon,
+    BuildingOfficeIcon,
+    ChartBarIcon,
+    ClipboardDocumentListIcon,
+    ClockIcon,
+    CogIcon,
+    ComputerDesktopIcon,
+    CurrencyDollarIcon,
+    DocumentTextIcon,
+    EnvelopeIcon,
+    ExclamationTriangleIcon,
+    GiftIcon,
+    HomeIcon,
+    PhotoIcon,
+    PrinterIcon,
+    ReceiptPercentIcon,
+    ShieldCheckIcon,
+    ShoppingBagIcon,
+    SparklesIcon,
+    TableCellsIcon,
+    TagIcon,
+    TruckIcon,
+    UserCircleIcon,
+    UserGroupIcon,
+    UsersIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -227,8 +227,15 @@ const navigation: NavigationItem[] = [
     name: 'Financial',
     href: '/dashboard/expenses',
     icon: CurrencyDollarIcon,
-    requiredFeature: ['expenses', 'work-periods'], // Show if user has ANY
+    requiredFeature: ['expenses', 'work-periods', 'accounting'], // Show if user has ANY
     children: [
+      {
+        name: 'Ledger & Accounting',
+        href: '/dashboard/accounting',
+        icon: CurrencyDollarIcon,
+        roles: ['owner', 'super_admin', 'manager'],
+        requiredFeature: 'accounting',
+      },
       {
         name: 'Expenses',
         href: '/dashboard/expenses',

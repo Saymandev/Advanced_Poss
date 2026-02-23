@@ -19,6 +19,7 @@ export interface PurchaseOrder {
   taxAmount: number;
   discountAmount?: number;
   notes?: string;
+  paymentMethod?: string;
   items: Array<{
     id: string;
     ingredientId: string;
@@ -51,6 +52,7 @@ export interface CreatePurchaseOrderRequest {
     unitPrice: number;
     notes?: string;
   }>;
+  paymentMethod?: string;
 }
 
 export interface UpdatePurchaseOrderRequest {
@@ -119,6 +121,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
             taxAmount: order.taxAmount || 0,
             discountAmount: order.discountAmount,
             notes: order.notes,
+            paymentMethod: order.paymentMethod,
             items: (order.items || []).map((item: any) => ({
               id: item._id || item.id,
               ingredientId: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
@@ -176,6 +179,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
           taxAmount: order.taxAmount || 0,
           discountAmount: order.discountAmount,
           notes: order.notes,
+          paymentMethod: order.paymentMethod,
           items: (order.items || []).map((item: any) => ({
             id: item._id || item.id,
             ingredientId: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
@@ -235,6 +239,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
           taxAmount: order.taxAmount || 0,
           discountAmount: order.discountAmount,
           notes: order.notes,
+          paymentMethod: order.paymentMethod,
           items: (order.items || []).map((item: any) => ({
             id: item._id || item.id,
             ingredientId: item.ingredientId?._id || item.ingredientId?.id || item.ingredientId,
