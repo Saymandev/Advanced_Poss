@@ -8,11 +8,11 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-  useCreateDeliveryZoneMutation,
-  useDeleteDeliveryZoneMutation,
-  useGetDeliveryZonesByBranchQuery,
-  useUpdateDeliveryZoneMutation,
-  type DeliveryZone,
+    useCreateDeliveryZoneMutation,
+    useDeleteDeliveryZoneMutation,
+    useGetDeliveryZonesByBranchQuery,
+    useUpdateDeliveryZoneMutation,
+    type DeliveryZone,
 } from '@/lib/api/endpoints/deliveryZonesApi';
 import { DeliveryOrder, DeliveryStatus, useAssignDeliveryDriverMutation, useGetDeliveryOrdersQuery, useUpdateDeliveryStatusMutation } from '@/lib/api/endpoints/posApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
@@ -24,6 +24,7 @@ import toast from 'react-hot-toast';
 
 const DELIVERY_STATUS_OPTIONS: { value: DeliveryStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
+  { value: 'confirmed', label: 'Confirmed' },
   { value: 'assigned', label: 'Assigned' },
   { value: 'out_for_delivery', label: 'Out for Delivery' },
   { value: 'delivered', label: 'Delivered' },
@@ -255,6 +256,8 @@ export default function DeliveriesPage() {
             ? 'danger'
             : deliveryStatus === 'assigned'
             ? 'warning'
+            : deliveryStatus === 'confirmed'
+            ? 'info'
             : 'secondary';
         return (
           <div className="space-y-1">
@@ -267,6 +270,16 @@ export default function DeliveriesPage() {
                 <Badge variant="warning" className="text-xs">Payment Pending</Badge>
               )}
             </div>
+            {deliveryStatus === 'pending' && (
+              <Button
+                size="sm"
+                className="w-full mt-2 bg-sky-600 hover:bg-sky-500 text-xs py-1 h-7"
+                onClick={() => handleStatusChange(record.id, 'confirmed')}
+                disabled={updatingStatus}
+              >
+                Confirm Order
+              </Button>
+            )}
             <select
               className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs px-2 py-1"
               value={deliveryStatus}

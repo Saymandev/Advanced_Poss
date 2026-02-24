@@ -39,7 +39,7 @@ export interface CreatePOSOrderRequest {
     email?: string;
   };
   totalAmount: number;
-  status: 'pending' | 'paid' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
   paymentMethod?: string; // e.g. 'cash', 'card', 'split'
   transactionId?: string; // used for split breakdowns
   notes?: string;
@@ -88,7 +88,7 @@ export interface POSStats {
   }>;
 }
 
-export type DeliveryStatus = 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled';
+export type DeliveryStatus = 'pending' | 'confirmed' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
 export interface DeliveryOrder extends POSOrder {
   deliveryStatus?: DeliveryStatus;

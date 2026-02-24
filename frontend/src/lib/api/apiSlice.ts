@@ -1,13 +1,27 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { enqueueOfflineOrder, getFromCache, saveToCache } from '../offline/db';
+import { enqueueOfflineOrder, getSnapshot } from '../offline/db';
+import { SNAPSHOT_KEYS } from '../offline/posPrefetcher';
 import { logout } from '../slices/authSlice';
 
-const OFFLINE_CACHE_ENDPOINTS = [
-  '/categories',
-  '/pos/menu-items',
-  '/payment-methods',
-  '/customers',
+// Maps URL substrings to snapshot keys — used for offline GET fallback
+const OFFLINE_SNAPSHOT_MAP: Array<{ match: string; key: string }> = [
+  { match: '/pos/menu-items',         key: SNAPSHOT_KEYS.MENU_ITEMS },
+  { match: '/categories',             key: SNAPSHOT_KEYS.CATEGORIES },
+  { match: '/payment-methods/branch', key: SNAPSHOT_KEYS.PAYMENT_METHODS },
+  { match: '/payment-methods',        key: SNAPSHOT_KEYS.PAYMENT_METHODS },
+  { match: '/pos/tables/available',   key: SNAPSHOT_KEYS.TABLES },
+  { match: '/pos/settings',           key: SNAPSHOT_KEYS.POS_SETTINGS },
+  { match: '/staff',                  key: SNAPSHOT_KEYS.STAFF },
+  { match: '/delivery-zones',         key: SNAPSHOT_KEYS.DELIVERY_ZONES },
+  { match: '/customers',              key: SNAPSHOT_KEYS.CUSTOMERS },
 ];
+
+/** Returns the snapshot key for a given URL, or null if not cacheable */
+const getSnapshotKeyForUrl = (url: string): string | null => {
+  // More specific matches first (e.g. /payment-methods/branch before /payment-methods)
+  const match = OFFLINE_SNAPSHOT_MAP.find(m => url.includes(m.match));
+  return match?.key ?? null;
+};
 // Helper to transparently decrypt AES-encrypted API responses
 const decryptIfNeeded = async (response: any) => {
   try {
@@ -114,48 +128,58 @@ let refreshPromise: Promise<any> | null = null;
 // Wrapper to handle token refresh and subscription expiry errors
 const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
   const requestUrl = typeof args === 'string' ? args : args?.url || '';
-  const isCacheable = args?.method === 'GET' || !args?.method;
-  const shouldCache = OFFLINE_CACHE_ENDPOINTS.some(endpoint => requestUrl.includes(endpoint));
-  
-  let cacheKey = requestUrl;
-  if (typeof args === 'object' && args.params) {
-    const paramsString = new URLSearchParams(args.params as Record<string, string>).toString();
-    if (paramsString) cacheKey = `${requestUrl}?${paramsString}`;
-  }
+  const isGetRequest = args?.method === 'GET' || !args?.method;
 
-  // Intercept when offline
+  // ─── OFFLINE HANDLING ──────────────────────────────────────────────────────
   if (typeof window !== 'undefined' && !window.navigator.onLine) {
-    // 1. Return Cache for GET
-    if (isCacheable && shouldCache) {
-      const cachedData = await getFromCache(cacheKey);
-      if (cachedData) {
-        console.log(`[Offline Mode] Served ${cacheKey} from Local DB cache`);
-        return { data: cachedData };
+    // 1. GET requests: serve from IndexedDB snapshot (prefetched by usePOSOfflinePrefetcher)
+    if (isGetRequest) {
+      const snapshotKey = getSnapshotKeyForUrl(requestUrl);
+      if (snapshotKey) {
+        const snap = await getSnapshot(snapshotKey);
+        if (snap) {
+          console.log(`[Offline] Serving ${requestUrl} from snapshot '${snapshotKey}' (age: ${Math.round((Date.now() - snap.savedAt) / 60000)}m, fresh: ${snap.isFresh})`);
+          return { data: snap.data };
+        }
+        console.warn(`[Offline] No snapshot found for '${snapshotKey}' (${requestUrl}) — data will be missing`);
+        return { data: null };
       }
     }
 
-    // 2. Queue POS Orders for POST
+    // 2. POST /pos/orders — queue to IndexedDB for later sync
     if (requestUrl.includes('/pos/orders') && args?.method === 'POST') {
-      console.log('[Offline Mode] Intercepting POS order creation');
       try {
         const orderPayload = args.body;
         const offlineId = await enqueueOfflineOrder(orderPayload);
-        
+        console.log(`[Offline] Order queued with id ${offlineId}`);
         return {
           data: {
             ...orderPayload,
             id: offlineId,
-            orderNumber: `OFF-${Math.floor(1000 + Math.random() * 9000).toString()}`,
+            orderNumber: `OFF-${Math.floor(1000 + Math.random() * 9000)}`,
             createdAt: new Date().toISOString(),
             status: orderPayload.paymentMethod ? 'paid' : 'pending',
-            isOffline: true, // Flag to identify it in UI
-          }
+            isOffline: true,
+          },
         };
-      } catch (error) {
+      } catch {
         return { error: { status: 503, data: { message: 'Failed to queue offline order' } } };
       }
     }
+
+    // 3. POST /pos/payments — when offline, silently succeed (order is already queued above)
+    // The payment record will be created on the backend when the order syncs.
+    if (requestUrl.includes('/pos/payments') && args?.method === 'POST') {
+      console.log('[Offline] Payment request suppressed — will sync with order');
+      return { data: { success: true, isOffline: true } };
+    }
+
+    // All other mutations while offline — return a clear error
+    if (args?.method && args.method !== 'GET') {
+      return { error: { status: 503, data: { message: 'You are offline. This action will be available when reconnected.' } } };
+    }
   }
+  // ──────────────────────────────────────────────────────────────────────────
 
   let result = await baseQuery(args, api, extraOptions);
   
@@ -164,10 +188,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
     result = await decryptIfNeeded(result);
   }
 
-  // Save successful reads to cache for future offline access
-  if (typeof window !== 'undefined' && window.navigator.onLine && result && !result.error && isCacheable && shouldCache) {
-    await saveToCache(cacheKey, result.data);
-  }
+  // (Offline caching is now handled by usePOSOfflinePrefetcher — not here)
   // Handle 401 unauthorized errors (token expired)
   if (result.error && result.error.status === 401) {
     const errorData = result.error.data as any;

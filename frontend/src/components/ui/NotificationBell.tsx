@@ -3,14 +3,15 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useSocket } from '@/lib/hooks/useSocket';
 import { useSuperAdminNotifications } from '@/lib/hooks/useSuperAdminNotifications';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-  BellIcon,
-  CheckIcon,
-  TrashIcon,
-  XMarkIcon,
+    BellIcon,
+    CheckIcon,
+    TrashIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
 
@@ -37,6 +38,9 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const userId = (user as any)?.id || (user as any)?._id;
   const userRole = (user as any)?.role?.toLowerCase();
   const features = Array.isArray((user as any)?.enabledFeatures) ? (user as any)?.enabledFeatures : [];
+
+  // WebSocket for real-time incoming notifications (with role filtering)
+  const { socket } = useSocket();
 
   // Super-admin endpoints for mark-read / mark-all
   const markSuperAdminRead = async (id: string) => {
@@ -91,7 +95,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
     try {
       await fetch(`${apiBase}/notifications/${id}/read`, {
         method: 'POST',
-        credentials: 'include', // Important: send httpOnly cookies
+        credentials: 'include',
       });
     } catch (err) {
       console.warn('Failed to mark notification read on server:', err);
@@ -107,12 +111,67 @@ export function NotificationBell({ className }: NotificationBellProps) {
       if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
       await fetch(`${apiBase}/notifications/read-all?${params.toString()}`, {
         method: 'POST',
-        credentials: 'include', // Important: send httpOnly cookies
+        credentials: 'include',
       });
     } catch (err) {
       console.warn('Failed to mark all notifications read on server:', err);
     }
   };
+
+  const clearAllServer = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (companyId) params.append('companyId', companyId);
+      if (branchId) params.append('branchId', branchId);
+      if (userRole) params.append('role', userRole);
+      if (userId) params.append('userId', typeof userId === 'string' ? userId : userId.toString());
+      await fetch(`${apiBase}/notifications?${params.toString()}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.warn('Failed to clear all notifications on server:', err);
+    }
+  };
+
+  // ── WebSocket: real-time notification with client-side role/feature filter ──
+  useEffect(() => {
+    if (!socket || isSuperAdmin) return; // super-admin uses its own hook
+
+    const handleIncoming = (payload: any) => {
+      const notifRoles: string[] = Array.isArray(payload.roles) ? payload.roles.map((r: string) => r.toLowerCase()) : [];
+      const notifUserIds: string[] = Array.isArray(payload.userIds)
+        ? payload.userIds.map((id: any) => (typeof id === 'string' ? id : String(id)))
+        : [];
+      const notifFeatures: string[] = Array.isArray(payload.features) ? payload.features : [];
+
+      // Determine if this notification is meant for this user:
+      // 1. If roles[] is non-empty, this user's role must be in it
+      const roleMatches = notifRoles.length === 0 || (userRole && notifRoles.includes(userRole));
+      // 2. If userIds[] is non-empty, this user's ID must be in it
+      const userIdStr = typeof userId === 'string' ? userId : userId?.toString();
+      const userMatches = notifUserIds.length === 0 || (userIdStr && notifUserIds.includes(userIdStr));
+      // 3. If both are empty, it's a broadcast — accept it
+      const isBroadcast = notifRoles.length === 0 && notifUserIds.length === 0;
+      // 4. Feature gate
+      const featureMatches = notifFeatures.length === 0 || notifFeatures.some((f) => features.includes(f));
+
+      const shouldAccept = (isBroadcast || roleMatches || userMatches) && featureMatches;
+      if (!shouldAccept) return;
+
+      fallbackNotifications.addNotification({
+        type: (payload.type as any) || 'system',
+        title: payload.title || 'Notification',
+        message: payload.message || '',
+        data: payload.metadata || payload.data || {},
+      });
+    };
+
+    socket.on('notification', handleIncoming);
+    return () => { socket.off('notification', handleIncoming); };
+  }, [socket, isSuperAdmin, userRole, userId, features, fallbackNotifications]);
+
+  // ────────────────────────────────────────────────────────
 
   const active = isSuperAdmin ? {
     ...superAdmin,
@@ -136,7 +195,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
       await markAllReadServer();
     },
     clearNotification: fallbackNotifications.clearNotification,
-    clearAll: fallbackNotifications.clearAll,
+    clearAll: async () => {
+      fallbackNotifications.clearAll();
+      await clearAllServer(); // also remove from DB scoped to this role
+    },
     refresh: fetchFallbackNotifications,
     isFetching: isFetchingFallback,
     isOpen: localOpen,
@@ -224,17 +286,15 @@ export function NotificationBell({ className }: NotificationBellProps) {
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
             <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
             <div className="flex items-center gap-2">
-              {isSuperAdmin && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => refresh?.()}
-                  className="text-xs"
-                  disabled={isFetching}
-                >
-                  {isFetching ? 'Refreshing...' : 'Refresh'}
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => refresh?.()}
+                className="text-xs"
+                disabled={isFetching}
+              >
+                {isFetching ? 'Refreshing...' : 'Refresh'}
+              </Button>
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"

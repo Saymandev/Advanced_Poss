@@ -3,12 +3,21 @@ import { apiSlice } from '../apiSlice';
 export interface Table {
   id: string;
   number: string;
+  tableNumber?: string;
   capacity: number;
-  status: 'available' | 'occupied' | 'reserved' | 'maintenance' | 'needs_cleaning';
+  status: 'available' | 'occupied' | 'reserved' | 'cleaning';
   location?: string;
   qrCode?: string;
   currentOrderId?: string;
-  reservationId?: string;
+  reservedFor?: string;       // ISO datetime (start)
+  reservedUntil?: string;     // ISO datetime (end) — new
+  reservationNotes?: string;  // new
+  reservedBy?: {
+    name: string;
+    phone: string;
+    partySize: number;
+    email?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +31,17 @@ export interface CreateTableRequest {
 
 export interface UpdateTableRequest extends Partial<CreateTableRequest> {
   id: string;
+}
+
+export interface ReserveTableRequest {
+  tableId: string;
+  reservedFor: string;    // ISO datetime (start)
+  reservedUntil: string;  // ISO datetime (end)
+  name: string;
+  phone: string;
+  partySize: number;
+  email?: string;
+  notes?: string;
 }
 
 export interface Reservation {
@@ -187,6 +207,21 @@ export const tablesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Reservation', 'Table'],
     }),
+    reserveTable: builder.mutation<Table, ReserveTableRequest>({
+      query: ({ tableId, ...body }) => ({
+        url: `/tables/${tableId}/reserve`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Table', 'Reservation'],
+    }),
+    cancelTableReservation: builder.mutation<Table, string>({
+      query: (tableId) => ({
+        url: `/tables/${tableId}/cancel-reservation`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Table', 'Reservation'],
+    }),
   }),
 });
 
@@ -201,4 +236,6 @@ export const {
   useGetReservationsQuery,
   useCreateReservationMutation,
   useUpdateReservationMutation,
+  useReserveTableMutation,
+  useCancelTableReservationMutation,
 } = tablesApi;

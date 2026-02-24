@@ -8,24 +8,26 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useRefundOrderMutation } from '@/lib/api/endpoints/posApi';
 import { useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ArrowPathIcon,
-    DocumentTextIcon,
-    EyeIcon,
-    MagnifyingGlassIcon,
-    PlusIcon,
-    PrinterIcon,
-    QrCodeIcon,
-    ShoppingCartIcon,
-    StarIcon,
-    UserIcon,
-    XCircleIcon
+  ArrowPathIcon,
+  ComputerDesktopIcon,
+  DocumentTextIcon,
+  EyeIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  PrinterIcon,
+  QrCodeIcon,
+  ShoppingCartIcon,
+  StarIcon,
+  UserIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -218,6 +220,9 @@ function OrderReview({ orderId }: { orderId: string }) {
 export default function OrdersPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { hasFeature } = useRolePermissions();
+  const canAccessPOS = hasFeature('order-management');
   const urlSearch = searchParams.get('search') || '';
   
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -852,7 +857,16 @@ export default function OrdersPage() {
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
-          
+          {canAccessPOS && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/dashboard/pos?orderId=${row.id}`)}
+              title="View in POS"
+            >
+              <ComputerDesktopIcon className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -1084,12 +1098,12 @@ export default function OrdersPage() {
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Order Details</h2>
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Token #{selectedOrder.orderNumber.split('-').pop() || selectedOrder.orderNumber}
+                    Token #{selectedOrder?.orderNumber?.split('-')?.pop() || selectedOrder?.orderNumber}
                   </p>
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                {selectedOrder.status === 'paid' && selectedOrder.paymentStatus === 'paid' && (
+                {selectedOrder?.status === 'paid' && selectedOrder?.paymentStatus === 'paid' && (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -1099,7 +1113,18 @@ export default function OrdersPage() {
                     }}
                     className="flex items-center justify-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-700 w-full sm:w-auto"
                   >
-                    <span className="text-sm">Refund</span>
+                    Refund
+                  </Button>
+                )}
+                {canAccessPOS && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => router.push(`/dashboard/pos?orderId=${selectedOrder.id}`)}
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                  >
+                    <ComputerDesktopIcon className="w-4 h-4" />
+                    Open in POS
                   </Button>
                 )}
                 <Button
@@ -1123,7 +1148,7 @@ export default function OrdersPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => handleDeleteOrder(selectedOrder.id)}
+                  onClick={() => handleDeleteOrder(selectedOrder?.id)}
                   disabled={isCancelling}
                   className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
                 >
@@ -1141,32 +1166,32 @@ export default function OrdersPage() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Invoice Number:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.orderNumber.replace(/[^0-9]/g, '').slice(-6) || selectedOrder.orderNumber}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder?.orderNumber?.replace(/[^0-9]/g, '').slice(-6) || selectedOrder?.orderNumber}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Table:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.tableNumber === '—' ? '—' : selectedOrder.tableNumber}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder?.tableNumber === '—' ? '—' : selectedOrder?.tableNumber}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Order Status:</span>
-                    {getStatusBadge(selectedOrder.status)}
+                    {getStatusBadge(selectedOrder?.status)}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Payment Status:</span>
-                    {getPaymentStatusBadge(selectedOrder.paymentStatus === 'paid' ? 'paid' : 'unpaid')}
+                    {getPaymentStatusBadge(selectedOrder?.paymentStatus === 'paid' ? 'paid' : 'unpaid')}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Payment At:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {selectedOrder.paymentStatus === 'paid' && selectedOrder.completedAt
-                        ? formatDateTime(selectedOrder.completedAt)
+                      {selectedOrder?.paymentStatus === 'paid' && selectedOrder?.completedAt
+                        ? formatDateTime(selectedOrder?.completedAt)
                         : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Order Type:</span>
                     <span className="font-medium text-gray-900 dark:text-white capitalize">
-                      {selectedOrder.orderType || 'Dine-In'}
+                      {selectedOrder?.orderType || 'Dine-In'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -1176,14 +1201,14 @@ export default function OrdersPage() {
                         <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       </div>
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {selectedOrder.waiterName || 'Default Waiter'}
+                        {selectedOrder?.waiterName || 'Default Waiter'}
                       </span>
                     </div>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Customer Name:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {selectedOrder.customerName || '—'}
+                      {selectedOrder?.customerName || '—'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -1195,19 +1220,19 @@ export default function OrdersPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Order Date:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatDateTime(selectedOrder.createdAt)}
+                      {selectedOrder?.createdAt ? formatDateTime(selectedOrder?.createdAt) : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Customer Phone:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {selectedOrder.customerPhone || '—'}
+                      {selectedOrder?.customerPhone || '—'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Payment Method:</span>
                     <span className="font-medium text-gray-900 dark:text-white capitalize">
-                      {selectedOrder.paymentMethod || '—'}
+                      {selectedOrder?.paymentMethod || '—'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -1224,21 +1249,21 @@ export default function OrdersPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(selectedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0))}
+                      {formatCurrency(selectedOrder?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0)}
                     </span>
                   </div>
                   {(() => {
                     // Calculate subtotal from items
-                    const subtotal = selectedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    const subtotal = selectedOrder?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0;
                     
                     // Get discount amount from order (loyaltyDiscount or discountAmount)
-                    const storedDiscount = selectedOrder.discount || 0;
+                    const storedDiscount = selectedOrder?.discount || 0;
                     
                     // Get tax rate and service charge rate from order or settings
-                    const taxRate = selectedOrder.taxRate ?? posSettings?.taxRate ?? 0;
-                    const serviceChargeRate = selectedOrder.serviceChargeRate ?? posSettings?.serviceCharge ?? 0;
+                    const taxRate = selectedOrder?.taxRate ?? posSettings?.taxRate ?? 0;
+                    const serviceChargeRate = selectedOrder?.serviceChargeRate ?? posSettings?.serviceCharge ?? 0;
                     
-                    const actualTotal = selectedOrder.total;
+                    const actualTotal = selectedOrder?.total || 0;
                     
                     // Reverse-engineer the discount and tax/SC from the actual total
                     // Based on POS payment screen logic (from pos/page.tsx line 877-879):
@@ -1342,7 +1367,7 @@ export default function OrdersPage() {
                           <div className="flex justify-between items-center">
                             <span className="text-lg font-bold text-gray-900 dark:text-white">Total:</span>
                             <span className="text-xl font-bold text-gray-900 dark:text-white">
-                              {formatCurrency(selectedOrder.total)}
+                              {formatCurrency(selectedOrder?.total || 0)}
                             </span>
                           </div>
                         </div>
@@ -1373,7 +1398,7 @@ export default function OrdersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedOrder.items.map((item) => (
+                    {selectedOrder?.items?.map((item: any) => (
                       <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
@@ -1387,7 +1412,7 @@ export default function OrdersPage() {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          {getStatusBadge(selectedOrder.status)}
+                          {getStatusBadge(selectedOrder?.status || 'pending')}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <span className="text-gray-900 dark:text-white">
@@ -1415,10 +1440,10 @@ export default function OrdersPage() {
                           <span className="text-gray-600 dark:text-gray-400">{item.notes || '—'}</span>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <OrderItemRating orderId={selectedOrder.id} menuItemId={item.id} />
+                          <OrderItemRating orderId={selectedOrder?.id || ''} menuItemId={item.id} />
                         </td>
                         <td className="py-3 px-4">
-                          <OrderReview orderId={selectedOrder.id} />
+                          <OrderReview orderId={selectedOrder?.id || ''} />
                         </td>
                       </tr>
                     ))}
@@ -1426,16 +1451,16 @@ export default function OrdersPage() {
                   <tfoot>
                     {(() => {
                       // Calculate subtotal from items
-                      const subtotal = selectedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                      const subtotal = selectedOrder?.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
                       
                       // Get discount amount from order (loyaltyDiscount or discountAmount)
-                      const storedDiscount = selectedOrder.discount || 0;
+                      const storedDiscount = selectedOrder?.discount || 0;
                       
                       // Get tax rate and service charge rate from order or settings
-                      const taxRate = selectedOrder.taxRate ?? posSettings?.taxRate ?? 0;
-                      const serviceChargeRate = selectedOrder.serviceChargeRate ?? posSettings?.serviceCharge ?? 0;
+                      const taxRate = selectedOrder?.taxRate ?? posSettings?.taxRate ?? 0;
+                      const serviceChargeRate = selectedOrder?.serviceChargeRate ?? posSettings?.serviceCharge ?? 0;
                       
-                      const actualTotal = selectedOrder.total;
+                      const actualTotal = selectedOrder?.total || 0;
                       
                       // Reverse-engineer the discount and tax/SC from the actual total
                       let discount = storedDiscount;
@@ -1538,7 +1563,7 @@ export default function OrdersPage() {
                               TOTAL:
                             </td>
                             <td className="py-3 px-4 text-right text-lg font-bold text-gray-900 dark:text-white">
-                              {formatCurrency(selectedOrder.total)}
+                              {formatCurrency(selectedOrder?.total || 0)}
                             </td>
                             <td colSpan={3}></td>
                           </tr>
@@ -1678,15 +1703,15 @@ export default function OrdersPage() {
               <div className="text-sm space-y-1 text-blue-700 dark:text-blue-300">
                 <div className="flex justify-between">
                   <span>Order Number:</span>
-                  <span className="font-medium">{selectedOrder.orderNumber}</span>
+                  <span className="font-medium">{selectedOrder?.orderNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Token:</span>
-                  <span className="font-medium">#{selectedOrder.orderNumber.split('-').pop() || selectedOrder.orderNumber}</span>
+                  <span className="font-medium">#{selectedOrder?.orderNumber?.split('-').pop() || selectedOrder?.orderNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Table:</span>
-                  <span className="font-medium">{selectedOrder.tableNumber === '—' ? 'N/A' : selectedOrder.tableNumber}</span>
+                  <span className="font-medium">{selectedOrder?.tableNumber === '—' ? 'N/A' : selectedOrder?.tableNumber}</span>
                 </div>
               </div>
             </div>
@@ -1723,7 +1748,7 @@ export default function OrdersPage() {
                             const url = URL.createObjectURL(blob);
                             const link = document.createElement('a');
                             link.href = url;
-                            link.download = `order-qr-${selectedOrder.orderNumber}.png`;
+                            link.download = `order-qr-${selectedOrder?.orderNumber || 'order'}.png`;
                             link.click();
                             URL.revokeObjectURL(url);
                             toast.success('QR code downloaded');

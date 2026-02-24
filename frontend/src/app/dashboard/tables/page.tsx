@@ -8,20 +8,24 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
-import { Table, useCreateTableMutation, useDeleteTableMutation, useGetTablesQuery, useUpdateTableMutation, useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
+import type { ReserveTableRequest } from '@/lib/api/endpoints/tablesApi';
+import { Table, useCancelTableReservationMutation, useCreateTableMutation, useDeleteTableMutation, useGetTablesQuery, useReserveTableMutation, useUpdateTableMutation, useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import {
-    CheckCircleIcon,
-    ClockIcon,
-    EyeIcon,
-    PencilIcon,
-    PlusIcon,
-    TableCellsIcon,
-    TrashIcon,
-    UserGroupIcon,
-    XCircleIcon
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  EyeIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  TableCellsIcon,
+  TrashIcon,
+  UserGroupIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
+import { format, parseISO } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 export default function TablesPage() {
@@ -103,6 +107,70 @@ export default function TablesPage() {
   const [updateTable, { isLoading: isUpdating }] = useUpdateTableMutation();
   const [deleteTable] = useDeleteTableMutation();
   const [updateTableStatus] = useUpdateTableStatusMutation();
+  const [reserveTable, { isLoading: isReserving }] = useReserveTableMutation();
+  const [cancelTableReservation, { isLoading: isCancelling }] = useCancelTableReservationMutation();
+
+  // ─── Reservation modal state ────────────────────────────────────────────────
+  const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+  const [reservationTarget, setReservationTarget] = useState<Table | null>(null);
+  const [resForm, setResForm] = useState<ReserveTableRequest & { date: string; startTime: string; endTime: string }>({
+    tableId: '',
+    date: new Date().toISOString().split('T')[0],
+    startTime: '14:00',
+    endTime: '16:00',
+    reservedFor: '',
+    reservedUntil: '',
+    name: '',
+    phone: '',
+    partySize: 2,
+    email: '',
+    notes: '',
+  });
+
+  const openReservationModal = (table: Table) => {
+    setReservationTarget(table);
+    setResForm(f => ({ ...f, tableId: table.id }));
+    setIsReservationModalOpen(true);
+  };
+
+  const handleReserve = async () => {
+    if (!resForm.name.trim()) { toast.error('Customer name is required'); return; }
+    if (!resForm.phone.trim()) { toast.error('Phone number is required'); return; }
+    const reservedFor   = `${resForm.date}T${resForm.startTime}:00`;
+    const reservedUntil = `${resForm.date}T${resForm.endTime}:00`;
+    if (reservedUntil <= reservedFor) { toast.error('End time must be after start time'); return; }
+    try {
+      await reserveTable({
+        ...resForm,
+        reservedFor,
+        reservedUntil,
+        email: resForm.email?.trim() || undefined,
+        notes: resForm.notes?.trim() || undefined,
+      }).unwrap();
+      toast.success(`Table ${reservationTarget?.number} reserved for ${resForm.name}`);
+      setIsReservationModalOpen(false);
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.data?.message || 'Failed to create reservation');
+    }
+  };
+
+  const handleCancelReservation = async (table: Table) => {
+    if (!confirm(`Cancel reservation for Table ${table.number}?`)) return;
+    try {
+      await cancelTableReservation(table.id).unwrap();
+      toast.success(`Reservation for Table ${table.number} cancelled`);
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.data?.message || 'Failed to cancel reservation');
+    }
+  };
+
+  const formatTime = (iso?: string) => {
+    if (!iso) return '';
+    try { return format(parseISO(iso), 'h:mm a'); } catch { return iso; }
+  };
+  // ────────────────────────────────────────────────────────────────────────────
   const [formData, setFormData] = useState<any>({
     number: '1',
     capacity: 4,
@@ -379,7 +447,7 @@ export default function TablesPage() {
               <ClockIcon className="w-4 h-4" />
             </Button>
           )}
-          {(row.status === 'needs_cleaning' || (row as any).status === 'needs_cleaning') && (
+          {(row.status === ('needs_cleaning' as any) || (row as any).status === 'needs_cleaning') && (
             <Button
               variant="ghost"
               size="sm"
@@ -580,25 +648,48 @@ export default function TablesPage() {
                     )}
                   </div>
                   <Badge className={`w-full justify-center ${
-                    table.status === 'available' 
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700' 
+                    table.status === 'available'
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
                       : table.status === 'occupied'
                       ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
                       : table.status === 'reserved'
                       ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700'
                       : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700'
                   }`}>
-                    {table.status === 'available' 
-                      ? 'Available' 
-                      : table.status === 'reserved'
-                      ? 'Reserved'
-                      : 'Occupied'}
+                    {table.status === 'available' ? 'Available' : table.status === 'reserved' ? 'Reserved' : 'Occupied'}
                   </Badge>
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                     <p className="text-xs text-gray-600 dark:text-gray-400">
                       Capacity: <span className="font-semibold text-gray-900 dark:text-white">{table.capacity} seats</span>
                     </p>
                   </div>
+                  {/* Reservation info on reserved tables */}
+                  {table.status === 'reserved' && table.reservedBy && (
+                    <div className="pt-1 space-y-1" onClick={e => e.stopPropagation()}>
+                      <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
+                        <ClockIcon className="h-3 w-3" />
+                        {formatTime(table.reservedFor)}{table.reservedUntil ? ` – ${formatTime(table.reservedUntil)}` : ''}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">{table.reservedBy.name} · {table.reservedBy.partySize} guests</p>
+                      <button
+                        className="text-[10px] text-red-500 hover:text-red-700 underline mt-0.5"
+                        onClick={e => { e.stopPropagation(); handleCancelReservation(table as Table); }}
+                        disabled={isCancelling}
+                      >
+                        Cancel reservation
+                      </button>
+                    </div>
+                  )}
+                  {/* Reserve button on available tables */}
+                  {table.status === 'available' && (
+                    <button
+                      onClick={e => { e.stopPropagation(); openReservationModal(table as Table); }}
+                      className="w-full mt-1 text-xs px-3 py-1.5 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors font-medium flex items-center justify-center gap-1.5"
+                    >
+                      <CalendarDaysIcon className="h-3.5 w-3.5" />
+                      Reserve
+                    </button>
+                  )}
                 </div>
                 {table.currentOrderId && (
                   <div className="absolute -top-2 -right-2 w-4 h-4 bg-primary-600 rounded-full flex items-center justify-center">
@@ -782,11 +873,14 @@ export default function TablesPage() {
                   </Badge>
                 </div>
               )}
-              {selectedTable.reservationId && (
+              {selectedTable.reservedBy && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Reservation
                   </label>
+                  <p className="text-sm text-gray-800 dark:text-gray-200">
+                    {selectedTable.reservedBy.name} ({selectedTable.reservedBy.partySize} guests)
+                  </p>
                   <Badge variant="warning">Reserved</Badge>
                 </div>
               )}
@@ -905,6 +999,135 @@ export default function TablesPage() {
             </Button>
             <Button onClick={handleEdit} disabled={isUpdating || !formData.number || !formData.capacity}>
               {isUpdating ? 'Updating...' : 'Update Table'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ─── Reservation Modal ───────────────────────────────────────────────── */}
+      <Modal
+        isOpen={isReservationModalOpen}
+        onClose={() => setIsReservationModalOpen(false)}
+        title={`Reserve Table ${reservationTarget?.number ?? ''}`}
+        className="max-w-lg"
+      >
+        <div className="space-y-5">
+          {/* Time slot */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+              <CalendarDaysIcon className="h-4 w-4" /> Time Slot
+            </p>
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Date *</label>
+                <input
+                  type="date"
+                  value={resForm.date}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e => setResForm(f => ({ ...f, date: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Start Time *</label>
+                  <input
+                    type="time"
+                    value={resForm.startTime}
+                    onChange={e => setResForm(f => ({ ...f, startTime: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">End Time *</label>
+                  <input
+                    type="time"
+                    value={resForm.endTime}
+                    onChange={e => setResForm(f => ({ ...f, endTime: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              {resForm.startTime && resForm.endTime && resForm.endTime > resForm.startTime && (
+                <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <ClockIcon className="h-3.5 w-3.5" />
+                  Duration: {Math.round((new Date(`2000-01-01T${resForm.endTime}`).getTime() - new Date(`2000-01-01T${resForm.startTime}`).getTime()) / 60000)} minutes
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Customer info */}
+          <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+              <UserGroupIcon className="h-4 w-4" /> Customer Details
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Full Name *</label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                value={resForm.name}
+                onChange={e => setResForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Phone *</label>
+                <div className="relative">
+                  <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="tel"
+                    placeholder="+880..."
+                    value={resForm.phone}
+                    onChange={e => setResForm(f => ({ ...f, phone: e.target.value }))}
+                    className="w-full pl-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Party Size *</label>
+                <div className="relative">
+                  <UserGroupIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="number"
+                    min={1}
+                    max={reservationTarget?.capacity ?? 20}
+                    value={resForm.partySize}
+                    onChange={e => setResForm(f => ({ ...f, partySize: parseInt(e.target.value) || 1 }))}
+                    className="w-full pl-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Email (optional)</label>
+              <input
+                type="email"
+                placeholder="john@example.com"
+                value={resForm.email ?? ''}
+                onChange={e => setResForm(f => ({ ...f, email: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notes (optional)</label>
+              <textarea
+                placeholder="e.g. Window seat, allergy info, special occasion..."
+                value={resForm.notes ?? ''}
+                onChange={e => setResForm(f => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+            <Button variant="secondary" onClick={() => setIsReservationModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleReserve} disabled={isReserving}>
+              {isReserving ? 'Reserving…' : `Reserve ${resForm.startTime} – ${resForm.endTime}`}
             </Button>
           </div>
         </div>

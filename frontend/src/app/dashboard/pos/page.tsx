@@ -5,6 +5,7 @@ import { Calculator } from '@/components/ui/Calculator';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { useFeatureAccess } from '@/hooks/useFeatureRedirect';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { Booking, useCreateBookingMutation, useGetBookingsQuery } from '@/lib/api/endpoints/bookingsApi';
@@ -37,6 +38,7 @@ import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { useOfflineSyncManager } from '@/lib/hooks/useOfflineSyncManager';
+import { usePOSOfflinePrefetcher } from '@/lib/hooks/usePOSOfflinePrefetcher';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
@@ -69,6 +71,7 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 interface ModifierSelection {
@@ -129,14 +132,24 @@ const getOrderTypeLabel = (orderType: OrderType): string => {
   };
   return labels[orderType] || orderType;
 };
-const ORDER_STATUS_LABELS: Record<'pending' | 'paid' | 'cancelled', string> = {
+const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: 'Pending',
+  confirmed: 'Confirmed',
+  preparing: 'Preparing',
+  ready: 'Ready',
+  served: 'Served',
   paid: 'Paid',
+  completed: 'Completed',
   cancelled: 'Cancelled',
 };
-const ORDER_STATUS_STYLES: Record<'pending' | 'paid' | 'cancelled', string> = {
+const ORDER_STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-500/10 text-amber-200 border border-amber-500/30',
+  confirmed: 'bg-sky-500/10 text-sky-200 border border-sky-500/30',
+  preparing: 'bg-blue-500/10 text-blue-200 border border-blue-500/30',
+  ready: 'bg-purple-500/10 text-purple-200 border border-purple-500/30',
+  served: 'bg-indigo-500/10 text-indigo-200 border border-indigo-500/30',
   paid: 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30',
+  completed: 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30',
   cancelled: 'bg-rose-500/10 text-rose-200 border border-rose-500/30',
 };
 const ORDER_STATUS_FILTERS = [
@@ -222,7 +235,15 @@ const generateClientId = () => {
 export default function POSPage() {
   const dispatch = useAppDispatch();
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  const { isOnline, pendingCount } = useOfflineSyncManager();
+  const { isOnline, pendingCount, syncOrders } = useOfflineSyncManager();
+  // Enterprise offline prefetcher — downloads all POS data to IndexedDB when online
+  const {
+    isOfflineReady,
+    isSyncing: isPrefetchSyncing,
+    lastSyncedAt,
+    syncErrors,
+    syncNow,
+  } = usePOSOfflinePrefetcher();
   const formatCurrency = useFormatCurrency(); // Use hook to get reactive currency formatting
   const isOwnerOrManager =
     user?.role === 'owner' || user?.role === 'super_admin';
@@ -436,6 +457,19 @@ export default function POSPage() {
   const [refundReason, setRefundReason] = useState('');
   const [refundAmount, setRefundAmount] = useState('');
   const [refundOrderId, setRefundOrderId] = useState('');
+
+  const searchParams = useSearchParams();
+
+  // Handle auto-opening order from URL (e.g. from notifications)
+  useEffect(() => {
+    const urlOrderId = searchParams.get('orderId');
+    if (urlOrderId) {
+      setQueueDetailId(urlOrderId);
+      setIsQueueCollapsed(false); // Open the queue sidebar to show details
+      setQueueTab('history'); // Usually these are confirmed/past orders
+    }
+  }, [searchParams]);
+
   // Delivery zones for POS (branch-based)
   // Use same branch resolution logic as Bookings page so POS + Bookings see the same branch
   const currentBranchId =
@@ -3465,6 +3499,29 @@ export default function POSPage() {
                     </Button>
                     {order.status === 'pending' && (
                       <>
+                        {order.orderType !== 'dine-in' && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={async () => {
+                              if (!canAct) return;
+                              try {
+                                await updateOrder({
+                                  id: orderId,
+                                  data: { status: 'confirmed' }
+                                }).unwrap();
+                                toast.success('Order confirmed');
+                                refetchQueue();
+                              } catch (error: any) {
+                                toast.error(error?.data?.message || 'Failed to confirm order');
+                              }
+                            }}
+                            disabled={!canAct}
+                            className="rounded-lg bg-sky-500/15 text-sky-700 dark:text-sky-200 hover:bg-sky-500/25 disabled:opacity-60"
+                          >
+                            Confirm
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="secondary"
@@ -3494,6 +3551,77 @@ export default function POSPage() {
                           className="rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
                         >
                           {queueActionOrderId === orderId ? 'Cancelling...' : 'Cancel'}
+                        </Button>
+                      </>
+                    )}
+                    {['confirmed', 'preparing', 'ready', 'served'].includes(order.status) && (
+                      <>
+                        {order.status === 'confirmed' && order.orderType !== 'dine-in' && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={async () => {
+                              if (!canAct) return;
+                              try {
+                                await updateOrder({
+                                  id: orderId,
+                                  data: { status: 'preparing' }
+                                }).unwrap();
+                                toast.success('Order is now preparing');
+                                refetchQueue();
+                              } catch (error: any) {
+                                toast.error(error?.data?.message || 'Failed to update order status');
+                              }
+                            }}
+                            disabled={!canAct}
+                            className="rounded-lg bg-blue-500/15 text-blue-700 dark:text-blue-200 hover:bg-blue-500/25 disabled:opacity-60"
+                          >
+                            Set Preparing
+                          </Button>
+                        )}
+                        {order.status === 'preparing' && order.orderType !== 'dine-in' && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={async () => {
+                              if (!canAct) return;
+                              try {
+                                await updateOrder({
+                                  id: orderId,
+                                  data: { status: 'ready' }
+                                }).unwrap();
+                                toast.success('Order is ready');
+                                refetchQueue();
+                              } catch (error: any) {
+                                toast.error(error?.data?.message || 'Failed to update order status');
+                              }
+                            }}
+                            disabled={!canAct}
+                            className="rounded-lg bg-purple-500/15 text-purple-700 dark:text-purple-200 hover:bg-purple-500/25 disabled:opacity-60"
+                          >
+                            Set Ready
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={async () => {
+                            if (!canAct) return;
+                            try {
+                              await updateOrder({
+                                id: orderId,
+                                data: { status: 'paid' }
+                              }).unwrap();
+                              toast.success('Order marked as paid');
+                              refetchQueue();
+                            } catch (error: any) {
+                              toast.error(error?.data?.message || 'Failed to update order status');
+                            }
+                          }}
+                          disabled={!canAct}
+                          className="rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
+                        >
+                          Mark Paid
                         </Button>
                       </>
                     )}
@@ -3617,19 +3745,15 @@ export default function POSPage() {
       </div>
     ) : (
     <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100">
-      {/* Offline Status Banner */}
-      {!isOnline && (
-        <div className="bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-4 py-2 text-sm flex justify-center items-center gap-2 border-b border-amber-200 dark:border-amber-800/50 shadow-sm z-50 transition-all">
-          <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3" />
-          </svg>
-          <span className="font-semibold">Offline Mode Active.</span>
-          <span className="hidden sm:inline">Orders will be saved locally.</span>
-          {pendingCount > 0 && (
-            <span className="font-bold ml-1 sm:ml-2">({pendingCount} pending order{pendingCount !== 1 ? 's' : ''} to sync)</span>
-          )}
-        </div>
-      )}
+      {/* Offline Status Banner — Enterprise */}
+      <OfflineBanner
+        isOfflineReady={isOfflineReady}
+        isSyncing={isPrefetchSyncing}
+        lastSyncedAt={lastSyncedAt}
+        pendingCount={pendingCount}
+        syncErrors={syncErrors}
+        onSyncNow={() => { syncNow(true); syncOrders(); }}
+      />
       {/* Header */}
       <div className="bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-gray-200 dark:border-slate-800 px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-5 shadow-lg">
         <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -5170,14 +5294,38 @@ export default function POSPage() {
                       Print
                     </Button>
                     {queueDetail.status === 'pending' && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => canActOnOrder && handleQueueCancel(detailId)}
-                        disabled={!canActOnOrder || queueActionOrderId === detailId}
-                        className="rounded-lg bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
-                      >
-                        {queueActionOrderId === detailId ? 'Cancelling…' : 'Cancel Order'}
-                      </Button>
+                      <>
+                        {queueDetail.orderType !== 'dine-in' && (
+                          <Button
+                            variant="secondary"
+                            onClick={async () => {
+                              if (!canActOnOrder) return;
+                              try {
+                                await updateOrder({
+                                  id: detailId,
+                                  data: { status: 'confirmed' }
+                                }).unwrap();
+                                toast.success('Order confirmed');
+                                setQueueDetailId(null);
+                                refetchQueue();
+                              } catch (error: any) {
+                                toast.error(error?.data?.message || 'Failed to update order status');
+                              }
+                            }}
+                            className="rounded-lg bg-sky-500/15 text-sky-200 hover:bg-sky-500/25"
+                          >
+                            Confirm Order
+                          </Button>
+                        )}
+                        <Button
+                          variant="secondary"
+                          onClick={() => canActOnOrder && handleQueueCancel(detailId)}
+                          disabled={!canActOnOrder || queueActionOrderId === detailId}
+                          className="rounded-lg bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
+                        >
+                          {queueActionOrderId === detailId ? 'Cancelling…' : 'Cancel Order'}
+                        </Button>
+                      </>
                     )}
                     {queueDetail.status === 'paid' && (
                       <div className="flex gap-2">

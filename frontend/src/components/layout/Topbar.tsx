@@ -4,24 +4,26 @@ import { Modal } from '@/components/ui/Modal';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { apiSlice } from '@/lib/api/apiSlice';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
+import { useOfflineSyncManager } from '@/lib/hooks/useOfflineSyncManager';
 import { logout } from '@/lib/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import {
-  ArrowRightOnRectangleIcon,
-  ClockIcon,
-  CogIcon,
-  HomeModernIcon,
-  MagnifyingGlassIcon,
-  MoonIcon,
-  SunIcon,
-  UserCircleIcon,
-  XMarkIcon
+    ArrowRightOnRectangleIcon,
+    ClockIcon,
+    CogIcon,
+    HomeModernIcon,
+    MagnifyingGlassIcon,
+    MoonIcon,
+    SunIcon,
+    UserCircleIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { useTheme } from 'next-themes';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+
 export function Topbar() {
   const { user, companyContext: _companyContext } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
@@ -31,6 +33,8 @@ export function Topbar() {
   const searchParams = useSearchParams();
   const urlSearch = searchParams.get('search') || '';
   const [searchQuery, setSearchQuery] = useState(urlSearch);
+  const { isOnline, pendingCount } = useOfflineSyncManager();
+  const [showOnlinePill, setShowOnlinePill] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +48,15 @@ export function Topbar() {
       setSearchQuery('');
     }
   }, [pathname, urlSearch]);
+
+  // Show green pill briefly when coming back online
+  useEffect(() => {
+    if (isOnline) {
+      setShowOnlinePill(true);
+      const t = setTimeout(() => setShowOnlinePill(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [isOnline]);
   const handleLogout = async () => {
     try {
       // Call logout API to clear httpOnly cookies on server
@@ -141,6 +154,19 @@ export function Topbar() {
                 <MoonIcon className="h-4 w-4" />
               )}
             </Button>
+            {/* Offline / Online status pill */}
+            {!isOnline ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-500 dark:text-red-400 text-xs font-medium animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                Offline
+                {pendingCount > 0 && <span className="font-bold">({pendingCount})</span>}
+              </div>
+            ) : showOnlinePill ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/30 text-green-600 dark:text-green-400 text-xs font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                Online
+              </div>
+            ) : null}
              {/* Notifications */}
             <NotificationBell />
 

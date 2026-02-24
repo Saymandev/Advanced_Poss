@@ -1,18 +1,21 @@
 'use client';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { useUpdateOrderStatusMutation } from '@/lib/api/endpoints/ordersApi';
 import { useCreatePOSOrderMutation, type CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-  CheckCircleIcon,
-  ClockIcon,
-  MapPinIcon,
-  ShoppingBagIcon,
-  UserIcon,
-  XCircleIcon
+    CheckCircleIcon,
+    ClockIcon,
+    ComputerDesktopIcon,
+    MapPinIcon,
+    ShoppingBagIcon,
+    UserIcon,
+    XCircleIcon,
 } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 interface OrderNotificationModalProps {
@@ -24,6 +27,9 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
   const [updateOrderStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
   const [createPOSOrder] = useCreatePOSOrderMutation();
   const { user } = useAppSelector((state) => state.auth);
+  const router = useRouter();
+  const { hasFeature } = useRolePermissions();
+  const canAccessPOS = hasFeature('order-management');
   const [hasPlayedSound, setHasPlayedSound] = useState(false);
   // Play notification sound when modal opens
   useEffect(() => {
@@ -138,7 +144,13 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
           };
           try {
             const posOrderResult = await createPOSOrder(deliveryPayload).unwrap();
+            const newPOSOrderId = posOrderResult.id;
             toast.success(`Order confirmed and added to delivery queue! Order #${posOrderResult.orderNumber || posOrderResult.id}`);
+            
+            // Ask user if they want to process this order in POS right now - only if they have access
+            if (canAccessPOS && newPOSOrderId && confirm('Order confirmed! Would you like to process it in POS now?')) {
+              router.push(`/dashboard/pos?orderId=${newPOSOrderId}`);
+            }
           } catch (posError: any) {
             console.error('❌ Failed to create POS delivery order from public order:', posError);
             const errorMessage = posError?.data?.message || posError?.message || 'Unknown error';
@@ -156,6 +168,13 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
       toast.error(error.data?.message || error.message || 'Failed to confirm order');
     }
   };
+
+  const handleProcessInPOS = () => {
+    const orderId = order.id || order._id || order.orderId;
+    router.push(`/dashboard/pos?orderId=${orderId}`);
+    onClose();
+  };
+
   const handleReject = async () => {
     try {
       const orderId = order.id || order._id || order.orderId;
@@ -323,13 +342,23 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
           <Button
             onClick={handleConfirm}
             disabled={isUpdating}
-            className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+            className="flex-2 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white"
           >
             <CheckCircleIcon className="w-5 h-5" />
             Confirm Order
           </Button>
+          {canAccessPOS && (
+            <Button
+              onClick={handleProcessInPOS}
+              variant="secondary"
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              <ComputerDesktopIcon className="w-5 h-5" />
+              POS
+            </Button>
+          )}
         </div>
       </div>
     </Modal>
   );
-}
+}
