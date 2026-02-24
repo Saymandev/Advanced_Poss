@@ -13,16 +13,16 @@ import { CreateCustomerRequest, Customer, useCreateCustomerMutation, useDeleteCu
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-  EyeIcon,
-  GiftIcon,
-  PencilIcon,
-  PhoneIcon,
-  PlusIcon,
-  StarIcon,
-  TrashIcon,
-  TrophyIcon,
-  UserIcon,
-  UsersIcon
+    EyeIcon,
+    GiftIcon,
+    PencilIcon,
+    PhoneIcon,
+    PlusIcon,
+    StarIcon,
+    TrashIcon,
+    TrophyIcon,
+    UserIcon,
+    UsersIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -593,9 +593,9 @@ export default function CustomersPage() {
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage your customers and loyalty program
           </p>
-          {error && (
+          {!!error && (
             <p className="text-red-600 dark:text-red-400 text-xs sm:text-sm mt-1">
-              Error loading customers: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
+              Error loading customers: {String((error as any)?.data?.message || (error as any)?.message || 'Unknown error')}
             </p>
           )}
         </div>
@@ -758,10 +758,10 @@ export default function CustomersPage() {
       </Card>
 
       {/* Error Display */}
-      {error && (
+      {!!error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <p className="text-red-600 dark:text-red-400 font-medium">
-            Error loading customers: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
+            Error loading customers: {String((error as any)?.data?.message || (error as any)?.message || 'Unknown error')}
           </p>
           <Button
             variant="secondary"

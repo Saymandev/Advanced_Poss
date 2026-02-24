@@ -10,25 +10,25 @@ import { useGetMenuItemsQuery, useUpdateMenuItemMutation } from '@/lib/api/endpo
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-  ArrowTrendingDownIcon,
-  ArrowTrendingUpIcon,
-  ChartBarIcon,
-  CheckCircleIcon,
-  EyeIcon,
-  LightBulbIcon,
-  SparklesIcon,
-  XMarkIcon
+    ArrowTrendingDownIcon,
+    ArrowTrendingUpIcon,
+    ChartBarIcon,
+    CheckCircleIcon,
+    EyeIcon,
+    LightBulbIcon,
+    SparklesIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
+    Bar,
+    BarChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
 } from 'recharts';
 export default function AIMenuOptimizationPage() {
   const { user } = useAppSelector((state) => state.auth);
@@ -565,7 +565,7 @@ export default function AIMenuOptimizationPage() {
           <CardTitle>AI Optimization Suggestions</CardTitle>
         </CardHeader>
         <CardContent>
-          {optimizationError && (
+          {!!optimizationError && (
             <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-4">
               <p className="text-red-800 dark:text-red-400 text-sm font-medium">
                 Error loading optimization data
@@ -615,7 +615,7 @@ export default function AIMenuOptimizationPage() {
           <CardTitle>Demand Predictions</CardTitle>
         </CardHeader>
         <CardContent>
-          {demandError && (
+          {!!demandError && (
             <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-4">
               <p className="text-red-800 dark:text-red-400 text-sm font-medium">
                 Error loading demand predictions

@@ -156,7 +156,7 @@ export function FeatureBasedSubscriptionSelector({
           Error loading features
         </p>
         <p className="text-xs text-red-500 dark:text-red-400">
-          {featuresError && 'message' in featuresError ? featuresError.message : 'Unknown error. Please check if features are seeded in the database.'}
+          {(featuresError as any)?.data?.message || (featuresError as any)?.message || 'Unknown error. Please check if features are seeded in the database.'}
         </p>
         <p className="text-xs text-red-500 dark:text-red-400 mt-2">
           Super Admin can seed features by calling: <code className="bg-red-100 dark:bg-red-900/40 px-1 rounded">GET /subscription-features/seed</code>

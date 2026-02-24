@@ -1768,10 +1768,10 @@ export default function SubscriptionsPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {plansError && (
+            {!!plansError && (
               <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-600 dark:text-red-400">
-                  Error loading plans: {plansError && 'message' in plansError ? plansError.message : 'Unknown error'}
+                  Error loading plans: {(plansError as any)?.data?.message || (plansError as any)?.message || 'Unknown error'}
                 </p>
               </div>
             )}
@@ -2842,7 +2842,7 @@ export default function SubscriptionsPage() {
             </p>
           </div>
         </div>
-        {plansError && (
+        {!!plansError && (
           <Card>
             <CardContent className="py-12 text-center">
               <XCircleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />

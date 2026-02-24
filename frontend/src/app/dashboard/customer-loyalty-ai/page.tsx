@@ -12,14 +12,14 @@ import { useGetCustomersQuery } from '@/lib/api/endpoints/customersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-  ArrowTrendingDownIcon,
-  ArrowTrendingUpIcon,
-  EyeIcon,
-  GiftIcon,
-  LightBulbIcon,
-  SparklesIcon,
-  UserIcon,
-  UsersIcon
+    ArrowTrendingDownIcon,
+    ArrowTrendingUpIcon,
+    EyeIcon,
+    GiftIcon,
+    LightBulbIcon,
+    SparklesIcon,
+    UserIcon,
+    UsersIcon
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -422,7 +422,7 @@ export default function CustomerLoyaltyAIPage() {
           <CardTitle>Customer Loyalty Insights</CardTitle>
         </CardHeader>
         <CardContent>
-          {loyaltyError && (
+          {!!loyaltyError && (
             <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-4">
               <p className="text-red-800 dark:text-red-400 text-sm">
                 Error loading customer loyalty insights. Please try refreshing.

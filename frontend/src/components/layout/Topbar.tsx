@@ -3,17 +3,21 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { apiSlice } from '@/lib/api/apiSlice';
+import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { logout } from '@/lib/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import {
   ArrowRightOnRectangleIcon,
+  ClockIcon,
   CogIcon,
+  HomeModernIcon,
   MagnifyingGlassIcon,
   MoonIcon,
   SunIcon,
   UserCircleIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 import { useTheme } from 'next-themes';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -28,7 +32,10 @@ export function Topbar() {
   const urlSearch = searchParams.get('search') || '';
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  const { data: currentShift, isLoading: shiftLoading } = useGetCurrentWorkPeriodQuery();
   // Sync search input with URL when on order-history page
   useEffect(() => {
     if (pathname === '/dashboard/order-history') {
@@ -134,14 +141,33 @@ export function Topbar() {
                 <MoonIcon className="h-4 w-4" />
               )}
             </Button>
-            {/* Notifications */}
+             {/* Notifications */}
             <NotificationBell />
+
+            {/* Active Shift Indicator */}
+            {!shiftLoading && currentShift && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsShiftModalOpen(true)}
+                  className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 px-3 py-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all rounded-full"
+                >
+                  <div className="relative">
+                    <ClockIcon className="h-4 w-4" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full animate-ping" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full" />
+                  </div>
+                  <span className="text-xs font-semibold hidden sm:inline">Active Shift #{currentShift.serial}</span>
+                </Button>
+              </div>
+            )}
             {/* User menu */}
             <div className="relative group">
               <Button
                 variant="ghost"
                 className="flex items-center gap-2 p-2"
-              >
+                >
                 {user?.avatar ? (
                   <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary-200 dark:border-primary-700">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -269,7 +295,79 @@ export function Topbar() {
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
           Search for orders, customers, and more...
         </p>
-      </form>
+       </form>
+    </Modal>
+
+    {/* Active Shift Details Modal */}
+    <Modal
+      isOpen={isShiftModalOpen}
+      onClose={() => setIsShiftModalOpen(false)}
+      title="Active Shift Details"
+      size="md"
+    >
+      <div className="space-y-4 py-2">
+        {currentShift ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Shift Serial</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">#{currentShift.serial}</p>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <p className="text-lg font-bold text-green-600 dark:text-green-400 capitalize">{currentShift.status}</p>
+                </div>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Start Time</p>
+                <p className="text-base font-medium text-gray-900 dark:text-white">
+                  {currentShift.startTime ? format(new Date(currentShift.startTime), 'MMM d, yyyy h:mm a') : 'N/A'}
+                </p>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Opening Balance</p>
+                <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                  {new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT' }).format(currentShift.openingBalance || 0)}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30 flex items-start gap-3">
+              <HomeModernIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div>
+                <p className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-0.5">Note</p>
+                <p className="text-sm text-blue-800 dark:text-blue-300">
+                  This shift is currently active and recording transactions. You can manage shifts from the Work Periods section.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => setIsShiftModalOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setIsShiftModalOpen(false);
+                  router.push('/dashboard/work-periods');
+                }}
+              >
+                Manage Shifts
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400">No active work period found.</p>
+          </div>
+        )}
+      </div>
     </Modal>
     </>
   );

@@ -4,46 +4,46 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-  useExportReportMutation,
-  useGetDashboardQuery,
-  useGetDueSettlementsQuery,
-  useGetFinancialSummaryQuery,
-  useGetPeakHoursQuery,
-  useGetRevenueByCategoryQuery,
-  useGetSalesAnalyticsQuery,
-  useGetTopSellingItemsQuery,
-  useGetWastageReportQuery,
+    useExportReportMutation,
+    useGetDashboardQuery,
+    useGetDueSettlementsQuery,
+    useGetFinancialSummaryQuery,
+    useGetPeakHoursQuery,
+    useGetRevenueByCategoryQuery,
+    useGetSalesAnalyticsQuery,
+    useGetTopSellingItemsQuery,
+    useGetWastageReportQuery,
 } from '@/lib/api/endpoints/reportsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-  ArrowPathIcon,
-  ArrowTrendingDownIcon,
-  ArrowTrendingUpIcon,
-  CakeIcon,
-  ChartBarIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  ExclamationTriangleIcon,
-  ShoppingCartIcon,
-  TrashIcon,
-  UsersIcon,
+    ArrowPathIcon,
+    ArrowTrendingDownIcon,
+    ArrowTrendingUpIcon,
+    CakeIcon,
+    ChartBarIcon,
+    ClockIcon,
+    CurrencyDollarIcon,
+    ExclamationTriangleIcon,
+    ShoppingCartIcon,
+    TrashIcon,
+    UsersIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
 } from 'recharts';
 const COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
 
@@ -592,7 +592,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       {/* Error Banner */}
-      {hasError && (
+      {!!hasError && (
         <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">

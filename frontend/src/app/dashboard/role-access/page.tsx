@@ -15,15 +15,15 @@ import { useActivateUserMutation, useAdminUpdatePasswordMutation, useAdminUpdate
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import {
-  ExclamationTriangleIcon,
-  EyeIcon,
-  KeyIcon,
-  LockClosedIcon,
-  MapPinIcon,
-  PencilIcon,
-  TrashIcon,
-  UsersIcon,
-  XMarkIcon,
+    ExclamationTriangleIcon,
+    EyeIcon,
+    KeyIcon,
+    LockClosedIcon,
+    MapPinIcon,
+    PencilIcon,
+    TrashIcon,
+    UsersIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -1033,7 +1033,7 @@ export default function RoleAccessPage() {
                   No active branches found. Please create a branch first.
                 </p>
               )}
-              {branchesError && (
+              {!!branchesError && (
                 <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                   Error loading branches. Please try again.
                 </p>

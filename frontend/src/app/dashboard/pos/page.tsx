@@ -29,6 +29,7 @@ import {
   usePrintReceiptMutation,
   usePrintReceiptPDFMutation,
   useProcessPaymentMutation,
+  useRefundOrderMutation,
   useUpdatePOSOrderMutation
 } from '@/lib/api/endpoints/posApi';
 import { useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
@@ -430,6 +431,11 @@ export default function POSPage() {
   const [isPendingOrderPaymentModalOpen, setIsPendingOrderPaymentModalOpen] = useState(false);
   const [pendingOrderPaymentMethod, setPendingOrderPaymentMethod] = useState<string>('cash');
   const [pendingOrderPaymentReceived, setPendingOrderPaymentReceived] = useState<string>('0');
+  // Refund modal states
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundOrderId, setRefundOrderId] = useState('');
   // Delivery zones for POS (branch-based)
   // Use same branch resolution logic as Bookings page so POS + Bookings see the same branch
   const currentBranchId =
@@ -658,6 +664,7 @@ export default function POSPage() {
   const [printReceiptPDF] = usePrintReceiptPDFMutation();
   const [downloadReceiptPDF] = useDownloadReceiptPDFMutation();
   const [updateOrder] = useUpdatePOSOrderMutation();
+  const [refundOrder] = useRefundOrderMutation();
   const { data: printers } = useGetPrintersQuery();
   const {
     data: receiptHTML,
@@ -771,27 +778,35 @@ export default function POSPage() {
     skip: !branchId,
     pollingInterval: 60000, // Refresh every 60 seconds (reduced from 30s to reduce load)
   });
-  const waiterOptions = useMemo<Array<{ id: string; name: string; activeOrdersCount: number }>>(() => {
+  const waiterOptions = useMemo<Array<{ id: string; name: string; activeOrdersCount: number; isGlobal: boolean }>>(() => {
     const staffList = staffData?.staff || [];
-    const currentBranchId = user?.branchId || branchId;
+    const currentBranchId = branchId || user?.branchId;
+    
     return staffList
       .filter((staffMember: any) => {
-        // CRITICAL: Only show employees with "waiter" role (or "server" as alias)
+        // Broaden role check to include anyone who might serve tables
         const role = (staffMember.role || '').toLowerCase();
-        const isWaiter = role === 'waiter' || role === 'server';
-        if (!isWaiter) {
-          return false; // Only waiter/server roles allowed
+        const potentialWaiterRoles = ['waiter', 'server', 'steward', 'staff', 'employee', 'captain', 'manager', 'cashier', 'owner'];
+        const isPotentialWaiter = potentialWaiterRoles.includes(role);
+        
+        if (!isPotentialWaiter) {
+          return false;
         }
-        // CRITICAL: Filter by branch assignment - only show waiters assigned to current branch
-        const staffBranchId = staffMember.branchId || (staffMember.branch as any)?.id;
-        const isAssignedToBranch = currentBranchId && staffBranchId && 
-          (staffBranchId.toString() === currentBranchId.toString() || 
-           staffBranchId === currentBranchId);
+
+        // Less strict branch filtering: 
+        // 1. If staff has no branch assignment, they might be company-wide staff
+        // 2. Or match the current branch exactly
+        const staffBranchId = staffMember.branchId;
+        const isAssignedToBranch = !currentBranchId || !staffBranchId || 
+          staffBranchId.toString() === currentBranchId.toString();
+          
         return isAssignedToBranch;
       })
       .map((staffMember: any) => {
         const waiterId = staffMember.id;
         const activeOrdersCount = waiterActiveOrdersCount[waiterId] || 0;
+        const isGlobal = !staffMember.branchId;
+        
         return {
           id: waiterId,
           name:
@@ -799,11 +814,20 @@ export default function POSPage() {
             staffMember.email ||
             staffMember.id,
           activeOrdersCount,
+          isGlobal,
         };
+      })
+      .sort((a, b) => {
+        // Prioritize branch-specific staff at the top
+        if (a.isGlobal && !b.isGlobal) return 1;
+        if (!a.isGlobal && b.isGlobal) return -1;
+        return a.name.localeCompare(b.name);
       });
   }, [staffData, user?.branchId, branchId, waiterActiveOrdersCount]);
   const selectedWaiterName = useMemo(() => {
-    return waiterOptions.find((option) => option.id === selectedWaiterId)?.name || '';
+    const waiter = waiterOptions.find((option) => option.id === selectedWaiterId);
+    if (!waiter) return '';
+    return `${waiter.name}${waiter.isGlobal ? ' (Global)' : ''}`;
   }, [waiterOptions, selectedWaiterId]);
   useEffect(() => {
     if (!selectedWaiterId && waiterOptions.length > 0) {
@@ -1955,6 +1979,7 @@ export default function POSPage() {
         paymentMethodForBackend = fullPaymentMethod as any; // Pass the actual method code (bkash, nagad, cash, card, etc.)
         paymentBreakdown = [{ method: fullPaymentMethod, amount: totalDue }];
         const methodName = selectedMethod?.displayName || selectedMethod?.name || fullPaymentMethod;
+        const amountReceivedForBackend = received;
         if (allowsChange) {
           changeDue = Math.max(0, received - totalDue);
           paymentNotes.push(
@@ -1990,6 +2015,10 @@ export default function POSPage() {
         const cashPortion = activeRows
           .filter((row) => row.method === 'cash')
           .reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
+        
+        const totalReceived = activeRows.reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
+        const amountReceivedForBackend = totalReceived;
+        
         if (cashPortion > 0 && totalApplied > totalDue) {
           changeDue = totalApplied - totalDue;
           paymentNotes.push(`Change due: ${formatCurrency(changeDue)}`);
@@ -2177,6 +2206,8 @@ export default function POSPage() {
           : selectedCustomerId
           ? { customerId: selectedCustomerId }
           : {}),
+        amountReceived: paymentTab === 'full' ? parseFloat(fullPaymentReceived || '0') : multiPayments.reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0),
+        changeDue: changeDue > 0 ? changeDue : undefined,
       };
       const orderResponse = await createOrderWithRetry(orderData);
       const order = (orderResponse as any).data || orderResponse;
@@ -2192,6 +2223,8 @@ export default function POSPage() {
           amount: totalDue,
           method: paymentTab === 'full' ? fullPaymentMethod : paymentMethodForBackend,
           transactionId: transactionReference,
+          amountReceived: paymentTab === 'full' ? parseFloat(fullPaymentReceived || '0') : multiPayments.reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0),
+          changeDue: changeDue > 0 ? changeDue : undefined,
         }).unwrap();
       }
       setCurrentOrderId(orderId);
@@ -2329,6 +2362,41 @@ export default function POSPage() {
     },
     [cancelOrder, queueDetailId, refetchQueue]
   );
+
+  const handleOpenRefundModal = useCallback((orderId: string, total: number) => {
+    setRefundOrderId(orderId);
+    setRefundAmount(total.toString());
+    setRefundReason('');
+    setIsRefundModalOpen(true);
+  }, []);
+
+  const handleRefundSubmit = async () => {
+    if (!refundOrderId || !refundAmount || Number(refundAmount) <= 0) {
+      toast.error('Please enter a valid refund amount');
+      return;
+    }
+    if (!refundReason.trim()) {
+      toast.error('Please enter a refund reason');
+      return;
+    }
+
+    try {
+      await refundOrder({
+        orderId: refundOrderId,
+        amount: Number(refundAmount),
+        reason: refundReason,
+      }).unwrap();
+
+      toast.success('Refund processed successfully');
+      setIsRefundModalOpen(false);
+      refetchQueue();
+      if (queueDetailId === refundOrderId) {
+        setQueueDetailId(null);
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to process refund');
+    }
+  };
   const getTableStatus = (table: any) => {
     if (table.status === 'reserved') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200 border-2 border-yellow-500/50';
     if (table.status === 'available') return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border-2 border-green-500/50';
@@ -3430,27 +3498,38 @@ export default function POSPage() {
                       </>
                     )}
                     {order.status === 'paid' && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={async () => {
-                          if (!canAct) return;
-                          try {
-                            await updateOrder({
-                              id: orderId,
-                              data: { status: 'pending' }
-                            }).unwrap();
-                            toast.success('Order marked as pending');
-                            refetchQueue();
-                          } catch (error: any) {
-                            toast.error(error?.data?.message || 'Failed to update order status');
-                          }
-                        }}
-                        disabled={!canAct}
-                        className="rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-200 hover:bg-amber-500/25 disabled:opacity-60"
-                      >
-                        Mark Pending
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => canAct && handleOpenRefundModal(orderId, order.totalAmount)}
+                          disabled={!canAct}
+                          className="rounded-lg bg-orange-500/15 text-orange-700 dark:text-orange-200 hover:bg-orange-500/25 disabled:opacity-60"
+                        >
+                          Refund
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={async () => {
+                            if (!canAct) return;
+                            try {
+                              await updateOrder({
+                                id: orderId,
+                                data: { status: 'pending' }
+                              }).unwrap();
+                              toast.success('Order marked as pending');
+                              refetchQueue();
+                            } catch (error: any) {
+                              toast.error(error?.data?.message || 'Failed to update order status');
+                            }
+                          }}
+                          disabled={!canAct}
+                          className="rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-200 hover:bg-amber-500/25 disabled:opacity-60"
+                        >
+                          Mark Pending
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -3850,7 +3929,7 @@ export default function POSPage() {
                   ) : (
                     waiterOptions.map((waiter) => (
                       <option key={waiter.id} value={waiter.id} className="bg-slate-900">
-                        {waiter.name}
+                        {waiter.name}{waiter.isGlobal ? ' (Global)' : ''}
                         {waiter.activeOrdersCount > 0 ? ` (${waiter.activeOrdersCount} active order${waiter.activeOrdersCount > 1 ? 's' : ''})` : ''}
                       </option>
                     ))
@@ -4459,6 +4538,50 @@ export default function POSPage() {
           </div>
         </div>
       </Modal>
+      {/* Refund Modal */}
+      <Modal
+        isOpen={isRefundModalOpen}
+        onClose={() => setIsRefundModalOpen(false)}
+        title="Process Refund"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-4 text-sm text-orange-200">
+            <p className="font-semibold">Refund Warning</p>
+            <p>Processing a refund will record a financial reversal. This action should only be taken when returning money to a customer.</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Refund Amount</label>
+            <Input
+              type="number"
+              value={refundAmount}
+              onChange={(e) => setRefundAmount(e.target.value)}
+              placeholder="0.00"
+              className="bg-slate-900 border-slate-800"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Reason for Refund</label>
+            <textarea
+              value={refundReason}
+              onChange={(e) => setRefundReason(e.target.value)}
+              placeholder="Enter reason..."
+              className="w-full h-24 rounded-lg bg-slate-900 border border-slate-800 p-3 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="secondary" onClick={() => setIsRefundModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-orange-600 hover:bg-orange-500 text-white"
+              onClick={handleRefundSubmit}
+            >
+              Confirm Refund
+            </Button>
+          </div>
+        </div>
+      </Modal>
       {/* Item Discount Modal */}
       <Modal
         isOpen={isItemDiscountModalOpen}
@@ -5055,6 +5178,39 @@ export default function POSPage() {
                       >
                         {queueActionOrderId === detailId ? 'Cancelling…' : 'Cancel Order'}
                       </Button>
+                    )}
+                    {queueDetail.status === 'paid' && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          onClick={() => canActOnOrder && handleOpenRefundModal(detailId, queueDetail.totalAmount || queueDetail.total)}
+                          disabled={!canActOnOrder}
+                          className="rounded-lg bg-orange-500/15 text-orange-200 hover:bg-orange-500/25"
+                        >
+                          Refund
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={async () => {
+                            if (!canActOnOrder) return;
+                            try {
+                              await updateOrder({
+                                id: detailId,
+                                data: { status: 'pending' }
+                              }).unwrap();
+                              toast.success('Order marked as pending');
+                              refetchQueue();
+                              setQueueDetailId(null);
+                            } catch (error: any) {
+                              toast.error(error?.data?.message || 'Failed to update order status');
+                            }
+                          }}
+                          disabled={!canActOnOrder}
+                          className="rounded-lg bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"
+                        >
+                          Mark Pending
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -5725,16 +5881,31 @@ export default function POSPage() {
                       return;
                     }
                     // Map payment method code to backend expected format
-                    // Backend accepts 'cash', 'card', or 'split', but we use paymentBreakdown for actual method
                     const backendMethod = pendingOrderPaymentMethod === 'cash' ? 'cash' : 
                                          pendingOrderPaymentMethod === 'card' || pendingOrderPaymentMethod.includes('CARD') ? 'card' : 
                                          'split';
+                    
+                    const changeVal = pendingOrderPaymentMethod === 'cash' ? Math.max(0, received - orderAmount) : 0;
+                    const amountReceivedValue = pendingOrderPaymentMethod === 'cash' ? received : orderAmount;
+
                     await processPayment({
                       orderId: occupiedTableModal.orderDetails.currentOrderId,
                       amount: orderAmount,
-                      method: backendMethod,
+                      method: pendingOrderPaymentMethod, // Use the actual method code
                       transactionId: undefined,
+                      amountReceived: amountReceivedValue,
+                      changeDue: changeVal > 0 ? changeVal : undefined,
                     }).unwrap();
+
+                    setPaymentSuccessOrder({
+                      orderId: occupiedTableModal.orderDetails.currentOrderId,
+                      orderNumber: occupiedTableModal.orderDetails.orderNumber || 'Order',
+                      totalPaid: orderAmount,
+                      changeDue: changeVal > 0 ? changeVal : undefined,
+                      summary: `${pendingOrderPaymentMethod} payment for ${formatCurrency(orderAmount)}`,
+                      breakdown: [{ method: pendingOrderPaymentMethod, amount: orderAmount }],
+                    });
+
                     toast.success('Payment processed successfully');
                     setIsPendingOrderPaymentModalOpen(false);
                     setOccupiedTableModal(null);

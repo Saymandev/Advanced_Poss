@@ -654,9 +654,9 @@ export default function CategoriesPage() {
           ) : error ? (
             <div className="text-center py-12">
               <p className="text-red-600 dark:text-red-400 mb-4">
-                {error && 'data' in error 
+                {String(typeof error === 'object' && error !== null && 'data' in error 
                   ? (error.data as any)?.message || 'Error loading categories'
-                  : 'Error loading categories'}
+                  : 'Error loading categories')}
               </p>
               <Button onClick={() => refetch()} variant="secondary">
                 Try Again
@@ -1032,4 +1032,4 @@ export default function CategoriesPage() {
       </Modal>
     </div>
   );
-}
+}

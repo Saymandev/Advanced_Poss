@@ -8,22 +8,22 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery } from '@/lib/api/endpoints/posApi';
+import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useRefundOrderMutation } from '@/lib/api/endpoints/posApi';
 import { useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  ArrowPathIcon,
-  DocumentTextIcon,
-  EyeIcon,
-  MagnifyingGlassIcon,
-  PlusIcon,
-  PrinterIcon,
-  QrCodeIcon,
-  ShoppingCartIcon,
-  StarIcon,
-  UserIcon,
-  XCircleIcon
+    ArrowPathIcon,
+    DocumentTextIcon,
+    EyeIcon,
+    MagnifyingGlassIcon,
+    PlusIcon,
+    PrinterIcon,
+    QrCodeIcon,
+    ShoppingCartIcon,
+    StarIcon,
+    UserIcon,
+    XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useSearchParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
@@ -259,6 +259,11 @@ export default function OrdersPage() {
   }, { skip: !branchId });
   
   const [cancelPOSOrder, { isLoading: isCancelling }] = useCancelPOSOrderMutation();
+  const [refundOrder, { isLoading: isRefunding }] = useRefundOrderMutation();
+
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundAmount, setRefundAmount] = useState<number | ''>('');
 
   // Update search when URL param changes
   useEffect(() => {
@@ -627,6 +632,50 @@ export default function OrdersPage() {
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to cancel order');
     }
+  };
+
+  const handleRefundSubmit = async () => {
+    if (!selectedOrder) return;
+    if (!refundAmount || Number(refundAmount) <= 0) {
+      toast.error('Please enter a valid refund amount');
+      return;
+    }
+    if (Number(refundAmount) > selectedOrder.total) {
+      toast.error('Refund amount cannot exceed order total');
+      return;
+    }
+    if (!refundReason.trim()) {
+      toast.error('Please enter a refund reason');
+      return;
+    }
+
+    try {
+      await refundOrder({
+        orderId: selectedOrder.id,
+        amount: Number(refundAmount),
+        reason: refundReason,
+      }).unwrap();
+      
+      toast.success('Refund processed successfully');
+      setIsRefundModalOpen(false);
+      setRefundReason('');
+      setRefundAmount('');
+      refetch();
+      if (selectedOrderId === selectedOrder.id) {
+        setIsViewModalOpen(false);
+        setSelectedOrderId('');
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to process refund');
+    }
+  };
+
+  const openRefundModal = (order: Order) => {
+    setSelectedOrder(order);
+    setSelectedOrderId(order.id);
+    setRefundAmount(order.total);
+    setRefundReason('');
+    setIsRefundModalOpen(true);
   };
 
   const openViewModal = (order: Order) => {
@@ -1040,6 +1089,19 @@ export default function OrdersPage() {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                {selectedOrder.status === 'paid' && selectedOrder.paymentStatus === 'paid' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setIsViewModalOpen(false);
+                      openRefundModal(selectedOrder);
+                    }}
+                    className="flex items-center justify-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-700 w-full sm:w-auto"
+                  >
+                    <span className="text-sm">Refund</span>
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"
@@ -1490,6 +1552,89 @@ export default function OrdersPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Refund Modal */}
+      <Modal
+        isOpen={isRefundModalOpen}
+        onClose={() => {
+          setIsRefundModalOpen(false);
+          setRefundReason('');
+          setRefundAmount('');
+        }}
+        title="Refund Order"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
+            <h4 className="font-medium text-orange-800 dark:text-orange-400 mb-2">Refund Information</h4>
+            <div className="text-sm space-y-1 text-orange-700 dark:text-orange-300">
+              <div className="flex justify-between">
+                <span>Order Total:</span>
+                <span className="font-medium">{selectedOrder ? formatCurrency(selectedOrder.total) : '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Order Number:</span>
+                <span className="font-medium">{selectedOrder?.orderNumber}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Refund Amount <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                max={selectedOrder?.total || 0}
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value ? Number(e.target.value) : '')}
+                placeholder="0.00"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter the amount to refund. Maximum: {selectedOrder ? formatCurrency(selectedOrder.total) : '—'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Refund Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                className="w-full min-h-[100px] p-3 text-sm rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                placeholder="Please provide a detailed reason for this refund..."
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsRefundModalOpen(false);
+                setRefundReason('');
+                setRefundAmount('');
+              }}
+              disabled={isRefunding}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRefundSubmit}
+              disabled={isRefunding || !refundReason.trim() || !refundAmount || Number(refundAmount) <= 0 || Number(refundAmount) > (selectedOrder?.total || 0)}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {isRefunding ? 'Processing...' : 'Process Refund'}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* QR Code Review Modal */}

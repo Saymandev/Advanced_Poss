@@ -7,19 +7,19 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { DigitalReceipt, useEmailDigitalReceiptMutation, useGenerateDigitalReceiptMutation, useGetDigitalReceiptsQuery } from '@/lib/api/endpoints/aiApi';
 import { useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
-import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  DocumentTextIcon,
-  EnvelopeIcon,
-  EyeIcon,
-  PrinterIcon,
-  ReceiptRefundIcon,
-  ShoppingCartIcon,
-  UserIcon,
+    DocumentTextIcon,
+    EnvelopeIcon,
+    EyeIcon,
+    PrinterIcon,
+    ReceiptRefundIcon,
+    ShoppingCartIcon,
+    UserIcon,
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -560,7 +560,7 @@ export default function DigitalReceiptsPage() {
               )}
             </div>
           </div>
-          {error && (
+          {!!error && (
             <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <p className="text-sm text-red-600 dark:text-red-400">
                 Error loading receipts: {(error as any)?.data?.message || 'Unknown error occurred'}

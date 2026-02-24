@@ -48,6 +48,8 @@ export interface CreatePOSOrderRequest {
   customerId?: string; // Customer ID for loyalty points
   loyaltyPointsRedeemed?: number; // Loyalty points redeemed for this order
   loyaltyDiscount?: number; // Discount amount from loyalty points
+  amountReceived?: number;
+  changeDue?: number;
 }
 
 export interface POSOrder extends CreatePOSOrderRequest {
@@ -172,6 +174,8 @@ export const posApi = apiSlice.injectEndpoints({
       amount: number;
       method: string; // 'cash' | 'card' | 'split' | 'bkash' | 'nagad' | etc.
       transactionId?: string;
+      amountReceived?: number;
+      changeDue?: number;
     }>({
       query: (data) => ({
         url: '/pos/payments',

@@ -13,17 +13,17 @@ import { Staff, useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-  BuildingOfficeIcon,
-  ClockIcon,
-  EnvelopeIcon,
-  ExclamationTriangleIcon,
-  EyeIcon,
-  MapPinIcon,
-  PencilIcon,
-  PhoneIcon,
-  PlusIcon,
-  PowerIcon,
-  TrashIcon
+    BuildingOfficeIcon,
+    ClockIcon,
+    EnvelopeIcon,
+    ExclamationTriangleIcon,
+    EyeIcon,
+    MapPinIcon,
+    PencilIcon,
+    PhoneIcon,
+    PlusIcon,
+    PowerIcon,
+    TrashIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -1440,7 +1440,7 @@ export default function BranchesPage() {
             <div className="text-sm text-gray-500 dark:text-gray-400">Loading branch details...</div>
           </div>
         )}
-        {(_detailsError || _statsError) && (
+        {!!(_detailsError || _statsError) && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
             <div className="flex items-start gap-2">
               <ExclamationTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />

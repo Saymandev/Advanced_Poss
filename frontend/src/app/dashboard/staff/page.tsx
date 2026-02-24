@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
+import { useGetBranchesQuery } from '@/lib/api/endpoints/branchesApi';
 import { CreateStaffRequest, Staff, useCreateStaffMutation, useDeactivateStaffMutation, useDeleteStaffMutation, useGetStaffByIdQuery, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -81,6 +82,9 @@ export default function StaffPage() {
     skip: !selectedStaffId || (!isViewModalOpen && !isEditModalOpen),
   });
 
+  const { data: branchesResponse } = useGetBranchesQuery({ companyId: companyId || undefined }, { skip: !companyId });
+  const branches = useMemo(() => branchesResponse?.branches || [], [branchesResponse]);
+
   const [createStaff, { isLoading: isCreating }] = useCreateStaffMutation();
   const [updateStaff, { isLoading: isUpdating }] = useUpdateStaffMutation();
   const [deleteStaff] = useDeleteStaffMutation();
@@ -112,6 +116,7 @@ export default function StaffPage() {
     skills: [],
     certifications: [],
     notes: '',
+    branchId: undefined,
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -139,6 +144,7 @@ export default function StaffPage() {
         skills: selectedStaffData.skills || [],
         certifications: selectedStaffData.certifications || [],
         notes: selectedStaffData.notes || '',
+        branchId: selectedStaffData.branchId || undefined,
         pin: '',
         password: '',
       });
@@ -163,6 +169,7 @@ export default function StaffPage() {
       skills: [],
       certifications: [],
       notes: '',
+      branchId: undefined,
     });
     setSelectedStaffId('');
     setFormErrors({});
@@ -231,7 +238,7 @@ export default function StaffPage() {
         role: formData.role || 'waiter',
         password: formData.password,
         pin: formData.pin || undefined,
-        branchId,
+        branchId: formData.branchId || undefined,
         companyId,
       };
 
@@ -277,6 +284,7 @@ export default function StaffPage() {
         lastName: formData.lastName,
         email: formData.email,
         role: formData.role,
+        branchId: formData.branchId || null,
       };
 
       // Only include phoneNumber if it has a value
@@ -561,7 +569,7 @@ export default function StaffPage() {
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage your restaurant staff and team members
           </p>
-          {error && (
+          {!!error && (
             <p className="text-red-600 dark:text-red-400 text-xs sm:text-sm mt-1">
               Error loading staff: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
             </p>
@@ -744,7 +752,7 @@ export default function StaffPage() {
       </Card>
 
       {/* Error Display */}
-      {error && (
+      {!!error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <p className="text-red-600 dark:text-red-400 font-medium">
             Error loading staff: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
@@ -1065,12 +1073,15 @@ export default function StaffPage() {
               value={formData.role || 'waiter'}
               onChange={(value) => setFormData({ ...formData, role: value as any })}
             />
-            <Input
-              label="Department (Optional)"
-              value={formData.department || ''}
-              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-              placeholder="e.g., Kitchen, Front of House"
-              className="text-sm sm:text-base"
+            <Select
+              label="Branch Assignment (Required for POS)"
+              options={[
+                { value: '', label: 'All Branches (Global)' },
+                ...branches.map(b => ({ value: b.id, label: b.name }))
+              ]}
+              value={formData.branchId || ''}
+              onChange={(value) => setFormData({ ...formData, branchId: value || undefined })}
+              helperText="Assign to a specific branch or make global."
             />
           </div>
 
