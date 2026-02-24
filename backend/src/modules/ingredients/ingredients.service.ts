@@ -1,11 +1,12 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { IngredientFilterDto } from '../../common/dto/pagination.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
@@ -18,6 +19,7 @@ export class IngredientsService {
     @InjectModel(Ingredient.name)
     private ingredientModel: Model<IngredientDocument>,
     private websocketsGateway: WebsocketsGateway,
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(createIngredientDto: CreateIngredientDto): Promise<Ingredient> {
@@ -291,6 +293,25 @@ export class IngredientsService {
             branchId,
             savedIngredient.toObject ? savedIngredient.toObject() : savedIngredient,
           );
+        }
+
+        // --- Persistent Notifications ---
+        if (savedIngredient.isLowStock || savedIngredient.isOutOfStock) {
+          const type = savedIngredient.isOutOfStock ? 'system' : 'priority'; // out of stock is system/critical
+          const title = savedIngredient.isOutOfStock ? 'Out of Stock!' : 'Low Stock Alert';
+          const message = savedIngredient.isOutOfStock 
+            ? `${savedIngredient.name} is completely out of stock`
+            : `${savedIngredient.name} is running low (${savedIngredient.currentStock} ${savedIngredient.unit} remaining)`;
+
+          await this.notificationsService.create({
+            companyId: savedIngredient.companyId.toString(),
+            branchId,
+            roles: ['owner', 'manager', 'chef'],
+            type: type as any,
+            title,
+            message,
+            metadata: { ingredientId: savedIngredient._id.toString() },
+          });
         }
       }
     } catch (wsError) {

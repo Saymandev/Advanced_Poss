@@ -9,9 +9,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { OrderFilterDto } from '../../common/dto/pagination.dto';
 import { MenuItemsService } from '../menu-items/menu-items.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { TablesService } from '../tables/tables.service';
 import { TransactionCategory, TransactionType } from '../transactions/schemas/transaction.schema';
 import { TransactionsService } from '../transactions/transactions.service';
+import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -27,6 +29,8 @@ export class OrdersService {
     private menuItemsService: MenuItemsService,
     @Inject(forwardRef(() => TransactionsService))
     private transactionsService: TransactionsService,
+    private notificationsService: NotificationsService,
+    private websocketsGateway: WebsocketsGateway,
   ) {}
 
   async create(createOrderDto: CreateOrderDto): Promise<Order> {
@@ -139,6 +143,24 @@ export class OrdersService {
         item.totalPrice,
       );
     }
+    
+    // Notifications
+    const companyId = createOrderDto.companyId.toString();
+    const branchId = createOrderDto.branchId.toString();
+    
+    // 1. Persistent Notification
+    await this.notificationsService.create({
+      companyId,
+      branchId,
+      roles: ['manager', 'cashier', 'waiter'],
+      type: 'order',
+      title: 'New Order',
+      message: `Order #${orderNumber} has been created`,
+      metadata: { orderId: savedOrder._id.toString() },
+    });
+    
+    // 2. Real-time Notification
+    this.websocketsGateway.notifyNewOrder(branchId, savedOrder);
 
     return this.findOne(savedOrder._id.toString());
   }
@@ -356,8 +378,28 @@ export class OrdersService {
     }
 
     await this.orderModel.findByIdAndUpdate(id, updateData);
+    
+    // Notifications
+    const updatedOrder = await this.findOne(id);
+    const branchId = updatedOrder.branchId?._id?.toString() || (updatedOrder.branchId as any)?.toString();
+    
+    if (branchId) {
+      // 1. Persistent Notification
+      await this.notificationsService.create({
+        companyId: updatedOrder.companyId.toString(),
+        branchId,
+        roles: ['manager', 'cashier', 'waiter'],
+        type: 'order',
+        title: 'Order Status Changed',
+        message: `Order #${updatedOrder.orderNumber} status updated to ${updateStatusDto.status}`,
+        metadata: { orderId: id, status: updateStatusDto.status },
+      });
+      
+      // 2. Real-time Notification
+      this.websocketsGateway.notifyOrderStatusChanged(branchId, updatedOrder);
+    }
 
-    return this.findOne(id);
+    return updatedOrder;
   }
 
   async addPayment(id: string, addPaymentDto: AddPaymentDto): Promise<Order> {
@@ -425,6 +467,24 @@ export class OrdersService {
     } catch (txnError) {
       console.error('❌ Failed to record transaction in ledger:', txnError);
     }
+
+    // Notifications
+    const branchId = order.branchId.toString();
+    const companyId = order.companyId.toString();
+    
+    // 1. Persistent Notification
+    await this.notificationsService.create({
+      companyId,
+      branchId,
+      roles: ['manager', 'owner', 'cashier'],
+      type: 'payment',
+      title: 'Payment Received',
+      message: `Payment of ${addPaymentDto.amount} received for Order #${order.orderNumber}`,
+      metadata: { orderId: order._id.toString(), amount: addPaymentDto.amount },
+    });
+    
+    // 2. Real-time Notification
+    this.websocketsGateway.notifyPaymentReceived(branchId, order, payment);
 
     return this.findOne(id);
   }

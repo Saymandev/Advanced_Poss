@@ -4,7 +4,7 @@ import { CreatePOSOrderDto } from './create-pos-order.dto';
 
 export class UpdatePOSOrderDto extends PartialType(CreatePOSOrderDto) {
   @IsOptional()
-  @IsEnum(['pending', 'paid', 'cancelled'])
+  @IsEnum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'paid', 'completed', 'cancelled'])
   status?: string;
 
   @IsOptional()

@@ -11,6 +11,8 @@ import { CustomersService } from '../customers/customers.service';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { KitchenService } from '../kitchen/kitchen.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
+import { OrdersService } from '../orders/orders.service';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { ServiceChargeSetting, ServiceChargeSettingDocument } from '../settings/schemas/service-charge-setting.schema';
 import { TaxSetting, TaxSettingDocument } from '../settings/schemas/tax-setting.schema';
 import { SettingsService } from '../settings/settings.service';
@@ -29,10 +31,12 @@ import { ReceiptService } from './receipt.service';
 import { POSOrder, POSOrderDocument } from './schemas/pos-order.schema';
 import { POSPayment, POSPaymentDocument } from './schemas/pos-payment.schema';
 import { POSSettings, POSSettingsDocument } from './schemas/pos-settings.schema';
+
 @Injectable()
 export class POSService {
   constructor(
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
+    @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(POSPayment.name) private posPaymentModel: Model<POSPaymentDocument>,
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
@@ -58,6 +62,8 @@ export class POSService {
     private workPeriodsService: WorkPeriodsService,
     @Inject(forwardRef(() => TransactionsService))
     private transactionsService: TransactionsService,
+    @Inject(forwardRef(() => OrdersService))
+    private ordersService: OrdersService,
   ) {}
   // Generate unique order number
   private async generateOrderNumber(branchId: string): Promise<string> {
@@ -706,33 +712,166 @@ export class POSService {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
-    const [orders, total] = await Promise.all([
+
+    // 1. Fetch from POSOrder
+    const [posOrders, posTotal] = await Promise.all([
       this.posOrderModel
         .find(query)
         .populate('tableId', 'tableNumber capacity')
         .populate('userId', 'firstName lastName email')
-        .populate('paymentId', 'method amount status transactionId') // Populate payment to get method
+        .populate('paymentId', 'method amount status transactionId')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
+        .lean()
         .exec(),
       this.posOrderModel.countDocuments(query).exec(),
     ]);
-    return { orders, total };
+
+    // 2. Fetch from public Order (only for "pending" or broad queries, or for work period history)
+    let mergedOrders: any[] = [...posOrders];
+    let total = posTotal;
+
+    // Include public orders if:
+    // - No specific status requested (broad query)
+    // - Status is one of the "active" statuses (pending, preparing, ready)
+    // - There is a date range filter (indicates history/reporting query for work periods)
+    const includePublic = !filters.status || 
+                         ['pending', 'preparing', 'ready'].includes(filters.status) ||
+                         (filters.startDate || filters.endDate);
+    
+    if (includePublic) {
+      const publicQuery: any = {
+        branchId: query.branchId,
+      };
+
+      // If status filter provided, translate it or use a default set for "active" orders
+      if (filters.status) {
+        publicQuery.status = filters.status;
+      } else if (!filters.startDate && !filters.endDate) {
+        // If no date range and no status, limit to active orders to avoid massive fetches
+        publicQuery.status = { $in: ['pending', 'preparing', 'ready', 'confirmed'] };
+      }
+
+      // Sync date range if present
+      if (query.createdAt) {
+        publicQuery.createdAt = query.createdAt;
+      }
+      
+      if (filters.orderType) {
+        publicQuery.type = filters.orderType;
+      }
+
+      if (filters.search) {
+        publicQuery.$or = [
+          { orderNumber: { $regex: filters.search, $options: 'i' } },
+          { guestName: { $regex: filters.search, $options: 'i' } },
+          { guestPhone: { $regex: filters.search, $options: 'i' } },
+        ];
+      }
+
+      const publicOrders = await this.orderModel
+        .find(publicQuery)
+        .populate('waiterId', 'firstName lastName email')
+        .sort({ createdAt: -1 })
+        .limit(filters.limit || limit)
+        .exec();
+
+      const standardizedPublic = publicOrders.map(order => {
+        const obj = order.toObject();
+        
+        // Standardize status: If a public order is completed and fully paid, 
+        // we treat it as 'paid' in the POS context for reporting.
+        let posStatus = obj.status;
+        if (obj.status === 'completed' && obj.paymentStatus === 'paid') {
+          posStatus = 'paid';
+        } else if (obj.status === 'cancelled') {
+          posStatus = 'cancelled';
+        } else if (['pending', 'confirmed', 'preparing', 'ready', 'served'].includes(obj.status)) {
+          posStatus = 'pending'; // Map all active statuses to pending for POS list
+        }
+
+        return {
+          ...obj,
+          orderType: obj.type || 'dine-in',
+          totalAmount: obj.total,
+          status: posStatus,
+          customerInfo: obj.deliveryInfo || {
+            name: obj.guestName || 'Customer',
+            phone: obj.guestPhone || '',
+          },
+          userId: obj.waiterId,
+          items: (obj.items || []).map((item: any) => ({
+            ...item,
+            price: item.unitPrice || item.basePrice || 0, // Map unitPrice to price for POS frontend
+          })),
+        };
+      });
+
+      mergedOrders = [...mergedOrders, ...standardizedPublic];
+      total += await this.orderModel.countDocuments(publicQuery).exec();
+      
+      // Re-sort merged results
+      mergedOrders.sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA;
+      });
+
+      // Truncate to limit after merging
+      mergedOrders = mergedOrders.slice(0, limit);
+    }
+
+    return { orders: mergedOrders as any[], total };
   }
   // Get single POS order
-  async getOrderById(id: string): Promise<POSOrder> {
-    const order = await this.posOrderModel
+  async getOrderById(id: string): Promise<any> {
+    // Try POSOrder first
+    const posOrder = await this.posOrderModel
       .findById(id)
       .populate('tableId', 'tableNumber number capacity')
       .populate('userId', 'firstName lastName name email')
       .populate('items.menuItemId', 'name description price')
       .populate('paymentId')
       .exec();
-    if (!order) {
-      throw new NotFoundException('POS order not found');
+
+    if (posOrder) {
+      return posOrder;
     }
-    return order;
+
+    // Try public Order if not found in POSOrder
+    const publicOrder = await this.orderModel
+      .findById(id)
+      .populate('tableId', 'tableNumber number capacity')
+      .populate('waiterId', 'firstName lastName name email')
+      .populate('items.menuItemId', 'name description price')
+      .populate('customerId')
+      .exec();
+
+    if (!publicOrder) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Standardize public Order to match POSOrder structure for the frontend
+    const standardized = publicOrder.toObject() as any;
+    return {
+      ...standardized,
+      orderType: standardized.type || 'dine-in', // Standardize property name
+      totalAmount: standardized.total, // Standardize total
+      items: (standardized.items || []).map((item: any) => ({
+        ...item,
+        price: item.unitPrice || item.basePrice || 0, // Map unitPrice to price
+      })),
+      customerInfo: standardized.deliveryInfo || {
+        name: standardized.guestName || 
+              (typeof standardized.customerId === 'object' ? standardized.customerId?.firstName : undefined) || 
+              'Customer',
+        phone: standardized.guestPhone || 
+               (typeof standardized.customerId === 'object' ? standardized.customerId?.phone : undefined) || 
+               '',
+      },
+      userId: standardized.waiterId, // Map waiterId to userId
+    };
   }
   // Update POS order
   async updateOrder(id: string, updateOrderDto: UpdatePOSOrderDto, userId: string): Promise<POSOrder> {
@@ -751,43 +890,106 @@ export class POSService {
     if (updateOrderDto.status === 'paid') {
       updateData.completedAt = new Date();
     }
-    const updatedOrder = await this.posOrderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
-    // Notify via WebSocket: order updated
-    try {
-      this.websocketsGateway.notifyOrderUpdated(
-        order.branchId.toString(),
-        updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
-      );
-      if (updateOrderDto.status) {
-        this.websocketsGateway.notifyOrderStatusChanged(
-          order.branchId.toString(),
-          updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
+
+    // Try POSOrder first
+    const updatedPOSOrder = await this.posOrderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+    
+    if (updatedPOSOrder) {
+      // Notify via WebSocket: order updated
+      try {
+        this.websocketsGateway.notifyOrderUpdated(
+          updatedPOSOrder.branchId.toString(),
+          updatedPOSOrder.toObject ? updatedPOSOrder.toObject() : updatedPOSOrder,
         );
+        if (updateOrderDto.status) {
+          this.websocketsGateway.notifyOrderStatusChanged(
+            updatedPOSOrder.branchId.toString(),
+            updatedPOSOrder.toObject ? updatedPOSOrder.toObject() : updatedPOSOrder,
+          );
+        }
+      } catch (wsError) {
+        console.error('Failed to emit WebSocket event:', wsError);
       }
-    } catch (wsError) {
-      console.error('Failed to emit WebSocket event:', wsError);
+      return updatedPOSOrder;
     }
-    return updatedOrder;
+
+    // Try public Order using OrdersService for consistent logic (notifications, etc)
+    if (updateOrderDto.status) {
+      const publicOrder = await this.orderModel.findById(id).exec();
+      if (publicOrder) {
+        const updatedPublic = await this.ordersService.updateStatus(id, {
+          status: updateOrderDto.status,
+          reason: updateOrderDto.cancellationReason,
+        });
+
+        // Standardize for return
+        const standardized = (updatedPublic as any).toObject ? (updatedPublic as any).toObject() : updatedPublic;
+        return {
+          ...standardized,
+          orderType: standardized.type || 'dine-in',
+          totalAmount: standardized.total,
+          userId: standardized.waiterId,
+        };
+      }
+    }
+
+    const updatedPublicOrder = await this.orderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+    if (!updatedPublicOrder) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Standardize for return
+    const standardized = updatedPublicOrder.toObject() as any;
+    return {
+      ...standardized,
+      orderType: standardized.type || 'dine-in',
+      totalAmount: standardized.total,
+      userId: standardized.waiterId,
+    };
   }
   // Cancel POS order
-  async cancelOrder(id: string, reason: string, userId: string): Promise<POSOrder> {
-    const order = await this.posOrderModel.findById(id).exec();
+  async cancelOrder(id: string, reason: string, userId: string): Promise<any> {
+    // Try POSOrder first
+    let order: any = await this.posOrderModel.findById(id).exec();
+    let isPublic = false;
+
     if (!order) {
-      throw new NotFoundException('POS order not found');
+      order = await this.orderModel.findById(id).exec();
+      isPublic = true;
     }
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
     if (order.status === 'paid') {
       throw new ConflictException('Cannot cancel a paid order');
     }
-    const cancelledOrder = await this.posOrderModel.findByIdAndUpdate(
-      id,
-      {
-        status: 'cancelled',
-        cancelledAt: new Date(),
-        cancelledBy: new Types.ObjectId(userId),
-        cancellationReason: reason,
-      },
-      { new: true }
-    ).exec();
+
+    const updateData = {
+      status: 'cancelled',
+      cancelledAt: new Date(),
+      cancelledBy: new Types.ObjectId(userId),
+      cancellationReason: reason,
+    };
+
+    let cancelledOrder: any;
+    if (isPublic) {
+      cancelledOrder = await this.orderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+    } else {
+      cancelledOrder = await this.posOrderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+    }
+
+    // Standardize public order for return
+    if (isPublic) {
+      const standardized = cancelledOrder.toObject();
+      cancelledOrder = {
+        ...standardized,
+        orderType: standardized.type || 'dine-in',
+        totalAmount: standardized.total,
+        userId: standardized.waiterId,
+      };
+    }
     // Free the table if it's a dine-in order and no other active orders exist on this table
     if (order.tableId && order.orderType === 'dine-in') {
       try {
@@ -843,14 +1045,24 @@ export class POSService {
         );
       }
     }
-    const order: any = await this.posOrderModel.findById(processPaymentDto.orderId).exec();
+    let order: any = await this.posOrderModel.findById(processPaymentDto.orderId).exec();
+    let isPublic = false;
+
     if (!order) {
-      throw new NotFoundException('POS order not found');
+      order = await this.orderModel.findById(processPaymentDto.orderId).exec();
+      isPublic = !!order;
     }
-    if (order.status === 'paid') {
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    
+    if (order.status === 'paid' || (isPublic && order.paymentStatus === 'paid')) {
       throw new ConflictException('Order is already paid');
     }
-    if (Math.abs(order.totalAmount - processPaymentDto.amount) > 0.01) {
+
+    const orderTotal = isPublic ? order.total : order.totalAmount;
+    if (Math.abs(orderTotal - processPaymentDto.amount) > 0.01) {
       throw new BadRequestException('Payment amount does not match order total');
     }
     const paymentData = {
@@ -874,13 +1086,30 @@ export class POSService {
     const payment = new this.posPaymentModel(paymentData);
     const savedPayment = await payment.save();
     // Update order status
-    const updatedOrder = await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
-      status: 'paid',
-      paymentId: savedPayment._id,
-      completedAt: new Date(),
-      amountReceived: processPaymentDto.amountReceived,
-      changeDue: processPaymentDto.changeDue,
-    }, { new: true }).exec();
+    let updatedOrder: any;
+    if (isPublic) {
+      updatedOrder = await this.ordersService.addPayment(processPaymentDto.orderId, {
+        method: processPaymentDto.method,
+        amount: processPaymentDto.amount,
+        transactionId: processPaymentDto.transactionId || savedPayment._id.toString(),
+        processedBy: userId,
+      });
+
+      // Ensure status is updated to completed if fully paid
+      if ((updatedOrder as any).paymentStatus === 'paid' && updatedOrder.status !== 'completed') {
+        updatedOrder = await this.ordersService.updateStatus(processPaymentDto.orderId, {
+          status: 'completed',
+        });
+      }
+    } else {
+      updatedOrder = await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
+        status: 'paid',
+        paymentId: savedPayment._id,
+        completedAt: new Date(),
+        amountReceived: processPaymentDto.amountReceived,
+        changeDue: processPaymentDto.changeDue,
+      }, { new: true }).exec();
+    }
     // If this is a room_service order that was just paid, add the additional charge to the booking
     if (updatedOrder.orderType === 'room_service' && updatedOrder.bookingId) {
       try {
@@ -1845,23 +2074,78 @@ export class POSService {
     branchId: string,
     deliveryStatus?: 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled',
     assignedDriverId?: string,
-  ): Promise<POSOrder[]> {
-    const query: any = {
-      branchId: new Types.ObjectId(branchId),
+  ): Promise<any[]> {
+    const branchObjectId = new Types.ObjectId(branchId);
+    
+    // 1. Fetch from POSOrder
+    const posQuery: any = {
+      branchId: branchObjectId,
       orderType: 'delivery',
     };
     if (deliveryStatus) {
-      query.deliveryStatus = deliveryStatus;
+      posQuery.deliveryStatus = deliveryStatus;
     }
     if (assignedDriverId) {
-      query.assignedDriverId = new Types.ObjectId(assignedDriverId);
+      posQuery.assignedDriverId = new Types.ObjectId(assignedDriverId);
     }
-    return this.posOrderModel
-      .find(query)
+    const posOrders = await this.posOrderModel
+      .find(posQuery)
       .populate('userId', 'firstName lastName email')
       .populate('assignedDriverId', 'firstName lastName phone')
       .sort({ createdAt: -1 })
       .exec();
+
+    // 2. Fetch from public Order (if they are unconfirmed/pending)
+    // Map deliveryStatus back to public order status if needed, 
+    // but usually unconfirmed orders are just 'pending' or 'confirmed'
+    const publicQuery: any = {
+      branchId: branchObjectId,
+      type: 'delivery',
+    };
+    
+    // If filtering by specific delivery statuses, some public orders might not match
+    // but we want to show 'pending' public orders in the 'pending' delivery queue
+    if (deliveryStatus === 'pending' || !deliveryStatus) {
+      publicQuery.status = { $in: ['pending', 'preparing', 'ready'] };
+    } else {
+      // For other delivery statuses, public orders are likely already converted to POS orders
+      // or handled elsewhere, but for safety we only query if specifically pending
+      if (deliveryStatus) publicQuery.status = 'none'; // effectively skip
+    }
+
+    const publicOrders = await this.orderModel
+      .find(publicQuery)
+      .populate('waiterId', 'firstName lastName email')
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // Standardize public orders to match delivery queue format
+    const standardizedPublic = publicOrders.map(order => {
+      const obj = order.toObject();
+      return {
+        ...obj,
+        orderType: 'delivery',
+        totalAmount: obj.total,
+        items: (obj.items || []).map((item: any) => ({
+          ...item,
+          price: item.unitPrice || item.basePrice || 0,
+        })),
+        customerInfo: obj.deliveryInfo || {
+          name: obj.guestName || 'Customer',
+          phone: obj.guestPhone || '',
+        },
+        deliveryStatus: 'pending', // Public unconfirmed orders are inherently pending delivery
+        userId: obj.waiterId,
+      };
+    });
+
+    // Merge and sort
+    const allOrders = [...posOrders, ...standardizedPublic];
+    return allOrders.sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return dateB - dateA;
+    });
   }
   /**
    * Assign a driver to a delivery order
@@ -1878,10 +2162,23 @@ export class POSService {
     if (!driver) {
       throw new NotFoundException('Driver not found');
     }
-    const order = await this.posOrderModel.findById(orderId);
+
+    // Try POSOrder first
+    let order = await this.posOrderModel.findById(orderId);
     if (!order) {
-      throw new NotFoundException('Order not found');
+      // Try public Order
+      const publicOrder = await this.orderModel.findById(orderId);
+      if (!publicOrder) {
+        throw new NotFoundException('Order not found');
+      }
+      if (publicOrder.type !== 'delivery') {
+        throw new BadRequestException('This order is not a delivery order');
+      }
+      // Note: We can only assign drivers to confirmed POS orders in this system's architecture.
+      // If the user tries to assign a driver to an unconfirmed order, we should suggest confirming it first.
+      throw new BadRequestException('Please confirm this order before assigning a driver.');
     }
+    
     if (order.orderType !== 'delivery') {
       throw new BadRequestException('This order is not a delivery order');
     }
@@ -1905,7 +2202,7 @@ export class POSService {
    */
   async updateDeliveryStatus(
     orderId: string,
-    status: 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled',
+    status: 'pending' | 'confirmed' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled',
     userId: string,
   ): Promise<POSOrder> {
     if (!Types.ObjectId.isValid(orderId)) {

@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as QRCode from 'qrcode';
 import { GeneratorUtil } from '../../common/utils/generator.util';
+import { NotificationsService } from '../notifications/notifications.service';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { POSSettings, POSSettingsDocument } from '../pos/schemas/pos-settings.schema';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
@@ -26,6 +27,7 @@ export class TablesService {
     @InjectModel(POSSettings.name)
     private posSettingsModel: Model<POSSettingsDocument>,
     private websocketsGateway: WebsocketsGateway,
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(createTableDto: CreateTableDto): Promise<Table> {
@@ -370,11 +372,24 @@ export class TablesService {
 
     const table = await this.tableModel
       .findByIdAndUpdate(id, updateData, { new: true })
-      .populate('branchId', 'name code')
+      .populate('branchId', 'name code companyId')
       .populate('currentOrderId', 'orderNumber total');
 
     if (!table) {
       throw new NotFoundException('Table not found');
+    }
+
+    // Persistent Notification
+    if (branchIdForSocket && (table.branchId as any)?.companyId) {
+      await this.notificationsService.create({
+        companyId: (table.branchId as any).companyId.toString(),
+        branchId: branchIdForSocket,
+        roles: ['manager', 'waiter'],
+        type: 'system',
+        title: 'Table Status Changed',
+        message: `Table ${table.tableNumber} is now ${updateStatusDto.status}`,
+        metadata: { tableId: id, status: updateStatusDto.status },
+      });
     }
 
     // Notify via WebSocket: table status changed
@@ -383,17 +398,13 @@ export class TablesService {
         const tableObj = table.toObject ? table.toObject() : table;
         // Ensure id field exists for socket event
         if (!tableObj.id && tableObj._id) {
-          tableObj.id = tableObj._id.toString();
+          tableObj.id = (tableObj._id as any).toString();
         }
 
         this.websocketsGateway.notifyTableStatusChanged(
           branchIdForSocket,
           tableObj,
         );
-      } else {
-        console.warn('⚠️ Cannot emit table status change: branchId not found', { 
-          tableId: table._id || table.id 
-        });
       }
     } catch (wsError) {
       console.error('❌ Failed to emit WebSocket event:', wsError);
@@ -408,24 +419,92 @@ export class TablesService {
     }
 
     const table = await this.tableModel.findById(id);
-
     if (!table) {
       throw new NotFoundException('Table not found');
     }
 
-    if (table.status !== 'available') {
-      throw new BadRequestException('Table is not available for reservation');
+    if (table.status === 'occupied') {
+      throw new BadRequestException('Table is currently occupied and cannot be reserved');
+    }
+
+    const startTime = new Date(reserveDto.reservedFor);
+    const endTime = new Date(reserveDto.reservedUntil);
+
+    // Validate time window
+    if (endTime <= startTime) {
+      throw new BadRequestException('Reservation end time must be after start time');
+    }
+    const minDuration = 15 * 60 * 1000; // 15 minutes minimum
+    if (endTime.getTime() - startTime.getTime() < minDuration) {
+      throw new BadRequestException('Reservation must be at least 15 minutes long');
+    }
+
+    // Conflict detection: reject if another reservation overlaps the requested window
+    // Overlap condition: existing.start < newEnd AND existing.end > newStart
+    const conflictingReservation = await this.tableModel.findOne({
+      _id: new Types.ObjectId(id),
+      status: 'reserved',
+      reservedFor: { $lt: endTime },     // existing start < new end
+      reservedUntil: { $gt: startTime }, // existing end > new start
+    });
+
+    if (conflictingReservation) {
+      const existingStart = conflictingReservation.reservedFor?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const existingEnd = (conflictingReservation as any).reservedUntil?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      throw new BadRequestException(
+        `Table already has an overlapping reservation from ${existingStart} to ${existingEnd}. Please choose a different time.`
+      );
     }
 
     table.status = 'reserved';
-    table.reservedFor = new Date(reserveDto.reservedFor);
+    table.reservedFor = startTime;
+    (table as any).reservedUntil = endTime;
+    (table as any).reservationNotes = reserveDto.notes || undefined;
     table.reservedBy = {
       name: reserveDto.name,
       phone: reserveDto.phone,
       partySize: reserveDto.partySize,
+      ...(reserveDto.email ? { email: reserveDto.email } : {}),
     };
 
-    return table.save();
+    const saved = await table.save();
+
+    // Notify via WebSocket
+    try {
+      const branchId = table.branchId?.toString();
+      if (branchId) {
+        const tableObj = (saved as any).toObject ? (saved as any).toObject() : saved;
+        if (!tableObj.id && tableObj._id) tableObj.id = tableObj._id.toString();
+        this.websocketsGateway.notifyTableStatusChanged(branchId, tableObj);
+      }
+    } catch (wsError) {
+      console.error('Failed to emit reservation WebSocket event:', wsError);
+    }
+
+    // Persistent Notification
+    const branchId = table.branchId?.toString();
+    if (branchId) {
+      // Get companyId from branch population (table is already populated in some flows or we can fetch it)
+      const tableWithBranch = await this.tableModel.findById(id).populate('branchId', 'companyId').exec();
+      const companyId = (tableWithBranch?.branchId as any)?.companyId;
+
+      if (companyId) {
+        await this.notificationsService.create({
+          companyId: companyId.toString(),
+          branchId,
+          roles: ['manager', 'waiter'],
+          type: 'system',
+          title: 'Table Reserved',
+          message: `Table ${table.tableNumber} reserved for ${reserveDto.name} at ${startTime.toLocaleTimeString()}`,
+          metadata: { tableId: id, reservation: reserveDto },
+        });
+      }
+
+      // Targeted real-time notification
+      this.websocketsGateway.notifyTableReserved(branchId, saved, reserveDto);
+    }
+
+    return saved;
   }
 
   async cancelReservation(id: string): Promise<Table> {
@@ -434,7 +513,6 @@ export class TablesService {
     }
 
     const table = await this.tableModel.findById(id);
-
     if (!table) {
       throw new NotFoundException('Table not found');
     }
@@ -445,9 +523,44 @@ export class TablesService {
 
     table.status = 'available';
     table.reservedFor = undefined;
+    (table as any).reservedUntil = undefined;
+    (table as any).reservationNotes = undefined;
     table.reservedBy = undefined;
 
-    return table.save();
+    const saved = await table.save();
+
+    // Notify via WebSocket
+    try {
+      const branchId = table.branchId?.toString();
+      if (branchId) {
+        const tableObj = (saved as any).toObject ? (saved as any).toObject() : saved;
+        if (!tableObj.id && tableObj._id) tableObj.id = tableObj._id.toString();
+        this.websocketsGateway.notifyTableStatusChanged(branchId, tableObj);
+      }
+    } catch (wsError) {
+      console.error('Failed to emit cancellation WebSocket event:', wsError);
+    }
+
+    // Persistent Notification
+    const branchId = table.branchId?.toString();
+    if (branchId) {
+      const tableWithBranch = await this.tableModel.findById(id).populate('branchId', 'companyId').exec();
+      const companyId = (tableWithBranch?.branchId as any)?.companyId;
+
+      if (companyId) {
+        await this.notificationsService.create({
+          companyId: companyId.toString(),
+          branchId,
+          roles: ['manager', 'waiter'],
+          type: 'system',
+          title: 'Reservation Cancelled',
+          message: `Reservation for Table ${table.tableNumber} has been cancelled`,
+          metadata: { tableId: id },
+        });
+      }
+    }
+
+    return saved;
   }
 
   async remove(id: string): Promise<void> {

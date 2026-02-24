@@ -37,21 +37,28 @@ export class Table {
   @Prop({ type: Types.ObjectId, ref: 'User' })
   occupiedBy?: Types.ObjectId;
 
-  // Reservation
   @Prop()
-  reservedFor?: Date;
+  reservedFor?: Date; // Reservation start time
+
+  @Prop()
+  reservedUntil?: Date; // Reservation end time (new)
+
+  @Prop({ trim: true })
+  reservationNotes?: string; // Optional notes (new)
 
   @Prop({
     type: {
       name: String,
       phone: String,
       partySize: Number,
+      email: String,
     },
   })
   reservedBy?: {
     name: string;
     phone: string;
     partySize: number;
+    email?: string;
   };
 
   @Prop({ default: true })

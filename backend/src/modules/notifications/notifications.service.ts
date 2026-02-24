@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
-import { Notification, NotificationDocument } from './schemas/notification.schema';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { Notification, NotificationDocument } from './schemas/notification.schema';
 
 @Injectable()
 export class NotificationsService {
@@ -66,12 +66,44 @@ export class NotificationsService {
       limit = 20,
     } = params;
 
-    const filter: any = {};
-    if (companyId) filter.companyId = new Types.ObjectId(companyId);
-    if (branchId) filter.branchId = new Types.ObjectId(branchId);
-    if (role) filter.roles = role.toLowerCase();
-    if (userId) filter.userIds = new Types.ObjectId(userId);
-    if (features.length > 0) filter.features = { $in: features };
+    // Build base scope filters (company + branch)
+    const scopeFilter: any = {};
+    if (companyId) scopeFilter.companyId = new Types.ObjectId(companyId);
+    if (branchId) scopeFilter.branchId = new Types.ObjectId(branchId);
+
+    // A notification is relevant to this user if EITHER:
+    //   (a) their role appears in the notification's roles[] array, OR
+    //   (b) their userId appears in the notification's userIds[] array, OR
+    //   (c) roles[] is empty AND userIds[] is empty (broadcast to everyone in scope)
+    const targetingConditions: any[] = [];
+
+    if (role) {
+      // Notifications explicitly targeting this role
+      targetingConditions.push({ roles: { $in: [role.toLowerCase()] } });
+    }
+
+    if (userId) {
+      // Direct notifications for this user
+      targetingConditions.push({ userIds: new Types.ObjectId(userId) });
+    }
+
+    // Broadcast notifications (no role or user restriction)
+    targetingConditions.push({
+      roles: { $size: 0 },
+      userIds: { $size: 0 },
+    });
+
+    const filter: any = {
+      ...scopeFilter,
+      ...(targetingConditions.length > 0 ? { $or: targetingConditions } : {}),
+    };
+
+    // Feature gate: if user has specific features enabled, include those notifications
+    if (features.length > 0) {
+      filter.$and = [
+        { $or: [{ features: { $size: 0 } }, { features: { $in: features } }] },
+      ];
+    }
 
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
@@ -88,23 +120,25 @@ export class NotificationsService {
   }
 
   async markAsRead(id: string, userId?: string) {
-    // If userId provided, only mark if targeted to that user
-    const filter: any = { _id: id };
-    if (userId) {
-      filter.$or = [
-        { userIds: new Types.ObjectId(userId) },
-        { userIds: { $size: 0 } }, // broadcast without specific users
-      ];
-    }
-    await this.notificationModel.findOneAndUpdate(filter, { readAt: new Date() }).exec();
+    // Mark as read regardless of role — the user has already been pre-filtered on fetch
+    await this.notificationModel.findOneAndUpdate(
+      { _id: id },
+      { readAt: new Date() },
+    ).exec();
   }
 
   async markAllAsRead(params: { companyId?: string; branchId?: string; role?: string; userId?: string }) {
     const filter: any = { readAt: { $exists: false } };
     if (params.companyId) filter.companyId = new Types.ObjectId(params.companyId);
     if (params.branchId) filter.branchId = new Types.ObjectId(params.branchId);
-    if (params.role) filter.roles = params.role.toLowerCase();
-    if (params.userId) filter.userIds = new Types.ObjectId(params.userId);
+
+    // Use $or so we only mark notifications relevant to this user
+    const targeting: any[] = [];
+    if (params.role) targeting.push({ roles: { $in: [params.role.toLowerCase()] } });
+    if (params.userId) targeting.push({ userIds: new Types.ObjectId(params.userId) });
+    targeting.push({ roles: { $size: 0 }, userIds: { $size: 0 } });
+    filter.$or = targeting;
+
     await this.notificationModel.updateMany(filter, { readAt: new Date() }).exec();
   }
 
@@ -112,10 +146,18 @@ export class NotificationsService {
     await this.notificationModel.findByIdAndDelete(id).exec();
   }
 
-  async deleteAll(params: { companyId?: string; branchId?: string }) {
+  async deleteAll(params: { companyId?: string; branchId?: string; role?: string; userId?: string }) {
     const filter: any = {};
     if (params.companyId) filter.companyId = new Types.ObjectId(params.companyId);
     if (params.branchId) filter.branchId = new Types.ObjectId(params.branchId);
+
+    // Scope deletion to notifications relevant to this role/user — never delete other roles' data
+    const targeting: any[] = [];
+    if (params.role) targeting.push({ roles: { $in: [params.role.toLowerCase()] } });
+    if (params.userId) targeting.push({ userIds: new Types.ObjectId(params.userId) });
+    targeting.push({ roles: { $size: 0 }, userIds: { $size: 0 } });
+    if (targeting.length > 0) filter.$or = targeting;
+
     await this.notificationModel.deleteMany(filter).exec();
   }
 }

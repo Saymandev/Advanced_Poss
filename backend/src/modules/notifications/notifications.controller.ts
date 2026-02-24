@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
@@ -49,5 +49,21 @@ export class NotificationsController {
   ) {
     return this.notificationsService.markAllAsRead({ companyId, branchId, role, userId });
   }
-}
 
+  /** DELETE /notifications — clears notifications for this user's role/branch scope only */
+  @Delete()
+  async clearAll(
+    @Query('companyId') companyId?: string,
+    @Query('branchId') branchId?: string,
+    @Query('role') role?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.notificationsService.deleteAll({ companyId, branchId, role, userId });
+  }
+
+  /** DELETE /notifications/:id — delete single notification */
+  @Delete(':id')
+  async deleteOne(@Param('id') id: string) {
+    return this.notificationsService.delete(id);
+  }
+}

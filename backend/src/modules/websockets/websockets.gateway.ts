@@ -1,13 +1,13 @@
 import { Logger } from '@nestjs/common';
 import {
-  ConnectedSocket,
-  MessageBody,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  OnGatewayInit,
-  SubscribeMessage,
-  WebSocketGateway,
-  WebSocketServer,
+    ConnectedSocket,
+    MessageBody,
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnGatewayInit,
+    SubscribeMessage,
+    WebSocketGateway,
+    WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 @WebSocketGateway({
@@ -417,175 +417,199 @@ export class WebsocketsGateway
   // Order events
   notifyNewOrder(branchId: string, order: any) {
     this.emitToBranch(branchId, 'order:new', order);
-    this.emitToKitchen(branchId, 'kitchen:new-order', order);
+    this.emitToKitchen(branchId, 'kitchen:order-received', order);
+    
     if (order.tableId) {
       this.emitToTable(order.tableId, 'table:order-created', order);
     }
+    
+    // Notification for Bell
+    this.emitScopedNotification({
+      branchId,
+      roles: ['manager', 'cashier', 'waiter'],
+      payload: {
+        type: 'order',
+        title: 'New Order',
+        message: `Order #${order.orderNumber} created`,
+        metadata: { orderId: order._id || order.id }
+      },
+    });
+
     // Notify specific waiter if assigned
     if (order.waiterId) {
       const waiterIdStr = typeof order.waiterId === 'string' ? order.waiterId : String(order.waiterId);
       this.notifyWaiterAssigned(waiterIdStr, order);
     }
   }
+
   notifyWaiterAssigned(waiterId: string | any, order: any) {
-    // Ensure waiterId is a string (convert ObjectId if needed)
-    let waiterIdStr: string;
-    if (typeof waiterId === 'string') {
-      waiterIdStr = waiterId;
-    } else if (waiterId && typeof waiterId.toString === 'function') {
-      waiterIdStr = waiterId.toString();
-    } else {
-      waiterIdStr = String(waiterId || '');
-    }
-    // Extract tableNumber from tableId if populated
-    let tableNumber: string | undefined;
-    if (order.tableId) {
-      if (typeof order.tableId === 'object' && order.tableId !== null) {
-        // If tableId is populated (object), extract tableNumber
-        tableNumber = (order.tableId as any).tableNumber || (order.tableId as any).number || undefined;
-      } else if (typeof order.tableId === 'string') {
-        // If tableId is just an ID string, we can't get tableNumber here
-        tableNumber = undefined;
-      }
-    }
+    let waiterIdStr: string = typeof waiterId === 'string' ? waiterId : String(waiterId?._id || waiterId || '');
+    
     const notificationData = {
       orderId: order.id || (order._id ? String(order._id) : null),
       orderNumber: order.orderNumber,
-      tableNumber: tableNumber || order.tableNumber || undefined,
-      tableId: typeof order.tableId === 'string' ? order.tableId : (order.tableId?._id || order.tableId?.id || undefined),
-      orderType: order.orderType || order.type,
-      totalAmount: order.totalAmount || order.total,
-      items: order.items || [],
-      notes: order.notes || order.customerNotes || '',
       timestamp: new Date(),
-      order: order,
     };
     
     this.emitToUser(waiterIdStr, 'order:assigned', notificationData);
-    this.logger.log(`📬 Notified waiter ${waiterIdStr} about assigned order ${order.orderNumber || 'N/A'}`);
-    }
+    
+    // Notification for Bell (targeted to specific user)
+    this.emitScopedNotification({
+      userIds: [waiterIdStr],
+      payload: {
+        type: 'order',
+        title: 'Order Assigned',
+        message: `You have been assigned to Order #${order.orderNumber}`,
+        metadata: { orderId: order._id || order.id }
+      },
+    });
+  }
+
   notifyOrderUpdated(branchId: string, order: any) {
     this.emitToBranch(branchId, 'order:updated', order);
     if (order.tableId) {
       this.emitToTable(order.tableId, 'table:order-updated', order);
     }
   }
+
   notifyOrderStatusChanged(branchId: string, order: any) {
     const orderId = order.id || order._id?.toString() || order.orderNumber;
-    // Emit to branch room (for authenticated users)
-    this.emitToBranch(branchId, 'order:status-changed', {
-      orderId,
-      status: order.status,
-      order,
-    });
-    // Emit to kitchen room
-    this.emitToKitchen(branchId, 'kitchen:order-status-changed', {
-      orderId,
-      status: order.status,
-      order,
-    });
-    // Emit to table room if applicable
+    this.emitToBranch(branchId, 'order:status-changed', { orderId, status: order.status, order });
+    this.emitToKitchen(branchId, 'kitchen:order-status-changed', { orderId, status: order.status, order });
+
     if (order.tableId) {
-      this.emitToTable(order.tableId, 'table:order-status-changed', {
-        orderId,
-        status: order.status,
-      });
+      this.emitToTable(order.tableId, 'table:order-status-changed', { orderId, status: order.status });
     }
-    // Emit to order-specific room for public tracking (no auth required)
+
+    // Public tracking room
     if (orderId) {
-      const orderRoom = `order:${orderId}`;
-      this.server.to(orderRoom).emit('order:status-changed', {
-        orderId,
-        status: order.status,
-        order,
-      });
-      this.logger.debug(`📡 Emitted order status change to order room: ${orderRoom}`);
+      this.server.to(`order:${orderId}`).emit('order:status-changed', { orderId, status: order.status, order });
     }
+
+    // Notification for Bell
+    this.emitScopedNotification({
+      branchId,
+      roles: ['manager', 'cashier', 'waiter'],
+      payload: {
+        type: 'order',
+        title: 'Order Status Updated',
+        message: `Order #${order.orderNumber} is now ${order.status}`,
+        metadata: { orderId, status: order.status }
+      },
+    });
   }
+
   notifyOrderItemReady(branchId: string, orderId: string, itemId: string) {
-    this.emitToBranch(branchId, 'order:item-ready', {
-      orderId,
-      itemId,
-    });
-    this.emitToKitchen(branchId, 'kitchen:item-ready', {
-      orderId,
-      itemId,
+    this.emitToBranch(branchId, 'order:item-ready', { orderId, itemId });
+    this.emitToKitchen(branchId, 'kitchen:item-ready', { orderId, itemId });
+    
+    // Notification for Bell
+    this.emitScopedNotification({
+      branchId,
+      roles: ['waiter', 'cashier', 'manager'],
+      payload: {
+        type: 'kitchen',
+        title: 'Item Ready',
+        message: `An item for Order #${orderId} is ready for pick up`,
+        metadata: { orderId, itemId }
+      },
     });
   }
+
   notifyPaymentReceived(branchId: string, order: any, payment: any) {
-    this.emitToBranch(branchId, 'order:payment-received', {
-      orderId: order.id,
-      payment,
-      order,
+    this.emitToBranch(branchId, 'order:payment-received', { orderId: order.id, payment, order });
+    
+    // Notification for Bell
+    this.emitScopedNotification({
+      branchId,
+      roles: ['manager', 'owner', 'cashier'],
+      payload: {
+        type: 'payment',
+        title: 'Payment Received',
+        message: `Payment of ${payment.amount} received for Order #${order.orderNumber}`,
+        metadata: { orderId: order.id, paymentId: payment.id }
+      },
     });
-    if (order.tableId) {
-      // Include order object in table:payment-received so frontend can access tableId
-      this.emitToTable(order.tableId, 'table:payment-received', {
-        payment,
-        order, // Include order object for consistency
-        orderId: order.id || order._id?.toString(),
-      });
-    }
   }
+
   // Table events
   notifyTableStatusChanged(branchId: string, table: any) {
-    this.emitToBranch(branchId, 'table:status-changed', {
-      tableId: table.id,
-      status: table.status,
-      table,
-    });
-    this.emitToTable(table.id, 'table:status-changed', {
-      status: table.status,
-    });
+    this.emitToBranch(branchId, 'table:status-changed', { tableId: table.id, status: table.status, table });
   }
-  notifyTableOccupied(branchId: string, table: any, order: any) {
-    this.emitToBranch(branchId, 'table:occupied', {
-      tableId: table.id,
-      orderId: order.id,
-      table,
-      order,
-    });
-  }
-  notifyTableAvailable(branchId: string, table: any) {
-    this.emitToBranch(branchId, 'table:available', {
-      tableId: table.id,
-      table,
-    });
-  }
+
   notifyTableReserved(branchId: string, table: any, reservation: any) {
-    this.emitToBranch(branchId, 'table:reserved', {
-      tableId: table.id,
-      reservation,
-      table,
+    this.emitToBranch(branchId, 'table:reserved', { tableId: table.id, reservation, table });
+    
+    // Notification for Bell
+    this.emitScopedNotification({
+      branchId,
+      roles: ['manager', 'waiter'],
+      payload: {
+        type: 'system',
+        title: 'Table Reserved',
+        message: `Table ${table.tableNumber} reserved for ${reservation.name}`,
+        metadata: { tableId: table.id }
+      },
     });
   }
+
   // Inventory events
   notifyLowStock(branchId: string, ingredient: any) {
-    this.emitToBranch(branchId, 'inventory:low-stock', {
-      ingredientId: ingredient.id,
-      name: ingredient.name,
-      currentStock: ingredient.currentStock,
-      minimumStock: ingredient.minimumStock,
-      ingredient,
+    this.emitToBranch(branchId, 'inventory:low-stock', { ingredientId: ingredient.id, name: ingredient.name, ingredient });
+    
+    // Notification for Bell
+    this.emitScopedNotification({
+      branchId,
+      roles: ['owner', 'manager', 'chef'],
+      payload: {
+        type: 'system', // or promotion/system
+        title: 'Low Stock Alert',
+        message: `${ingredient.name} is running low (${ingredient.currentStock} ${ingredient.unit} remaining)`,
+        metadata: { ingredientId: ingredient.id }
+      },
     });
   }
+
   notifyOutOfStock(branchId: string, ingredient: any) {
-    this.emitToBranch(branchId, 'inventory:out-of-stock', {
-      ingredientId: ingredient.id,
-      name: ingredient.name,
-      ingredient,
+    this.emitToBranch(branchId, 'inventory:out-of-stock', { ingredientId: ingredient.id, name: ingredient.name, ingredient });
+    
+    // Notification for Bell
+    this.emitScopedNotification({
+      branchId,
+      roles: ['owner', 'manager', 'chef'],
+      payload: {
+        type: 'system',
+        title: 'Out of Stock!',
+        message: `${ingredient.name} is out of stock`,
+        metadata: { ingredientId: ingredient.id }
+      },
     });
   }
+
   notifyStockUpdated(branchId: string, ingredient: any) {
     this.emitToBranch(branchId, 'inventory:stock-updated', {
-      ingredientId: ingredient.id,
+      ingredientId: ingredient._id || ingredient.id,
       currentStock: ingredient.currentStock,
       ingredient,
     });
   }
+
+
   // Customer events
   notifyNewCustomer(branchId: string, customer: any) {
     this.emitToBranch(branchId, 'customer:new', customer);
+    
+    // Notification for Bell
+    this.emitScopedNotification({
+      branchId,
+      roles: ['manager', 'owner', 'cashier'],
+      payload: {
+        type: 'promotion', // or system
+        title: 'New Customer',
+        message: `${customer.firstName} ${customer.lastName} joined`,
+        metadata: { customerId: customer.id }
+      },
+    });
   }
   notifyCustomerUpdated(branchId: string, customer: any) {
     this.emitToBranch(branchId, 'customer:updated', customer);

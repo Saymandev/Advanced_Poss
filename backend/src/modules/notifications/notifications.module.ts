@@ -10,7 +10,7 @@ import { Notification, NotificationSchema } from './schemas/notification.schema'
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Notification.name, schema: NotificationSchema }]),
-    WebsocketsModule,
+    forwardRef(() => WebsocketsModule),
     forwardRef(() => SubscriptionsModule),
     forwardRef(() => SubscriptionPlansModule),
   ],

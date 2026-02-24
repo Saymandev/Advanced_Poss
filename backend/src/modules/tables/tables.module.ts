@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BranchesModule } from '../branches/branches.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
 import { POSSettings, POSSettingsSchema } from '../pos/schemas/pos-settings.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
@@ -19,8 +20,9 @@ import { TablesService } from './tables.service';
     ]),
     forwardRef(() => BranchesModule),
     forwardRef(() => WebsocketsModule),
-    forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard (circular dependency)
-    forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard (Subscription model) (circular dependency)
+    forwardRef(() => SubscriptionPlansModule),
+    forwardRef(() => SubscriptionsModule),
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [TablesController],
   providers: [TablesService],

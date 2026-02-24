@@ -10,6 +10,7 @@ import { DeliveryZonesModule } from '../delivery-zones/delivery-zones.module';
 import { IngredientsModule } from '../ingredients/ingredients.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
+import { OrdersModule } from '../orders/orders.module';
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { ServiceChargeSetting, ServiceChargeSettingSchema } from '../settings/schemas/service-charge-setting.schema';
 import { SystemSettings, SystemSettingsSchema } from '../settings/schemas/system-settings.schema';
@@ -58,6 +59,7 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
     UsersModule,
     SettingsModule,
     RolePermissionsModule,
+    forwardRef(() => OrdersModule),
     forwardRef(() => TablesModule),
     forwardRef(() => KitchenModule),
     forwardRef(() => CustomersModule),

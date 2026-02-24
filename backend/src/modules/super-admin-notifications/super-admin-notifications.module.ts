@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { WebsocketsModule } from '../websockets/websockets.module';
 import { SuperAdminNotification, SuperAdminNotificationSchema } from './schemas/super-admin-notification.schema';
@@ -10,7 +10,7 @@ import { SuperAdminNotificationsService } from './super-admin-notifications.serv
     MongooseModule.forFeature([
       { name: SuperAdminNotification.name, schema: SuperAdminNotificationSchema },
     ]),
-    WebsocketsModule,
+    forwardRef(() => WebsocketsModule),
   ],
   controllers: [SuperAdminNotificationsController],
   providers: [SuperAdminNotificationsService],

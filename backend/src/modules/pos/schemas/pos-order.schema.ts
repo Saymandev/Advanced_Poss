@@ -59,10 +59,10 @@ export class POSOrder {
   };
 
   @Prop({ 
-    enum: ['pending', 'assigned', 'out_for_delivery', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'assigned', 'out_for_delivery', 'delivered', 'cancelled'],
     default: 'pending'
   })
-  deliveryStatus?: 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled';
+  deliveryStatus?: 'pending' | 'confirmed' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   assignedDriverId?: Types.ObjectId;
