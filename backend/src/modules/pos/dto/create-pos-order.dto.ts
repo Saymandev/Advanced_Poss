@@ -187,5 +187,15 @@ export class CreatePOSOrderDto {
   @IsNumber()
   @Min(0)
   loyaltyDiscount?: number; // Discount amount from loyalty points
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amountReceived?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  changeDue?: number;
 }
 

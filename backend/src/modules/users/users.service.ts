@@ -1,8 +1,8 @@
 import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
@@ -138,16 +138,23 @@ export class UsersService {
     // Employees without a branchId assignment will be excluded
     if (query.branchId) {
       try {
-        // Try both string and ObjectId formats for branchId filtering
         const branchIdStr = query.branchId.toString();
         const branchIdObj = new Types.ObjectId(query.branchId);
-        // Use $in to match either string or ObjectId format
-        // This ensures only employees assigned to this branch are returned
-        query.branchId = { $in: [branchIdStr, branchIdObj] };
+        // Include branch match OR no branch assigned (global staff)
+        query.$or = [
+          { branchId: { $in: [branchIdStr, branchIdObj] } },
+          { branchId: { $exists: false } },
+          { branchId: null }
+        ];
+        delete query.branchId;
       } catch (error) {
-        // If branchId is not a valid ObjectId, use string format
         const branchIdStr = query.branchId.toString();
-        query.branchId = branchIdStr;
+        query.$or = [
+          { branchId: branchIdStr },
+          { branchId: { $exists: false } },
+          { branchId: null }
+        ];
+        delete query.branchId;
       }
     }
 

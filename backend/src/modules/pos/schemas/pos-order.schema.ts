@@ -134,6 +134,12 @@ export class POSOrder {
 
   @Prop({ type: Number, default: 0 })
   loyaltyDiscount?: number; // Discount amount from loyalty points
+
+  @Prop({ type: Number })
+  amountReceived?: number;
+
+  @Prop({ type: Number })
+  changeDue?: number;
 }
 
 export const POSOrderSchema = SchemaFactory.createForClass(POSOrder);

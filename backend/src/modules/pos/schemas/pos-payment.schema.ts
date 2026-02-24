@@ -42,6 +42,12 @@ export class POSPayment {
 
   @Prop({ type: Types.ObjectId, ref: 'Branch' })
   branchId: Types.ObjectId;
+
+  @Prop({ type: Number })
+  amountReceived?: number;
+
+  @Prop({ type: Number })
+  changeDue?: number;
 }
 
 export const POSPaymentSchema = SchemaFactory.createForClass(POSPayment);

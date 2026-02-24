@@ -411,6 +411,8 @@ export class POSService {
               processedAt: new Date(),
               branchId: new Types.ObjectId(branchId),
               paymentDetails: {},
+              amountReceived: createOrderDto.amountReceived,
+              changeDue: createOrderDto.changeDue,
             };
             const payment = new this.posPaymentModel(paymentData);
             const savedPayment = await payment.save();
@@ -866,6 +868,8 @@ export class POSService {
         cardType: processPaymentDto.cardType,
         authorizationCode: processPaymentDto.authorizationCode,
       },
+      amountReceived: processPaymentDto.amountReceived,
+      changeDue: processPaymentDto.changeDue,
     };
     const payment = new this.posPaymentModel(paymentData);
     const savedPayment = await payment.save();
@@ -874,6 +878,8 @@ export class POSService {
       status: 'paid',
       paymentId: savedPayment._id,
       completedAt: new Date(),
+      amountReceived: processPaymentDto.amountReceived,
+      changeDue: processPaymentDto.changeDue,
     }, { new: true }).exec();
     // If this is a room_service order that was just paid, add the additional charge to the booking
     if (updatedOrder.orderType === 'room_service' && updatedOrder.bookingId) {

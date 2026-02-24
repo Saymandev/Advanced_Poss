@@ -33,5 +33,15 @@ export class ProcessPaymentDto {
   @IsOptional()
   @IsString()
   authorizationCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amountReceived?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  changeDue?: number;
 }
 

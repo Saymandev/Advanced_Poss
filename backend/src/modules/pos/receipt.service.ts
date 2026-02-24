@@ -460,6 +460,8 @@ export class ReceiptService {
       totalAmount: actualTotal,
       paymentMethod: order.paymentMethod,
       paymentDetails: order.paymentId || undefined,
+      amountReceived: (order as any).amountReceived || (order.paymentId as any)?.amountReceived || 0,
+      changeDue: (order as any).changeDue || (order.paymentId as any)?.changeDue || 0,
       createdAt: (order as any)?.createdAt || new Date(),
       completedAt: (order as any)?.completedAt || undefined,
       // Restaurant info
@@ -733,6 +735,16 @@ export class ReceiptService {
             <span>Total:</span>
             <span>${receiptData.currency} ${this.formatCurrency(receiptData.totalAmount, receiptData.currency)}</span>
         </div>
+        ${receiptData.amountReceived > 0 ? `
+            <div class="total-line" style="margin-top: 10px;">
+                <span>Amount Received:</span>
+                <span>${this.formatCurrency(receiptData.amountReceived, receiptData.currency)}</span>
+            </div>
+            <div class="total-line">
+                <span>Change Due:</span>
+                <span>${this.formatCurrency(receiptData.changeDue, receiptData.currency)}</span>
+            </div>
+        ` : ''}
     </div>
     ${receiptData.paymentMethod ? `
         <div class="payment-info">
