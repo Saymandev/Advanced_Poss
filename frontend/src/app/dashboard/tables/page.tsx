@@ -13,17 +13,17 @@ import { Table, useCancelTableReservationMutation, useCreateTableMutation, useDe
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import {
-  CalendarDaysIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  EyeIcon,
-  PencilIcon,
-  PhoneIcon,
-  PlusIcon,
-  TableCellsIcon,
-  TrashIcon,
-  UserGroupIcon,
-  XCircleIcon
+    CalendarDaysIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    EyeIcon,
+    PencilIcon,
+    PhoneIcon,
+    PlusIcon,
+    TableCellsIcon,
+    TrashIcon,
+    UserGroupIcon,
+    XCircleIcon
 } from '@heroicons/react/24/outline';
 import { format, parseISO } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -140,8 +140,12 @@ export default function TablesPage() {
     const reservedUntil = `${resForm.date}T${resForm.endTime}:00`;
     if (reservedUntil <= reservedFor) { toast.error('End time must be after start time'); return; }
     try {
+      // Destructure to remove frontend-only fields (date, startTime, endTime)
+      // which cause backend validation errors (property should not exist)
+      const { date, startTime, endTime, ...submitData } = resForm;
+
       await reserveTable({
-        ...resForm,
+        ...submitData,
         reservedFor,
         reservedUntil,
         email: resForm.email?.trim() || undefined,
