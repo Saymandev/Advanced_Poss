@@ -15,23 +15,23 @@ import { useGetDeliveryZonesByBranchQuery } from '@/lib/api/endpoints/deliveryZo
 import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
-  posApi,
-  useCancelPOSOrderMutation,
-  useCreatePOSOrderMutation,
-  useDownloadReceiptPDFMutation,
-  useGetAvailableTablesQuery,
-  useGetPOSMenuItemsQuery,
-  useGetPOSOrderQuery,
-  useGetPOSOrdersQuery,
-  useGetPOSSettingsQuery,
-  useGetPrintersQuery,
-  useGetReceiptHTMLQuery,
-  useGetWaiterActiveOrdersCountQuery,
-  usePrintReceiptMutation,
-  usePrintReceiptPDFMutation,
-  useProcessPaymentMutation,
-  useRefundOrderMutation,
-  useUpdatePOSOrderMutation
+    posApi,
+    useCancelPOSOrderMutation,
+    useCreatePOSOrderMutation,
+    useDownloadReceiptPDFMutation,
+    useGetAvailableTablesQuery,
+    useGetPOSMenuItemsQuery,
+    useGetPOSOrderQuery,
+    useGetPOSOrdersQuery,
+    useGetPOSSettingsQuery,
+    useGetPrintersQuery,
+    useGetReceiptHTMLQuery,
+    useGetWaiterActiveOrdersCountQuery,
+    usePrintReceiptMutation,
+    usePrintReceiptPDFMutation,
+    useProcessPaymentMutation,
+    useRefundOrderMutation,
+    useUpdatePOSOrderMutation
 } from '@/lib/api/endpoints/posApi';
 import { useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
@@ -44,31 +44,31 @@ import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
 import { getEncryptedItemWithTTL, removeEncryptedItem, setEncryptedItemWithTTL } from '@/lib/utils/storage-encryption';
 import {
-  ArrowPathIcon,
-  BuildingOfficeIcon,
-  CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  CreditCardIcon,
-  CurrencyDollarIcon,
-  DocumentArrowDownIcon,
-  FunnelIcon,
-  HomeModernIcon,
-  InformationCircleIcon,
-  LockClosedIcon,
-  MagnifyingGlassIcon,
-  MinusIcon,
-  PencilSquareIcon,
-  PlusIcon,
-  PrinterIcon,
-  ShoppingBagIcon,
-  ShoppingCartIcon,
-  TableCellsIcon,
-  TrashIcon,
-  TruckIcon,
-  UserGroupIcon,
+    ArrowPathIcon,
+    BuildingOfficeIcon,
+    CheckIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    ClipboardDocumentListIcon,
+    ClockIcon,
+    CreditCardIcon,
+    CurrencyDollarIcon,
+    DocumentArrowDownIcon,
+    FunnelIcon,
+    HomeModernIcon,
+    InformationCircleIcon,
+    LockClosedIcon,
+    MagnifyingGlassIcon,
+    MinusIcon,
+    PencilSquareIcon,
+    PlusIcon,
+    PrinterIcon,
+    ShoppingBagIcon,
+    ShoppingCartIcon,
+    TableCellsIcon,
+    TrashIcon,
+    TruckIcon,
+    UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -1667,21 +1667,10 @@ export default function POSPage() {
       return;
     }
     try {
-      // Fetch order using RTK Query - get the order data from the API
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const apiUrl = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
-      const orderResponse = await fetch(`${apiUrl}/pos/orders/${orderId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!orderResponse.ok) {
-        const errorData = await orderResponse.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to fetch order');
-      }
-      const orderData = await orderResponse.json();
-      const order = orderData.data || orderData;
+      // Fetch order using RTK Query - this ensures tokens are handled correctly
+      const orderData = await dispatch(posApi.endpoints.getPOSOrder.initiate(orderId)).unwrap();
+      const order = (orderData as any).data || orderData;
+      
       if (!order || !order.items) {
         throw new Error('Invalid order data received');
       }
