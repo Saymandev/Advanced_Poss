@@ -1,15 +1,15 @@
 import { Type } from 'class-transformer';
 import {
-    IsArray,
-    IsEnum,
-    IsNotEmpty,
-    IsNumber,
-    IsObject,
-    IsOptional,
-    IsString,
-    Min,
-    ValidateIf,
-    ValidateNested,
+  IsArray,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 
 export class POSOrderItemDto {
@@ -152,6 +152,31 @@ export class CreatePOSOrderDto {
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
+  subtotal: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  taxRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  taxAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  serviceChargeRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  serviceChargeAmount?: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @Min(0)
   totalAmount: number;
 
   @IsNotEmpty()
@@ -196,6 +221,21 @@ export class CreatePOSOrderDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Type(() => Number)
   changeDue?: number;
+
+  @IsOptional()
+  @IsEnum(['internal', 'customer_app', 'foodpanda', 'ubereats', 'pathao', 'other'])
+  orderSource?: string;
+
+  @IsOptional()
+  @IsString()
+  externalOrderId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  platformCommission?: number;
 }
 

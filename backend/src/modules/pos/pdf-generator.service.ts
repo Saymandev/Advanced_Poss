@@ -445,7 +445,7 @@ export class PDFGeneratorService {
                 ${receiptSettings?.footer || 'Thank you. Come again.'}
             </div>
             <div style="font-size: 8px; color: #666; margin-top: 10px;">
-                Powered By: <a href="https://infotigo.com/" style="color: #666; text-decoration: none;">https://infotigo.com/</a>
+                Powered By: Raha Pos Solutions
             </div>
         </div>
     </div>

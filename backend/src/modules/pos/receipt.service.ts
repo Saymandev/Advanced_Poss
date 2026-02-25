@@ -685,7 +685,15 @@ export class ReceiptService {
         ${receiptData.tableNumber && receiptData.tableNumber !== 'N/A' ? `<div><strong>Table:</strong> ${receiptData.tableNumber}</div>` : ''}
         ${receiptData.customerInfo?.name ? `<div><strong>Customer:</strong> ${receiptData.customerInfo.name}</div>` : ''}
         ${receiptData.customerInfo?.email ? `<div><strong>Email:</strong> ${receiptData.customerInfo.email}</div>` : ''}
-        ${receiptData.customerInfo?.phone ? `<div><strong>Phone:</strong> ${receiptData.customerInfo.phone}</div>` : ''}
+        ${receiptData.customerInfo?.phone ? `<div style="font-size: 11px; font-weight: bold; margin-top: 2px;"><strong>Phone:</strong> ${receiptData.customerInfo.phone}</div>` : ''}
+        ${receiptData.orderType === 'delivery' && receiptData.customerInfo?.addressLine1 ? `
+        <div style="font-size: 11px; font-weight: bold; margin-top: 4px; border: 1px dashed #ccc; padding: 4px;">
+            <strong>DELIVERY ADDRESS:</strong><br/>
+            ${receiptData.customerInfo.addressLine1}
+            ${receiptData.customerInfo.addressLine2 ? `<br/>${receiptData.customerInfo.addressLine2}` : ''}
+            <br/>${receiptData.customerInfo.city}${receiptData.customerInfo.state ? `, ${receiptData.customerInfo.state}` : ''}
+            ${receiptData.customerInfo.postalCode ? `<br/>ZIP: ${receiptData.customerInfo.postalCode}` : ''}
+        </div>` : ''}
     </div>
     <div class="items">
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
@@ -775,8 +783,35 @@ export class ReceiptService {
                 ${receiptData.receiptSettings.footer || 'Thank you. Come again.'}
             </div>
             <div style="font-size: 9px; color: #666; margin-top: 10px;">
-                Powered By: <a href="https://infotigo.com/" style="color: #666; text-decoration: none;">https://infotigo.com/</a>
+                Powered By: Raha Pos Solutions
             </div>
+            
+            ${receiptData.orderType === 'delivery' ? `
+            <div style="margin-top: 30px; border-top: 1px solid #000; padding-top: 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                    <div style="width: 45%; border-top: 1px solid #111; padding-top: 5px; font-size: 10px; text-align: center;">
+                        Customer Signature
+                    </div>
+                    <div style="width: 45%; border-top: 1px solid #111; padding-top: 5px; font-size: 10px; text-align: center;">
+                        Date & Time
+                    </div>
+                </div>
+                <div style="font-size: 9px; text-align: center; font-style: italic; color: #666; margin-bottom: 15px;">
+                    Please sign upon receiving your order.
+                </div>
+                
+                <div style="border: 2px solid #edeff2; padding: 10px; margin-top: 20px; background: #f8fafc;">
+                    <div style="font-weight: bold; font-size: 12px; margin-bottom: 8px; color: #1e293b;">DRIVER VOUCHER</div>
+                    <div style="font-size: 10px; color: #475569;">Keep this copy for store records.</div>
+                    <div style="margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 8px;">
+                        <span style="font-size: 10px;">Receiver Name: ____________________</span>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <span style="font-size: 10px;">Signature: _________________________</span>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
         </div>
     </div>
 </body>

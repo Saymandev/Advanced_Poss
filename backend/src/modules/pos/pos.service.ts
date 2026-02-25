@@ -20,6 +20,8 @@ import { TablesService } from '../tables/tables.service';
 import { TransactionCategory, TransactionType } from '../transactions/schemas/transaction.schema';
 import { TransactionsService } from '../transactions/transactions.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { WastageReason } from '../wastage/schemas/wastage.schema';
+import { WastageService } from '../wastage/wastage.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { WorkPeriodsService } from '../work-periods/work-periods.service';
 import { CreatePOSOrderDto } from './dto/create-pos-order.dto';
@@ -64,6 +66,8 @@ export class POSService {
     private transactionsService: TransactionsService,
     @Inject(forwardRef(() => OrdersService))
     private ordersService: OrdersService,
+    @Inject(forwardRef(() => WastageService))
+    private wastageService: WastageService,
   ) {}
   // Generate unique order number
   private async generateOrderNumber(branchId: string): Promise<string> {
@@ -714,7 +718,7 @@ export class POSService {
     const skip = (page - 1) * limit;
 
     // 1. Fetch from POSOrder
-    const [posOrders, posTotal] = await Promise.all([
+    const [posOrdersRaw, posTotal] = await Promise.all([
       this.posOrderModel
         .find(query)
         .populate('tableId', 'tableNumber capacity')
@@ -727,6 +731,8 @@ export class POSService {
         .exec(),
       this.posOrderModel.countDocuments(query).exec(),
     ]);
+
+    const posOrders = (posOrdersRaw as any[]).map(o => ({ ...o, isPublic: false }));
 
     // 2. Fetch from public Order (only for "pending" or broad queries, or for work period history)
     let mergedOrders: any[] = [...posOrders];
@@ -790,9 +796,9 @@ export class POSService {
         } else if (['pending', 'confirmed', 'preparing', 'ready', 'served'].includes(obj.status)) {
           posStatus = 'pending'; // Map all active statuses to pending for POS list
         }
-
         return {
           ...obj,
+          isPublic: true,
           orderType: obj.type || 'dine-in',
           totalAmount: obj.total,
           status: posStatus,
@@ -1616,15 +1622,21 @@ export class POSService {
         : {}),
       items: itemsToSplit.map((item) => ({
         menuItemId: item.menuItemId?.toString?.() ?? item.menuItemId,
+        name: item.name,
         quantity: item.quantity,
         price: item.price,
         notes: item.notes,
       })),
-      customerInfo: originalOrder.customerInfo,
-      totalAmount: splitTotal,
+      subtotal: splitTotal,
+      taxRate: originalOrder.taxRate || 0,
+      taxAmount: (splitTotal * (originalOrder.taxRate || 0)) / 100,
+      serviceChargeRate: originalOrder.serviceChargeRate || 0,
+      serviceChargeAmount: (splitTotal * (originalOrder.serviceChargeRate || 0)) / 100,
+      totalAmount: splitTotal + ((splitTotal * (originalOrder.taxRate || 0)) / 100) + ((splitTotal * (originalOrder.serviceChargeRate || 0)) / 100) + (originalOrder.orderType === 'delivery' ? (originalOrder.deliveryFee || 0) : 0),
       status: 'pending',
-      paymentMethod: originalOrder.paymentMethod,
-      notes: `Split from order ${originalOrder.orderNumber}`,
+      customerInfo: originalOrder.customerInfo,
+      notes: `Split from Order #${originalOrder.orderNumber}`,
+      waiterId: originalOrder.userId?.toString(),
     };
     const newOrder = await this.createOrder(splitOrderData, userId, branchId);
     // Update original order with remaining items
@@ -1645,14 +1657,43 @@ export class POSService {
     };
   }
   // Process refund for an order
-  async processRefund(orderId: string, amount: number, reason: string, userId: string, branchId: string): Promise<POSPayment> {
+  async processRefund(orderId: string, amount: number, reason: string, userId: string, branchId: string, options?: { isDamage?: boolean }): Promise<POSPayment> {
     const order = await this.getOrderById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
     if (order.status !== 'paid') {
       throw new BadRequestException('Can only refund paid orders');
     }
     if (amount > order.totalAmount) {
       throw new BadRequestException('Refund amount cannot exceed order total');
     }
+
+    // Capture companyId from order or request context
+    const companyId = order.companyId?.toString();
+
+    // If marked as damage, record wastage
+    if (options?.isDamage && companyId) {
+      try {
+        if (this.wastageService) {
+          for (const item of order.items) {
+            await this.wastageService.create({
+              menuItemId: item.menuItemId?.toString(),
+              quantity: item.quantity,
+              unit: 'pcs',
+              reason: WastageReason.DAMAGED,
+              unitCost: item.price,
+              wastageDate: new Date().toISOString(),
+              notes: `Auto-recorded from Refund of Order #${order.orderNumber}. Reason: ${reason}`,
+            }, companyId, branchId, userId);
+          }
+        }
+      } catch (error) {
+        console.error('❌ [processRefund] Failed to record wastage:', error);
+        // Don't fail the refund if wastage recording fails, but log it
+      }
+    }
+
     // Create refund payment record
     const refundData = {
       orderId: new Types.ObjectId(orderId),
@@ -1667,6 +1708,7 @@ export class POSService {
       paymentDetails: {
         refundReason: reason,
         originalOrderId: orderId,
+        isDamage: options?.isDamage || false,
       },
     };
     const refund = new this.posPaymentModel(refundData);
@@ -1692,6 +1734,27 @@ export class POSService {
       .sort({ createdAt: -1 })
       .limit(limit)
       .exec();
+  }
+
+  // Get POS payments with filters
+  async getPayments(filters: { branchId?: string; startDate?: string; endDate?: string }): Promise<POSPayment[]> {
+    const query: any = {};
+    if (filters.branchId) {
+      query.branchId = new Types.ObjectId(filters.branchId);
+    }
+    if (filters.startDate || filters.endDate) {
+      query.createdAt = {};
+      if (filters.startDate) {
+        query.createdAt.$gte = new Date(filters.startDate);
+      }
+      if (filters.endDate) {
+        query.createdAt.$lte = new Date(filters.endDate);
+      }
+    }
+    // Only count completed and refunded payments for revenue
+    query.status = { $in: ['completed', 'refunded'] };
+    
+    return this.posPaymentModel.find(query).sort({ createdAt: 1 }).exec();
   }
   // Get available tables (integrate with real table service)
   async getAvailableTables(branchId: string): Promise<any[]> {
@@ -2093,54 +2156,54 @@ export class POSService {
       .populate('userId', 'firstName lastName email')
       .populate('assignedDriverId', 'firstName lastName phone')
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
 
     // 2. Fetch from public Order (if they are unconfirmed/pending)
-    // Map deliveryStatus back to public order status if needed, 
-    // but usually unconfirmed orders are just 'pending' or 'confirmed'
     const publicQuery: any = {
       branchId: branchObjectId,
       type: 'delivery',
     };
     
-    // If filtering by specific delivery statuses, some public orders might not match
-    // but we want to show 'pending' public orders in the 'pending' delivery queue
     if (deliveryStatus === 'pending' || !deliveryStatus) {
-      publicQuery.status = { $in: ['pending', 'preparing', 'ready'] };
+      publicQuery.status = { $in: ['pending', 'preparing', 'ready', 'confirmed'] };
     } else {
-      // For other delivery statuses, public orders are likely already converted to POS orders
-      // or handled elsewhere, but for safety we only query if specifically pending
-      if (deliveryStatus) publicQuery.status = 'none'; // effectively skip
+      if (deliveryStatus) publicQuery.status = 'none';
     }
 
     const publicOrders = await this.orderModel
       .find(publicQuery)
       .populate('waiterId', 'firstName lastName email')
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
 
-    // Standardize public orders to match delivery queue format
-    const standardizedPublic = publicOrders.map(order => {
-      const obj = order.toObject();
-      return {
-        ...obj,
-        orderType: 'delivery',
-        totalAmount: obj.total,
-        items: (obj.items || []).map((item: any) => ({
-          ...item,
-          price: item.unitPrice || item.basePrice || 0,
-        })),
-        customerInfo: obj.deliveryInfo || {
-          name: obj.guestName || 'Customer',
-          phone: obj.guestPhone || '',
-        },
-        deliveryStatus: 'pending', // Public unconfirmed orders are inherently pending delivery
-        userId: obj.waiterId,
-      };
-    });
+    const standardizedPos = posOrders.map(o => ({
+      ...o,
+      id: (o as any)._id || (o as any).id,
+      isPublic: false,
+    }));
+
+    const standardizedPublic = publicOrders.map(order => ({
+      ...order,
+      id: (order as any)._id || (order as any).id,
+      isPublic: true,
+      orderType: 'delivery' as const,
+      totalAmount: (order as any).total,
+      items: (order.items || []).map((item: any) => ({
+        ...item,
+        price: item.unitPrice || item.basePrice || 0,
+      })),
+      customerInfo: (order as any).deliveryInfo || {
+        name: (order as any).guestName || 'Customer',
+        phone: (order as any).guestPhone || '',
+      },
+      deliveryStatus: 'pending' as const,
+      userId: (order as any).waiterId,
+    }));
 
     // Merge and sort
-    const allOrders = [...posOrders, ...standardizedPublic];
+    const allOrders = [...standardizedPos, ...standardizedPublic];
     return allOrders.sort((a: any, b: any) => {
       const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
       const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();

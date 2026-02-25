@@ -24,6 +24,7 @@ import { TablesModule } from '../tables/tables.module';
 import { TransactionsModule } from '../transactions/transactions.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { UsersModule } from '../users/users.module';
+import { WastageModule } from '../wastage/wastage.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
 import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { PDFGeneratorService } from './pdf-generator.service';
@@ -69,6 +70,7 @@ import { PrinterConfig, PrinterConfigSchema } from './schemas/printer-config.sch
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => TransactionsModule), // Used to record POS payments in accounting ledger
+    forwardRef(() => WastageModule),
   ],
   controllers: [POSController, PrinterManagementController],
   providers: [POSService, ReceiptService, PDFGeneratorService, PrinterService, EmailService, SmsService],

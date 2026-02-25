@@ -90,6 +90,21 @@ export class POSOrder {
   @Prop({ type: Object })
   customerInfo?: CustomerInfo;
 
+  @Prop({ type: Number, default: 0 })
+  subtotal: number;
+
+  @Prop({ type: Number, default: 0 })
+  taxRate: number;
+
+  @Prop({ type: Number, default: 0 })
+  taxAmount: number;
+
+  @Prop({ type: Number, default: 0 })
+  serviceChargeRate: number;
+
+  @Prop({ type: Number, default: 0 })
+  serviceChargeAmount: number;
+
   @Prop({ required: true })
   totalAmount: number;
 
@@ -140,6 +155,19 @@ export class POSOrder {
 
   @Prop({ type: Number })
   changeDue?: number;
+
+  @Prop({ 
+    required: true, 
+    enum: ['internal', 'customer_app', 'foodpanda', 'ubereats', 'pathao', 'other'],
+    default: 'internal'
+  })
+  orderSource: string;
+
+  @Prop({ type: String })
+  externalOrderId?: string;
+
+  @Prop({ type: Number, default: 0 })
+  platformCommission?: number;
 }
 
 export const POSOrderSchema = SchemaFactory.createForClass(POSOrder);

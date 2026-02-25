@@ -1,19 +1,19 @@
 import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-  Request,
-  Res,
-  UseGuards
+    BadRequestException,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    Patch,
+    Post,
+    Put,
+    Query,
+    Request,
+    Res,
+    UseGuards
 } from '@nestjs/common';
 import { ApiOperation } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -153,8 +153,8 @@ export class POSController {
 
   @Post('refunds')
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
-  async refundOrder(@Body() body: { orderId: string; amount: number; reason: string }, @Request() req) {
-    return this.posService.processRefund(body.orderId, body.amount, body.reason, req.user.id, req.user.branchId);
+  async refundOrder(@Body() body: { orderId: string; amount: number; reason: string; isDamage?: boolean }, @Request() req) {
+    return this.posService.processRefund(body.orderId, body.amount, body.reason, req.user.id, req.user.branchId, { isDamage: body.isDamage });
   }
 
   @Get('tables/:tableId/orders')

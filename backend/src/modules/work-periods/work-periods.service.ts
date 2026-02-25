@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { PasswordUtil } from '../../common/utils/password.util';
 import { EmailService } from '../../common/services/email.service';
+import { PasswordUtil } from '../../common/utils/password.util';
 import { PDFGeneratorService } from '../pos/pdf-generator.service';
 import { POSService } from '../pos/pos.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
@@ -252,6 +252,12 @@ export class WorkPeriodsService {
       limit: 10000, // Get all orders
     });
 
+    const payments = await this.posService.getPayments({
+      branchId,
+      startDate: startDateStr,
+      endDate: endDateStr,
+    });
+
     // Calculate totals and statistics
     let grossSales = 0;
     let subtotal = 0;
@@ -260,6 +266,7 @@ export class WorkPeriodsService {
     let totalOrders = orders.orders.length;
     let voidCount = 0;
     let cancelCount = 0;
+    let refundTotal = 0;
 
     // Payment methods breakdown
     const paymentMethods: Record<string, { count: number; amount: number }> = {};
@@ -272,27 +279,35 @@ export class WorkPeriodsService {
       }
 
       // Count void orders (if status is void or similar)
-      // Note: Adjust based on your actual void status
       if (order.status === 'void' || order.status === 'voided') {
         voidCount++;
       }
 
-      // Only count paid orders in gross sales
+      // We count paid orders for subtotal/tax/service charge breakdown
+      // Note: If an order is fully refunded, it's 'cancelled' and excluded here, which is correct for historical accuracy of the order itself.
       if (order.status === 'paid') {
-        grossSales += order.totalAmount || 0;
-        subtotal += order.totalAmount || 0;
+        subtotal += order.subtotal || order.totalAmount || 0;
+        vatTotal += order.taxAmount || 0;
+        serviceCharge += order.serviceChargeAmount || 0;
+      }
+    });
+
+    // Net revenue calculation from payments (More accurate for cash drawer)
+    payments.forEach((payment) => {
+      if (payment.amount < 0) {
+        refundTotal += Math.abs(payment.amount);
+      } else {
+        grossSales += payment.amount;
       }
 
-      // Payment method breakdown
-      const paymentMethod = order.paymentMethod || 'cash';
-      if (!paymentMethods[paymentMethod]) {
-        paymentMethods[paymentMethod] = { count: 0, amount: 0 };
+      // Payment method breakdown from actual transactions
+      const method = payment.method || 'cash';
+      if (!paymentMethods[method]) {
+        paymentMethods[method] = { count: 0, amount: 0 };
       }
-      paymentMethods[paymentMethod].count += 1;
-      if (order.status === 'paid') {
-        paymentMethods[paymentMethod].amount += order.totalAmount || 0;
-        totalByPaymentMethod[paymentMethod] = (totalByPaymentMethod[paymentMethod] || 0) + (order.totalAmount || 0);
-      }
+      paymentMethods[method].count += 1;
+      paymentMethods[method].amount += payment.amount;
+      totalByPaymentMethod[method] = (totalByPaymentMethod[method] || 0) + payment.amount;
     });
 
     // Calculate payment method percentages and commissions
@@ -314,6 +329,8 @@ export class WorkPeriodsService {
     return {
       totalOrders,
       grossSales,
+      refundTotal,
+      netSales: grossSales - refundTotal,
       subtotal,
       vatTotal,
       serviceCharge,
