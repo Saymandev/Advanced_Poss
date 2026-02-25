@@ -60,7 +60,7 @@ export default function HelpCenterPage() {
             <Link href="/" className="flex items-center space-x-2">
               <SparklesIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
               <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Advanced POS
+                Raha Pos Solutions
               </span>
             </Link>
             <div className="flex items-center space-x-4">
@@ -84,7 +84,7 @@ export default function HelpCenterPage() {
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl font-extrabold mb-4">Help Center</h1>
             <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto mb-8">
-              Find answers to common questions and learn how to use Advanced POS
+              Find answers to common questions and learn how to use Raha Pos Solutions
             </p>
             <div className="max-w-2xl mx-auto">
               <div className="relative">
@@ -194,7 +194,7 @@ export default function HelpCenterPage() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <SparklesIcon className="w-6 h-6 text-primary-400" />
-                <span className="text-xl font-bold">Advanced POS</span>
+                <span className="text-xl font-bold">Raha Pos Solutions</span>
               </div>
               <p className="text-gray-400">
                 The most powerful restaurant management system
@@ -227,7 +227,7 @@ export default function HelpCenterPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Advanced POS. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>

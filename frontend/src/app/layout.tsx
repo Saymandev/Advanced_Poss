@@ -6,9 +6,9 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'RESTOGO Management System',
-  description: 'RESTOGO – modern restaurant management system for bars, cafes, and restaurants',
-  applicationName: 'RESTOGO',
+  title: 'Raha Pos Solutions',
+  description: 'Raha Pos Solutions – modern restaurant management system for bars, cafes, restaurants and Hotels',
+  applicationName: 'Raha Pos Solutions',
   manifest: '/manifest.json',
   icons: {
     icon: [

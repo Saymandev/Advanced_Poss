@@ -184,19 +184,25 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Demo credentials hint */}
+          {/* Demo request hint */}
           <div className="px-8 pb-6">
-            <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-4">
-              <p className="text-xs text-primary-300 font-medium mb-1">Demo Account</p>
-              <p className="text-xs text-gray-400">Email: demo@restaurant.com</p>
-              <p className="text-xs text-gray-400">PIN: 1234</p>
+            <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-400">
+                Need a Demo?{' '}
+                <Link 
+                  href="/contact?subject=Request a Demo" 
+                  className="text-primary-400 hover:text-primary-300 font-semibold transition-colors decoration-dotted underline underline-offset-4"
+                >
+                  Contact us
+                </Link>
+              </p>
             </div>
           </div>
         </Card>
 
         {/* Footer */}
         <p className="text-center text-gray-500 text-sm mt-8">
-          © 2024 Advanced POS. All rights reserved.
+          © {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.
         </p>
       </div>
     </div>

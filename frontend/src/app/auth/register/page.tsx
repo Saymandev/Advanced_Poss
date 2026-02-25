@@ -662,7 +662,7 @@ export default function RegisterPage() {
         </Card>
 
         <p className="text-center text-gray-500 text-sm mt-8">
-          © 2024 Advanced POS. All rights reserved.
+         © {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.
         </p>
       </div>
     </div>

@@ -38,8 +38,14 @@ export interface CreatePOSOrderRequest {
     phone?: string;
     email?: string;
   };
+  subtotal: number;
+  taxRate?: number;
+  taxAmount?: number;
+  serviceChargeRate?: number;
+  serviceChargeAmount?: number;
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
+  isPublic?: boolean;
   paymentMethod?: string; // e.g. 'cash', 'card', 'split'
   transactionId?: string; // used for split breakdowns
   notes?: string;
@@ -50,6 +56,9 @@ export interface CreatePOSOrderRequest {
   loyaltyDiscount?: number; // Discount amount from loyalty points
   amountReceived?: number;
   changeDue?: number;
+  orderSource?: 'internal' | 'customer_app' | 'foodpanda' | 'ubereats' | 'pathao' | 'other';
+  externalOrderId?: string;
+  platformCommission?: number;
 }
 
 export interface POSOrder extends CreatePOSOrderRequest {
@@ -421,17 +430,13 @@ export const posApi = apiSlice.injectEndpoints({
     }),
 
     // Refund order
-    refundOrder: builder.mutation<POSPayment, {
-      orderId: string;
-      amount: number;
-      reason: string;
-    }>({
-      query: (data) => ({
+    refundOrder: builder.mutation<POSPayment, { orderId: string; amount: number; reason: string; isDamage?: boolean }>({
+      query: (body) => ({
         url: '/pos/refunds',
         method: 'POST',
-        body: data,
+        body,
       }),
-      invalidatesTags: ['POS', 'Payment', 'Customer'],
+      invalidatesTags: ['POS'],
     }),
 
     // Get order history for table

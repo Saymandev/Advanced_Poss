@@ -15,7 +15,7 @@ export default function SecurityPage() {
             <Link href="/" className="flex items-center space-x-2">
               <SparklesIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
               <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Advanced POS
+                Raha Pos Solutions
               </span>
             </Link>
             <div className="flex items-center space-x-4">
@@ -85,7 +85,7 @@ export default function SecurityPage() {
               <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Access Control</h2>
               <div className="space-y-4 text-gray-600 dark:text-gray-300">
                 <p>
-                  Advanced POS includes comprehensive role-based access control, allowing you to manage who
+                  Raha Pos Solutions includes comprehensive role-based access control, allowing you to manage who
                   has access to what information within your organization.
                 </p>
                 <p>
@@ -117,7 +117,7 @@ export default function SecurityPage() {
               <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Compliance</h2>
               <div className="space-y-4 text-gray-600 dark:text-gray-300">
                 <p>
-                  Advanced POS complies with major data protection regulations including GDPR, CCPA, and
+                  Raha Pos Solutions complies with major data protection regulations including GDPR, CCPA, and
                   other regional privacy laws.
                 </p>
                 <p>
@@ -145,7 +145,7 @@ export default function SecurityPage() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <SparklesIcon className="w-6 h-6 text-primary-400" />
-                <span className="text-xl font-bold">Advanced POS</span>
+                <span className="text-xl font-bold">Raha Pos Solutions</span>
               </div>
               <p className="text-gray-400">
                 The most powerful restaurant management system
@@ -178,7 +178,7 @@ export default function SecurityPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Advanced POS. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>

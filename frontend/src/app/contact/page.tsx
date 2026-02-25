@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useSubmitGeneralContactFormMutation } from '@/lib/api/endpoints/publicApi';
-import { EnvelopeIcon, MapPinIcon, PhoneIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon, MapPinIcon, PhoneIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
-export default function ContactPage() {
+function ContactFormContent() {
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -17,6 +19,13 @@ export default function ContactPage() {
     subject: '',
     message: '',
   });
+
+  useEffect(() => {
+    const subject = searchParams.get('subject');
+    if (subject) {
+      setFormData(prev => ({ ...prev, subject }));
+    }
+  }, [searchParams]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitContactForm, { isLoading }] = useSubmitGeneralContactFormMutation();
@@ -86,10 +95,11 @@ export default function ContactPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
-              <SparklesIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Advanced POS
-              </span>
+              <img
+                src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
+                alt="Raha Pos Solutions logo"
+                className="h-10 w-auto rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
+              />
             </Link>
             <div className="flex items-center space-x-4">
               <Link href="/">
@@ -139,10 +149,10 @@ export default function ContactPage() {
                       <div>
                         <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Email</h3>
                         <a
-                          href="mailto:support@advancedpos.com"
+                          href="mailto:support@rahapos.com"
                           className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                         >
-                          support@advancedpos.com
+                          support@rahapos.com
                         </a>
                       </div>
                     </div>
@@ -266,8 +276,11 @@ export default function ContactPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <SparklesIcon className="w-6 h-6 text-primary-400" />
-                <span className="text-xl font-bold">Advanced POS</span>
+                <img
+                  src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
+                  alt="Raha Pos Solutions logo"
+                  className="h-10 w-auto rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
+                />
               </div>
               <p className="text-gray-400">
                 The most powerful restaurant management system
@@ -300,7 +313,7 @@ export default function ContactPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Advanced POS. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>
@@ -308,3 +321,14 @@ export default function ContactPage() {
   );
 }
 
+export default function ContactPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    }>
+      <ContactFormContent />
+    </Suspense>
+  );
+}

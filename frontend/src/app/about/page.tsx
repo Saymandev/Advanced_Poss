@@ -17,7 +17,7 @@ export default function AboutPage() {
             <Link href="/" className="flex items-center space-x-2">
               <SparklesIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
               <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Advanced POS
+                Raha Pos Solutions
               </span>
             </Link>
             <div className="flex items-center space-x-4">
@@ -39,7 +39,7 @@ export default function AboutPage() {
       <section className="bg-gradient-to-r from-primary-600 to-secondary-600 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-extrabold mb-4">About Advanced POS</h1>
+            <h1 className="text-5xl md:text-6xl font-extrabold mb-4">About Raha Pos Solutions</h1>
             <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto">
               Empowering restaurants with cutting-edge technology
             </p>
@@ -54,7 +54,7 @@ export default function AboutPage() {
             <CardContent className="p-8">
               <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Our Mission</h2>
               <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
-                At Advanced POS, we're dedicated to revolutionizing the restaurant industry through innovative
+                At Raha Pos Solutions, we're dedicated to revolutionizing the restaurant industry through innovative
                 point-of-sale solutions. Our mission is to help restaurant owners streamline their operations,
                 increase efficiency, and grow their businesses with powerful, intuitive technology.
               </p>
@@ -70,7 +70,7 @@ export default function AboutPage() {
               <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">What We Do</h2>
               <div className="space-y-4 text-gray-600 dark:text-gray-300">
                 <p>
-                  Advanced POS is a comprehensive restaurant management system that combines point-of-sale
+                  Raha Pos Solutions is a comprehensive restaurant management system that combines point-of-sale
                   functionality with inventory management, staff scheduling, customer relationship management,
                   and powerful analytics.
                 </p>
@@ -129,7 +129,7 @@ export default function AboutPage() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <SparklesIcon className="w-6 h-6 text-primary-400" />
-                <span className="text-xl font-bold">Advanced POS</span>
+                <span className="text-xl font-bold">Raha Pos Solutions</span>
               </div>
               <p className="text-gray-400">
                 The most powerful restaurant management system
@@ -162,7 +162,7 @@ export default function AboutPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Advanced POS. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>

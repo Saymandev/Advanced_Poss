@@ -5,23 +5,24 @@
 import { Button } from '@/components/ui/Button';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { useGetPublicStatsQuery, useGetPublicTestimonialsQuery } from '@/lib/api/endpoints/systemFeedbackApi';
+import { cn } from '@/lib/utils';
 import {
-    ArrowRightIcon,
-    BellAlertIcon,
-    BoltIcon,
-    ChartBarIcon,
-    CheckCircleIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    CloudArrowUpIcon,
-    CreditCardIcon,
-    DevicePhoneMobileIcon,
-    GlobeAltIcon,
-    PlayIcon,
-    ShieldCheckIcon,
-    SparklesIcon,
-    StarIcon,
-    UserGroupIcon
+  ArrowRightIcon,
+  BellAlertIcon,
+  BoltIcon,
+  ChartBarIcon,
+  CheckCircleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloudArrowUpIcon,
+  CreditCardIcon,
+  DevicePhoneMobileIcon,
+  GlobeAltIcon,
+  PlayIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  StarIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -34,11 +35,12 @@ const HeroImageSlider = () => {
   
   // Gorgeous restaurant images - using high-quality Unsplash images
   const images = [
-    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80',
-    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1920&q=80',
-    'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1920&q=80',
-    'https://images.unsplash.com/photo-1552569973-5ccf61401762?w=1920&q=80',
-    'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=1920&q=80',
+    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1920&q=80', // Hotel
+    'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1920&q=80', // Cafe
+    'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=1920&q=80', // Bakery
+    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80', // Restaurant
+    'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=1920&q=80', // Bar
+    'https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=1920&q=80', // Food Truck
   ];
 
   useEffect(() => {
@@ -102,7 +104,7 @@ const HeroImageSlider = () => {
             }`}
           >
             {/* Enhanced gradient overlay for better text readability */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80 z-10"></div>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/80 z-10"></div>
             <img
               src={image}
               alt={`Restaurant ${index + 1}`}
@@ -279,9 +281,17 @@ export default function LandingPage() {
     return statsData.activeCompanies;
   }, [statsData]);
   const [mounted, setMounted] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   if (!mounted) {
@@ -292,24 +302,34 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-black relative overflow-hidden">
 
       {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl z-50 border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm">
+      <nav 
+        className={cn(
+          "fixed top-0 w-full z-50 transition-all duration-300 border-b",
+          isScrolled 
+            ? "bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-gray-200/50 dark:border-gray-800/50 shadow-md py-2" 
+            : "bg-white/10 dark:bg-gray-900/10 backdrop-blur-md border-white/10 py-3"
+        )}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex justify-between items-center h-14">
             <div className="flex items-center space-x-3 group cursor-pointer">
               <div className="relative flex items-center">
                 <img
-                  src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085415/restogo-logo_yxebls.png"
-                  alt="RESTOGO logo"
-                  className="w-10 h-10 rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
+                  src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
+                  alt="Raha Pos Solutions logo"
+                  className="h-10 w-auto rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
                 />
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 via-secondary-600 to-primary-600 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
-                RESTOGO
-              </span>
+              
             </div>
             <div className="hidden md:flex items-center space-x-4">
               <Link href="/auth/login">
-                <Button variant="ghost" className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                <Button variant="ghost" className={cn(
+                  "transition-colors",
+                  isScrolled 
+                    ? "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" 
+                    : "text-white hover:bg-white/10"
+                )}>
                   Login
                 </Button>
               </Link>
@@ -322,7 +342,11 @@ export default function LandingPage() {
             {/* Mobile menu */}
             <div className="md:hidden flex items-center space-x-2">
               <Link href="/auth/login">
-                <Button variant="ghost" size="sm">Login</Button>
+                <Button variant="ghost" size="sm" className={cn(
+                  isScrolled ? "text-gray-700 dark:text-gray-300" : "text-white"
+                )}>
+                  Login
+                </Button>
               </Link>
               <Link href="/auth/register">
                 <Button size="sm" className="bg-gradient-to-r from-primary-600 to-secondary-600">Start</Button>
@@ -333,7 +357,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-24 sm:pt-32 pb-16 sm:pb-22 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center">
+      <section className="relative pt-20 sm:pt-24 pb-16 sm:pb-22 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center">
         {/* Image Slider Background */}
         <HeroImageSlider />
         
@@ -341,7 +365,7 @@ export default function LandingPage() {
           <div className="text-center">
             {/* Badge */}
             {!isLoadingStats && activeCompaniesCount > 0 && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 mb-6 sm:mb-8 rounded-full bg-white/25 backdrop-blur-md border border-white/40 animate-fade-in shadow-xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 sm:px-4 sm:py-1.5 mb-4 sm:mb-6 rounded-full bg-white/25 backdrop-blur-md border border-white/40 animate-fade-in shadow-xl">
                 <StarIcon className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-300" />
                 <span className="text-xs sm:text-sm font-semibold text-white">
                   Trusted by {activeCompaniesCount >= 1000 ? `${(activeCompaniesCount / 1000).toFixed(1)}K+` : `${activeCompaniesCount}+`} Restaurants
@@ -378,10 +402,10 @@ export default function LandingPage() {
 
             {/* Stats - Responsive grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-12 sm:mt-16 md:mt-24 px-4">
-              <div className="group relative bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/40 hover:border-white/60 hover:-translate-y-1 sm:hover:-translate-y-2">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary-50/50 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="group relative bg-white/15 dark:bg-white/5 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/30 hover:border-white/50 hover:-translate-y-1 sm:hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
-                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2 sm:mb-3">
+                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-primary-400 to-secondary-400 bg-clip-text text-transparent mb-2 sm:mb-3">
                     {isLoadingStats ? (
                       <span className="inline-block w-16 sm:w-20 h-8 sm:h-12 bg-gray-200 animate-pulse rounded"></span>
                     ) : statsData?.activeCompanies ? (
@@ -392,13 +416,13 @@ export default function LandingPage() {
                       '0+'
                     )}
                   </div>
-                  <div className="text-gray-700 font-medium text-sm sm:text-base md:text-lg">Active Restaurants</div>
+                  <div className="text-white/80 font-medium text-sm sm:text-base md:text-lg">Active Restaurants</div>
                 </div>
               </div>
-              <div className="group relative bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/40 hover:border-white/60 hover:-translate-y-1 sm:hover:-translate-y-2">
-                <div className="absolute inset-0 bg-gradient-to-br from-secondary-50/50 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="group relative bg-white/15 dark:bg-white/5 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/30 hover:border-white/50 hover:-translate-y-1 sm:hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-secondary-500/10 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
-                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-secondary-600 to-primary-600 bg-clip-text text-transparent mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 justify-center">
+                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-secondary-400 to-primary-400 bg-clip-text text-transparent mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 justify-center">
                     {isLoadingStats ? (
                       <span className="inline-block w-16 sm:w-20 h-8 sm:h-12 bg-gray-200 animate-pulse rounded"></span>
                     ) : statsData?.averageRating ? (
@@ -413,13 +437,13 @@ export default function LandingPage() {
                       </>
                     )}
                   </div>
-                  <div className="text-gray-700 font-medium text-sm sm:text-base md:text-lg">Average Rating</div>
+                  <div className="text-white/80 font-medium text-sm sm:text-base md:text-lg">Average Rating</div>
                 </div>
               </div>
-              <div className="group relative bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/40 hover:border-white/60 hover:-translate-y-1 sm:hover:-translate-y-2">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="group relative bg-white/15 dark:bg-white/5 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-white/30 hover:border-white/50 hover:-translate-y-1 sm:hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
-                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2 sm:mb-3">
+                  <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2 sm:mb-3">
                     {isLoadingStats ? (
                       <span className="inline-block w-16 sm:w-20 h-8 sm:h-12 bg-gray-200 animate-pulse rounded"></span>
                     ) : statsData?.totalCustomers ? (
@@ -430,7 +454,7 @@ export default function LandingPage() {
                       '0+'
                     )}
                   </div>
-                  <div className="text-gray-700 font-medium text-sm sm:text-base md:text-lg">Happy Customers</div>
+                  <div className="text-white/80 font-medium text-sm sm:text-base md:text-lg">Happy Customers</div>
                 </div>
               </div>
             </div>
@@ -968,7 +992,7 @@ export default function LandingPage() {
               Ready to Transform Your Restaurant?
             </h2>
             <p className="text-xl md:text-2xl text-white/90 mb-10 max-w-2xl mx-auto">
-              Join thousands of restaurants already using RESTOGO. Start your free trial today and experience the difference.
+              Join thousands of restaurants already using Raha Pos Solutions. Start your free trial today and experience the difference.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/auth/register" className="group">
@@ -1004,8 +1028,11 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <SparklesIcon className="w-6 h-6 text-primary-400" />
-                <span className="text-xl font-bold">RESTOGO</span>
+                <img
+                  src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
+                  alt="Raha Pos Solutions logo"
+                  className=" h-10 rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
+                />
               </div>
               <p className="text-gray-400">
                 The most powerful restaurant management system
@@ -1038,7 +1065,9 @@ export default function LandingPage() {
             </div>
           </div>
             <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 RESTOGO Management System. All rights reserved.</p>
+            <p>&copy; {
+               new Date().getFullYear()
+              } Raha Pos Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>

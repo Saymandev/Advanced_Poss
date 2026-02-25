@@ -648,16 +648,24 @@ export function Sidebar({ className }: SidebarProps) {
             isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
           )}>
             <div className="flex items-center gap-3">
-              <Image
-                src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085415/restogo-logo_yxebls.png"
-                alt="RESTOGO logo"
-                width={40}
-                height={40}
-                className="rounded-md object-contain"
-                priority
-              />
+              {user?.company?.logo ? (
+                <Image
+                  src={user.company.logo}
+                  alt={user.company.name || "Company logo"}
+                  width={40}
+                  height={40}
+                  className="rounded-md object-contain"
+                  priority
+                />
+              ) : (
+                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-md flex items-center justify-center">
+                  <BuildingOfficeIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                </div>
+              )}
               <div>
-                <h2 className="font-semibold text-gray-900 dark:text-white text-base leading-tight">RESTOGO</h2>
+                <h2 className="font-semibold text-gray-900 dark:text-white text-base leading-tight">
+                  {user?.company?.name || "My Company"}
+                </h2>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Management System</p>
               </div>
             </div>
@@ -711,8 +719,8 @@ export function Sidebar({ className }: SidebarProps) {
             "text-xs text-gray-600 dark:text-gray-400 text-center transition-all duration-300",
             isCollapsed ? "opacity-0 w-0 overflow-hidden h-0" : "opacity-100"
           )}>
-            <p className="leading-tight">RESTOGO Management System</p>
-            <p className="text-xs opacity-75">v1.0.0</p>
+            <p className="leading-tight font-medium">Raha Pos Solutions</p>
+            <p className="text-[10px] opacity-75">Advanced POS System</p>
           </div>
         </div>
       </div>

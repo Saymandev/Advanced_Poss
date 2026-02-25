@@ -1,7 +1,7 @@
 {
-  "name": "RestoGo POS",
-  "short_name": "RestoGo",
-  "description": "RestoGo Restaurant Management & Point of Sale",
+  "name": "Raha Pos Solutions POS",
+  "short_name": "Raha Pos Solutions",
+  "description": "Raha Pos Solutions Restaurant Management & Point of Sale",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",

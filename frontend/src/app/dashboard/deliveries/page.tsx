@@ -270,7 +270,7 @@ export default function DeliveriesPage() {
                 <Badge variant="warning" className="text-xs">Payment Pending</Badge>
               )}
             </div>
-            {deliveryStatus === 'pending' && (
+            {deliveryStatus === 'pending' && record.isPublic && (
               <Button
                 size="sm"
                 className="w-full mt-2 bg-sky-600 hover:bg-sky-500 text-xs py-1 h-7"

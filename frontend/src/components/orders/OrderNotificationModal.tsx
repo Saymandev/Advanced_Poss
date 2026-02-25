@@ -131,6 +131,9 @@ export function OrderNotificationModal({ isOpen, onClose, order }: OrderNotifica
               phone: publicCustomer.phone || '',
               email: publicCustomer.email || '',
             },
+            subtotal: (order.total || 0) - (order.deliveryFee || 0),
+            taxAmount: 0,
+            serviceChargeAmount: 0,
             totalAmount: order.total || 0,
             status: 'pending', // Keep as pending so it appears in POS queue
             paymentMethod: (order.paymentMethod as any) || 'cash',

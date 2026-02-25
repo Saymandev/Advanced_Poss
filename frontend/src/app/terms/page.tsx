@@ -15,7 +15,7 @@ export default function TermsPage() {
             <Link href="/" className="flex items-center space-x-2">
               <SparklesIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
               <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Advanced POS
+                Raha Pos Solutions
               </span>
             </Link>
             <div className="flex items-center space-x-4">
@@ -53,7 +53,7 @@ export default function TermsPage() {
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">1. Acceptance of Terms</h2>
               <div className="space-y-4 text-gray-600 dark:text-gray-300">
                 <p>
-                  By accessing and using Advanced POS, you accept and agree to be bound by the terms and
+                  By accessing and using Raha Pos Solutions, you accept and agree to be bound by the terms and
                   provision of this agreement.
                 </p>
                 <p>
@@ -68,13 +68,13 @@ export default function TermsPage() {
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">2. Use License</h2>
               <div className="space-y-4 text-gray-600 dark:text-gray-300">
                 <p>
-                  Permission is granted to temporarily use Advanced POS for personal or commercial purposes.
+                  Permission is granted to temporarily use Raha Pos Solutions for personal or commercial purposes.
                   This is the grant of a license, not a transfer of title, and under this license you may not:
                 </p>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>Modify or copy the materials</li>
                   <li>Use the materials for any commercial purpose or for any public display</li>
-                  <li>Attempt to reverse engineer any software contained in Advanced POS</li>
+                  <li>Attempt to reverse engineer any software contained in Raha Pos Solutions</li>
                   <li>Remove any copyright or other proprietary notations from the materials</li>
                 </ul>
               </div>
@@ -134,7 +134,7 @@ export default function TermsPage() {
                 <p>
                   In no event shall Advanced POS or its suppliers be liable for any damages (including, without
                   limitation, damages for loss of data or profit, or due to business interruption) arising out
-                  of the use or inability to use Advanced POS.
+                  of the use or inability to use Raha Pos Solutions.
                 </p>
               </div>
             </CardContent>
@@ -163,7 +163,7 @@ export default function TermsPage() {
                   If you have any questions about these Terms of Service, please contact us at:
                 </p>
                 <p>
-                  Email: legal@advancedpos.com<br />
+                  Email: legal@rahapos.com<br />
                   Address: 123 Business Street, Suite 100, City, State 12345
                 </p>
               </div>
@@ -187,7 +187,7 @@ export default function TermsPage() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <SparklesIcon className="w-6 h-6 text-primary-400" />
-                <span className="text-xl font-bold">Advanced POS</span>
+                <span className="text-xl font-bold">Raha Pos Solutions</span>
               </div>
               <p className="text-gray-400">
                 The most powerful restaurant management system
@@ -220,7 +220,7 @@ export default function TermsPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Advanced POS. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>

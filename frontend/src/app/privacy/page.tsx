@@ -15,7 +15,7 @@ export default function PrivacyPage() {
             <Link href="/" className="flex items-center space-x-2">
               <SparklesIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
               <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Advanced POS
+                Raha Pos Solutions
               </span>
             </Link>
             <div className="flex items-center space-x-4">
@@ -138,7 +138,7 @@ export default function PrivacyPage() {
                   If you have any questions about this Privacy Policy, please contact us at:
                 </p>
                 <p>
-                  Email: privacy@advancedpos.com<br />
+                  Email: privacy@rahapos.com<br />
                   Address: 123 Business Street, Suite 100, City, State 12345
                 </p>
               </div>
@@ -162,7 +162,7 @@ export default function PrivacyPage() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <SparklesIcon className="w-6 h-6 text-primary-400" />
-                <span className="text-xl font-bold">Advanced POS</span>
+                <span className="text-xl font-bold">Raha Pos Solutions</span>
               </div>
               <p className="text-gray-400">
                 The most powerful restaurant management system
@@ -195,7 +195,7 @@ export default function PrivacyPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Advanced POS. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>

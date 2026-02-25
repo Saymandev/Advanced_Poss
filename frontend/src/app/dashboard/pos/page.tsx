@@ -107,6 +107,7 @@ interface CartItem {
 interface OrderSummary {
   subtotal: number;
   tax: number;
+  serviceChargeAmount: number;
   total: number;
   itemCount: number;
   deliveryFee: number;
@@ -246,7 +247,7 @@ export default function POSPage() {
   } = usePOSOfflinePrefetcher();
   const formatCurrency = useFormatCurrency(); // Use hook to get reactive currency formatting
   const isOwnerOrManager =
-    user?.role === 'owner' || user?.role === 'super_admin';
+    user?.role === 'owner' || user?.role === 'super_admin' || user?.role === 'manager';
   // Check if user has access to booking management feature (for room booking / room service)
   const { hasAccess: hasBookingAccess } = useFeatureAccess('booking-management');
   // Build order type options based on feature access
@@ -457,6 +458,7 @@ export default function POSPage() {
   const [refundReason, setRefundReason] = useState('');
   const [refundAmount, setRefundAmount] = useState('');
   const [refundOrderId, setRefundOrderId] = useState('');
+  const [refundIsDamage, setRefundIsDamage] = useState(false);
 
   const searchParams = useSearchParams();
 
@@ -576,6 +578,7 @@ export default function POSPage() {
       deliveryDetails.addressLine1.trim() !== ''
       && deliveryDetails.city.trim() !== ''
       && deliveryDetails.contactPhone.trim() !== ''
+      && (deliveryDetails as any).zoneId
     );
   const takeawayIsValid = !requiresTakeawayDetails
     || (
@@ -602,6 +605,7 @@ export default function POSPage() {
     if (!deliveryDetails.contactPhone.trim()) missing.push('contact phone');
     if (!deliveryDetails.addressLine1.trim()) missing.push('address line 1');
     if (!deliveryDetails.city.trim()) missing.push('city');
+    if (!(deliveryDetails as any).zoneId) missing.push('delivery zone');
     return missing;
   }, [requiresDeliveryDetails, deliveryDetails]);
   const missingTakeawayFields = useMemo(() => {
@@ -651,6 +655,7 @@ export default function POSPage() {
   });
   // Use nullish coalescing (??) instead of || to allow 0 as a valid tax rate
   const taxRate = posSettings?.taxRate ?? 10; // Default 10% only if undefined/null
+  const serviceChargeRate = posSettings?.serviceCharge ?? 0;
   // Payment mode: 'pay-first' = pay before creating order, 'pay-later' = create order then pay
   const [paymentMode, setPaymentMode] = useState<'pay-first' | 'pay-later'>(() => {
     if (typeof window !== 'undefined') {
@@ -965,11 +970,13 @@ export default function POSPage() {
     const totalDiscount = discountAmount + loyaltyDiscount;
     const taxableSubtotal = Math.max(baseSubtotal - totalDiscount, 0);
     const taxAmount = (taxableSubtotal * taxRate) / 100;
-    const total = taxableSubtotal + taxAmount + deliveryFeeValue;
+    const serviceChargeAmount = (taxableSubtotal * serviceChargeRate) / 100;
+    const total = taxableSubtotal + taxAmount + serviceChargeAmount + deliveryFeeValue;
     return {
       subtotal: baseSubtotal,
       discount: totalDiscount,
       tax: taxAmount,
+      serviceChargeAmount,
       total,
       itemCount: base.itemCount,
       deliveryFee: deliveryFeeValue,
@@ -977,6 +984,7 @@ export default function POSPage() {
   }, [
     cart,
     taxRate,
+    serviceChargeRate,
     deliveryFeeValue,
     discountMode,
     discountType,
@@ -1842,6 +1850,12 @@ export default function POSPage() {
               roomNumber: roomServiceBookingForOrder?.roomNumber,
             }
           : {}),
+        subtotal: orderSummary.subtotal,
+        taxRate: taxRate,
+        taxAmount: orderSummary.tax,
+        serviceChargeRate: serviceChargeRate,
+        serviceChargeAmount: (orderSummary as any).serviceChargeAmount || 0,
+        totalAmount: Number(orderSummary.total.toFixed(2)),
         items: cart.map((item) => ({
           menuItemId: item.menuItemId,
           quantity: item.quantity,
@@ -1849,7 +1863,6 @@ export default function POSPage() {
           notes: buildItemNotes(item),
         })),
         customerInfo: customerInfo,
-        totalAmount: Number(orderSummary.total.toFixed(2)),
         status: 'pending' as const,
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
         ...(selectedCustomerId && loyaltyRedemption.pointsRedeemed > 0
@@ -2222,8 +2235,13 @@ export default function POSPage() {
           price: item.price,
           notes: buildItemNotes(item),
         })),
+        subtotal: orderSummary.subtotal,
+        taxRate: taxRate,
+        taxAmount: orderSummary.tax,
+        serviceChargeRate: serviceChargeRate,
+        serviceChargeAmount: (orderSummary as any).serviceChargeAmount || 0,
+        totalAmount: orderSummary.total,
         customerInfo: customerInfo,
-        totalAmount: totalDue,
         // In "pay-first" mode, create order as 'paid' (payment happens before order creation)
         // In "pay-later" mode, create order as 'pending' then process payment (except room service)
         status: paymentMode === 'pay-first' ? 'paid' as const : 'pending' as const,
@@ -2401,6 +2419,7 @@ export default function POSPage() {
     setRefundOrderId(orderId);
     setRefundAmount(total.toString());
     setRefundReason('');
+    setRefundIsDamage(false);
     setIsRefundModalOpen(true);
   }, []);
 
@@ -2419,6 +2438,7 @@ export default function POSPage() {
         orderId: refundOrderId,
         amount: Number(refundAmount),
         reason: refundReason,
+        isDamage: refundIsDamage,
       }).unwrap();
 
       toast.success('Refund processed successfully');
@@ -3499,7 +3519,7 @@ export default function POSPage() {
                     </Button>
                     {order.status === 'pending' && (
                       <>
-                        {order.orderType !== 'dine-in' && (
+                        {order.orderType !== 'dine-in' && order.isPublic && (
                           <Button
                             size="sm"
                             variant="secondary"
@@ -4282,7 +4302,11 @@ export default function POSPage() {
                       type="number"
                       min="0"
                       step="0.01"
-                      className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
+                      readOnly={!isOwnerOrManager}
+                      className={cn(
+                        "bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100",
+                        !isOwnerOrManager && "opacity-70 cursor-not-allowed bg-gray-50 dark:bg-slate-900"
+                      )}
                     />
                   </div>
                 </div>
@@ -4692,6 +4716,18 @@ export default function POSPage() {
               placeholder="Enter reason..."
               className="w-full h-24 rounded-lg bg-slate-900 border border-slate-800 p-3 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
             />
+          </div>
+          <div className="flex items-center gap-2 py-2">
+            <input
+              type="checkbox"
+              id="refundIsDamage"
+              checked={refundIsDamage}
+              onChange={(e) => setRefundIsDamage(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-800 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+            />
+            <label htmlFor="refundIsDamage" className="text-sm font-medium text-slate-200">
+              Record items as Damages (Wastage)
+            </label>
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="secondary" onClick={() => setIsRefundModalOpen(false)}>
@@ -5295,7 +5331,7 @@ export default function POSPage() {
                     </Button>
                     {queueDetail.status === 'pending' && (
                       <>
-                        {queueDetail.orderType !== 'dine-in' && (
+                        {queueDetail.orderType !== 'dine-in' && queueDetail.isPublic && (
                           <Button
                             variant="secondary"
                             onClick={async () => {

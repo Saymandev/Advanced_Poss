@@ -1,7 +1,7 @@
 import { IDBPDatabase, openDB } from 'idb';
 import { CreatePOSOrderRequest } from '../api/endpoints/posApi';
 
-const DB_NAME = 'restogo-pos-offline-db';
+const DB_NAME = 'raha-pos-offline-db';
 const DB_VERSION = 2; // bumped to trigger schema upgrade
 
 // Default TTL in milliseconds

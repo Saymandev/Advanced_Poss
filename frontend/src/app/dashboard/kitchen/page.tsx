@@ -8,37 +8,37 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-  KitchenOrder,
-  useCancelKitchenOrderMutation,
-  useCompleteKitchenOrderItemMutation,
-  useCompleteKitchenOrderMutation,
-  useGetKitchenDelayedOrdersQuery,
-  useGetKitchenPendingOrdersQuery,
-  useGetKitchenPreparingOrdersQuery,
-  useGetKitchenReadyOrdersQuery,
-  useGetKitchenUrgentOrdersQuery,
-  useMarkKitchenOrderUrgentMutation,
-  useStartKitchenOrderItemMutation,
-  useStartKitchenOrderMutation,
-  useUpdateKitchenItemPriorityMutation
+    KitchenOrder,
+    useCancelKitchenOrderMutation,
+    useCompleteKitchenOrderItemMutation,
+    useCompleteKitchenOrderMutation,
+    useGetKitchenDelayedOrdersQuery,
+    useGetKitchenPendingOrdersQuery,
+    useGetKitchenPreparingOrdersQuery,
+    useGetKitchenReadyOrdersQuery,
+    useGetKitchenUrgentOrdersQuery,
+    useMarkKitchenOrderUrgentMutation,
+    useStartKitchenOrderItemMutation,
+    useStartKitchenOrderMutation,
+    useUpdateKitchenItemPriorityMutation
 } from '@/lib/api/endpoints/kitchenApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-  ArrowPathIcon,
-  ArrowsPointingInIcon,
-  ArrowsPointingOutIcon,
-  ArrowsUpDownIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  FireIcon,
-  MagnifyingGlassIcon,
-  SpeakerWaveIcon,
-  SpeakerXMarkIcon,
-  UserIcon,
-  XCircleIcon
+    ArrowPathIcon,
+    ArrowsPointingInIcon,
+    ArrowsPointingOutIcon,
+    ArrowsUpDownIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    FireIcon,
+    MagnifyingGlassIcon,
+    SpeakerWaveIcon,
+    SpeakerXMarkIcon,
+    UserIcon,
+    XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -690,7 +690,9 @@ export default function KitchenPage() {
                     className={`border rounded-lg p-3 sm:p-4 ${
                       isUrgent || isDelayed
                         ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
-                        : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
+                        : order.orderType === 'delivery'
+                          ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30'
+                          : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
                     }`}
                   >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
@@ -911,7 +913,9 @@ export default function KitchenPage() {
                     className={`border rounded-lg p-3 sm:p-4 ${
                       isUrgent
                         ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
-                        : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
+                        : order.orderType === 'delivery'
+                          ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30'
+                          : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
                     }`}
                   >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
@@ -1090,7 +1094,11 @@ export default function KitchenPage() {
             ) : (
               filteredReadyOrders.map((order: any) => {
                 return (
-                  <div key={order.id} className="border border-green-200 dark:border-green-800 rounded-lg p-3 sm:p-4 bg-green-50 dark:bg-green-900/20">
+                  <div key={order.id} className={`border rounded-lg p-3 sm:p-4 ${
+                    order.orderType === 'delivery'
+                      ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-100/50 dark:bg-indigo-900/40 ring-2 ring-indigo-500/20'
+                      : 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
+                  }`}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">
