@@ -375,8 +375,35 @@ export class OrdersService {
         }
       }
     } else if (updateStatusDto.status === 'completed') {
+      const wasAlreadyPaid = order.paymentStatus === 'paid';
       updateData.completedAt = new Date();
       updateData.paymentStatus = 'paid';
+
+      // Record in ledger if it was not already paid
+      if (!wasAlreadyPaid) {
+        try {
+          const branchId = order.branchId?._id?.toString() || (order.branchId as any)?.toString();
+          const companyId = order.companyId?.toString();
+          
+          await this.transactionsService.recordTransaction(
+            {
+              paymentMethodId: 'cash',
+              type: TransactionType.IN,
+              category: TransactionCategory.SALE,
+              amount: order.total,
+              date: new Date().toISOString(),
+              referenceId: order._id.toString(),
+              referenceModel: 'Order',
+              description: `Payment (Status Update) for Public order ${order.orderNumber}`,
+            },
+            companyId || branchId,
+            branchId,
+            userId || order.waiterId?.toString(),
+          );
+        } catch (error) {
+          console.error('Failed to record transaction for public order status update:', error);
+        }
+      }
 
       // Free up table if dine-in
       if (order.tableId) {

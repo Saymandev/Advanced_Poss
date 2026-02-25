@@ -560,6 +560,7 @@ export class ReceiptService {
       notes: order?.notes || undefined,
       publicUrl,
       currency, // Add currency to receipt data
+      deliveryFee: (order as any).deliveryFee || 0,
       // Generate order review URL for QR code - use custom domain if available
       orderReviewUrl: (() => {
         const orderId = (order as any)._id?.toString() || (order as any).id?.toString();
@@ -777,6 +778,12 @@ export class ReceiptService {
             <div class="total-line">
                 <span>Service Charge (${receiptData.serviceCharge}%):</span>
                 <span>${this.formatCurrency(receiptData.serviceChargeAmount, receiptData.currency)}</span>
+            </div>
+        ` : ''}
+        ${receiptData.deliveryFee > 0 ? `
+            <div class="total-line">
+                <span>Delivery Fee:</span>
+                <span>${this.formatCurrency(receiptData.deliveryFee, receiptData.currency)}</span>
             </div>
         ` : ''}
         <div class="total-line final">

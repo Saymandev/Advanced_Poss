@@ -902,6 +902,56 @@ export class POSService {
     const updatedPOSOrder = await this.posOrderModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
     
     if (updatedPOSOrder) {
+      // If status just changed to paid, record transaction if not already paid
+      if (updateOrderDto.status === 'paid' && order.status !== 'paid') {
+        try {
+          // Create a payment record
+          const paymentData = {
+            orderId: updatedPOSOrder._id,
+            amount: updatedPOSOrder.totalAmount,
+            method: 'cash', // Default to cash for status updates
+            status: 'completed',
+            processedBy: new Types.ObjectId(userId),
+            processedAt: new Date(),
+            branchId: updatedPOSOrder.branchId,
+          };
+          const payment = new this.posPaymentModel(paymentData);
+          const savedPayment = await payment.save();
+
+          // Link payment to order
+          await this.posOrderModel.findByIdAndUpdate(id, { paymentId: savedPayment._id }).exec();
+
+          // Record in ledger
+          const resolvedCompanyId = (updatedPOSOrder as any).companyId?.toString() || updatedPOSOrder.branchId?.toString();
+          
+          await this.transactionsService.recordTransaction(
+            {
+              paymentMethodId: 'cash',
+              type: TransactionType.IN,
+              category: TransactionCategory.SALE,
+              amount: updatedPOSOrder.totalAmount,
+              date: new Date().toISOString(),
+              referenceId: updatedPOSOrder._id.toString(),
+              referenceModel: 'POSOrder',
+              description: `Payment (Status Update) for POS order ${updatedPOSOrder.orderNumber}`,
+              notes: `Txn ID: ${savedPayment._id}`,
+            },
+            resolvedCompanyId,
+            updatedPOSOrder.branchId.toString(),
+            userId,
+          );
+
+          // Notify via WebSocket: payment received
+          this.websocketsGateway.notifyPaymentReceived(
+            updatedPOSOrder.branchId.toString(),
+            updatedPOSOrder.toObject ? updatedPOSOrder.toObject() : updatedPOSOrder,
+            savedPayment.toObject ? savedPayment.toObject() : savedPayment,
+          );
+        } catch (error) {
+          console.error('Failed to record transaction for status update:', error);
+        }
+      }
+
       // Notify via WebSocket: order updated
       try {
         this.websocketsGateway.notifyOrderUpdated(
