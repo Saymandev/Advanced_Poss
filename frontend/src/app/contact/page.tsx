@@ -98,7 +98,7 @@ function ContactFormContent() {
               <img
                 src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
                 alt="Raha Pos Solutions logo"
-                className="h-10 w-auto rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
+                className="h-10 w-auto"
               />
             </Link>
             <div className="flex items-center space-x-4">
@@ -279,7 +279,7 @@ function ContactFormContent() {
                 <img
                   src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
                   alt="Raha Pos Solutions logo"
-                  className="h-10 w-auto rounded-md shadow-lg group-hover:scale-110 transition-transform duration-300"
+                  className="h-10 w-auto"
                 />
               </div>
               <p className="text-gray-400">
