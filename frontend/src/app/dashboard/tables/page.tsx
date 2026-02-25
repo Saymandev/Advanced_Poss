@@ -92,6 +92,9 @@ export default function TablesPage() {
       qrCode: table.qrCode,
       currentOrderId: table.currentOrderId || table.currentOrder?._id,
       reservationId: table.reservationId || table.reservation?._id,
+      reservedFor: table.reservedFor,
+      reservedUntil: table.reservedUntil,
+      reservedBy: table.reservedBy,
       createdAt: table.createdAt || new Date().toISOString(),
       updatedAt: table.updatedAt || new Date().toISOString(),
     }));
@@ -146,8 +149,8 @@ export default function TablesPage() {
 
       await reserveTable({
         ...submitData,
-        reservedFor,
-        reservedUntil,
+        reservedFor: new Date(reservedFor).toISOString(),
+        reservedUntil: new Date(reservedUntil).toISOString(),
         email: resForm.email?.trim() || undefined,
         notes: resForm.notes?.trim() || undefined,
       }).unwrap();
