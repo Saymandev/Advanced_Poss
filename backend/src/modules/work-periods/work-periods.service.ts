@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EmailService } from '../../common/services/email.service';
@@ -17,6 +17,7 @@ export class WorkPeriodsService {
     @InjectModel(WorkPeriod.name) private workPeriodModel: Model<WorkPeriodDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private usersService: UsersService,
+    @Inject(forwardRef(() => POSService))
     private posService: POSService,
     private pdfGeneratorService: PDFGeneratorService,
     private emailService: EmailService,
