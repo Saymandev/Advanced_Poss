@@ -47,6 +47,7 @@ export class POSService {
     private receiptService: ReceiptService,
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
+    @Inject(forwardRef(() => WebsocketsGateway))
     private websocketsGateway: WebsocketsGateway,
     private emailService: EmailService,
     private smsService: SmsService,

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrdersModule } from '../orders/orders.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
@@ -11,8 +11,8 @@ import { KitchenOrder, KitchenOrderSchema } from './schemas/kitchen-order.schema
     MongooseModule.forFeature([
       { name: KitchenOrder.name, schema: KitchenOrderSchema },
     ]),
-    OrdersModule,
-    WebsocketsModule,
+    forwardRef(() => OrdersModule),
+    forwardRef(() => WebsocketsModule),
   ],
   controllers: [KitchenController],
   providers: [KitchenService],

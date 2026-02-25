@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BookingsModule } from '../bookings/bookings.module';
 import { BranchesModule } from '../branches/branches.module';
@@ -29,18 +29,18 @@ import { ContactForm, ContactFormSchema } from './schemas/contact-form.schema';
     ]),
     CompaniesModule,
     BranchesModule,
-    MenuItemsModule,
+    forwardRef(() => MenuItemsModule),
     CategoriesModule,
-    OrdersModule,
+    forwardRef(() => OrdersModule),
     CustomersModule,
     DeliveryZonesModule,
     GalleryModule,
     UsersModule,
-    WebsocketsModule,
+    forwardRef(() => WebsocketsModule),
     SystemFeedbackModule,
-    SubscriptionsModule, // For subscription limit validation
-    RoomsModule, // For public room browsing
-    BookingsModule, // For public bookings
+    forwardRef(() => SubscriptionsModule), // For subscription limit validation
+    forwardRef(() => RoomsModule), // For public room browsing
+    forwardRef(() => BookingsModule), // For public bookings
   ],
   controllers: [PublicController],
   providers: [PublicService],

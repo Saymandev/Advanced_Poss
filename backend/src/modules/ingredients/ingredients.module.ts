@@ -13,8 +13,8 @@ import { Ingredient, IngredientSchema } from './schemas/ingredient.schema';
     MongooseModule.forFeature([
       { name: Ingredient.name, schema: IngredientSchema },
     ]),
-    WebsocketsModule,
-    NotificationsModule,
+    forwardRef(() => WebsocketsModule),
+    forwardRef(() => NotificationsModule),
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
   ],

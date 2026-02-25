@@ -16,7 +16,7 @@ import { DigitalReceipt, DigitalReceiptSchema } from './schemas/digital-receipt.
       { name: DigitalReceipt.name, schema: DigitalReceiptSchema },
       { name: POSOrder.name, schema: POSOrderSchema },
     ]),
-    POSModule,
+    forwardRef(() => POSModule),
     CustomersModule,
     forwardRef(() => SubscriptionPlansModule),
     forwardRef(() => SubscriptionsModule),

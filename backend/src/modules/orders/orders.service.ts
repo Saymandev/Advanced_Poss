@@ -26,11 +26,15 @@ export class OrdersService {
   constructor(
     @InjectModel(Order.name)
     private orderModel: Model<OrderDocument>,
+    @Inject(forwardRef(() => TablesService))
     private tablesService: TablesService,
+    @Inject(forwardRef(() => MenuItemsService))
     private menuItemsService: MenuItemsService,
     @Inject(forwardRef(() => TransactionsService))
     private transactionsService: TransactionsService,
+    @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
+    @Inject(forwardRef(() => WebsocketsGateway))
     private websocketsGateway: WebsocketsGateway,
     @Inject(forwardRef(() => POSService))
     private posService: POSService,
