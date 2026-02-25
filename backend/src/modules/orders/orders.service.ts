@@ -1,9 +1,9 @@
 import {
-    BadRequestException,
-    Inject,
-    Injectable,
-    NotFoundException,
-    forwardRef,
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -385,21 +385,28 @@ export class OrdersService {
           const branchId = order.branchId?._id?.toString() || (order.branchId as any)?.toString();
           const companyId = order.companyId?.toString();
           
-          await this.transactionsService.recordTransaction(
-            {
-              paymentMethodId: 'cash',
-              type: TransactionType.IN,
-              category: TransactionCategory.SALE,
-              amount: order.total,
-              date: new Date().toISOString(),
-              referenceId: order._id.toString(),
-              referenceModel: 'Order',
-              description: `Payment (Status Update) for Public order ${order.orderNumber}`,
-            },
-            companyId || branchId,
-            branchId,
-            userId || order.waiterId?.toString(),
-          );
+          // Use userId from request or waiterId from order
+          const creatorId = userId || order.waiterId?.toString();
+          
+          if (!creatorId) {
+            console.error(`Cannot record transaction for order ${order.orderNumber}: No user ID found`);
+          } else {
+            await this.transactionsService.recordTransaction(
+              {
+                paymentMethodId: 'cash',
+                type: TransactionType.IN,
+                category: TransactionCategory.SALE,
+                amount: order.total,
+                date: new Date().toISOString(),
+                referenceId: order._id.toString(),
+                referenceModel: 'Order',
+                description: `Payment (Status Update) for Public order ${order.orderNumber}`,
+              },
+              companyId || branchId,
+              branchId,
+              creatorId,
+            );
+          }
         } catch (error) {
           console.error('Failed to record transaction for public order status update:', error);
         }

@@ -905,6 +905,12 @@ export class POSService {
       // If status just changed to paid, record transaction if not already paid
       if (updateOrderDto.status === 'paid' && order.status !== 'paid') {
         try {
+          // Update order with payment info (amountReceived, changeDue)
+          await this.posOrderModel.findByIdAndUpdate(id, {
+            amountReceived: updatedPOSOrder.totalAmount,
+            changeDue: 0,
+          }).exec();
+
           // Create a payment record
           const paymentData = {
             orderId: updatedPOSOrder._id,
@@ -914,6 +920,8 @@ export class POSService {
             processedBy: new Types.ObjectId(userId),
             processedAt: new Date(),
             branchId: updatedPOSOrder.branchId,
+            amountReceived: updatedPOSOrder.totalAmount,
+            changeDue: 0,
           };
           const payment = new this.posPaymentModel(paymentData);
           const savedPayment = await payment.save();
@@ -922,7 +930,8 @@ export class POSService {
           await this.posOrderModel.findByIdAndUpdate(id, { paymentId: savedPayment._id }).exec();
 
           // Record in ledger
-          const resolvedCompanyId = (updatedPOSOrder as any).companyId?.toString() || updatedPOSOrder.branchId?.toString();
+          const branchId = updatedPOSOrder.branchId.toString();
+          const resolvedCompanyId = (updatedPOSOrder as any).companyId?.toString() || branchId;
           
           await this.transactionsService.recordTransaction(
             {
@@ -937,14 +946,19 @@ export class POSService {
               notes: `Txn ID: ${savedPayment._id}`,
             },
             resolvedCompanyId,
-            updatedPOSOrder.branchId.toString(),
+            branchId,
             userId,
           );
 
           // Notify via WebSocket: payment received
           this.websocketsGateway.notifyPaymentReceived(
-            updatedPOSOrder.branchId.toString(),
-            updatedPOSOrder.toObject ? updatedPOSOrder.toObject() : updatedPOSOrder,
+            branchId,
+            { 
+              ...(updatedPOSOrder.toObject ? updatedPOSOrder.toObject() : updatedPOSOrder),
+              amountReceived: updatedPOSOrder.totalAmount,
+              changeDue: 0,
+              status: 'paid'
+            },
             savedPayment.toObject ? savedPayment.toObject() : savedPayment,
           );
         } catch (error) {
