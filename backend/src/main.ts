@@ -48,10 +48,22 @@ async function bootstrap() {
   }));
   // CORS
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:3000'],
+    origin: (origin, callback) => {
+      // Allow if request has no origin (like mobile apps or curl) or matches whitelist
+      if (!origin || 
+          origin === frontendUrl || 
+          origin === 'http://localhost:3000' || 
+          
+          origin.includes('raha.bd')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'], // Important for some environments
   });
   // Compression
   app.use(compression());
