@@ -6,33 +6,33 @@ import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { useAppSelector } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-    Bars3Icon,
-    BeakerIcon,
-    BuildingOfficeIcon,
-    ChartBarIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    CogIcon,
-    ComputerDesktopIcon,
-    CurrencyDollarIcon,
-    DocumentTextIcon,
-    EnvelopeIcon,
-    ExclamationTriangleIcon,
-    GiftIcon,
-    HomeIcon,
-    PhotoIcon,
-    PrinterIcon,
-    ReceiptPercentIcon,
-    ShieldCheckIcon,
-    ShoppingBagIcon,
-    SparklesIcon,
-    TableCellsIcon,
-    TagIcon,
-    TruckIcon,
-    UserCircleIcon,
-    UserGroupIcon,
-    UsersIcon,
-    XMarkIcon
+  Bars3Icon,
+  BeakerIcon,
+  BuildingOfficeIcon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  CogIcon,
+  ComputerDesktopIcon,
+  CurrencyDollarIcon,
+  DocumentTextIcon,
+  EnvelopeIcon,
+  ExclamationTriangleIcon,
+  GiftIcon,
+  HomeIcon,
+  PhotoIcon,
+  PrinterIcon,
+  ReceiptPercentIcon,
+  ShieldCheckIcon,
+  ShoppingBagIcon,
+  SparklesIcon,
+  TableCellsIcon,
+  TagIcon,
+  TruckIcon,
+  UserCircleIcon,
+  UserGroupIcon,
+  UsersIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -417,7 +417,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className }: SidebarProps) {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
   const { hasAnyFeature, isLoading: permissionsLoading, permissions: userPermissions, userFeatures } = useRolePermissions();
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>(['POS System']);
@@ -648,10 +648,10 @@ export function Sidebar({ className }: SidebarProps) {
             isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
           )}>
             <div className="flex items-center gap-3">
-              {user?.company?.logo ? (
+              {companyContext?.logoUrl ? (
                 <Image
-                  src={user.company.logo}
-                  alt={user.company.name || "Company logo"}
+                  src={companyContext.logoUrl}
+                  alt={companyContext.companyName || "Company logo"}
                   width={40}
                   height={40}
                   className="rounded-md object-contain"
@@ -664,9 +664,9 @@ export function Sidebar({ className }: SidebarProps) {
               )}
               <div>
                 <h2 className="font-semibold text-gray-900 dark:text-white text-base leading-tight">
-                  {user?.company?.name || "My Company"}
+                  {companyContext?.companyName || "My Company"}
                 </h2>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Management System</p>
+                
               </div>
             </div>
           </div>

@@ -12,6 +12,11 @@ export interface User {
   phoneNumber?: string;
   avatar?: string;
   permissions?: string[];
+  company?: {
+    id: string;
+    name: string;
+    logo?: string;
+  };
 }
 
 export interface AuthState {
