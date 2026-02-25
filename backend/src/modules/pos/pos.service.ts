@@ -1982,7 +1982,15 @@ export class POSService {
         }
         // Show order details if there are orders (pending or paid in pay-first mode)
         const shouldShowOrderDetails = primaryOrder !== null;
-        const tableStatus = isOccupied ? 'occupied' : 'available';
+        
+        // Calculate status: occupied if has order, otherwise use status from TableService (handles 'reserved', 'cleaning', etc)
+        let tableStatus = isOccupied ? 'occupied' : (table.status || 'available');
+        
+        // If TablesService says it's reserved, keep it reserved unless it's occupied by an order
+        if (!isOccupied && table.status === 'reserved') {
+          tableStatus = 'reserved';
+        }
+
         return {
           id: tableId,
           number: table.tableNumber || table.number || '',

@@ -1,9 +1,10 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model, Types } from 'mongoose';
 import * as QRCode from 'qrcode';
 import { GeneratorUtil } from '../../common/utils/generator.util';
@@ -174,23 +175,34 @@ export class TablesService {
         // Marking tables as occupied
       }
 
-      // Update table status based on orders
+      // Update table status based on orders and reservations
+      const now = new Date();
       return tables.map((table: any) => {
         const tableId = table._id?.toString() || table.id;
         const hasOrder = occupiedTableIds.has(tableId);
 
-        // Calculate status: occupied if has order (pending or paid)
-        // Paid orders with tableId always occupy tables (customer paid and is using the table)
-        // This works regardless of payment mode setting (handles frontend toggle vs backend setting mismatch)
+        // Calculate status: 
+        // 1. occupied if has order (pending or paid)
+        // 2. reserved if currently within a reservation window
+        // 3. available otherwise
         let calculatedStatus = table.status;
+        
         if (hasOrder) {
           calculatedStatus = 'occupied';
-        } else if (table.status === 'occupied') {
-          // Table was marked as occupied but has no orders - make it available
-          // (This handles cases where orders were completed/cancelled but status wasn't updated)
-          calculatedStatus = 'available';
+        } else {
+          // Check for active reservation
+          const isReservedNow = table.reservedFor && 
+                               new Date(table.reservedFor) <= now && 
+                               table.reservedUntil && 
+                               new Date(table.reservedUntil) > now;
+          
+          if (isReservedNow) {
+            calculatedStatus = 'reserved';
+          } else if (table.status === 'occupied' || table.status === 'reserved') {
+            // Table was marked as occupied/reserved but has no orders or active reservation - make it available
+            calculatedStatus = 'available';
+          }
         }
-        // Keep 'reserved' and 'cleaning' statuses as-is
 
         return {
           ...table,
@@ -625,5 +637,54 @@ export class TablesService {
     }
 
     return tables;
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleTableReservations() {
+    const now = new Date();
+    
+    // 1. Find tables that should be 'reserved' but are 'available'
+    const pendingReservations = await this.tableModel.find({
+      status: 'available',
+      reservedFor: { $lte: now },
+      reservedUntil: { $gt: now },
+    }).exec();
+
+    for (const table of pendingReservations) {
+      table.status = 'reserved';
+      await table.save();
+      this.emitTableStatusChange(table);
+    }
+
+    // 2. Find tables that are 'reserved' but the window has expired
+    const expiredReservations = await this.tableModel.find({
+      status: 'reserved',
+      reservedUntil: { $lte: now },
+    }).exec();
+
+    for (const table of expiredReservations) {
+      table.status = 'available';
+      table.reservedFor = undefined;
+      (table as any).reservedUntil = undefined;
+      (table as any).reservationNotes = undefined;
+      table.reservedBy = undefined;
+      await table.save();
+      this.emitTableStatusChange(table);
+    }
+  }
+
+  private emitTableStatusChange(table: TableDocument) {
+    try {
+      const branchId = table.branchId?.toString();
+      if (branchId) {
+        const tableObj = table.toObject ? table.toObject() : table;
+        if (!tableObj.id && tableObj._id) {
+          tableObj.id = (tableObj._id as any).toString();
+        }
+        this.websocketsGateway.notifyTableStatusChanged(branchId, tableObj);
+      }
+    } catch (error) {
+      console.error('Failed to emit table status change via cron:', error);
+    }
   }
 }
