@@ -229,6 +229,9 @@ export class Order {
 
   @Prop([{ type: Types.ObjectId, ref: 'Order' }])
   splitOrderIds?: Types.ObjectId[];
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

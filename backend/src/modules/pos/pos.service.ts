@@ -1819,6 +1819,7 @@ export class POSService {
         return order;
       })
     );
+
     // Always log paid orders if found, regardless of payment mode setting
     if (paidOrdersWithUser.length > 0) {
       paidOrdersWithUser.forEach(order => {
@@ -2271,8 +2272,20 @@ export class POSService {
     if (!Types.ObjectId.isValid(orderId)) {
       throw new BadRequestException('Invalid order ID');
     }
-    const order = await this.posOrderModel.findById(orderId);
+    // Check if this might be a public order if not found in POSOrder
+    let order = await this.posOrderModel.findById(orderId);
+    
     if (!order) {
+      // If status is 'confirmed', try to promote from public Order
+      if (status === 'confirmed') {
+        try {
+          const promotedOrder = await this.promotePublicOrderToPOS(orderId, userId);
+          return promotedOrder;
+        } catch (error) {
+          console.error(`❌ [updateDeliveryStatus] Failed to promote order ${orderId}:`, error);
+          throw new NotFoundException('Order not found in POS and could not be promoted from public orders');
+        }
+      }
       throw new NotFoundException('Order not found');
     }
     if (order.orderType !== 'delivery') {
@@ -2296,5 +2309,83 @@ export class POSService {
     const updatedOrder = await order.save();
     // TODO: Optionally emit websocket event for delivery updates in future
     return updatedOrder;
+  }
+
+  /**
+   * Promotes a public order to a POS order
+   * This is typically called when a manager/cashier confirms an online order
+   */
+  async promotePublicOrderToPOS(orderId: string, userId: string): Promise<POSOrderDocument> {
+    // 1. Fetch the public order
+    const publicOrder = await this.orderModel.findById(orderId).populate('items.menuItemId');
+    if (!publicOrder) {
+      throw new NotFoundException('Public order not found');
+    }
+
+    // 2. Check if it's already been promoted (to avoid duplicates)
+    const existingPOSOrder = await this.posOrderModel.findOne({ externalOrderId: orderId });
+    if (existingPOSOrder) {
+      return existingPOSOrder as POSOrderDocument;
+    }
+
+    // 3. Map Public Order items to POS items
+    const posItems = publicOrder.items.map(item => ({
+      menuItemId: item.menuItemId instanceof Types.ObjectId ? item.menuItemId : (item.menuItemId as any)._id,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.unitPrice,
+      basePrice: item.basePrice,
+      notes: item.specialInstructions
+    }));
+
+    // 4. Determine order source and customer info
+    const customerInfo = {
+      name: publicOrder.deliveryInfo?.name || publicOrder.guestName || 'Public Customer',
+      phone: publicOrder.deliveryInfo?.phone || publicOrder.guestPhone,
+      email: publicOrder.customerId ? undefined : undefined 
+    };
+
+    // 5. Build CreatePOSOrderDto
+    const createDto: CreatePOSOrderDto = {
+      orderType: publicOrder.type === 'delivery' ? 'delivery' : 
+                 publicOrder.type === 'takeaway' ? 'takeaway' : 'dine-in',
+      items: posItems as any,
+      tableId: publicOrder.tableId?.toString(),
+      customerInfo: customerInfo,
+      deliveryFee: publicOrder.deliveryFee,
+      subtotal: publicOrder.subtotal,
+      taxRate: publicOrder.taxRate,
+      taxAmount: publicOrder.taxAmount,
+      serviceChargeRate: publicOrder.serviceChargeRate,
+      serviceChargeAmount: publicOrder.serviceChargeAmount,
+      totalAmount: publicOrder.total,
+      status: 'pending', 
+      orderSource: 'customer_app',
+      externalOrderId: orderId,
+      deliveryDetails: publicOrder.type === 'delivery' ? {
+        contactName: publicOrder.deliveryInfo?.name,
+        contactPhone: publicOrder.deliveryInfo?.phone,
+        addressLine1: publicOrder.deliveryInfo?.address,
+        instructions: publicOrder.deliveryInfo?.instructions
+      } : undefined
+    };
+
+    // 6. Create the POS order using existing infrastructure
+    const newPOSOrder = await this.createOrder(
+      createDto, 
+      userId, 
+      publicOrder.branchId.toString(), 
+      publicOrder.companyId.toString()
+    );
+
+    // 7. Update public order status to confirmed
+    publicOrder.status = 'confirmed';
+    publicOrder.confirmedAt = new Date();
+    await publicOrder.save();
+
+    // 8. Notify via websocket
+    this.websocketsGateway.notifyOrderStatusChanged(publicOrder.branchId.toString(), publicOrder);
+
+    return newPOSOrder as POSOrderDocument;
   }
 }

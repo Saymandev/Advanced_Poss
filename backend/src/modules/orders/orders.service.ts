@@ -10,6 +10,7 @@ import { Model, Types } from 'mongoose';
 import { OrderFilterDto } from '../../common/dto/pagination.dto';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { POSService } from '../pos/pos.service';
 import { TablesService } from '../tables/tables.service';
 import { TransactionCategory, TransactionType } from '../transactions/schemas/transaction.schema';
 import { TransactionsService } from '../transactions/transactions.service';
@@ -31,6 +32,8 @@ export class OrdersService {
     private transactionsService: TransactionsService,
     private notificationsService: NotificationsService,
     private websocketsGateway: WebsocketsGateway,
+    @Inject(forwardRef(() => POSService))
+    private posService: POSService,
   ) {}
 
   async create(createOrderDto: CreateOrderDto): Promise<Order> {
@@ -335,6 +338,7 @@ export class OrdersService {
   async updateStatus(
     id: string,
     updateStatusDto: UpdateOrderStatusDto,
+    userId?: string,
   ): Promise<Order> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid order ID');
@@ -355,6 +359,17 @@ export class OrdersService {
       updateData.confirmedAt = new Date();
       updateData['items.$[].sentToKitchenAt'] = new Date();
       updateData['items.$[].status'] = 'preparing';
+
+      // Promotion logic: Create POS order if it doesn't exist
+      if (userId) {
+        try {
+          await this.posService.promotePublicOrderToPOS(id, userId);
+        } catch (error) {
+          console.error(`❌ [OrdersService.updateStatus] Failed to promote order ${id} to POS:`, error);
+          // We don't throw here to avoid blocking the status update, 
+          // but the order might not show up in POS until fixed
+        }
+      }
     } else if (updateStatusDto.status === 'completed') {
       updateData.completedAt = new Date();
       updateData.paymentStatus = 'paid';

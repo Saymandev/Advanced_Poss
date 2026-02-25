@@ -5,6 +5,7 @@ import { Model, Types } from 'mongoose';
 import * as qrcode from 'qrcode';
 import { BranchesService } from '../branches/branches.service';
 import { CompaniesService } from '../companies/companies.service';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { SettingsService } from '../settings/settings.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { Table, TableDocument } from '../tables/schemas/table.schema';
@@ -17,6 +18,7 @@ import { POSSettings, POSSettingsDocument } from './schemas/pos-settings.schema'
 export class ReceiptService {
   constructor(
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
+    @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(POSSettings.name) private posSettingsModel: Model<POSSettingsDocument>,
     @InjectModel(Table.name) private tableModel: Model<TableDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
@@ -137,14 +139,52 @@ export class ReceiptService {
   }
   // Generate receipt data
   async generateReceiptData(orderId: string): Promise<any> {
-    const order = await this.posOrderModel
+    let order = await this.posOrderModel
       .findById(orderId)
       .populate('tableId', 'tableNumber capacity')
-      .populate('userId', 'name email')
+      .populate('userId', 'firstName lastName name email')
       .populate('paymentId')
       .exec();
+
+    // Fallback to public Order if POSOrder not found
+    let isPublicOrder = false;
     if (!order) {
-      throw new Error('Order not found');
+      const publicOrder = await this.orderModel
+        .findById(orderId)
+        .populate('tableId', 'tableNumber capacity')
+        .populate('waiterId', 'firstName lastName name email')
+        .exec();
+      
+      if (!publicOrder) {
+        throw new Error('Order not found');
+      }
+
+      // Map public order to a similar structure as POSOrder for the receipt data
+      isPublicOrder = true;
+      order = {
+        _id: publicOrder._id,
+        orderNumber: publicOrder.orderNumber,
+        branchId: publicOrder.branchId,
+        companyId: publicOrder.companyId,
+        orderType: publicOrder.type,
+        status: publicOrder.status,
+        totalAmount: publicOrder.total,
+        items: publicOrder.items.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.unitPrice,
+          notes: item.specialInstructions
+        })),
+        tableId: publicOrder.tableId,
+        userId: publicOrder.waiterId,
+        customerInfo: publicOrder.deliveryInfo ? {
+          name: publicOrder.deliveryInfo.name,
+          phone: publicOrder.deliveryInfo.phone,
+          addressLine1: publicOrder.deliveryInfo.address,
+        } : undefined,
+        createdAt: publicOrder.createdAt,
+        notes: publicOrder.internalNotes || publicOrder.customerNotes
+      } as any;
     }
     const settings = await this.posSettingsModel
       .findOne({ branchId: order.branchId })

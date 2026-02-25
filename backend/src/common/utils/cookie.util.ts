@@ -13,8 +13,8 @@ const getCookieOptions = (isProduction: boolean = false) => {
   // In development (localhost), we can't use Secure=true without HTTPS
   return {
     httpOnly: true, // Prevents JavaScript access (XSS protection)
-    secure: isProduction, // Must be true for 'none' to work
-    sameSite: 'none' as const, // Support cross-domain cookies (crucial for preview envs)
+    secure: isProduction, // Must be true for HTTPS production
+    sameSite: 'lax' as const, // CSRF protection, improved security for primary domain
     path: '/',
   };
 };

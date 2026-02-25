@@ -1,19 +1,19 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { OrderFilterDto } from '../../common/dto/pagination.dto';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
@@ -148,8 +148,9 @@ export class OrdersController {
   updateStatus(
     @Param('id') id: string,
     @Body() updateStatusDto: UpdateOrderStatusDto,
+    @CurrentUser() user: any,
   ) {
-    return this.ordersService.updateStatus(id, updateStatusDto);
+    return this.ordersService.updateStatus(id, updateStatusDto, user.id);
   }
 
   @Post(':id/payment')
