@@ -8,12 +8,16 @@ const ACCESS_TOKEN_COOKIE = 'accessToken';
 const REFRESH_TOKEN_COOKIE = 'refreshToken';
 
 // Cookie options for production
-const getCookieOptions = (isProduction: boolean = false) => ({
-  httpOnly: true, // Prevents JavaScript access (XSS protection)
-  secure: isProduction, // HTTPS only in production
-  sameSite: 'strict' as const, // CSRF protection
-  path: '/',
-});
+const getCookieOptions = (isProduction: boolean = false) => {
+  // Production cookies should always be Secure
+  // In development (localhost), we can't use Secure=true without HTTPS
+  return {
+    httpOnly: true, // Prevents JavaScript access (XSS protection)
+    secure: isProduction, // Must be true for HTTPS production
+    sameSite: 'lax' as const, // CSRF protection, more compatible for redirects
+    path: '/',
+  };
+};
 
 /**
  * Set authentication cookies

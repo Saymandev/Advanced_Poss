@@ -23,7 +23,13 @@ async function bootstrap() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
   const configService = app.get(ConfigService);
   const port = configService.get('PORT') || 5000;
-  const frontendUrl = configService.get('APP_URL');
+    const frontendUrl = (configService.get('APP_URL') || 'http://localhost:3000').replace(/\/$/, '');
+
+  // IMPORTANT: Trust proxy is required for cookies 'secure' flag to work behind Nginx/Cloudflare
+  if (configService.get('nodeEnv') === 'production') {
+    app.set('trust proxy', 1);
+  }
+
   // Security
   app.use(helmet({
     contentSecurityPolicy: {
@@ -136,4 +142,5 @@ async function bootstrap() {
   });
   await app.listen(port);
   }
-bootstrap();// touch
+bootstrap();
+// touch
