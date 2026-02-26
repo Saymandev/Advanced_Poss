@@ -7,8 +7,16 @@ import { AppDispatch } from '../store';
 
 export const useOfflineSyncManager = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const syncLockRef = useCallback(() => {
+    // We use a ref to track sync status across renders to prevent race conditions
+    // but we also keep isSyncing state for UI indicators.
+    return (window as any)._posSyncInProgress === true;
+  }, []);
+  const setSyncLock = (val: boolean) => {
+    (window as any)._posSyncInProgress = val;
+    setIsSyncing(val);
+  };
   const [pendingCount, setPendingCount] = useState(0);
 
   const checkPendingOrders = useCallback(async () => {
@@ -21,17 +29,20 @@ export const useOfflineSyncManager = () => {
   }, []);
 
   const syncOrders = useCallback(async () => {
-    if (!window.navigator.onLine || isSyncing) return;
+    if (!window.navigator.onLine || syncLockRef()) {
+      if (syncLockRef()) console.log('[Sync] Skip: Sync already in progress');
+      return;
+    }
     
     try {
-      setIsSyncing(true);
+      setSyncLock(true);
       const orders = await getPendingOfflineOrders();
       
       if (orders.length === 0) {
-        setIsSyncing(false);
         return;
       }
 
+      console.log(`[Sync] Starting sync for ${orders.length} tasks...`);
       let successCount = 0;
       toast.loading(`Syncing ${orders.length} offline orders...`, { id: 'sync-orders' });
 
@@ -72,21 +83,19 @@ export const useOfflineSyncManager = () => {
       console.error('Error during sync process', error);
       toast.dismiss('sync-orders');
     } finally {
-      setIsSyncing(false);
+      setSyncLock(false);
     }
-  }, [dispatch, isSyncing, checkPendingOrders]);
+  }, [dispatch, syncLockRef, checkPendingOrders]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleOnline = () => {
-      setIsOnline(true);
       toast.success('Internet connection restored!');
       syncOrders();
     };
 
     const handleOffline = () => {
-      setIsOnline(false);
       toast.error('You are offline. POS orders will be saved locally and synced later.', { duration: 5000 });
     };
 
@@ -111,5 +120,5 @@ export const useOfflineSyncManager = () => {
     };
   }, [syncOrders, checkPendingOrders]);
 
-  return { isOnline, isSyncing, pendingCount, syncOrders };
+  return { isOnline: typeof window !== 'undefined' ? window.navigator.onLine : true, isSyncing, pendingCount, syncOrders };
 };

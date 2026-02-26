@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { enqueueOfflineOrder, enqueueOfflinePayment, findQueuedOrderById, getSnapshot, updateOfflineOrderStatus } from '../offline/db';
+import { enqueueOfflineOrder, enqueueOfflinePayment, findQueuedOrderById, getPendingOfflineOrders, getSnapshot, updateOfflineOrderStatus } from '../offline/db';
 import { SNAPSHOT_KEYS } from '../offline/posPrefetcher';
 import { logout } from '../slices/authSlice';
 import { decryptData } from '../utils/crypto';
@@ -57,6 +57,40 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       const snapshotKey = getSnapshotKeyForUrl(requestUrl);
       if (snapshotKey) {
         const snap = await getSnapshot(snapshotKey);
+        
+        // Special Case: Merge pending offline orders into query results for immediate visibility
+        if (snapshotKey === SNAPSHOT_KEYS.ORDERS && requestUrl.includes('/pos/orders')) {
+          try {
+            const pendingOrders = await getPendingOfflineOrders();
+            const offlineMapped = pendingOrders
+              .filter(o => o.type === 'CREATE_ORDER')
+              .map(o => ({
+                ...o.payload,
+                id: o.id, // temp UUID
+                _isOffline: true,
+                orderNumber: `OFF-${o.id.slice(0, 4).toUpperCase()}`,
+                createdAt: o.createdAt,
+              }));
+
+            if (offlineMapped.length > 0) {
+              const baseData: any = snap?.data || { orders: [], total: 0 };
+              const mergedOrders = [...offlineMapped, ...(Array.isArray(baseData) ? baseData : (baseData.orders || []))];
+              
+              // Sort by date (newest first)
+              mergedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+              const mergedData = Array.isArray(baseData) 
+                ? mergedOrders 
+                : { ...baseData, orders: mergedOrders, total: (baseData.total || 0) + offlineMapped.length };
+
+              console.log(`[Offline] Merged ${offlineMapped.length} pending orders into GET /pos/orders results`);
+              return { data: mergedData };
+            }
+          } catch (e) {
+            console.error('[Offline] Failed to merge pending orders:', e);
+          }
+        }
+
         if (snap) {
           const items = snap.data;
           const itemCount = Array.isArray(items) ? items.length : (typeof items === 'object' && items !== null ? Object.keys(items).length : 'N/A');
@@ -79,11 +113,12 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
         const orderPayload = args.body;
         const offlineId = await enqueueOfflineOrder(orderPayload);
         console.log(`[Offline] Order queued with id ${offlineId}`);
+        const tempOrderNumber = `OFF-${offlineId.slice(0, 4).toUpperCase()}`;
         return {
           data: {
             ...orderPayload,
             id: offlineId,
-            orderNumber: `OFF-${Math.floor(1000 + Math.random() * 9000)}`,
+            orderNumber: tempOrderNumber,
             createdAt: new Date().toISOString(),
             status: orderPayload.paymentMethod ? 'paid' : 'pending',
             isOffline: true,
