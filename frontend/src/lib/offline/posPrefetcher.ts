@@ -105,8 +105,8 @@ const fetchStaff = async (companyId: string, branchId: string): Promise<Prefetch
     const params = new URLSearchParams({ limit: '9999', isActive: 'true' });
     if (companyId) params.set('companyId', companyId);
     if (branchId) params.set('branchId', branchId);
-    const raw = await fetchJson(`${getApiBase()}/staff?${params}`);
-    const items = raw?.staff || (Array.isArray(raw) ? raw : []);
+    const raw = await fetchJson(`${getApiBase()}/users?${params}`);
+    const items = raw?.users || (Array.isArray(raw) ? raw : []);
     await saveSnapshot(SNAPSHOT_KEYS.STAFF, items, TTL.STAFF);
     return { key: SNAPSHOT_KEYS.STAFF, success: true, count: items.length };
   } catch (error: any) {
