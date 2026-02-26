@@ -1,9 +1,9 @@
 import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  UnauthorizedException,
+    BadRequestException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -327,7 +327,7 @@ export class AuthService {
         // Reset login attempts on successful login
         await this.usersService.updateLastLogin((userWithPin as any)._id?.toString() || (userWithPin as any).id, '0.0.0.0');
 
-        const tokens = await this.generateTokens(userWithPin);
+        const tokens = await this.generateTokens(userWithPin, branchId);
         // @ts-ignore - Mongoose virtual property
         await this.usersService.updateRefreshToken((userWithPin as any)._id?.toString() || (userWithPin as any).id, tokens.refreshToken);
 
@@ -343,7 +343,7 @@ export class AuthService {
             lastName: userWithPin.lastName,
             role: userWithPin.role,
             companyId: userWithPin.companyId,
-            branchId: userWithPin.branchId,
+            branchId: branchId || userWithPin.branchId,
             permissions,
           },
           tokens,
@@ -842,7 +842,7 @@ export class AuthService {
     });
   }
 
-  private async generateTokens(user: any) {
+  private async generateTokens(user: any, manualBranchId?: string) {
     // Handle both Mongoose documents (_id) and plain objects (id)
     const userId = user.id || (user as any)._id?.toString() || user._id;
 
@@ -859,7 +859,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       companyId: user.companyId?.toString(),
-      branchId: user.branchId?.toString(),
+      branchId: manualBranchId || user.branchId?.toString(),
     };
 
     this.logger.log(`🔑 Token payload.sub (user ID in token): ${payload.sub}`);
