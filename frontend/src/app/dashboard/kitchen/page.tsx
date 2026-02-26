@@ -1,6 +1,7 @@
 'use client';
 
 import ElapsedTime from '@/components/kitchen/ElapsedTime';
+import KitchenStatsHeader from '@/components/kitchen/KitchenStatsHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -8,37 +9,39 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
-    KitchenOrder,
-    useCancelKitchenOrderMutation,
-    useCompleteKitchenOrderItemMutation,
-    useCompleteKitchenOrderMutation,
-    useGetKitchenDelayedOrdersQuery,
-    useGetKitchenPendingOrdersQuery,
-    useGetKitchenPreparingOrdersQuery,
-    useGetKitchenReadyOrdersQuery,
-    useGetKitchenUrgentOrdersQuery,
-    useMarkKitchenOrderUrgentMutation,
-    useStartKitchenOrderItemMutation,
-    useStartKitchenOrderMutation,
-    useUpdateKitchenItemPriorityMutation
+  KitchenOrder,
+  useCancelKitchenOrderMutation,
+  useCompleteKitchenOrderItemMutation,
+  useCompleteKitchenOrderMutation,
+  useGetKitchenDelayedOrdersQuery,
+  useGetKitchenPendingOrdersQuery,
+  useGetKitchenPreparingOrdersQuery,
+  useGetKitchenReadyOrdersQuery,
+  useGetKitchenStatsQuery,
+  useGetKitchenUrgentOrdersQuery,
+  useMarkKitchenOrderUrgentMutation,
+  useStartKitchenOrderItemMutation,
+  useStartKitchenOrderMutation,
+  useUpdateKitchenItemPriorityMutation
 } from '@/lib/api/endpoints/kitchenApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-    ArrowPathIcon,
-    ArrowsPointingInIcon,
-    ArrowsPointingOutIcon,
-    ArrowsUpDownIcon,
-    CheckCircleIcon,
-    ClockIcon,
-    FireIcon,
-    MagnifyingGlassIcon,
-    SpeakerWaveIcon,
-    SpeakerXMarkIcon,
-    UserIcon,
-    XCircleIcon
+  ArrowPathIcon,
+  ArrowsPointingInIcon,
+  ArrowsPointingOutIcon,
+  ArrowsUpDownIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  FireIcon,
+  MagnifyingGlassIcon,
+  PrinterIcon,
+  SpeakerWaveIcon,
+  SpeakerXMarkIcon,
+  UserIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -136,6 +139,12 @@ export default function KitchenPage() {
     pollingInterval: isConnected ? 300000 : 120000, // 5min when WebSocket connected, 120s fallback
     refetchOnMountOrArgChange: false,
   });
+  
+  const { data: statsResponse, isLoading: statsLoading, refetch: refetchStats } = useGetKitchenStatsQuery(branchId || '', {
+    skip: !branchId,
+    pollingInterval: isConnected ? 300000 : 60000, 
+    refetchOnMountOrArgChange: false,
+  });
 
   // Refetch function with throttling
   const refetchAll = useCallback(() => {
@@ -153,7 +162,8 @@ export default function KitchenPage() {
     refetchReady();
     refetchUrgent();
     refetchDelayed();
-  }, [branchId, refetchPending, refetchPreparing, refetchReady, refetchUrgent, refetchDelayed]);
+    refetchStats();
+  }, [branchId, refetchPending, refetchPreparing, refetchReady, refetchUrgent, refetchDelayed, refetchStats]);
 
   // Debounce refetch to prevent excessive API calls from rapid WebSocket events
   const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -193,41 +203,37 @@ export default function KitchenPage() {
 
   // Remove the redundant setInterval - WebSocket handles real-time updates
 
-  const playSound = useCallback((type: 'new-order' | 'urgent') => {
+  const playSound = useCallback((type: 'new-order' | 'urgent' | 'ready') => {
     if (!soundEnabled) return;
     
     try {
-      const audio = new Audio();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Distinct frequencies for different alerts
       if (type === 'urgent') {
-        // Urgent alert sound (higher frequency beep)
-        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77+efTRAMUKfj8LZjHAY4kdfyzHksBSR3x/DdkEAKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+/nn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBACg==';
-      } else {
-        // New order sound (lower frequency beep)
-        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77+efTRAMUKfj8LZjHAY4kdfyzHksBSR3x/DdkEAKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+/nn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBACg==';
-      }
-      audio.volume = 0.3;
-      audio.play().catch(() => {}); // Ignore errors
-    } catch (error) {
-      console.error(error);
-      // Fallback: use Web Audio API
-      try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = type === 'urgent' ? 800 : 400;
+        oscillator.frequency.value = 880; // High A
+        oscillator.type = 'sawtooth'; // Piercing
+      } else if (type === 'new-order') {
+        oscillator.frequency.value = 440; // Middle A
         oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.3);
-      } catch (fallbackError) {
-        console.error(fallbackError);
+      } else {
+        oscillator.frequency.value = 330; // Low E
+        oscillator.type = 'sine';
       }
+      
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.4);
+    } catch (error) {
+      console.error('Audio alert failed:', error);
     }
   }, [soundEnabled]);
 
@@ -380,6 +386,7 @@ export default function KitchenPage() {
       } else if (newStatus === 'ready') {
         await completeItem({ id: orderId, itemId }).unwrap();
         toast.success('Item completed');
+        playSound('ready');
         refetchAll();
       }
     } catch (error: any) {
@@ -408,7 +415,7 @@ export default function KitchenPage() {
 
       // Complete all preparing items
       for (const item of itemsToComplete) {
-        const itemId = item.id;
+        const itemId = item.itemId;
         if (!itemId) {
           console.warn('Item missing ID:', item);
           continue;
@@ -604,6 +611,13 @@ export default function KitchenPage() {
         </div>
       </div>
 
+      {/* Stats Header */}
+      <KitchenStatsHeader 
+        stats={statsResponse} 
+        isLoading={statsLoading} 
+        isConnected={isConnected} 
+      />
+
       {/* Search and Filters */}
       <Card>
         <CardContent className="p-3 sm:p-4">
@@ -687,12 +701,14 @@ export default function KitchenPage() {
                 return (
                   <div 
                     key={order.id} 
-                    className={`border rounded-lg p-3 sm:p-4 ${
+                    className={`border rounded-lg p-3 sm:p-4 shadow-sm transition-all hover:shadow-md ${
                       isUrgent || isDelayed
-                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
+                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 ring-1 ring-red-500/20' 
                         : order.orderType === 'delivery'
-                          ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30'
-                          : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
+                          ? 'border-indigo-300 dark:border-indigo-700 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/40 dark:to-gray-800'
+                          : order.orderType === 'takeaway'
+                            ? 'border-teal-300 dark:border-teal-700 bg-gradient-to-br from-teal-50 to-white dark:from-teal-900/40 dark:to-gray-800'
+                            : 'border-yellow-200 dark:border-yellow-800 bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/20 dark:to-gray-800'
                     }`}
                   >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
@@ -728,7 +744,7 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                    <div key={item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
@@ -785,7 +801,7 @@ export default function KitchenPage() {
                                   value=""
                                   onChange={(chefId) => {
                                     if (chefId) {
-                                      handleItemStatusChange(order.id, item.id, 'preparing', chefId);
+                                      handleItemStatusChange(order.id, item.itemId, 'preparing', chefId);
                                     }
                                   }}
                                   placeholder={chefs.length > 0 ? "Assign Chef/Cook" : "Assign"}
@@ -795,7 +811,7 @@ export default function KitchenPage() {
                           {!chefs.length && (
                             <Button
                               size="sm"
-                              onClick={() => handleItemStatusChange(order.id, item.id, 'preparing')}
+                              onClick={() => handleItemStatusChange(order.id, item.itemId, 'preparing')}
                               className="text-xs sm:text-sm w-full sm:w-auto"
                             >
                               Start
@@ -863,15 +879,24 @@ export default function KitchenPage() {
                           <FireIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCancelOrder(order.id)}
-                        className="text-red-600 text-xs sm:text-sm"
-                        title="Cancel Order"
-                      >
-                        <XCircleIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.print()}
+                          className="text-gray-500 hover:text-gray-700 text-xs sm:text-sm"
+                          title="Print Ticket"
+                        >
+                          <PrinterIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCancelOrder(order.id)}
+                          className="text-red-600 text-xs sm:text-sm"
+                          title="Cancel Order"
+                        >
+                          <XCircleIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
                     </div>
                   </div>
                 )}
@@ -910,12 +935,14 @@ export default function KitchenPage() {
                 return (
                   <div 
                     key={order.id} 
-                    className={`border rounded-lg p-3 sm:p-4 ${
+                    className={`border rounded-lg p-3 sm:p-4 shadow-sm transition-all hover:shadow-md ${
                       isUrgent
-                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 animate-pulse' 
+                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 ring-1 ring-red-500/20' 
                         : order.orderType === 'delivery'
-                          ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30'
-                          : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
+                          ? 'border-indigo-300 dark:border-indigo-700 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/40 dark:to-gray-800'
+                          : order.orderType === 'takeaway'
+                            ? 'border-teal-300 dark:border-teal-700 bg-gradient-to-br from-teal-50 to-white dark:from-teal-900/40 dark:to-gray-800'
+                            : 'border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-800'
                     }`}
                   >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
@@ -952,7 +979,7 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                    <div key={item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
@@ -1003,7 +1030,7 @@ export default function KitchenPage() {
                               ]}
                               value={item.priority?.toString() || '1'}
                               onChange={(priority) => {
-                                handleUpdateItemPriority(order.id, item.id, parseInt(priority));
+                                handleUpdateItemPriority(order.id, item.itemId, parseInt(priority));
                               }}
                               className="w-24"
                             />
@@ -1015,7 +1042,7 @@ export default function KitchenPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleItemStatusChange(order.id, item.id, 'ready')}
+                              onClick={() => handleItemStatusChange(order.id, item.itemId, 'ready')}
                               className="text-xs sm:text-sm"
                             >
                               <CheckCircleIcon className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -1094,10 +1121,12 @@ export default function KitchenPage() {
             ) : (
               filteredReadyOrders.map((order: any) => {
                 return (
-                  <div key={order.id} className={`border rounded-lg p-3 sm:p-4 ${
+                  <div key={order.id} className={`border rounded-lg p-3 sm:p-4 shadow-sm transition-all hover:shadow-md ${
                     order.orderType === 'delivery'
-                      ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-100/50 dark:bg-indigo-900/40 ring-2 ring-indigo-500/20'
-                      : 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
+                      ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-100/50 dark:bg-indigo-900/40 ring-2 ring-indigo-500/20 animate-pulse'
+                      : order.orderType === 'takeaway'
+                        ? 'border-teal-300 dark:border-teal-700 bg-teal-50/50 dark:bg-teal-900/40'
+                        : 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
                   }`}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -1119,7 +1148,7 @@ export default function KitchenPage() {
 
                 <div className="space-y-2 mb-3">
                   {(order.items || []).map((item: any) => (
-                    <div key={item.id} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                    <div key={item.itemId} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
@@ -1235,7 +1264,7 @@ export default function KitchenPage() {
                   <h3 className="font-medium text-gray-900 dark:text-white mb-3">Order Items</h3>
                   <div className="space-y-3">
                     {selectedOrder.items.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div key={item.itemId} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
                             {item.quantity}x {item.name}
@@ -1252,7 +1281,7 @@ export default function KitchenPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleItemStatusChange(selectedOrder.id, item.id, 'ready')}
+                              onClick={() => handleItemStatusChange(selectedOrder.id, item.itemId, 'ready')}
                             >
                               <CheckCircleIcon className="w-4 h-4" />
                             </Button>

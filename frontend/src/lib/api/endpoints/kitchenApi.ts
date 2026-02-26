@@ -1,7 +1,7 @@
 import { apiSlice } from '../apiSlice';
 
 export interface KitchenOrderItem {
-  id: string;
+  itemId: string;
   menuItemId: string;
   name: string;
   quantity: number;

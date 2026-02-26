@@ -368,9 +368,10 @@ export default function SettingsPage() {
   };
   const handleUpdateTax = async () => {
     if (!editingTax) return;
+    const taxId = editingTax.id || (editingTax as any)._id;
     try {
       await updateTaxSetting({
-        id: editingTax.id,
+        id: taxId,
         data: taxForm,
       }).unwrap();
       toast.success('Tax setting updated successfully');
@@ -380,7 +381,9 @@ export default function SettingsPage() {
       toast.error(error.data?.message || 'Failed to update tax setting');
     }
   };
-  const handleDeleteTax = async (id: string, name: string) => {
+  const handleDeleteTax = async (tax: TaxSetting) => {
+    const id = tax.id || (tax as any)._id;
+    const name = tax.name;
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
     try {
       await deleteTaxSetting(id).unwrap();
@@ -416,9 +419,10 @@ export default function SettingsPage() {
   };
   const handleUpdateServiceCharge = async () => {
     if (!editingServiceCharge) return;
+    const chargeId = editingServiceCharge.id || (editingServiceCharge as any)._id;
     try {
       await updateServiceChargeSetting({
-        id: editingServiceCharge.id,
+        id: chargeId,
         data: serviceChargeForm,
       }).unwrap();
       toast.success('Service charge setting updated successfully');
@@ -428,7 +432,9 @@ export default function SettingsPage() {
       toast.error(error.data?.message || 'Failed to update service charge setting');
     }
   };
-  const handleDeleteServiceCharge = async (id: string, name: string) => {
+  const handleDeleteServiceCharge = async (charge: ServiceChargeSetting) => {
+    const id = charge.id || (charge as any)._id;
+    const name = charge.name;
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
     try {
       await deleteServiceChargeSetting(id).unwrap();
@@ -1469,7 +1475,7 @@ export default function SettingsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteTax(tax.id, tax.name)}
+                        onClick={() => handleDeleteTax(tax)}
                         className="text-red-600 hover:text-red-700"
                       >
                         <TrashIcon className="w-4 h-4" />
@@ -1531,7 +1537,7 @@ export default function SettingsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteServiceCharge(charge.id, charge.name)}
+                        onClick={() => handleDeleteServiceCharge(charge)}
                         className="text-red-600 hover:text-red-700"
                       >
                         <TrashIcon className="w-4 h-4" />

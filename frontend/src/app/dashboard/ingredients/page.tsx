@@ -262,9 +262,9 @@ export default function IngredientsPage() {
         category: formData.category,
         unit: formData.unit,
         currentStock: formData.currentStock,
-        minStock: formData.minimumStock,
-        maxStock: formData.maximumStock,
-        unitPrice: formData.unitCost,
+        minimumStock: formData.minimumStock,
+        maximumStock: formData.maximumStock,
+        unitCost: formData.unitCost,
         preferredSupplierId: formData.preferredSupplierId || undefined,
         storageLocation: formData.storageLocation || undefined,
         storageTemperature: formData.storageTemperature || undefined,
@@ -337,10 +337,10 @@ export default function IngredientsPage() {
       name: ingredient.name,
       description: ingredient.description || '',
       currentStock: ingredient.currentStock,
-      minimumStock: ingredient.minimumStock || ingredient.minStock,
-      maximumStock: ingredient.maximumStock || ingredient.maxStock,
+      minimumStock: ingredient.minimumStock,
+      maximumStock: ingredient.maximumStock,
       unit: ingredient.unit,
-      unitCost: ingredient.unitCost || ingredient.unitPrice,
+      unitCost: ingredient.unitCost,
       category: ingredient.category,
       preferredSupplierId: ingredient.preferredSupplierId || '',
       storageLocation: ingredient.storageLocation || '',
@@ -360,7 +360,7 @@ export default function IngredientsPage() {
 
   const getStockStatus = (ingredient: any) => {
     const stock = ingredient.currentStock || ingredient.quantity || 0;
-    const minLevel = ingredient.minStock || ingredient.minStockLevel || 10;
+    const minLevel = ingredient.minimumStock || 10;
     
     if (stock <= 0) {
       return { status: 'out', label: 'Out of Stock', variant: 'danger' as const };
@@ -394,9 +394,9 @@ export default function IngredientsPage() {
       align: 'right' as const,
       render: (value: number, row: any) => {
         const stockValue = typeof value === 'number' ? value : (typeof value === 'string' ? parseFloat(value) : 0);
-        const minValue = typeof (row.minimumStock || row.minStock || 0) === 'number' 
-          ? (row.minimumStock || row.minStock || 0) 
-          : (typeof (row.minimumStock || row.minStock || 0) === 'string' ? parseFloat(row.minimumStock || row.minStock || '0') : 0);
+        const minValue = typeof (row.minimumStock || 0) === 'number' 
+          ? (row.minimumStock || 0) 
+          : (typeof (row.minimumStock || 0) === 'string' ? parseFloat(row.minimumStock || '0') : 0);
         const formattedStock = isNaN(stockValue) ? '0.00' : stockValue.toFixed(2);
         const formattedMin = isNaN(minValue) ? '0.00' : minValue.toFixed(2);
         return (
@@ -412,11 +412,11 @@ export default function IngredientsPage() {
       },
     },
     {
-      key: 'unitPrice',
+      key: 'unitCost',
       title: 'Cost',
       align: 'right' as const,
       render: (value: number, row: any) => {
-        const unitCost = row.unitCost || value || 0;
+        const unitCost = value || 0;
         const stock = row.currentStock || 0;
         return (
           <div className="text-right">
@@ -523,7 +523,7 @@ export default function IngredientsPage() {
       outOfStock: ingredients.filter((i) => getStockStatus(i).status === 'out').length,
       totalValue: ingredients.reduce(
         (sum, item) =>
-          sum + ((item.unitCost || (item as any).unitPrice || 0) * (item.currentStock || 0)),
+          sum + (item.unitCost * (item.currentStock || 0)),
         0,
       ),
     };
@@ -1108,21 +1108,21 @@ export default function IngredientsPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum Stock</p>
                 <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {typeof (selectedIngredient.minimumStock || selectedIngredient.minStock) === 'number'
-                    ? (selectedIngredient.minimumStock || selectedIngredient.minStock).toFixed(2)
-                    : (selectedIngredient.minimumStock || selectedIngredient.minStock)} {selectedIngredient.unit}
+                  {typeof selectedIngredient.minimumStock === 'number'
+                    ? selectedIngredient.minimumStock.toFixed(2)
+                    : selectedIngredient.minimumStock} {selectedIngredient.unit}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Unit Cost</p>
                 <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(selectedIngredient.unitCost || selectedIngredient.unitPrice)}/{selectedIngredient.unit}
+                  {formatCurrency(selectedIngredient.unitCost)}/{selectedIngredient.unit}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Value</p>
                 <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency((selectedIngredient.unitCost || selectedIngredient.unitPrice || 0) * (selectedIngredient.currentStock || 0))}
+                  {formatCurrency(selectedIngredient.unitCost * (selectedIngredient.currentStock || 0))}
                 </p>
               </div>
               <div>

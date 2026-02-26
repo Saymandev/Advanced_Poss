@@ -1,5 +1,23 @@
 import { apiSlice } from '../apiSlice';
 
+/**
+ * Helper to ensure a response object or array of objects has an 'id' field
+ * mapped from '_id' if 'id' is missing.
+ */
+const ensureId = (data: any) => {
+  if (!data) return data;
+  if (Array.isArray(data)) {
+    return data.map(item => ({
+      ...item,
+      id: item.id || item._id,
+    }));
+  }
+  return {
+    ...data,
+    id: data.id || data._id,
+  };
+};
+
 export interface TaxSettings {
   id: string;
   name: string;
@@ -146,10 +164,11 @@ export const settingsApi = apiSlice.injectEndpoints({
       providesTags: ['Settings'],
       transformResponse: (response: any) => {
         const data = response?.data ?? response;
-        if (Array.isArray(data)) return data;
-        if (Array.isArray(data?.taxes)) return data.taxes;
-        if (Array.isArray(data?.items)) return data.items;
-        return [];
+        let items: any[] = [];
+        if (Array.isArray(data)) items = data;
+        else if (Array.isArray(data?.taxes)) items = data.taxes;
+        else if (Array.isArray(data?.items)) items = data.items;
+        return ensureId(items);
       },
     }),
     createTaxSetting: builder.mutation<TaxSettings, Omit<TaxSettings, 'id' | 'createdAt' | 'updatedAt'>>({
@@ -158,6 +177,7 @@ export const settingsApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      transformResponse: (response: any) => ensureId(response?.data ?? response),
       invalidatesTags: ['Settings'],
     }),
     updateTaxSetting: builder.mutation<TaxSettings, { id: string; data: Partial<TaxSettings> }>({
@@ -166,6 +186,7 @@ export const settingsApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (response: any) => ensureId(response?.data ?? response),
       invalidatesTags: ['Settings'],
     }),
     deleteTaxSetting: builder.mutation<void, string>({
@@ -182,10 +203,11 @@ export const settingsApi = apiSlice.injectEndpoints({
       providesTags: ['Settings'],
       transformResponse: (response: any) => {
         const data = response?.data ?? response;
-        if (Array.isArray(data)) return data;
-        if (Array.isArray(data?.serviceCharges)) return data.serviceCharges;
-        if (Array.isArray(data?.items)) return data.items;
-        return [];
+        let items: any[] = [];
+        if (Array.isArray(data)) items = data;
+        else if (Array.isArray(data?.serviceCharges)) items = data.serviceCharges;
+        else if (Array.isArray(data?.items)) items = data.items;
+        return ensureId(items);
       },
     }),
     createServiceChargeSetting: builder.mutation<ServiceChargeSettings, Omit<ServiceChargeSettings, 'id' | 'createdAt' | 'updatedAt'>>({
@@ -194,6 +216,7 @@ export const settingsApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      transformResponse: (response: any) => ensureId(response?.data ?? response),
       invalidatesTags: ['Settings'],
     }),
     updateServiceChargeSetting: builder.mutation<ServiceChargeSettings, { id: string; data: Partial<ServiceChargeSettings> }>({
@@ -202,6 +225,7 @@ export const settingsApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (response: any) => ensureId(response?.data ?? response),
       invalidatesTags: ['Settings'],
     }),
     deleteServiceChargeSetting: builder.mutation<void, string>({

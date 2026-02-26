@@ -8,11 +8,12 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { InventoryItem, useAddStockMutation, useGetInventoryItemByIdQuery, useGetInventoryItemsQuery, useGetLowStockItemsQuery, useRemoveStockMutation } from '@/lib/api/endpoints/inventoryApi';
+import { InventoryItem, useAddStockMutation, useFixAllStockStatusesMutation, useGetInventoryItemByIdQuery, useGetInventoryItemsQuery, useGetLowStockItemsQuery, useRemoveStockMutation } from '@/lib/api/endpoints/inventoryApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
   ArchiveBoxIcon,
+  ArrowsUpDownIcon,
   BeakerIcon,
   ExclamationTriangleIcon,
   EyeIcon,
@@ -60,6 +61,7 @@ export default function StocksPage() {
 
   const [addStock, { isLoading: isAddingStock }] = useAddStockMutation();
   const [removeStock, { isLoading: isRemovingStock }] = useRemoveStockMutation();
+  const [fixStatuses, { isLoading: isFixingStatuses }] = useFixAllStockStatusesMutation();
 
   // Extract ingredients from API response
   const ingredients = useMemo(() => {
@@ -216,7 +218,7 @@ export default function StocksPage() {
             {row.currentStock || 0} {row.unit}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Min: {row.minimumStock || row.minStock || 0} {row.unit}
+            Min: {row.minimumStock || 0} {row.unit}
           </p>
         </div>
       ),
@@ -226,7 +228,7 @@ export default function StocksPage() {
       title: 'Cost',
       align: 'right' as const,
       render: (value: number, row: InventoryItem) => {
-        const unitCost = row.unitCost || row.unitPrice || 0;
+        const unitCost = row.unitCost || 0;
         const stock = row.currentStock || 0;
         return (
           <div className="text-right">
@@ -315,7 +317,7 @@ export default function StocksPage() {
       inStock: ingredients.filter(i => !i.isLowStock && !i.isOutOfStock).length,
       lowStock: ingredients.filter(i => i.isLowStock && !i.isOutOfStock).length,
       outOfStock: ingredients.filter(i => i.isOutOfStock).length,
-      totalValue: ingredients.reduce((sum, item) => sum + ((item.unitCost || item.unitPrice || 0) * (item.currentStock || 0)), 0),
+      totalValue: ingredients.reduce((sum, item) => sum + ((item.unitCost || 0) * (item.currentStock || 0)), 0),
     };
   }, [ingredients, totalIngredients]);
 
@@ -329,7 +331,29 @@ export default function StocksPage() {
             Monitor inventory levels and stock alerts
           </p>
         </div>
-        <div className="w-full sm:w-auto">
+        <div className="w-full sm:w-auto flex items-center gap-2">
+          {user?.role === 'owner' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                if (companyId) {
+                  try {
+                    const result = await fixStatuses(companyId).unwrap();
+                    toast.success(`Maintenance complete: fixed ${result.fixed} items`);
+                    refetch();
+                  } catch (e) {
+                    toast.error('Failed to run maintenance');
+                  }
+                }
+              }}
+              className="text-gray-400 hover:text-primary-600"
+              title="Fix Stock Status Sync Issues & Typos"
+              disabled={isFixingStatuses}
+            >
+              <ArrowsUpDownIcon className={`w-4 h-4 ${isFixingStatuses ? 'animate-spin' : ''}`} />
+            </Button>
+          )}
           <ImportButton
           onImport={async (data, _result) => {
             let successCount = 0;
@@ -603,7 +627,7 @@ export default function StocksPage() {
                      {selectedIngredient.currentStock || 0} {selectedIngredient.unit}
                    </p>
                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                     Min Stock: {selectedIngredient.minimumStock || selectedIngredient.minStock || 0} {selectedIngredient.unit}
+                     Min Stock: {selectedIngredient.minimumStock || selectedIngredient.minimumStock || 0} {selectedIngredient.unit}
                    </p>
                  </div>
               </div>
@@ -623,7 +647,7 @@ export default function StocksPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Min Stock Level:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {selectedIngredient.minimumStock || selectedIngredient.minStock || 0} {selectedIngredient.unit}
+                      {selectedIngredient.minimumStock || 0} {selectedIngredient.unit}
                     </span>
                   </div>
                   {selectedIngredient.maximumStock && (
@@ -637,7 +661,7 @@ export default function StocksPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Stock Value:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency((selectedIngredient.unitCost || selectedIngredient.unitPrice || 0) * (selectedIngredient.currentStock || 0))}
+                      {formatCurrency((selectedIngredient.unitCost || 0) * (selectedIngredient.currentStock || 0))}
                     </span>
                   </div>
                 </div>
@@ -649,13 +673,13 @@ export default function StocksPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Cost per Unit:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                       {formatCurrency(selectedIngredient.unitCost || selectedIngredient.unitPrice || 0)}
+                       {formatCurrency(selectedIngredient.unitCost || 0)}
                      </span>
                    </div>
                    <div className="flex justify-between">
                      <span className="text-gray-600 dark:text-gray-400">Total Cost:</span>
                      <span className="font-medium text-gray-900 dark:text-white">
-                       {formatCurrency((selectedIngredient.unitCost || selectedIngredient.unitPrice || 0) * (selectedIngredient.currentStock || 0))}
+                       {formatCurrency((selectedIngredient.unitCost || selectedIngredient.unitCost || 0) * (selectedIngredient.currentStock || 0))}
                      </span>
                    </div>
                    {selectedIngredient.storageLocation && (

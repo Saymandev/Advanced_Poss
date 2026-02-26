@@ -6,13 +6,10 @@ export interface InventoryItem {
   category: 'food' | 'beverage' | 'packaging' | 'cleaning' | 'other';
   unit: 'kg' | 'g' | 'l' | 'ml' | 'pcs' | 'box' | 'pack' | 'bottle' | 'can';
   currentStock: number;
-  minStock: number;
   minimumStock: number;
-  maxStock: number;
   maximumStock: number;
   reorderPoint: number;
   reorderQuantity: number;
-  unitPrice: number;
   unitCost: number;
   totalValue: number;
   supplier?: {
@@ -140,13 +137,10 @@ export const inventoryApi = apiSlice.injectEndpoints({
             category: ingredient.category || 'food',
             unit: ingredient.unit || 'pcs',
             currentStock: ingredient.currentStock || 0,
-            minStock: ingredient.minimumStock || ingredient.minStock || 0,
             minimumStock: ingredient.minimumStock || ingredient.minStock || 0,
-            maxStock: ingredient.maximumStock || ingredient.maxStock || 0,
             maximumStock: ingredient.maximumStock || ingredient.maxStock || 0,
             reorderPoint: ingredient.reorderPoint || 0,
             reorderQuantity: ingredient.reorderQuantity || 0,
-            unitPrice: ingredient.unitCost || ingredient.unitPrice || 0,
             unitCost: ingredient.unitCost || ingredient.unitPrice || 0,
             totalValue: (ingredient.unitCost || ingredient.unitPrice || 0) * (ingredient.currentStock || 0),
             preferredSupplierId: ingredient.preferredSupplierId,
@@ -181,13 +175,10 @@ export const inventoryApi = apiSlice.injectEndpoints({
           category: ingredient.category || 'food',
           unit: ingredient.unit || 'pcs',
           currentStock: ingredient.currentStock || 0,
-          minStock: ingredient.minimumStock || ingredient.minStock || 0,
           minimumStock: ingredient.minimumStock || ingredient.minStock || 0,
-          maxStock: ingredient.maximumStock || ingredient.maxStock || 0,
           maximumStock: ingredient.maximumStock || ingredient.maxStock || 0,
           reorderPoint: ingredient.reorderPoint || 0,
           reorderQuantity: ingredient.reorderQuantity || 0,
-          unitPrice: ingredient.unitCost || ingredient.unitPrice || 0,
           unitCost: ingredient.unitCost || ingredient.unitPrice || 0,
           totalValue: (ingredient.unitCost || ingredient.unitPrice || 0) * (ingredient.currentStock || 0),
           preferredSupplierId: ingredient.preferredSupplierId,
@@ -283,9 +274,10 @@ export const inventoryApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Ingredient'],
     }),
-    getLowStockItems: builder.query<InventoryItem[], { companyId?: string }>({
-      query: ({ companyId }) => ({
+    getLowStockItems: builder.query<InventoryItem[], { companyId?: string; branchId?: string }>({
+      query: ({ companyId, branchId }) => ({
         url: `/ingredients/company/${companyId}/low-stock`,
+        params: { branchId },
       }),
       transformResponse: (response: any) => {
         const data = response.data || response || [];
@@ -339,6 +331,13 @@ export const inventoryApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Supplier'],
     }),
+    fixAllStockStatuses: builder.mutation<{ fixed: number; total: number }, string>({
+      query: (companyId) => ({
+        url: `/ingredients/company/${companyId}/fix-all-statuses`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Ingredient'],
+    }),
   }),
 });
 export const {
@@ -356,4 +355,5 @@ export const {
   useCreateSupplierMutation,
   useUpdateSupplierMutation,
   useDeleteSupplierMutation,
-} = inventoryApi;
+  useFixAllStockStatusesMutation,
+} = inventoryApi;

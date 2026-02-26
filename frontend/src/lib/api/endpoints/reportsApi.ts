@@ -73,20 +73,37 @@ export interface SalesAnalytics {
   }>;
 }
 export interface InventoryReport {
-  totalItems: number;
-  lowStockItems: number;
-  outOfStockItems: number;
-  totalValue: number;
-  items: Array<{
-    id: string;
-    name: string;
-    currentStock: number;
-    minStock: number;
-    maxStock: number;
-    unitPrice: number;
-    totalValue: number;
-    status: 'in-stock' | 'low-stock' | 'out-of-stock';
-  }>;
+  stats: {
+    total: number;
+    lowStock: number;
+    outOfStock: number;
+    needReorder: number;
+    totalInventoryValue: number;
+    byCategory: Record<string, number>;
+  };
+  valuation: {
+    total: number;
+    items: number;
+  };
+  alerts: {
+    lowStock: Array<{
+      id: string;
+      name: string;
+      currentStock: number;
+      minimumStock: number;
+    }>;
+    outOfStock: Array<{
+      id: string;
+      name: string;
+    }>;
+    needReorder: Array<{
+      id: string;
+      name: string;
+      currentStock: number;
+      reorderPoint: number;
+      reorderQuantity: number;
+    }>;
+  };
 }
 export interface CustomerReport {
   totalCustomers: number;
@@ -364,13 +381,26 @@ export const reportsApi = apiSlice.injectEndpoints({
         return response.data || response;
       },
     }),
-    getInventoryReport: builder.query<InventoryReport, { branchId?: string }>({
-      query: (params) => ({
-        url: '/reports/inventory',
-        params,
+    getInventoryReport: builder.query<InventoryReport, { companyId: string; branchId?: string }>({
+      query: ({ companyId, branchId }) => ({
+        url: `/reports/inventory/${companyId}`,
+        params: { branchId },
       }),
       transformResponse: (response: any) => {
-        return response.data || response;
+        const data = response.data || response;
+        // Map fields to standardized names if necessary
+        if (data.alerts && Array.isArray(data.alerts.lowStock)) {
+          // The backend getInventoryReport returns stats, valuation, and alerts
+          // We need to transform this to match the InventoryReport interface if they differ
+          // Our InventoryReport interface seems to expect a flat list of items
+          
+          // If already in flat format, just return
+          if (data.items) return data;
+
+          // If in new alerts/valuation format, we might need more transform
+          // Let's assume for now it returns what our interface expects or we adjust interface
+        }
+        return data;
       },
       providesTags: ['Report'],
     }),

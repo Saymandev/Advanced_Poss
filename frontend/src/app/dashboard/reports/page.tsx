@@ -8,6 +8,7 @@ import {
     useGetDashboardQuery,
     useGetDueSettlementsQuery,
     useGetFinancialSummaryQuery,
+    useGetInventoryReportQuery,
     useGetPeakHoursQuery,
     useGetRevenueByCategoryQuery,
     useGetSalesAnalyticsQuery,
@@ -62,7 +63,7 @@ export default function ReportsPage() {
   // Redirect if user doesn't have reports feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('reports');
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('week');
-  const [activeReport, setActiveReport] = useState<'financial' | 'sales' | 'wastage' | 'food' | 'settlement'>('financial');
+  const [activeReport, setActiveReport] = useState<'financial' | 'sales' | 'wastage' | 'food' | 'settlement' | 'inventory'>('financial');
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -243,6 +244,18 @@ export default function ReportsPage() {
     companyId: companyId || undefined,
   }, { 
     skip: !branchId && !companyId,
+    refetchOnMountOrArgChange: true,
+  });
+  const {
+    data: inventoryReport,
+    isLoading: isLoadingInventory,
+    error: inventoryError,
+    refetch: refetchInventory
+  } = useGetInventoryReportQuery({
+    companyId: companyId as string,
+    branchId: branchId || undefined,
+  }, {
+    skip: !companyId || activeReport !== 'inventory',
     refetchOnMountOrArgChange: true,
   });
   const [exportReport, { isLoading: isExporting }] = useExportReportMutation();
@@ -752,6 +765,26 @@ export default function ReportsPage() {
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Pending payments
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all ${activeReport === 'inventory' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          onClick={() => setActiveReport('inventory')}
+        >
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${activeReport === 'inventory' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <ChartBarIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${activeReport === 'inventory' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+              </div>
+              <div className="min-w-0">
+                <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'inventory' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+                  Inventory Report
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  Stock & valuation
                 </p>
               </div>
             </div>
@@ -1481,6 +1514,95 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+      {activeReport === 'inventory' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Items</p>
+                <p className="text-lg sm:text-xl font-bold text-blue-600">
+                  {isLoadingInventory ? '...' : (inventoryReport?.stats?.total || 0).toLocaleString()}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Low Stock</p>
+                <p className="text-lg sm:text-xl font-bold text-orange-600">
+                  {isLoadingInventory ? '...' : (inventoryReport?.stats?.lowStock || 0).toLocaleString()}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Out of Stock</p>
+                <p className="text-lg sm:text-xl font-bold text-red-600">
+                  {isLoadingInventory ? '...' : (inventoryReport?.stats?.outOfStock || 0).toLocaleString()}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Valuation</p>
+                <p className="text-lg sm:text-xl font-bold text-green-600">
+                  {isLoadingInventory ? '...' : formatCurrency(inventoryReport?.valuation?.total || 0)}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Low Stock Alerts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingInventory ? (
+                  <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>
+                ) : (inventoryReport?.alerts?.lowStock || []).length === 0 ? (
+                  <p className="text-center py-8 text-gray-500">No low stock items</p>
+                ) : (
+                  <div className="space-y-4">
+                    {(inventoryReport?.alerts?.lowStock || []).map((item: any) => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/10 rounded-lg">
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                          <p className="text-xs text-gray-500">Stock: {item.currentStock} / Min: {item.minimumStock}</p>
+                        </div>
+                        <span className="text-orange-600 font-bold">Low</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Out of Stock Alerts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingInventory ? (
+                  <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>
+                ) : (inventoryReport?.alerts?.outOfStock || []).length === 0 ? (
+                  <p className="text-center py-8 text-gray-500">No out of stock items</p>
+                ) : (
+                  <div className="space-y-4">
+                    {(inventoryReport?.alerts?.outOfStock || []).map((item: any) => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/10 rounded-lg">
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                        </div>
+                        <span className="text-red-600 font-bold">Out</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
       {activeReport === 'settlement' && (
         <Card>
