@@ -106,7 +106,7 @@ export class POSController {
 
   // Tables
   @Get('tables/available')
-  @RequiresFeature(FEATURES.TABLE_MANAGEMENT)
+  @RequiresFeature(FEATURES.TABLE_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   async getAvailableTables(@Request() req, @Query('branchId') branchId?: string) {
     return this.posService.getAvailableTables(branchId || req.user.branchId);
   }
@@ -120,7 +120,7 @@ export class POSController {
 
   // Menu Items
   @Get('menu-items')
-  @RequiresFeature(FEATURES.MENU_MANAGEMENT)
+  @RequiresFeature(FEATURES.MENU_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   async getPOSMenuItems(@Query() filters: any, @Request() req) {
     return this.posService.getPOSMenuItems({
       ...filters,
@@ -131,7 +131,7 @@ export class POSController {
 
   // Settings
   @Get('settings')
-  @RequiresFeature(FEATURES.POS_SETTINGS)
+  @RequiresFeature(FEATURES.POS_SETTINGS, FEATURES.ORDER_MANAGEMENT)
   async getPOSSettings(@Request() req) {
     return this.posService.getPOSSettings(req.user.branchId);
   }
