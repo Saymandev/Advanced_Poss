@@ -48,6 +48,25 @@ export function OfflineBanner({
     );
   }
 
+  // Show sync warning if we have errors (e.g. tablet sync failed)
+  if (isOnline && syncErrors.length > 0) {
+    return (
+      <div className="flex items-center justify-between gap-2 px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 text-rose-400 text-xs">
+        <div className="flex items-center gap-2">
+          <SignalSlashIcon className="h-3.5 w-3.5 shrink-0" />
+          <span>Warning: Some data failed to sync ({syncErrors.join(', ')}).</span>
+        </div>
+        <button
+          onClick={onSyncNow}
+          className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 transition-colors"
+        >
+          <ArrowPathIcon className="h-3 w-3" />
+          Retry Sync
+        </button>
+      </div>
+    );
+  }
+
   // Show sync success with pending orders when came back online
   if (isOnline && pendingCount > 0) {
     return (

@@ -114,10 +114,26 @@ const fetchStaff = async (companyId: string, branchId: string): Promise<Prefetch
   }
 };
 
-const fetchTables = async (): Promise<PrefetchResult> => {
+const fetchTables = async (branchId: string): Promise<PrefetchResult> => {
   try {
-    const raw = await fetchJson(`${getApiBase()}/pos/tables/available`);
-    const items = Array.isArray(raw) ? raw : raw?.tables || [];
+    const params = new URLSearchParams();
+    if (branchId) params.set('branchId', branchId);
+    const raw = await fetchJson(`${getApiBase()}/pos/tables/available?${params}`);
+    
+    // Handle all potential response shapes
+    let items = [];
+    if (Array.isArray(raw)) {
+      items = raw;
+    } else if (raw?.tables && Array.isArray(raw.tables)) {
+      items = raw.tables;
+    } else if (raw?.items && Array.isArray(raw.items)) {
+      items = raw.items;
+    } else if (raw?.data && Array.isArray(raw.data)) {
+      items = raw.data;
+    } else if (raw?.data?.tables && Array.isArray(raw.data.tables)) {
+      items = raw.data.tables;
+    }
+    
     await saveSnapshot(SNAPSHOT_KEYS.TABLES, items, TTL.TABLES);
     return { key: SNAPSHOT_KEYS.TABLES, success: true, count: items.length };
   } catch (error: any) {
@@ -202,7 +218,7 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
     runFetcher(SNAPSHOT_KEYS.CATEGORIES, TTL.CATEGORIES, () => fetchCategories(branchId)),
     runFetcher(SNAPSHOT_KEYS.PAYMENT_METHODS, TTL.PAYMENT_METHODS, () => fetchPaymentMethods(companyId, branchId)),
     runFetcher(SNAPSHOT_KEYS.STAFF, TTL.STAFF, () => fetchStaff(companyId, branchId)),
-    runFetcher(SNAPSHOT_KEYS.TABLES, TTL.TABLES, () => fetchTables()),
+    runFetcher(SNAPSHOT_KEYS.TABLES, TTL.TABLES, () => fetchTables(branchId)),
     runFetcher(SNAPSHOT_KEYS.POS_SETTINGS, TTL.POS_SETTINGS, () => fetchPOSSettings(branchId)),
     runFetcher(SNAPSHOT_KEYS.DELIVERY_ZONES, TTL.DELIVERY_ZONES, () => fetchDeliveryZones(branchId)),
     runFetcher(SNAPSHOT_KEYS.CUSTOMERS, TTL.CUSTOMERS, () => fetchCustomers()),
