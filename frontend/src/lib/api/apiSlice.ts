@@ -58,11 +58,17 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       if (snapshotKey) {
         const snap = await getSnapshot(snapshotKey);
         if (snap) {
-          const itemCount = Array.isArray(snap.data) ? snap.data.length : (typeof snap.data === 'object' && snap.data !== null ? Object.keys(snap.data).length : 'N/A');
-          console.log(`[Offline] Serving ${requestUrl} from snapshot '${snapshotKey}' (age: ${Math.round((Date.now() - snap.savedAt) / 60000)}m, fresh: ${snap.isFresh}, items: ${itemCount})`);
-          return { data: snap.data };
+          const items = snap.data;
+          const itemCount = Array.isArray(items) ? items.length : (typeof items === 'object' && items !== null ? Object.keys(items).length : 'N/A');
+          
+          if (snapshotKey === SNAPSHOT_KEYS.MENU_ITEMS || snapshotKey === SNAPSHOT_KEYS.CATEGORIES) {
+            console.log(`[Offline] 📦 Serving ${snapshotKey} for ${requestUrl} (${itemCount} items)`);
+          } else {
+            console.log(`[Offline] Serving ${requestUrl} from snapshot '${snapshotKey}' (age: ${Math.round((Date.now() - snap.savedAt) / 60000)}m, fresh: ${snap.isFresh}, items: ${itemCount})`);
+          }
+          return { data: items };
         }
-        console.warn(`[Offline] No snapshot found for '${snapshotKey}' (${requestUrl}) — data will be missing`);
+        console.warn(`[Offline] ⚠️ No snapshot found for '${snapshotKey}' (${requestUrl}) — data will be missing`);
         return { data: null };
       }
     }
