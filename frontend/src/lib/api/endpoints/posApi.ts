@@ -292,12 +292,13 @@ export const posApi = apiSlice.injectEndpoints({
           status: string;
         }>;
       };
-    }>, void>({
-      query: () => {
+    }>, string | void>({
+      query: (branchId) => {
         // Use POS endpoint which gets tables from branchId in JWT token
-        // No need to pass branchId - backend extracts it from JWT
+        // Fallback to explicit branchId query param if provided
         return {
           url: '/pos/tables/available',
+          params: branchId ? { branchId } : undefined,
         };
       },
       providesTags: (result) => 

@@ -15,23 +15,23 @@ import { useGetDeliveryZonesByBranchQuery } from '@/lib/api/endpoints/deliveryZo
 import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
-    posApi,
-    useCancelPOSOrderMutation,
-    useCreatePOSOrderMutation,
-    useDownloadReceiptPDFMutation,
-    useGetAvailableTablesQuery,
-    useGetPOSMenuItemsQuery,
-    useGetPOSOrderQuery,
-    useGetPOSOrdersQuery,
-    useGetPOSSettingsQuery,
-    useGetPrintersQuery,
-    useGetReceiptHTMLQuery,
-    useGetWaiterActiveOrdersCountQuery,
-    usePrintReceiptMutation,
-    usePrintReceiptPDFMutation,
-    useProcessPaymentMutation,
-    useRefundOrderMutation,
-    useUpdatePOSOrderMutation
+  posApi,
+  useCancelPOSOrderMutation,
+  useCreatePOSOrderMutation,
+  useDownloadReceiptPDFMutation,
+  useGetAvailableTablesQuery,
+  useGetPOSMenuItemsQuery,
+  useGetPOSOrderQuery,
+  useGetPOSOrdersQuery,
+  useGetPOSSettingsQuery,
+  useGetPrintersQuery,
+  useGetReceiptHTMLQuery,
+  useGetWaiterActiveOrdersCountQuery,
+  usePrintReceiptMutation,
+  usePrintReceiptPDFMutation,
+  useProcessPaymentMutation,
+  useRefundOrderMutation,
+  useUpdatePOSOrderMutation
 } from '@/lib/api/endpoints/posApi';
 import { useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
@@ -44,31 +44,31 @@ import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
 import { getEncryptedItemWithTTL, removeEncryptedItem, setEncryptedItemWithTTL } from '@/lib/utils/storage-encryption';
 import {
-    ArrowPathIcon,
-    BuildingOfficeIcon,
-    CheckIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    CreditCardIcon,
-    CurrencyDollarIcon,
-    DocumentArrowDownIcon,
-    FunnelIcon,
-    HomeModernIcon,
-    InformationCircleIcon,
-    LockClosedIcon,
-    MagnifyingGlassIcon,
-    MinusIcon,
-    PencilSquareIcon,
-    PlusIcon,
-    PrinterIcon,
-    ShoppingBagIcon,
-    ShoppingCartIcon,
-    TableCellsIcon,
-    TrashIcon,
-    TruckIcon,
-    UserGroupIcon,
+  ArrowPathIcon,
+  BuildingOfficeIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  CreditCardIcon,
+  CurrencyDollarIcon,
+  DocumentArrowDownIcon,
+  FunnelIcon,
+  HomeModernIcon,
+  InformationCircleIcon,
+  LockClosedIcon,
+  MagnifyingGlassIcon,
+  MinusIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  PrinterIcon,
+  ShoppingBagIcon,
+  ShoppingCartIcon,
+  TableCellsIcon,
+  TrashIcon,
+  TruckIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -619,8 +619,8 @@ export default function POSPage() {
   // Socket.IO for real-time updates
   const { socket, isConnected } = useSocket();
   // API calls
-  // Note: branchId is extracted from JWT token in backend, no need to pass it
-  const { data: tablesData, isLoading: tablesLoading, error: _tablesError, refetch: refetchTables } = useGetAvailableTablesQuery();
+  // Pass currentBranchId to ensure correct context even when pre-fetching or offline
+  const { data: tablesData, isLoading: tablesLoading, error: _tablesError, refetch: refetchTables } = useGetAvailableTablesQuery(currentBranchId);
   // Listen for table status changes via Socket.IO
   useEffect(() => {
     if (!socket || !isConnected) {

@@ -11,6 +11,8 @@ const OFFLINE_SNAPSHOT_MAP: Array<{ match: string; key: string }> = [
   { match: '/payment-methods',        key: SNAPSHOT_KEYS.PAYMENT_METHODS },
   { match: '/pos/tables/available',   key: SNAPSHOT_KEYS.TABLES },
   { match: '/pos/settings',           key: SNAPSHOT_KEYS.POS_SETTINGS },
+  { match: '/pos/waiters/active-orders', key: SNAPSHOT_KEYS.STAFF }, // Map waiter count to staff key (since they are usually synced together)
+  { match: '/users',                  key: SNAPSHOT_KEYS.STAFF },    // Fix: Map /users to staff key
   { match: '/staff',                  key: SNAPSHOT_KEYS.STAFF },
   { match: '/delivery-zones',         key: SNAPSHOT_KEYS.DELIVERY_ZONES },
   { match: '/customers',              key: SNAPSHOT_KEYS.CUSTOMERS },
