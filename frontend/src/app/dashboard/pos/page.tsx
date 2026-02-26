@@ -459,6 +459,7 @@ export default function POSPage() {
   const [refundAmount, setRefundAmount] = useState('');
   const [refundOrderId, setRefundOrderId] = useState('');
   const [refundIsDamage, setRefundIsDamage] = useState(false);
+  const [reservedTableModal, setReservedTableModal] = useState<{ tableId: string; reservation: any } | null>(null);
 
   const searchParams = useSearchParams();
 
@@ -1646,9 +1647,9 @@ export default function POSPage() {
         setOccupiedTableModal({ tableId, orderDetails: table.orderDetails });
         return;
       }
-      // If table is reserved, show error
+      // If table is reserved, show reservation check-in modal
       if (table?.status === 'reserved') {
-        toast.error('This table is reserved. Please choose another table.');
+        setReservedTableModal({ tableId, reservation: table });
         return;
       }
       setSelectedTable(tableId);
@@ -1758,6 +1759,59 @@ export default function POSPage() {
       toast.error(error?.data?.message || 'Failed to cancel order');
     }
   }, [occupiedTableModal, cancelOrder, refetchTables, refetchQueue]);
+
+  const handleCheckInReservation = useCallback(() => {
+    if (!reservedTableModal) return;
+    const { tableId, reservation } = reservedTableModal;
+    
+    // Set customer from reservation
+    if (reservation.reservedBy) {
+      setCustomerInfo({
+        name: reservation.reservedBy.name || '',
+        phone: reservation.reservedBy.phone || '',
+        email: reservation.reservedBy.email || '',
+      });
+      if (reservation.reservedBy.customerId) {
+        setSelectedCustomerId(reservation.reservedBy.customerId);
+      }
+    }
+
+    // Set guest count if available
+    if (reservation.reservedBy?.partySize) {
+      setGuestCount(reservation.reservedBy.partySize);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pos_guestCount', reservation.reservedBy.partySize.toString());
+      }
+    }
+
+    // Load pre-order items
+    if (reservation.preOrderItems && Array.isArray(reservation.preOrderItems) && reservation.preOrderItems.length > 0) {
+      // Clear existing cart if any
+      setCart([]);
+      
+      const cartItems: CartItem[] = [];
+      reservation.preOrderItems.forEach((item: any) => {
+        const menuItem = menuItemsData?.find((mi: any) => mi.id === item.menuItemId);
+        if (menuItem) {
+          const cartItem = buildCartItemFromMenuItem(menuItem, {
+            quantity: item.quantity || 1,
+            // You can add more overrides here if you save modifiers in pre-orders
+          });
+          cartItems.push(cartItem);
+        }
+      });
+      if (cartItems.length > 0) {
+        setCart(cartItems);
+        toast.success(`${cartItems.length} pre-ordered items loaded into cart`);
+      }
+    }
+
+    setSelectedTable(tableId);
+    setHasStartedOrder(true);
+    setIsCartModalOpen(true);
+    setReservedTableModal(null);
+    toast.success('Reservation checked in successfully');
+  }, [reservedTableModal, menuItemsData, buildCartItemFromMenuItem]);
   // Order functions
   const handleCreateOrder = useCallback(async () => {
     // In pay-first mode, orders cannot be created without payment
@@ -5881,6 +5935,88 @@ export default function POSPage() {
               })()}
               <Button
                 onClick={() => setOccupiedTableModal(null)}
+                variant="secondary"
+                className="w-full"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+      {/* Reservation Check-in Modal */}
+      <Modal
+        isOpen={Boolean(reservedTableModal)}
+        onClose={() => setReservedTableModal(null)}
+        title="Check-in Reservation"
+        size="md"
+      >
+        {reservedTableModal && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4">
+              <p className="text-sm text-yellow-200">
+                This table is reserved. Check-in the customer to start an order.
+              </p>
+            </div>
+            
+            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-slate-400">Customer Name</p>
+                  <p className="font-semibold text-slate-100">{reservedTableModal.reservation.reservedBy?.name || 'Guest'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Phone</p>
+                  <p className="font-semibold text-slate-100">{reservedTableModal.reservation.reservedBy?.phone || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Reservation Time</p>
+                  <p className="font-semibold text-sky-400">
+                    {reservedTableModal.reservation.reservedFor ? new Date(reservedTableModal.reservation.reservedFor).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Party Size</p>
+                  <p className="font-semibold text-slate-100">{reservedTableModal.reservation.reservedBy?.partySize || '—'} guests</p>
+                </div>
+              </div>
+            </div>
+
+            {reservedTableModal.reservation.preOrderItems && reservedTableModal.reservation.preOrderItems.length > 0 && (
+              <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                <p className="text-sm font-semibold text-slate-100">Pre-ordered Items</p>
+                <div className="space-y-1">
+                  {reservedTableModal.reservation.preOrderItems.map((item: any, idx: number) => {
+                    const menuItem = menuItemsData?.find((mi: any) => (mi.id || mi._id) === item.menuItemId);
+                    return (
+                      <div key={idx} className="flex justify-between text-xs text-slate-300">
+                        <span>{item.quantity}x {menuItem?.name || item.name || 'Item'}</span>
+                        <span>{menuItem ? formatCurrency(menuItem.price * item.quantity) : ''}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 pt-2 border-t border-slate-800 flex justify-between font-bold text-emerald-400 text-sm">
+                  <span>Pre-order Total</span>
+                  <span>
+                    {formatCurrency(reservedTableModal.reservation.preOrderItems.reduce((sum: number, item: any) => {
+                      const menuItem = menuItemsData?.find((mi: any) => (mi.id || mi._id) === item.menuItemId);
+                      return sum + (menuItem?.price || 0) * (item.quantity || 1);
+                    }, 0))}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 pt-2">
+              <Button
+                onClick={handleCheckInReservation}
+                className="w-full bg-emerald-600 hover:bg-emerald-500"
+              >
+                Check-in & Start Order
+              </Button>
+              <Button
+                onClick={() => setReservedTableModal(null)}
                 variant="secondary"
                 className="w-full"
               >

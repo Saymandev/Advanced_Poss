@@ -333,6 +333,7 @@ export const posApi = apiSlice.injectEndpoints({
           reservedFor: table.reservedFor,
           reservedUntil: table.reservedUntil,
           reservedBy: table.reservedBy,
+          preOrderItems: table.preOrderItems || [],
           location: table.location,
           orderDetails: table.orderDetails ? {
             ...table.orderDetails,
