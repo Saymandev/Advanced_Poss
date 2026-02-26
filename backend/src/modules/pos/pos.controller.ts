@@ -107,8 +107,8 @@ export class POSController {
   // Tables
   @Get('tables/available')
   @RequiresFeature(FEATURES.TABLE_MANAGEMENT)
-  async getAvailableTables(@Request() req) {
-    return this.posService.getAvailableTables(req.user.branchId);
+  async getAvailableTables(@Request() req, @Query('branchId') branchId?: string) {
+    return this.posService.getAvailableTables(branchId || req.user.branchId);
   }
 
   // Waiters
