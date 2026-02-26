@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -9,7 +10,6 @@ import {
   Query,
   Request,
   UseGuards,
-  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -24,12 +24,12 @@ import { PaymentMethodsService } from './payment-methods.service';
 @ApiTags('Payment Methods')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequiresFeature(FEATURES.SETTINGS)
 @Controller('payment-methods')
 export class PaymentMethodsController {
   constructor(private readonly paymentMethodsService: PaymentMethodsService) { }
 
   @Post()
+  @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Create payment method' })
   create(@Body() createDto: CreatePaymentMethodDto, @Request() req: any) {
     if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
@@ -40,6 +40,7 @@ export class PaymentMethodsController {
   }
 
   @Get()
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.ORDER_MANAGEMENT, FEATURES.EXPENSES, FEATURES.PURCHASE_ORDERS)
   @ApiOperation({ summary: 'Get all payment methods' })
   findAll(
     @Query('companyId') companyId?: string,
@@ -54,18 +55,21 @@ export class PaymentMethodsController {
   }
 
   @Get('system')
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.ORDER_MANAGEMENT, FEATURES.EXPENSES, FEATURES.PURCHASE_ORDERS)
   @ApiOperation({ summary: 'Get system-wide payment methods' })
   findSystemMethods() {
     return this.paymentMethodsService.findSystemPaymentMethods();
   }
 
   @Get('company/:companyId')
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.ORDER_MANAGEMENT, FEATURES.EXPENSES, FEATURES.PURCHASE_ORDERS)
   @ApiOperation({ summary: 'Get payment methods by company (includes system methods)' })
   findByCompany(@Param('companyId') companyId: string) {
     return this.paymentMethodsService.findByCompany(companyId);
   }
 
   @Get('branch/:companyId/:branchId')
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.ORDER_MANAGEMENT, FEATURES.EXPENSES, FEATURES.PURCHASE_ORDERS)
   @ApiOperation({
     summary: 'Get payment methods by branch (includes system and company methods)',
   })
@@ -77,12 +81,14 @@ export class PaymentMethodsController {
   }
 
   @Get(':id')
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.ORDER_MANAGEMENT, FEATURES.EXPENSES, FEATURES.PURCHASE_ORDERS)
   @ApiOperation({ summary: 'Get payment method by ID' })
   findOne(@Param('id') id: string) {
     return this.paymentMethodsService.findOne(id);
   }
 
   @Patch(':id')
+  @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Update payment method' })
   update(
     @Param('id') id: string,
@@ -97,6 +103,7 @@ export class PaymentMethodsController {
   }
 
   @Delete(':id')
+  @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Delete payment method' })
   remove(@Param('id') id: string, @Request() req: any) {
     if (req.user?.role !== UserRole.MANAGER && req.user?.role !== UserRole.OWNER && req.user?.role !== UserRole.SUPER_ADMIN) {
