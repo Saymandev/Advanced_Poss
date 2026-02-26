@@ -1879,6 +1879,20 @@ export class POSService {
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    // Safety check for branchId - if still not present, we can't fetch branch-specific data
+    if (!branchId) {
+      return [];
+    }
+
+    // Ensure branchId is a valid ObjectId before using it
+    try {
+      if (typeof branchId === 'string' && !Types.ObjectId.isValid(branchId)) {
+         return [];
+      }
+    } catch (e) {
+      return [];
+    }
+
     // Fetch PENDING orders to determine table occupation
     const pendingOrders = await this.posOrderModel.find({
       branchId: new Types.ObjectId(branchId),
