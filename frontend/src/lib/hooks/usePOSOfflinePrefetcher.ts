@@ -18,7 +18,7 @@ export const usePOSOfflinePrefetcher = (): POSOfflineState => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [syncErrors, setSyncErrors] = useState<string[]>([]);
-  const hasRunRef = useRef(false); // prevent double-run in React StrictMode
+  const hasRunRef = useRef(''); // prevent double-run in React StrictMode for same branch
 
   const branchId =
     (user as any)?.branchId
@@ -90,11 +90,13 @@ export const usePOSOfflinePrefetcher = (): POSOfflineState => {
   // On mount: check existing snapshot, then trigger a background sync if needed
   useEffect(() => {
     if (!branchId || !companyId) return;
-    if (hasRunRef.current) return;
-    hasRunRef.current = true;
+    
+    // prevent double-run in React StrictMode for the SAME branch
+    if (hasRunRef.current === branchId) return;
+    hasRunRef.current = branchId;
 
     checkExistingSnapshot();
-    // Kick off background sync (TTL-aware, won't re-fetch fresh data)
+    // Kick off background sync (Aggressive for empty snapshots, TTL-aware for full ones)
     syncNow(false);
   }, [branchId, companyId, checkExistingSnapshot, syncNow]);
 

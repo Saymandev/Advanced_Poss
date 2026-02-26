@@ -9,7 +9,7 @@
  */
 
 import { decryptData } from '../utils/crypto';
-import { isSnapshotFresh, saveSnapshot, TTL } from './db';
+import { getSnapshot, saveSnapshot, TTL } from './db';
 
 const getApiBase = () =>
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
@@ -238,9 +238,23 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
   const startedAt = Date.now();
   const { branchId, companyId, forceRefresh = false, onProgress } = ctx;
 
+  console.log(`[POS Offline] 🚀 Starting prefetch for branch: ${branchId}, company: ${companyId} (force: ${forceRefresh})`);
+
   const shouldSkip = async (key: SnapshotKey, ttl: number): Promise<boolean> => {
     if (forceRefresh) return false;
-    return isSnapshotFresh(key, ttl);
+    const snap = await getSnapshot(key);
+    if (!snap) return false;
+    
+    // If snapshot is fresh but empty (and it's a list type), we should probably try to re-fetch 
+    // once in case it was a permission issue that's now fixed.
+    const isListType = (['menuItems', 'categories', 'staff', 'customers'] as string[]).includes(key as string);
+    const isEmpty = Array.isArray(snap.data) && snap.data.length === 0;
+    
+    if (snap.isFresh && (!isListType || !isEmpty)) {
+      return true;
+    }
+    
+    return false;
   };
 
   const runFetcher = async (
