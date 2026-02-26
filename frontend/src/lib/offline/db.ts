@@ -33,7 +33,8 @@ export interface CachedData<T = any> {
 
 export interface QueuedOrder {
   id: string;
-  payload: CreatePOSOrderRequest;
+  type: 'CREATE_ORDER' | 'PROCESS_PAYMENT';
+  payload: any;
   status: 'pending' | 'syncing' | 'failed';
   createdAt: string;
   error?: string;
@@ -173,12 +174,54 @@ export const enqueueOfflineOrder = async (payload: CreatePOSOrderRequest): Promi
     const db = await getDB();
     if (!db) throw new Error('DB not initialized');
     const id = crypto.randomUUID();
-    const order: QueuedOrder = { id, payload, status: 'pending', createdAt: new Date().toISOString(), retryCount: 0 };
+    const order: QueuedOrder = { 
+      id, 
+      type: 'CREATE_ORDER',
+      payload, 
+      status: 'pending', 
+      createdAt: new Date().toISOString(), 
+      retryCount: 0 
+    };
     await db.put(STORES.SYNC_QUEUE, order);
     return id;
   } catch (error) {
     console.error('[OfflineDB] Failed to enqueue offline order:', error);
     throw error;
+  }
+};
+
+export const enqueueOfflinePayment = async (payload: any): Promise<string> => {
+  try {
+    const db = await getDB();
+    if (!db) throw new Error('DB not initialized');
+    const id = crypto.randomUUID();
+    const task: QueuedOrder = { 
+      id, 
+      type: 'PROCESS_PAYMENT',
+      payload, 
+      status: 'pending', 
+      createdAt: new Date().toISOString(), 
+      retryCount: 0 
+    };
+    await db.put(STORES.SYNC_QUEUE, task);
+    return id;
+  } catch (error) {
+    console.error('[OfflineDB] Failed to enqueue offline payment:', error);
+    throw error;
+  }
+};
+
+/**
+ * Finds a queued order by a temporary ID (like the offlineId generated in apiSlice)
+ * This is useful for linking payments to orders that haven't been synced yet.
+ */
+export const findQueuedOrderById = async (id: string): Promise<QueuedOrder | null> => {
+  try {
+    const db = await getDB();
+    if (!db) return null;
+    return await db.get(STORES.SYNC_QUEUE, id) as QueuedOrder | undefined || null;
+  } catch {
+    return null;
   }
 };
 

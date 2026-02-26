@@ -35,29 +35,34 @@ export const useOfflineSyncManager = () => {
       let successCount = 0;
       toast.loading(`Syncing ${orders.length} offline orders...`, { id: 'sync-orders' });
 
-      for (const order of orders) {
+      for (const task of orders) {
         try {
-          await updateOfflineOrderStatus(order.id, { status: 'syncing' });
+          await updateOfflineOrderStatus(task.id, { status: 'syncing' });
           
-          // Send to backend
-          await dispatch(posApi.endpoints.createPOSOrder.initiate(order.payload)).unwrap();
+          if (task.type === 'PROCESS_PAYMENT') {
+            // Standalone payment for existing server order
+            await dispatch(posApi.endpoints.processPayment.initiate(task.payload)).unwrap();
+          } else {
+            // New order (might include payment data if it was merged)
+            await dispatch(posApi.endpoints.createPOSOrder.initiate(task.payload)).unwrap();
+          }
           
           // Success, remove from queue
-          await removeOfflineOrder(order.id);
+          await removeOfflineOrder(task.id);
           successCount++;
         } catch (error) {
-          console.error(`Failed to sync order ${order.id}`, error);
-          await updateOfflineOrderStatus(order.id, { 
+          console.error(`Failed to sync task ${task.id} (${task.type})`, error);
+          await updateOfflineOrderStatus(task.id, { 
             status: 'failed', 
-            retryCount: (order.retryCount || 0) + 1,
+            retryCount: (task.retryCount || 0) + 1,
             error: error instanceof Error ? error.message : 'Unknown error'
           });
         }
       }
 
       if (successCount > 0) {
-        toast.success(`Successfully synced ${successCount} offline orders!`, { id: 'sync-orders' });
-        dispatch(posApi.util.invalidateTags(['POS', 'Order', 'Table']));
+        toast.success(`Successfully synced ${successCount} offline transactions!`, { id: 'sync-orders' });
+        dispatch(posApi.util.invalidateTags(['POS', 'Order', 'Table', 'Transactions', 'Payment']));
       } else {
         toast.error('Failed to sync offline orders. Will retry later.', { id: 'sync-orders' });
       }

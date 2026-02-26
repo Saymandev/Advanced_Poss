@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { enqueueOfflineOrder, getSnapshot } from '../offline/db';
+import { enqueueOfflineOrder, enqueueOfflinePayment, findQueuedOrderById, getSnapshot, updateOfflineOrderStatus } from '../offline/db';
 import { SNAPSHOT_KEYS } from '../offline/posPrefetcher';
 import { logout } from '../slices/authSlice';
 import { decryptData } from '../utils/crypto';
@@ -16,9 +16,9 @@ const OFFLINE_SNAPSHOT_MAP: Array<{ match: string; key: string }> = [
   { match: '/users',                  key: SNAPSHOT_KEYS.STAFF },    // Fix: Map /users to staff key
   { match: '/staff',                  key: SNAPSHOT_KEYS.STAFF },
   { match: '/delivery-zones',         key: SNAPSHOT_KEYS.DELIVERY_ZONES },
-  { match: '/customers',              key: SNAPSHOT_KEYS.CUSTOMERS },
   { match: '/settings/company',       key: SNAPSHOT_KEYS.COMPANY_SETTINGS },
   { match: '/companies/',             key: SNAPSHOT_KEYS.COMPANY_INFO },
+  { match: '/pos/orders',             key: SNAPSHOT_KEYS.ORDERS },
 ];
 
 /** Returns the snapshot key for a given URL, or null if not cacheable */
@@ -94,11 +94,42 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       }
     }
 
-    // 3. POST /pos/payments — when offline, silently succeed (order is already queued above)
-    // The payment record will be created on the backend when the order syncs.
+    // 3. POST /pos/payments — when offline, handle based on order source
     if (requestUrl.includes('/pos/payments') && args?.method === 'POST') {
-      console.log('[Offline] Payment request suppressed — will sync with order');
-      return { data: { success: true, isOffline: true } };
+      try {
+        const paymentPayload = args.body;
+        const orderId = paymentPayload.orderId;
+
+        // Check if this payment is for an offline order we haven't synced yet
+        const queuedOrder = await findQueuedOrderById(orderId);
+        
+        if (queuedOrder) {
+          // It's an offline order! Merge payment data into the order payload
+          // and mark the queued order as 'paid' so it syncs with correct status.
+          queuedOrder.payload.status = 'paid';
+          queuedOrder.payload.paymentMethod = paymentPayload.method;
+          queuedOrder.payload.amountReceived = paymentPayload.amountReceived;
+          queuedOrder.payload.changeDue = paymentPayload.changeDue;
+          queuedOrder.payload.transactionId = paymentPayload.transactionId;
+          
+          await updateOfflineOrderStatus(orderId, { 
+            payload: queuedOrder.payload,
+            status: 'pending' // Still pending sync
+          });
+          
+          console.log(`[Offline] Payment merged into queued order ${orderId}`);
+          return { data: { success: true, isOffline: true, merged: true } };
+        } else {
+          // It's a payment for an existing server order (or we can't find the offline one)
+          // Queue it as a standalone payment task.
+          const taskId = await enqueueOfflinePayment(paymentPayload);
+          console.log(`[Offline] Standalone payment queued with task ${taskId} for order ${orderId}`);
+          return { data: { success: true, isOffline: true, queued: true } };
+        }
+      } catch (error) {
+        console.error('[Offline] Failed to handle offline payment:', error);
+        return { error: { status: 503, data: { message: 'Failed to queue offline payment' } } };
+      }
     }
 
     // All other mutations while offline — return a clear error

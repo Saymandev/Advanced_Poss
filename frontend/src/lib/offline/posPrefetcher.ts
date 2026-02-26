@@ -24,8 +24,9 @@ export const SNAPSHOT_KEYS = {
   POS_SETTINGS: 'posSettings',
   DELIVERY_ZONES: 'deliveryZones',
   CUSTOMERS: 'customers',
-  COMPANY_SETTINGS: 'companySettings', // New
-  COMPANY_INFO: 'companyInfo',         // New
+  COMPANY_SETTINGS: 'companySettings',
+  COMPANY_INFO: 'companyInfo',
+  ORDERS: 'orders',
 } as const;
 
 export type SnapshotKey = (typeof SNAPSHOT_KEYS)[keyof typeof SNAPSHOT_KEYS];
@@ -225,6 +226,20 @@ const fetchCompanyInfo = async (companyId: string): Promise<PrefetchResult> => {
   }
 };
 
+const fetchPOSOrders = async (branchId: string): Promise<PrefetchResult> => {
+  try {
+    if (!branchId) return { key: SNAPSHOT_KEYS.ORDERS, success: true, count: 0 };
+    const params = new URLSearchParams({ limit: '100', branchId });
+    const raw = await fetchJson(`${getApiBase()}/pos/orders?${params}`);
+    const items = extractItems(raw, 'orders');
+    await saveSnapshot(SNAPSHOT_KEYS.ORDERS, items, TTL.TABLES); // Use short TTL for orders
+    console.log(`[POS Offline] 🧾 Prefetched ${items.length} recent orders for branch ${branchId}`);
+    return { key: SNAPSHOT_KEYS.ORDERS, success: true, count: items.length };
+  } catch (error: any) {
+    return { key: SNAPSHOT_KEYS.ORDERS, success: false, error: error.message };
+  }
+};
+
 // ─── Main Prefetch Orchestrator ───────────────────────────────────────────────
 
 export interface PrefetchContext {
@@ -283,6 +298,7 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
     runFetcher(SNAPSHOT_KEYS.CUSTOMERS, TTL.CUSTOMERS, () => fetchCustomers(companyId, branchId)),
     runFetcher(SNAPSHOT_KEYS.COMPANY_SETTINGS, TTL.GENERIC, () => fetchCompanySettings(companyId)),
     runFetcher(SNAPSHOT_KEYS.COMPANY_INFO, TTL.GENERIC, () => fetchCompanyInfo(companyId)),
+    runFetcher(SNAPSHOT_KEYS.ORDERS, TTL.TABLES, () => fetchPOSOrders(branchId)),
   ]);
 
   const finalResults: PrefetchResult[] = results.map((r, i) => {
