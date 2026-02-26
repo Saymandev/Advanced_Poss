@@ -52,6 +52,7 @@ export class Table {
       phone: String,
       partySize: Number,
       email: String,
+      customerId: { type: Types.ObjectId, ref: 'Customer' },
     },
   })
   reservedBy?: {
@@ -59,7 +60,11 @@ export class Table {
     phone: string;
     partySize: number;
     email?: string;
+    customerId?: Types.ObjectId;
   };
+
+  @Prop({ type: [Object], default: [] })
+  preOrderItems?: any[];
 
   @Prop({ default: true })
   isActive: boolean;

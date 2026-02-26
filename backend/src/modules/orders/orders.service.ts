@@ -111,9 +111,34 @@ export class OrdersService {
       deliveryFee -
       discountAmount;
 
+    // Automatically link or create customer if customerId is missing but contact info is present
+    let finalCustomerId = createOrderDto.customerId;
+    if (!finalCustomerId && (createOrderDto.deliveryInfo?.phone || createOrderDto.guestPhone)) {
+      try {
+        const contactPhone = createOrderDto.deliveryInfo?.phone || createOrderDto.guestPhone;
+        const contactEmail = (createOrderDto.deliveryInfo as any)?.email || '';
+        const contactName = createOrderDto.deliveryInfo?.name || createOrderDto.guestName || 'Public Customer';
+        
+        const customer = await this.posService.findOrCreateCustomer({
+          companyId: createOrderDto.companyId,
+          branchId: createOrderDto.branchId,
+          phone: contactPhone,
+          email: contactEmail,
+          name: contactName,
+        });
+        
+        if (customer) {
+          finalCustomerId = (customer as any)._id?.toString() || (customer as any).id?.toString();
+        }
+      } catch (error) {
+        console.error('Failed to find or create customer for public order:', error);
+      }
+    }
+
     // Create order
     const order = new this.orderModel({
       ...createOrderDto,
+      customerId: finalCustomerId,
       orderNumber,
       items,
       subtotal,

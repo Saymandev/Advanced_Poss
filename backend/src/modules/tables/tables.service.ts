@@ -472,11 +472,13 @@ export class TablesService {
     table.reservedFor = startTime;
     (table as any).reservedUntil = endTime;
     (table as any).reservationNotes = reserveDto.notes || undefined;
+    (table as any).preOrderItems = reserveDto.preOrderItems || [];
     table.reservedBy = {
       name: reserveDto.name,
       phone: reserveDto.phone,
       partySize: reserveDto.partySize,
       ...(reserveDto.email ? { email: reserveDto.email } : {}),
+      ...(reserveDto.customerId ? { customerId: new Types.ObjectId(reserveDto.customerId) } : {}),
     };
 
     const saved = await table.save();
@@ -537,6 +539,7 @@ export class TablesService {
     table.reservedFor = undefined;
     (table as any).reservedUntil = undefined;
     (table as any).reservationNotes = undefined;
+    (table as any).preOrderItems = [];
     table.reservedBy = undefined;
 
     const saved = await table.save();
@@ -667,6 +670,7 @@ export class TablesService {
       table.reservedFor = undefined;
       (table as any).reservedUntil = undefined;
       (table as any).reservationNotes = undefined;
+      (table as any).preOrderItems = [];
       table.reservedBy = undefined;
       await table.save();
       this.emitTableStatusChange(table);

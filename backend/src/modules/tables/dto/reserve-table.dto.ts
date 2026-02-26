@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsDateString, IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class ReserveTableDto {
   @ApiProperty({
@@ -40,4 +40,14 @@ export class ReserveTableDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiProperty({ example: '65a... (ObjectId)', required: false })
+  @IsString()
+  @IsOptional()
+  customerId?: string;
+
+  @ApiProperty({ example: [{ menuItemId: '...', quantity: 1 }], required: false })
+  @IsArray()
+  @IsOptional()
+  preOrderItems?: any[];
 }

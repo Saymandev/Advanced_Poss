@@ -141,37 +141,28 @@ export class POSService {
     }
     // Cache menu items to fetch names efficiently
     const menuItemCache = new Map<string, any>();
-    // Fetch menu item names for all items
-    const itemsWithNames = await Promise.all(
-      createOrderDto.items.map(async (item) => {
-        let menuItem = menuItemCache.get(item.menuItemId);
-        if (!menuItem) {
-          try {
-            menuItem = await this.menuItemsService.findOne(item.menuItemId);
-            if (menuItem) {
-              menuItemCache.set(item.menuItemId, menuItem);
-            }
-          } catch (error) {
-            console.error(`Failed to fetch menu item ${item.menuItemId}:`, error);
-          }
-        }
-        return {
-          menuItemId: new Types.ObjectId(item.menuItemId),
-          name: menuItem?.name || 'Unknown Item',
-          quantity: item.quantity,
-          price: item.price,
-          notes: item.notes,
-        };
-      })
-    );
+    // Fetch table early for dine-in orders to check for reservations/pre-orders
+    let reservationTable = null;
+    if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in') {
+      try {
+        reservationTable = await this.tablesService.findOne(createOrderDto.tableId);
+      } catch (e) {
+        console.error('Failed to pre-fetch table for reservation check:', e);
+      }
+    }
+
     // Process loyalty points redemption if customerId is provided
     let loyaltyPointsRedeemed = 0;
     let loyaltyDiscount = 0;
     let customer = null;
     let finalOrderTotal = createOrderDto.totalAmount;
-    if (createOrderDto.customerId && companyId) {
+
+    // Use customerId from reservation if not provided in request
+    const effectiveCustomerId = createOrderDto.customerId || (reservationTable?.reservedBy?.customerId?.toString());
+
+    if (effectiveCustomerId && companyId) {
       try {
-        customer = await this.customersService.findOne(createOrderDto.customerId);
+        customer = await this.customersService.findOne(effectiveCustomerId);
         if (customer) {
           const MIN_ORDER_AMOUNT = 1000; // Minimum order amount in TK
           const POINTS_PER_DISCOUNT = 2000; // 2000 points = 20 TK discount
@@ -192,7 +183,7 @@ export class POSService {
               loyaltyPointsRedeemed = blocksToRedeem * POINTS_PER_DISCOUNT;
               // Update order total with discount
               finalOrderTotal = orderSubtotal - loyaltyDiscount;
-              }
+            }
           }
         }
       } catch (error) {
@@ -200,17 +191,48 @@ export class POSService {
         // Don't fail order creation if loyalty processing fails
       }
     }
+
+    // Use pre-ordered items if order items are empty
+    const effectiveItems = (createOrderDto.items && createOrderDto.items.length > 0) 
+      ? createOrderDto.items 
+      : (reservationTable?.preOrderItems || []);
+
     const baseOrderData: any = {
       ...createOrderDto,
       branchId: new Types.ObjectId(branchId),
       userId: new Types.ObjectId(userId),
       companyId: companyId ? new Types.ObjectId(companyId) : undefined,
-      items: itemsWithNames,
-      customerId: createOrderDto.customerId ? new Types.ObjectId(createOrderDto.customerId) : undefined,
+      items: [], // Will be filled below with names
+      customerId: effectiveCustomerId ? new Types.ObjectId(effectiveCustomerId) : undefined,
       loyaltyPointsRedeemed,
       loyaltyDiscount,
       totalAmount: finalOrderTotal, // Use discounted amount if loyalty was applied
     };
+
+    // Fetch menu item names for effective items
+    const itemsWithNames = await Promise.all(
+      effectiveItems.map(async (item) => {
+        let menuItem = menuItemCache.get(item.menuItemId);
+        if (!menuItem) {
+          try {
+            menuItem = await this.menuItemsService.findOne(item.menuItemId);
+            if (menuItem) {
+              menuItemCache.set(item.menuItemId, menuItem);
+            }
+          } catch (error) {
+            console.error(`Failed to fetch menu item ${item.menuItemId}:`, error);
+          }
+        }
+        return {
+          menuItemId: new Types.ObjectId(item.menuItemId),
+          name: menuItem?.name || 'Unknown Item',
+          quantity: item.quantity,
+          price: item.price || (menuItem?.price || 0), // Use menu price if not in preorder
+          notes: item.notes,
+        };
+      })
+    );
+    baseOrderData.items = itemsWithNames;
     if (createOrderDto.tableId) {
       baseOrderData.tableId = new Types.ObjectId(createOrderDto.tableId);
       // Validate table capacity for dine-in orders
@@ -1201,19 +1223,38 @@ export class POSService {
     // Tables are only freed when staff explicitly releases them or orders are cancelled.
     // Handle customer loyalty redemption and stats update
     let customer = null;
-    if (order.customerId && companyId) {
+    const orderCustomerId = order.customerId || (order as any).customer;
+    
+    if (orderCustomerId && companyId) {
       try {
-        customer = await this.customersService.findOne(order.customerId.toString());
+        customer = await this.customersService.findOne(orderCustomerId.toString());
       } catch (error) {
         console.error('Error fetching customer by ID:', error);
       }
-    } else if (order.customerInfo?.email && companyId) {
-      try {
-        customer = await this.customersService.findByEmail(companyId, order.customerInfo.email);
-      } catch (error) {
-        console.error('Error fetching customer by email:', error);
+    } 
+    
+    // Fallback search by phone/email if no customerId linked
+    if (!customer && companyId) {
+      const phone = order.deliveryInfo?.phone || order.guestPhone || (order as any).phone;
+      const email = order.customerInfo?.email || order.deliveryInfo?.email || (order as any).email;
+      
+      if (phone) {
+        try {
+          customer = await this.customersService.findByPhone(companyId, phone);
+        } catch (error) {
+          console.error('Error fetching customer by phone:', error);
+        }
+      }
+      
+      if (!customer && email) {
+        try {
+          customer = await this.customersService.findByEmail(companyId, email);
+        } catch (error) {
+          console.error('Error fetching customer by email:', error);
+        }
       }
     }
+
     if (customer) {
       try {
         const customerId = (customer as any)._id?.toString() || (customer as any).id?.toString();
@@ -1225,8 +1266,10 @@ export class POSService {
             console.error('❌ Failed to redeem loyalty points:', error);
           }
         }
-        // Update customer statistics
-        await this.customersService.updateOrderStats(customerId, order.totalAmount);
+        // Update customer statistics and award points
+        // Award points based on the correct total field (total for public, totalAmount for POS)
+        const totalToAccrue = isPublic ? (order.total || 0) : (order.totalAmount || 0);
+        await this.customersService.updateOrderStats(customerId, totalToAccrue);
         } catch (customerError) {
         console.error('❌ Failed to update customer statistics:', customerError);
       }
@@ -2068,14 +2111,17 @@ export class POSService {
         page: 1,
         limit: 1000, // Get all items for POS
       };
+
       // Remove undefined values
       Object.keys(queryFilters).forEach(key => {
         if (queryFilters[key] === undefined) {
           delete queryFilters[key];
         }
       });
+
       // Fetch menu items from database (includes populated ingredient stock info)
       const result = await this.menuItemsService.findAll(queryFilters);
+
       // Transform to POS format
       return result.menuItems.map((item: any) => {
         const category = item.categoryId;
@@ -2084,20 +2130,24 @@ export class POSService {
         const firstImage = Array.isArray(item.images) && item.images.length > 0 
           ? item.images[0] 
           : undefined;
+
         // Calculate stock and low-stock flags from ingredient data
         let stock = 999; // Default to "plenty" when not tracking inventory
         let isLowStock = false;
         let isOutOfStock = false;
+
         if (item.trackInventory === true && Array.isArray(item.ingredients) && item.ingredients.length > 0) {
           for (const ing of item.ingredients) {
             const ingredient: any = ing?.ingredientId;
             if (!ingredient) continue;
+
             // Out of stock if any ingredient is out
             if (ingredient.isOutOfStock || ingredient.currentStock <= 0) {
               isOutOfStock = true;
               isLowStock = true;
               break;
             }
+
             // Low stock if any ingredient is flagged low
             if (
               ingredient.isLowStock ||
@@ -2109,16 +2159,19 @@ export class POSService {
               isLowStock = true;
             }
           }
+
           // If any ingredient is out of stock, treat item as out of stock
           if (isOutOfStock) {
             stock = 0;
           }
         }
+
         // If item is manually marked unavailable, treat as out of stock
         if (item.isAvailable === false) {
           stock = 0;
           isOutOfStock = true;
         }
+
         return {
           id: (item._id || item.id).toString(),
           name: item.name,
@@ -2141,6 +2194,47 @@ export class POSService {
       return [];
     }
   }
+
+  // Find or create a customer for order linking
+  async findOrCreateCustomer(data: {
+    companyId: string;
+    branchId: string;
+    phone: string;
+    email?: string;
+    name?: string;
+  }): Promise<any> {
+    try {
+      // 1. Try to find by phone
+      let customer = await this.customersService.findByPhone(data.companyId, data.phone);
+      
+      // 2. Try to find by email if phone search failed
+      if (!customer && data.email) {
+        customer = await this.customersService.findByEmail(data.companyId, data.email);
+      }
+      
+      // 3. Create if not found
+      if (!customer) {
+        const [firstName, ...lastNameParts] = (data.name || 'Public Customer').split(' ');
+        const lastName = lastNameParts.join(' ') || '';
+        
+        customer = await this.customersService.create({
+          companyId: data.companyId,
+          branchId: data.branchId,
+          firstName,
+          lastName,
+          phone: data.phone,
+          email: data.email || `${data.phone}@placeholder.com`,
+          isActive: true,
+        } as any);
+      }
+      
+      return customer;
+    } catch (error) {
+      console.error('Error in findOrCreateCustomer:', error);
+      return null;
+    }
+  }
+
   // Create kitchen order from POS order
   private async createKitchenOrderFromPOS(
     posOrder: POSOrderDocument,
@@ -2156,11 +2250,13 @@ export class POSService {
         console.error('Failed to fetch table for kitchen order:', error);
       }
     }
+
     // Build kitchen order items with menu item names
     const kitchenItems = [];
     for (let index = 0; index < posOrder.items.length; index++) {
       const item = posOrder.items[index];
       const menuItemId = item.menuItemId?.toString();
+
       // Get menu item name from cache or fetch it
       let menuItem = menuItemCache.get(menuItemId || '');
       if (!menuItem && menuItemId) {
@@ -2173,6 +2269,7 @@ export class POSService {
           console.error(`Failed to fetch menu item ${menuItemId}:`, error);
         }
       }
+
       const itemName = menuItem?.name || `Item ${index + 1}`;
       kitchenItems.push({
         itemId: `${posOrder.orderNumber}-${index}`,
@@ -2184,6 +2281,7 @@ export class POSService {
         priority: 0,
       });
     }
+
     // Transform POS order to kitchen order format
     const kitchenOrderData = {
       _id: posOrder._id,
@@ -2200,10 +2298,13 @@ export class POSService {
       customerId: posOrder.customerInfo ? { firstName: posOrder.customerInfo.name } : undefined,
       customerNotes: posOrder.notes,
     };
+
     // Use kitchen service to create the order
     await this.kitchenService.createFromOrder(kitchenOrderData);
   }
+
   // ========== DELIVERY MANAGEMENT METHODS ==========
+
   /**
    * Get delivery orders with optional status filter
    */
@@ -2284,6 +2385,7 @@ export class POSService {
       return dateB - dateA;
     });
   }
+
   /**
    * Assign a driver to a delivery order
    */
@@ -2294,6 +2396,7 @@ export class POSService {
     if (!Types.ObjectId.isValid(driverId)) {
       throw new BadRequestException('Invalid driver ID');
     }
+
     // Verify driver exists
     const driver = await this.userModel.findById(driverId);
     if (!driver) {
@@ -2319,21 +2422,25 @@ export class POSService {
     if (order.orderType !== 'delivery') {
       throw new BadRequestException('This order is not a delivery order');
     }
+
     // Update order with driver assignment
     order.assignedDriverId = new Types.ObjectId(driverId);
     order.deliveryStatus = 'assigned';
     order.assignedAt = new Date();
+
     // Update deliveryDetails.assignedDriver for backward compatibility
     if (order.deliveryDetails) {
       order.deliveryDetails.assignedDriver = driverId;
     } else {
       order.deliveryDetails = { assignedDriver: driverId };
     }
+
     const updatedOrder = await order.save();
     // TODO: Optionally emit websocket event for delivery updates in future
     // (No emit here because WebsocketsGateway doesn't expose a generic emit method yet)
     return updatedOrder;
   }
+
   /**
    * Update delivery status
    */
@@ -2345,6 +2452,7 @@ export class POSService {
     if (!Types.ObjectId.isValid(orderId)) {
       throw new BadRequestException('Invalid order ID');
     }
+
     // Check if this might be a public order if not found in POSOrder
     let order = await this.posOrderModel.findById(orderId);
     
@@ -2361,9 +2469,11 @@ export class POSService {
       }
       throw new NotFoundException('Order not found');
     }
+
     if (order.orderType !== 'delivery') {
       throw new BadRequestException('This order is not a delivery order');
     }
+
     // Update status and timestamps
     order.deliveryStatus = status;
     switch (status) {
@@ -2379,6 +2489,7 @@ export class POSService {
         order.cancelledBy = new Types.ObjectId(userId);
         break;
     }
+
     const updatedOrder = await order.save();
     // TODO: Optionally emit websocket event for delivery updates in future
     return updatedOrder;
@@ -2415,48 +2526,46 @@ export class POSService {
     const customerInfo = {
       name: publicOrder.deliveryInfo?.name || publicOrder.guestName || 'Public Customer',
       phone: publicOrder.deliveryInfo?.phone || publicOrder.guestPhone,
-      email: publicOrder.customerId ? undefined : undefined 
     };
 
-    // 5. Build CreatePOSOrderDto
-    const createDto: CreatePOSOrderDto = {
+    // 5. Create the new POS order using existing infrastructure
+    const createDto: any = {
       orderType: publicOrder.type === 'delivery' ? 'delivery' : 
                  publicOrder.type === 'takeaway' ? 'takeaway' : 'dine-in',
-      items: posItems as any,
+      items: posItems,
       tableId: publicOrder.tableId?.toString(),
-      customerInfo: customerInfo,
-      deliveryFee: publicOrder.deliveryFee,
-      subtotal: publicOrder.subtotal,
-      taxRate: publicOrder.taxRate,
-      taxAmount: publicOrder.taxAmount,
-      serviceChargeRate: publicOrder.serviceChargeRate,
-      serviceChargeAmount: publicOrder.serviceChargeAmount,
-      totalAmount: publicOrder.total,
-      status: 'pending', 
+      customerInfo,
+      deliveryFee: publicOrder.deliveryFee || 0,
+      subtotal: publicOrder.subtotal || 0,
+      taxRate: publicOrder.taxRate || 0,
+      taxAmount: publicOrder.taxAmount || 0,
+      serviceChargeRate: publicOrder.serviceChargeRate || 0,
+      serviceChargeAmount: publicOrder.serviceChargeAmount || 0,
+      totalAmount: publicOrder.total || 0,
+      status: 'pending',
       orderSource: 'customer_app',
       externalOrderId: orderId,
       deliveryDetails: publicOrder.type === 'delivery' ? {
         contactName: publicOrder.deliveryInfo?.name,
         contactPhone: publicOrder.deliveryInfo?.phone,
         addressLine1: publicOrder.deliveryInfo?.address,
-        instructions: publicOrder.deliveryInfo?.instructions
-      } : undefined
+        instructions: publicOrder.deliveryInfo?.instructions,
+      } : undefined,
     };
 
-    // 6. Create the POS order using existing infrastructure
     const newPOSOrder = await this.createOrder(
-      createDto, 
-      userId, 
-      publicOrder.branchId.toString(), 
-      publicOrder.companyId.toString()
+      createDto,
+      userId,
+      publicOrder.branchId.toString(),
+      publicOrder.companyId.toString(),
     );
 
-    // 7. Update public order status to confirmed
+    // 6. Update the original public order status
     publicOrder.status = 'confirmed';
     publicOrder.confirmedAt = new Date();
     await publicOrder.save();
 
-    // 8. Notify via websocket
+    // 7. Notify via websocket
     this.websocketsGateway.notifyOrderStatusChanged(publicOrder.branchId.toString(), publicOrder);
 
     return newPOSOrder as POSOrderDocument;
