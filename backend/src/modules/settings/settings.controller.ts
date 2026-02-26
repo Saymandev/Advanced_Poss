@@ -1,15 +1,15 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-  Request,
-  ForbiddenException,
+    Body,
+    Controller,
+    Delete,
+    ForbiddenException,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Request,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -18,17 +18,17 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import {
-  CreateServiceChargeSettingDto,
+    CreateServiceChargeSettingDto,
 } from './dto/create-service-charge-setting.dto';
 import { CreateTaxSettingDto } from './dto/create-tax-setting.dto';
 import {
-  UpdateCompanySettingsRequestDto
+    UpdateCompanySettingsRequestDto
 } from './dto/update-company-settings.dto';
 import {
-  UpdateInvoiceSettingsRequestDto
+    UpdateInvoiceSettingsRequestDto
 } from './dto/update-invoice-settings.dto';
 import {
-  UpdateServiceChargeSettingDto,
+    UpdateServiceChargeSettingDto,
 } from './dto/update-service-charge-setting.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { UpdateTaxSettingDto } from './dto/update-tax-setting.dto';
@@ -38,7 +38,6 @@ import { SettingsService } from './settings.service';
 @ApiTags('Settings')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequiresFeature(FEATURES.SETTINGS)
 @Controller('settings')
 export class SettingsController {
   constructor(
@@ -47,12 +46,14 @@ export class SettingsController {
   ) { }
 
   @Get('company')
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
   @ApiOperation({ summary: 'Get company level settings' })
   getCompanySettings(@Query('companyId') companyId: string) {
     return this.settingsService.getCompanySettings(companyId);
   }
 
   @Patch('company')
+  @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Update company level settings' })
   updateCompanySettings(
     @Body() body: UpdateCompanySettingsRequestDto,
@@ -62,6 +63,7 @@ export class SettingsController {
   }
 
   @Get('invoice')
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get invoice settings' })
   getInvoiceSettings(@Query('companyId') companyId: string) {
     return this.settingsService.getInvoiceSettings(companyId);

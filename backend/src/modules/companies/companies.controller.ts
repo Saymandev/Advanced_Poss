@@ -1,14 +1,14 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-  ForbiddenException,
+    Body,
+    Controller,
+    Delete,
+    ForbiddenException,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -26,18 +26,19 @@ import { VerifyCustomDomainDto } from './dto/verify-custom-domain.dto';
 @ApiTags('Companies')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequiresFeature(FEATURES.SETTINGS)
 @Controller('companies')
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) { }
 
   @Post()
+  @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Create new company' })
   create(@Body() createCompanyDto: CreateCompanyDto) {
     return this.companiesService.create(createCompanyDto);
   }
 
   @Get()
+  @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Get all companies' })
   findAll(@Query('ownerId') ownerId?: string, @CurrentUser() user?: any) {
     if (user?.role !== UserRole.SUPER_ADMIN) {
@@ -64,24 +65,28 @@ export class CompaniesController {
   }
 
   @Get(':id')
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
   @ApiOperation({ summary: 'Get company by ID' })
   findOne(@Param('id') id: string) {
     return this.companiesService.findOne(id);
   }
 
   @Get(':id/stats')
+  @RequiresFeature(FEATURES.SETTINGS, FEATURES.DASHBOARD)
   @ApiOperation({ summary: 'Get company statistics' })
   getStats(@Param('id') id: string) {
     return this.companiesService.getStats(id);
   }
 
   @Patch(':id')
+  @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Update company' })
   update(@Param('id') id: string, @Body() updateCompanyDto: UpdateCompanyDto) {
     return this.companiesService.update(id, updateCompanyDto);
   }
 
   @Patch(':id/settings')
+  @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Update company settings' })
   updateSettings(@Param('id') id: string, @Body() settings: any) {
     return this.companiesService.updateSettings(id, settings);
