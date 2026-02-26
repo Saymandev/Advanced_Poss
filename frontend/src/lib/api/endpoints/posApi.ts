@@ -199,6 +199,7 @@ export const posApi = apiSlice.injectEndpoints({
       branchId?: string;
       startDate?: string;
       endDate?: string;
+      date?: string;
     }>({
       query: (params) => ({
         url: '/pos/stats',
@@ -405,7 +406,7 @@ export const posApi = apiSlice.injectEndpoints({
       availableTables: number;
       totalRevenue: number;
       ordersInProgress: number;
-    }, { branchId?: string }>({
+    }, { branchId?: string; date?: string }>({
       query: (params) => ({
         url: '/pos/quick-stats',
         params,

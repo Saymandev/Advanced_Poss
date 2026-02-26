@@ -8,8 +8,8 @@ import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-  CurrencyDollarIcon,
-  ShoppingBagIcon,
+    CurrencyDollarIcon,
+    ShoppingBagIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -103,9 +103,7 @@ export default function DashboardPage() {
   const companyId = user?.companyId || companyContext?.companyId;
   // Get today's date - always fresh
   const todayStr = useMemo(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return formatDateInput(today);
+    return formatDateInput(new Date());
   }, []);
   // Ensure dateRange is always valid before making queries
   const validDateRange = useMemo(() => {
@@ -137,7 +135,8 @@ export default function DashboardPage() {
     branchId: branchId || undefined,
     startDate: safeDateRange.start,
     endDate: safeDateRange.end,
-  }), [branchId, safeDateRange.start, safeDateRange.end]);
+    date: todayStr,
+  }), [branchId, safeDateRange.start, safeDateRange.end, todayStr]);
   const { data: statsData, isLoading: statsLoading, error: statsError } = useGetPOSStatsQuery(
     statsParams,
     { skip: !validDateRange.start || !validDateRange.end }

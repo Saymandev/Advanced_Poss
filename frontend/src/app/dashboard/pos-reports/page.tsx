@@ -11,15 +11,15 @@ import { useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSStatsQuery } from '
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  ArrowDownTrayIcon,
-  ArrowTrendingDownIcon,
-  ArrowTrendingUpIcon,
-  ChartBarIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  EyeIcon,
-  MagnifyingGlassIcon,
-  ShoppingBagIcon,
+    ArrowDownTrayIcon,
+    ArrowTrendingDownIcon,
+    ArrowTrendingUpIcon,
+    ChartBarIcon,
+    ClockIcon,
+    CurrencyDollarIcon,
+    EyeIcon,
+    MagnifyingGlassIcon,
+    ShoppingBagIcon,
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -30,8 +30,10 @@ type OrderTypeFilter = 'all' | 'dine-in' | 'delivery' | 'takeaway';
 type QuickRange = 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'custom';
 
 const formatDateInput = (date: Date) => {
-  const tzOffsetMs = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - tzOffsetMs).toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const computeDateRange = (range: QuickRange): { start: string; end: string } => {
@@ -102,10 +104,13 @@ export default function POSReportsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [committedSearch, setCommittedSearch] = useState('');
 
+  const todayStr = useMemo(() => formatDateInput(new Date()), []);
+
   const statsParams = {
     branchId: user?.branchId || undefined,
     startDate: dateRange.start,
     endDate: dateRange.end,
+    date: todayStr,
     ...(orderTypeFilter !== 'all' ? { orderType: orderTypeFilter } : {}),
   } as const;
 
