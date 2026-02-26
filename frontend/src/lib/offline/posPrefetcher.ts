@@ -134,7 +134,11 @@ const fetchTables = async (branchId: string): Promise<PrefetchResult> => {
       items = raw.data.tables;
     }
     
-    await saveSnapshot(SNAPSHOT_KEYS.TABLES, items, TTL.TABLES);
+    // Only save if we got items or if it's explicitly an empty result for a valid branch
+    // This prevents overwriting a good snapshot with empty data if the branchId resolution fails
+    if (items.length > 0 || (branchId && raw)) {
+      await saveSnapshot(SNAPSHOT_KEYS.TABLES, items, TTL.TABLES);
+    }
     return { key: SNAPSHOT_KEYS.TABLES, success: true, count: items.length };
   } catch (error: any) {
     return { key: SNAPSHOT_KEYS.TABLES, success: false, error: error.message };

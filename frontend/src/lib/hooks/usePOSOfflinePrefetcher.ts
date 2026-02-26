@@ -20,17 +20,21 @@ export const usePOSOfflinePrefetcher = (): POSOfflineState => {
   const [syncErrors, setSyncErrors] = useState<string[]>([]);
   const hasRunRef = useRef(false); // prevent double-run in React StrictMode
 
-  const branchId: string =
-    (user as any)?.branchId ||
-    (companyContext as any)?.branchId ||
-    (companyContext as any)?.branches?.[0]?._id ||
-    (companyContext as any)?.branches?.[0]?.id ||
-    '';
+  const branchId =
+    (user as any)?.branchId
+    || (companyContext as any)?.branchId
+    || (companyContext as any)?.branches?.[0]?._id
+    || (companyContext as any)?.branches?.[0]?.id
+    || (user as any)?.company?.branches?.[0]?._id
+    || (user as any)?.company?.branches?.[0]?.id
+    || '';
 
-  const companyId: string =
-    (user as any)?.companyId ||
-    (companyContext as any)?.companyId ||
-    '';
+  const companyId =
+    (user as any)?.companyId
+    || (companyContext as any)?.companyId
+    || (user as any)?.company?._id
+    || (user as any)?.company?.id
+    || '';
 
   // Check if we already have usable offline data (don't wait for a new sync)
   const checkExistingSnapshot = useCallback(async () => {

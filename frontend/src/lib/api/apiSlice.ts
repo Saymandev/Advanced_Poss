@@ -140,7 +140,8 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       if (snapshotKey) {
         const snap = await getSnapshot(snapshotKey);
         if (snap) {
-          console.log(`[Offline] Serving ${requestUrl} from snapshot '${snapshotKey}' (age: ${Math.round((Date.now() - snap.savedAt) / 60000)}m, fresh: ${snap.isFresh})`);
+          const itemCount = Array.isArray(snap.data) ? snap.data.length : (typeof snap.data === 'object' && snap.data !== null ? Object.keys(snap.data).length : 'N/A');
+          console.log(`[Offline] Serving ${requestUrl} from snapshot '${snapshotKey}' (age: ${Math.round((Date.now() - snap.savedAt) / 60000)}m, fresh: ${snap.isFresh}, items: ${itemCount})`);
           return { data: snap.data };
         }
         console.warn(`[Offline] No snapshot found for '${snapshotKey}' (${requestUrl}) — data will be missing`);

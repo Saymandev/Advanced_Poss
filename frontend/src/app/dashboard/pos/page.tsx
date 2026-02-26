@@ -480,10 +480,14 @@ export default function POSPage() {
     || (companyContext as any)?.branchId
     || (companyContext as any)?.branches?.[0]?._id
     || (companyContext as any)?.branches?.[0]?.id
+    || (user as any)?.company?.branches?.[0]?._id
+    || (user as any)?.company?.branches?.[0]?.id
     || '';
   const currentCompanyId =
     (user as any)?.companyId
     || (companyContext as any)?.companyId
+    || (user as any)?.company?._id
+    || (user as any)?.company?.id
     || '';
   const { data: deliveryZones = [], isLoading: zonesLoading } = useGetDeliveryZonesByBranchQuery(
     { branchId: currentBranchId },
