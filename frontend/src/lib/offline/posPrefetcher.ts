@@ -102,7 +102,7 @@ const fetchPaymentMethods = async (companyId: string, branchId: string): Promise
 
 const fetchStaff = async (companyId: string, branchId: string): Promise<PrefetchResult> => {
   try {
-    const params = new URLSearchParams({ limit: '9999', isActive: 'true' });
+    const params = new URLSearchParams({ limit: '9999', status: 'active' });
     if (companyId) params.set('companyId', companyId);
     if (branchId) params.set('branchId', branchId);
     const raw = await fetchJson(`${getApiBase()}/users?${params}`);
