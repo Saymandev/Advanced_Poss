@@ -149,7 +149,8 @@ KitchenOrderSchema.pre('save', function (next) {
 KitchenOrderSchema.set('toJSON', {
   virtuals: true,
   transform: function (doc, ret) {
-    // @ts-ignore - Mongoose transform`n    // @ts-ignore - Mongoose transform`n    ret.id = ret._id;
+    // @ts-ignore - Mongoose transform
+    ret.id = ret._id;
     delete ret._id;
     delete ret.__v;
     return ret;

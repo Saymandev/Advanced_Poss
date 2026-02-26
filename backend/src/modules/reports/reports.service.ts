@@ -298,14 +298,19 @@ export class ReportsService {
     companyId: string,
     startDate: Date,
     endDate: Date,
+    branchId?: string,
   ): Promise<any> {
     const stats = await this.customersService.getStats(companyId);
-    // POSOrder doesn't have companyId, need to filter by branchId through company
-    // For now, get all orders with customerInfo
-    const orders = await this.posOrderModel.find({
+    // Filter POS orders by companyId and optionally branchId
+    const filter: any = {
+      companyId: new Types.ObjectId(companyId),
       customerInfo: { $exists: true, $ne: null },
       createdAt: { $gte: startDate, $lte: endDate },
-    });
+    };
+    if (branchId) {
+      filter.branchId = new Types.ObjectId(branchId);
+    }
+    const orders = await this.posOrderModel.find(filter);
     // Customer retention - use customerInfo.phone or customerInfo.email as identifier
     const uniqueCustomers = new Set(
       orders
@@ -395,17 +400,17 @@ export class ReportsService {
       quietestHour: sorted[sorted.length - 1],
     };
   }
-  async getInventoryReport(companyId: string): Promise<any> {
-    const stats = await this.ingredientsService.getStats(companyId);
-    const valuation = await this.ingredientsService.getValuation(companyId);
-    const lowStock = await this.ingredientsService.findLowStock(companyId);
-    const outOfStock = await this.ingredientsService.findOutOfStock(companyId);
-    const needReorder = await this.ingredientsService.findNeedReorder(companyId);
+  async getInventoryReport(companyId: string, branchId?: string): Promise<any> {
+    const stats = await this.ingredientsService.getStats(companyId, branchId);
+    const valuation = await this.ingredientsService.getValuation(companyId, branchId);
+    const lowStock = await this.ingredientsService.findLowStock(companyId, branchId);
+    const outOfStock = await this.ingredientsService.findOutOfStock(companyId, branchId);
+    const needReorder = await this.ingredientsService.findNeedReorder(companyId, branchId);
     return {
       stats,
       valuation: {
         total: valuation.totalValue,
-        items: valuation.items.length,
+        items: (valuation.items || []).length,
       },
       alerts: {
         lowStock: lowStock.map((i) => ({
@@ -483,8 +488,8 @@ export class ReportsService {
     // Customer stats
     const customerStats = companyId ? await this.customersService.getStats(companyId) : { total: 0, active: 0, vip: 0 };
     // Inventory alerts
-    const lowStock = companyId ? await this.ingredientsService.findLowStock(companyId) : [];
-    const outOfStock = companyId ? await this.ingredientsService.findOutOfStock(companyId) : [];
+    const lowStock = companyId ? await this.ingredientsService.findLowStock(companyId, branchId) : [];
+    const outOfStock = companyId ? await this.ingredientsService.findOutOfStock(companyId, branchId) : [];
     return {
       today: {
         orders: todayOrders.length,
@@ -941,9 +946,9 @@ export class ReportsService {
       })),
     };
   }
-  async getLowStockItems(companyId?: string): Promise<any> {
+  async getLowStockItems(companyId?: string, branchId?: string): Promise<any> {
     if (!companyId) return [];
-    return this.ingredientsService.findLowStock(companyId);
+    return this.ingredientsService.findLowStock(companyId, branchId);
   }
   async getDueSettlements(branchId?: string, companyId?: string): Promise<any> {
     const filter: any = {

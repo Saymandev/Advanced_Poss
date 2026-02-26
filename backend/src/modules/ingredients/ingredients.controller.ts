@@ -1,13 +1,13 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -70,20 +70,29 @@ export class IngredientsController {
 
   @Get('company/:companyId/low-stock')
   @ApiOperation({ summary: 'Get low stock ingredients' })
-  findLowStock(@Param('companyId') companyId: string) {
-    return this.ingredientsService.findLowStock(companyId);
+  findLowStock(
+    @Param('companyId') companyId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.ingredientsService.findLowStock(companyId, branchId);
   }
 
   @Get('company/:companyId/out-of-stock')
   @ApiOperation({ summary: 'Get out of stock ingredients' })
-  findOutOfStock(@Param('companyId') companyId: string) {
-    return this.ingredientsService.findOutOfStock(companyId);
+  findOutOfStock(
+    @Param('companyId') companyId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.ingredientsService.findOutOfStock(companyId, branchId);
   }
 
   @Get('company/:companyId/need-reorder')
   @ApiOperation({ summary: 'Get ingredients that need reorder' })
-  findNeedReorder(@Param('companyId') companyId: string) {
-    return this.ingredientsService.findNeedReorder(companyId);
+  findNeedReorder(
+    @Param('companyId') companyId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.ingredientsService.findNeedReorder(companyId, branchId);
   }
 
   @Get('company/:companyId/stats')
@@ -96,6 +105,12 @@ export class IngredientsController {
   @ApiOperation({ summary: 'Get inventory valuation' })
   getValuation(@Param('companyId') companyId: string) {
     return this.ingredientsService.getValuation(companyId);
+  }
+
+  @Post('company/:companyId/fix-all-statuses')
+  @ApiOperation({ summary: 'Maintenance: Recalculate all stock statuses and fix common typos' })
+  fixAllStatuses(@Param('companyId') companyId: string) {
+    return this.ingredientsService.fixAllStockStatuses(companyId);
   }
 
   @Get(':id')

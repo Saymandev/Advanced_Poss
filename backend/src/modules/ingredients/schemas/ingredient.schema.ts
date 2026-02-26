@@ -128,7 +128,7 @@ export const IngredientSchema = SchemaFactory.createForClass(Ingredient);
 
 // Indexes
 IngredientSchema.index({ companyId: 1, branchId: 1 });
-IngredientSchema.index({ companyId: 1, name: 1 }, { unique: true });
+IngredientSchema.index({ companyId: 1, branchId: 1, name: 1 }, { unique: true });
 IngredientSchema.index({ sku: 1 });
 IngredientSchema.index({ category: 1 });
 IngredientSchema.index({ isLowStock: 1 });

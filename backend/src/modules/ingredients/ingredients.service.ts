@@ -153,34 +153,44 @@ export class IngredientsService {
       .exec();
   }
 
-  async findLowStock(companyId: string): Promise<Ingredient[]> {
+  async findLowStock(companyId: string, branchId?: string): Promise<Ingredient[]> {
+    const query: any = {
+      companyId: new Types.ObjectId(companyId),
+      isLowStock: true,
+      isActive: true,
+    };
+    if (branchId) {
+      query.branchId = new Types.ObjectId(branchId);
+    }
     return this.ingredientModel
-      .find({
-        companyId: new Types.ObjectId(companyId),
-        isLowStock: true,
-        isActive: true,
-      })
+      .find(query)
       .sort({ currentStock: 1 })
       .exec();
   }
 
-  async findOutOfStock(companyId: string): Promise<Ingredient[]> {
-    return this.ingredientModel
-      .find({
-        companyId: new Types.ObjectId(companyId),
-        isOutOfStock: true,
-        isActive: true,
-      })
-      .exec();
+  async findOutOfStock(companyId: string, branchId?: string): Promise<Ingredient[]> {
+    const query: any = {
+      companyId: new Types.ObjectId(companyId),
+      isOutOfStock: true,
+      isActive: true,
+    };
+    if (branchId) {
+      query.branchId = new Types.ObjectId(branchId);
+    }
+    return this.ingredientModel.find(query).exec();
   }
 
-  async findNeedReorder(companyId: string): Promise<Ingredient[]> {
+  async findNeedReorder(companyId: string, branchId?: string): Promise<Ingredient[]> {
+    const query: any = {
+      companyId: new Types.ObjectId(companyId),
+      needsReorder: true,
+      isActive: true,
+    };
+    if (branchId) {
+      query.branchId = new Types.ObjectId(branchId);
+    }
     return this.ingredientModel
-      .find({
-        companyId: new Types.ObjectId(companyId),
-        needsReorder: true,
-        isActive: true,
-      })
+      .find(query)
       .populate('preferredSupplierId', 'name contactPerson phone email')
       .exec();
   }
@@ -208,17 +218,16 @@ export class IngredientsService {
       throw new BadRequestException('Invalid ingredient ID');
     }
 
-    const ingredient = await this.ingredientModel.findByIdAndUpdate(
-      id,
-      updateIngredientDto,
-      { new: true },
-    );
-
+    const ingredient = await this.ingredientModel.findById(id);
     if (!ingredient) {
       throw new NotFoundException('Ingredient not found');
     }
 
-    return ingredient;
+    // Apply updates
+    Object.assign(ingredient, updateIngredientDto);
+
+    // Save will trigger the pre('save') hook to recalculate status flags
+    return ingredient.save();
   }
 
   async adjustStock(
@@ -401,11 +410,15 @@ export class IngredientsService {
     }
   }
 
-  async getStats(companyId: string): Promise<any> {
-    const ingredients = await this.ingredientModel.find({
+  async getStats(companyId: string, branchId?: string): Promise<any> {
+    const query: any = {
       companyId: new Types.ObjectId(companyId),
       isActive: true,
-    });
+    };
+    if (branchId) {
+      query.branchId = new Types.ObjectId(branchId);
+    }
+    const ingredients = await this.ingredientModel.find(query);
 
     const totalValue = ingredients.reduce(
       (sum, ing) => sum + ing.currentStock * ing.unitCost,
@@ -428,11 +441,15 @@ export class IngredientsService {
     };
   }
 
-  async getValuation(companyId: string): Promise<any> {
-    const ingredients = await this.ingredientModel.find({
+  async getValuation(companyId: string, branchId?: string): Promise<any> {
+    const query: any = {
       companyId: new Types.ObjectId(companyId),
       isActive: true,
-    });
+    };
+    if (branchId) {
+      query.branchId = new Types.ObjectId(branchId);
+    }
+    const ingredients = await this.ingredientModel.find(query);
 
     const items = ingredients.map((ing) => ({
       name: ing.name,
@@ -449,6 +466,40 @@ export class IngredientsService {
       totalValue,
       generatedAt: new Date(),
     };
+  }
+
+  async fixAllStockStatuses(companyId: string): Promise<{ fixed: number; total: number }> {
+    const ingredients = await this.ingredientModel.find({
+      companyId: new Types.ObjectId(companyId),
+    });
+
+    let fixedCount = 0;
+    for (const ingredient of ingredients) {
+      // Fix common typos if found
+      if (ingredient.name.toLowerCase() === 'suger') {
+        ingredient.name = 'Sugar';
+      }
+
+      // Explicitly trigger status recalculation
+      const wasLow = ingredient.isLowStock;
+      const wasOut = ingredient.isOutOfStock;
+      const wasReorder = ingredient.needsReorder;
+
+      // Status logic from schema (copied here for explicit check)
+      ingredient.isOutOfStock = (ingredient.currentStock || 0) <= 0;
+      ingredient.isLowStock = (ingredient.currentStock || 0) > 0 && 
+                               (ingredient.currentStock || 0) <= (ingredient.minimumStock || 0);
+      ingredient.needsReorder = (ingredient.reorderPoint || 0) > 0 && 
+                                (ingredient.currentStock || 0) <= (ingredient.reorderPoint || 0);
+      
+      if (wasLow !== ingredient.isLowStock || wasOut !== ingredient.isOutOfStock || ingredient.needsReorder !== wasReorder) {
+        fixedCount++;
+      }
+      
+      await ingredient.save();
+    }
+
+    return { fixed: fixedCount, total: ingredients.length };
   }
 
   async bulkImport(

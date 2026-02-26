@@ -109,17 +109,18 @@ export class ReportsController {
   }
 
   @Get('customers/analytics/:companyId')
-
   @ApiOperation({ summary: 'Get customer analytics' })
   getCustomerAnalytics(
     @Param('companyId') companyId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Query('branchId') branchId?: string,
   ) {
     return this.reportsService.getCustomerAnalytics(
       companyId,
       new Date(startDate),
       new Date(endDate),
+      branchId,
     );
   }
 
@@ -139,10 +140,12 @@ export class ReportsController {
   }
 
   @Get('inventory/:companyId')
-
   @ApiOperation({ summary: 'Get inventory report' })
-  getInventoryReport(@Param('companyId') companyId: string) {
-    return this.reportsService.getInventoryReport(companyId);
+  getInventoryReport(
+    @Param('companyId') companyId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.reportsService.getInventoryReport(companyId, branchId);
   }
 
   @Get('comparison/:branchId')
@@ -205,10 +208,12 @@ export class ReportsController {
 
 
   @Get('low-stock')
-
   @ApiOperation({ summary: 'Get low stock items' })
-  getLowStockItems(@Query('companyId') companyId?: string) {
-    return this.reportsService.getLowStockItems(companyId);
+  getLowStockItems(
+    @Query('companyId') companyId?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.reportsService.getLowStockItems(companyId, branchId);
   }
 
   @Get('due-settlements')

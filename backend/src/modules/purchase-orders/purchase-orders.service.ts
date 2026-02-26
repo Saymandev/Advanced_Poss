@@ -362,20 +362,20 @@ export class PurchaseOrdersService {
 
         // Update Ingredient Inventory
         try {
-          await this.ingredientModel.findByIdAndUpdate(orderItem.ingredientId, {
-            $inc: { 
-              currentStock: deltaQty,
-              totalPurchased: deltaQty
-            },
-            $set: { 
-              lastPurchasePrice: orderItem.unitPrice,
-              lastRestockedDate: new Date()
-            }
-          });
-          fs.appendFileSync(logPath, `[PO-RECEIVE] Updated inventory for ${orderItem.ingredientName}: +${deltaQty}\n`);
+          const ingredient = await this.ingredientModel.findById(orderItem.ingredientId);
+          if (ingredient) {
+            ingredient.currentStock += deltaQty;
+            ingredient.totalPurchased += deltaQty;
+            ingredient.lastPurchasePrice = orderItem.unitPrice;
+            ingredient.lastRestockedDate = new Date();
+            await ingredient.save();
+            fs.appendFileSync(logPath, `[PO-RECEIVE] Updated inventory for ${orderItem.ingredientName}: +${deltaQty}\n`);
+          } else {
+            fs.appendFileSync(logPath, `[PO-RECEIVE] FAILED: Ingredient ${orderItem.ingredientId} not found\n`);
+          }
         } catch (invError) {
           console.error(`❌ Failed to update inventory for ingredient ${orderItem.ingredientName}:`, invError);
-          fs.appendFileSync(logPath, `[PO-RECEIVE] Inventory Update FAILED for ${orderItem.ingredientName}\n`);
+          fs.appendFileSync(logPath, `[PO-RECEIVE] Inventory Update ERROR for ${orderItem.ingredientName}\n`);
         }
       }
     }
