@@ -124,16 +124,16 @@ export class POSController {
   async getPOSMenuItems(@Query() filters: any, @Request() req) {
     return this.posService.getPOSMenuItems({
       ...filters,
-      branchId: req.user.branchId,
-      companyId: req.user.companyId || req.user.company?._id || req.user.company?.id,
+      branchId: filters.branchId || req.user.branchId,
+      companyId: filters.companyId || req.user.companyId || req.user.company?._id || req.user.company?.id,
     });
   }
 
   // Settings
   @Get('settings')
   @RequiresFeature(FEATURES.POS_SETTINGS, FEATURES.ORDER_MANAGEMENT)
-  async getPOSSettings(@Request() req) {
-    return this.posService.getPOSSettings(req.user.branchId);
+  async getPOSSettings(@Request() req, @Query('branchId') branchId?: string) {
+    return this.posService.getPOSSettings(branchId || req.user.branchId);
   }
 
   @Put('settings')

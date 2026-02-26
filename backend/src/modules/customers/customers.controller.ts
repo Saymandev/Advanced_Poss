@@ -1,20 +1,20 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-  ForbiddenException,
+    Body,
+    Controller,
+    Delete,
+    ForbiddenException,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator'; // Need this for manual checks
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { RequiresLimit } from '../../common/decorators/requires-limit.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator'; // Need this for manual checks
 import { CustomerFilterDto } from '../../common/dto/pagination.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -28,25 +28,27 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 @ApiTags('Customers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
-@RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) { }
 
   @Post()
   @RequiresLimit('maxCustomers')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
   @ApiOperation({ summary: 'Create new customer' })
   create(@Body() createCustomerDto: CreateCustomerDto) {
     return this.customersService.create(createCustomerDto);
   }
 
   @Get()
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get all customers with pagination, filtering, and search' })
   findAll(@Query() filterDto: CustomerFilterDto) {
     return this.customersService.findAll(filterDto);
   }
 
   @Get('search')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Search customers' })
   search(
     @Query('companyId') companyId: string,
@@ -57,18 +59,21 @@ export class CustomersController {
   }
 
   @Get('company/:companyId')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get customers by company' })
   findByCompany(@Param('companyId') companyId: string) {
     return this.customersService.findByCompany(companyId);
   }
 
   @Get('company/:companyId/vip')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
   @ApiOperation({ summary: 'Get VIP customers' })
   findVIP(@Param('companyId') companyId: string) {
     return this.customersService.findVIPCustomers(companyId);
   }
 
   @Get('company/:companyId/top')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
   @ApiOperation({ summary: 'Get top customers by spending' })
   findTopCustomers(
     @Param('companyId') companyId: string,
@@ -78,6 +83,7 @@ export class CustomersController {
   }
 
   @Get('company/:companyId/stats')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
   @ApiOperation({ summary: 'Get customer statistics' })
   getStats(@Param('companyId') companyId: string, @CurrentUser() user?: any) {
     if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
@@ -87,18 +93,21 @@ export class CustomersController {
   }
 
   @Get(':id')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get customer by ID' })
   findOne(@Param('id') id: string) {
     return this.customersService.findOne(id);
   }
 
   @Get(':id/orders')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get customer orders' })
   getCustomerOrders(@Param('id') id: string) {
     return this.customersService.getCustomerOrders(id);
   }
 
   @Patch(':id')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
   @ApiOperation({ summary: 'Update customer' })
   update(
     @Param('id') id: string,
@@ -170,6 +179,7 @@ export class CustomersController {
   }
 
   @Patch(':id/deactivate')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
   @ApiOperation({ summary: 'Deactivate customer' })
   deactivate(@Param('id') id: string, @CurrentUser() user?: any) {
     if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER && user?.role !== UserRole.MANAGER) {
@@ -179,6 +189,7 @@ export class CustomersController {
   }
 
   @Delete(':id')
+  @RequiresFeature(FEATURES.CUSTOMER_MANAGEMENT)
   @ApiOperation({ summary: 'Delete customer' })
   remove(@Param('id') id: string, @CurrentUser() user?: any) {
     if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.OWNER) {

@@ -1,17 +1,17 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
-  ForbiddenException,
-  Request,
+    Body,
+    Controller,
+    Delete,
+    ForbiddenException,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Request,
+    UploadedFile,
+    UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -34,25 +34,27 @@ import { UsersService } from './users.service';
 @ApiTags('Users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
-@RequiresFeature(FEATURES.STAFF_MANAGEMENT)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 
   @Post()
   @RequiresLimit('maxUsers')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Create new user' })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
 
   @Get()
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT, FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
   @ApiOperation({ summary: 'Get all users with pagination, filtering, and search' })
   findAll(@Query() filterDto: UserFilterDto) {
     return this.usersService.findAll(filterDto);
   }
 
   @Get('system/all')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Get all users across all companies (Super Admin only)' })
   findAllSystemWide(@Query() filterDto: UserFilterDto, @Request() req: any) {
     if (req.user.role !== UserRole.SUPER_ADMIN) {
@@ -77,6 +79,7 @@ export class UsersController {
   }
 
   @Get(':id')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT, FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
   @ApiOperation({ summary: 'Get user by ID' })
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
@@ -92,30 +95,35 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Update user by ID' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Delete user' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
   }
 
   @Patch(':id/deactivate')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Deactivate user' })
   deactivate(@Param('id') id: string) {
     return this.usersService.deactivate(id);
   }
 
   @Patch(':id/activate')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Activate user' })
   activate(@Param('id') id: string) {
     return this.usersService.activate(id);
   }
 
   @Patch(':id/admin-update-pin')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Update user PIN (admin - no current PIN required)' })
   adminUpdatePin(
     @Param('id') id: string,
@@ -125,6 +133,7 @@ export class UsersController {
   }
 
   @Patch(':id/admin-update-password')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Update user password (admin - no current password required)' })
   adminUpdatePassword(
     @Param('id') id: string,
@@ -134,6 +143,7 @@ export class UsersController {
   }
 
   @Get('branch/:branchId/role/:role')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get employees by branch and role' })
   getEmployeesByBranchAndRole(
     @Param('branchId') branchId: string,
@@ -143,6 +153,7 @@ export class UsersController {
   }
 
   @Post('upload-avatar')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT, FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
   @ApiOperation({ summary: 'Upload user avatar' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('avatar'))
