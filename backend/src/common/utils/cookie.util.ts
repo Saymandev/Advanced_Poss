@@ -11,10 +11,15 @@ const REFRESH_TOKEN_COOKIE = 'refreshToken';
 const getCookieOptions = (isProduction: boolean = false) => {
   // Production cookies should always be Secure
   // In development (localhost), we can't use Secure=true without HTTPS
+  
+  // sameSite: 'none' is required for cross-domain cookies (e.g. backend on orub.live, frontend on raha.bd)
+  // however, 'none' MUST have secure: true.
+  const sameSite = (process.env.COOKIE_SAME_SITE as any) || (isProduction ? 'none' : 'lax');
+  
   return {
     httpOnly: true, // Prevents JavaScript access (XSS protection)
-    secure: isProduction, // Must be true for HTTPS production
-    sameSite: 'lax' as const, // CSRF protection, improved security for primary domain
+    secure: isProduction || sameSite === 'none', // Must be true for HTTPS production or sameSite=none
+    sameSite: sameSite as 'lax' | 'strict' | 'none',
     path: '/',
   };
 };
