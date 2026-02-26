@@ -23,10 +23,6 @@ export const usePOSOfflinePrefetcher = (): POSOfflineState => {
   const branchId =
     (user as any)?.branchId
     || (companyContext as any)?.branchId
-    || (companyContext as any)?.branches?.[0]?._id
-    || (companyContext as any)?.branches?.[0]?.id
-    || (user as any)?.company?.branches?.[0]?._id
-    || (user as any)?.company?.branches?.[0]?.id
     || '';
 
   const companyId =
