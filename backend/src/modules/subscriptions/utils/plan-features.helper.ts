@@ -51,6 +51,7 @@ export const CORE_FEATURES = [
   FEATURES.DASHBOARD,
   FEATURES.SETTINGS,
   FEATURES.NOTIFICATIONS,
+  FEATURES.CMS,
 ];
 
 /**
@@ -180,6 +181,7 @@ export function getFeaturesByCategory() {
       { key: FEATURES.BRANCHES, name: 'Branches' },
       { key: 'multi-branch', name: 'Multi-Branch Support' },
       { key: FEATURES.NOTIFICATIONS, name: 'Notifications' },
+      { key: FEATURES.CMS, name: 'CMS & Gallery' },
     ],
     Hotel: [
       { key: FEATURES.ROOM_MANAGEMENT, name: 'Room Management' },
