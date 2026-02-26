@@ -5,6 +5,7 @@ import { RolePermissionsModule } from '../role-permissions/role-permissions.modu
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { TransactionsModule } from '../transactions/transactions.module';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { ExpensesController } from './expenses.controller';
 import { ExpensesService } from './expenses.service';
 import { Expense, ExpenseSchema } from './schemas/expense.schema';
@@ -16,6 +17,7 @@ import { Expense, ExpenseSchema } from './schemas/expense.schema';
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => TransactionsModule),
+    forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [ExpensesController],
   providers: [ExpensesService, RoleFeatureGuard],

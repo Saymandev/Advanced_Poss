@@ -1,9 +1,9 @@
 import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-  forwardRef,
+    BadRequestException,
+    Inject,
+    Injectable,
+    NotFoundException,
+    forwardRef
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as fs from 'fs';
@@ -13,6 +13,7 @@ import { ExpenseFilterDto } from '../../common/dto/pagination.dto';
 import { isSuperAdmin } from '../../common/utils/query.utils';
 import { TransactionCategory, TransactionType } from '../transactions/schemas/transaction.schema';
 import { TransactionsService } from '../transactions/transactions.service';
+import { WorkPeriodsService } from '../work-periods/work-periods.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { Expense, ExpenseDocument } from './schemas/expense.schema';
@@ -23,8 +24,25 @@ export class ExpensesService {
     private expenseModel: Model<ExpenseDocument>,
     @Inject(forwardRef(() => TransactionsService))
     private transactionsService: TransactionsService,
+    @Inject(forwardRef(() => WorkPeriodsService))
+    private workPeriodsService: WorkPeriodsService,
   ) {}
-  async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
+  async create(createExpenseDto: CreateExpenseDto, userRole?: string): Promise<Expense> {
+    // Check if user is owner or super_admin
+    const normalizedRole = userRole?.toLowerCase();
+    const isOwnerOrSuperAdmin = normalizedRole === 'owner' || normalizedRole === 'super_admin';
+
+    // If not owner/super_admin, check for active work period
+    if (!isOwnerOrSuperAdmin) {
+      const activePeriod = await this.workPeriodsService.findActive(
+        createExpenseDto.companyId,
+        createExpenseDto.branchId,
+      );
+      if (!activePeriod) {
+        throw new BadRequestException('Expenses can only be recorded during an active work period.');
+      }
+    }
+
     const expenseNumber = await this.generateExpenseNumber(
       createExpenseDto.branchId,
     );

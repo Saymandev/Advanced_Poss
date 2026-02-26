@@ -100,8 +100,8 @@ export class POSController {
 
   @Get('quick-stats')
   @RequiresFeature(FEATURES.DASHBOARD)
-  async getQuickStats(@Request() req) {
-    return this.posService.getQuickStats(req.user.branchId);
+  async getQuickStats(@Request() req, @Query('date') date?: string) {
+    return this.posService.getQuickStats(req.user.branchId, date);
   }
 
   // Tables

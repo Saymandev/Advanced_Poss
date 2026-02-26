@@ -20,8 +20,9 @@ export class ReportsController {
   getDashboardStats(
     @Query('branchId') branchId?: string,
     @Query('companyId') companyId?: string,
+    @Query('date') date?: string,
   ) {
-    return this.reportsService.getDashboardStats(branchId, companyId);
+    return this.reportsService.getDashboardStats(branchId, companyId, date);
   }
 
 
@@ -31,8 +32,9 @@ export class ReportsController {
   getDashboardStatsByBranch(
     @Param('branchId') branchId: string,
     @Query('companyId') companyId?: string,
+    @Query('date') date?: string,
   ) {
-    return this.reportsService.getDashboardStats(branchId, companyId);
+    return this.reportsService.getDashboardStats(branchId, companyId, date);
   }
 
   @Get('financial-summary')

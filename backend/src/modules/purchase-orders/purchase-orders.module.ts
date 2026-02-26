@@ -1,15 +1,16 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ExpensesModule } from '../expenses/expenses.module';
+import { Ingredient, IngredientSchema } from '../ingredients/schemas/ingredient.schema';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { Supplier, SupplierSchema } from '../suppliers/schemas/supplier.schema';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import {
-  PurchaseOrder,
-  PurchaseOrderSchema,
+    PurchaseOrder,
+    PurchaseOrderSchema,
 } from './schemas/purchase-order.schema';
-import { Supplier, SupplierSchema } from '../suppliers/schemas/supplier.schema';
-import { Ingredient, IngredientSchema } from '../ingredients/schemas/ingredient.schema';
-import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
-import { ExpensesModule } from '../expenses/expenses.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ExpensesModule } from '../expenses/expenses.module';
     ]),
     forwardRef(() => ExpensesModule),
     SubscriptionsModule,
+    forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [PurchaseOrdersController],
   providers: [PurchaseOrdersService],

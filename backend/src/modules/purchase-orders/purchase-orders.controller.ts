@@ -1,15 +1,16 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+    Body,
+    Controller,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { PurchaseOrderFilterDto } from '../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -32,8 +33,11 @@ export class PurchaseOrdersController {
 
   @Post()
   @ApiOperation({ summary: 'Create purchase order' })
-  create(@Body() dto: CreatePurchaseOrderDto) {
-    return this.purchaseOrdersService.create(dto);
+  create(
+    @Body() dto: CreatePurchaseOrderDto,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    return this.purchaseOrdersService.create(dto, userRole);
   }
 
   @Get()

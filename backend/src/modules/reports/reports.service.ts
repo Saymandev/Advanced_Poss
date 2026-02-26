@@ -439,8 +439,9 @@ export class ReportsService {
   async getDashboardStats(
     branchId?: string,
     companyId?: string,
+    dateInput?: string,
   ): Promise<any> {
-    const today = new Date();
+    const today = dateInput ? new Date(dateInput) : new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);

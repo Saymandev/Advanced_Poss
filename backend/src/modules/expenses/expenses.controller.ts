@@ -1,13 +1,13 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -32,8 +32,11 @@ export class ExpensesController {
   @Post()
   @RequiresFeature(FEATURES.EXPENSES)
   @ApiOperation({ summary: 'Create new expense' })
-  create(@Body() createExpenseDto: CreateExpenseDto) {
-    return this.expensesService.create(createExpenseDto);
+  create(
+    @Body() createExpenseDto: CreateExpenseDto,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    return this.expensesService.create(createExpenseDto, userRole);
   }
 
   @Get()

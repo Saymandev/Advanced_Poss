@@ -51,6 +51,10 @@ export class POSStatsFiltersDto {
 
   @IsOptional()
   @IsString()
+  date?: string;
+
+  @IsOptional()
+  @IsString()
   endDate?: string;
 
   @IsOptional()

@@ -1447,7 +1447,7 @@ export class POSService {
         }
       }
     }
-    const today = new Date();
+    const today = filters.date ? new Date(filters.date) : new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1534,8 +1534,8 @@ export class POSService {
     };
   }
   // Get quick stats
-  async getQuickStats(branchId: string): Promise<any> {
-    const today = new Date();
+  async getQuickStats(branchId: string, date?: string): Promise<any> {
+    const today = date ? new Date(date) : new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);

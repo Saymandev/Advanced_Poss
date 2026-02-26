@@ -1,9 +1,9 @@
 import {
-    BadRequestException,
-    Inject,
-    Injectable,
-    NotFoundException,
-    forwardRef,
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as fs from 'fs';
@@ -13,18 +13,19 @@ import { PurchaseOrderFilterDto } from '../../common/dto/pagination.dto';
 import { PurchaseOrderStatus } from '../../common/enums/purchase-order-status.enum';
 import { ExpensesService } from '../expenses/expenses.service';
 import {
-    Ingredient,
-    IngredientDocument,
+  Ingredient,
+  IngredientDocument,
 } from '../ingredients/schemas/ingredient.schema';
 import { Supplier, SupplierDocument } from '../suppliers/schemas/supplier.schema';
+import { WorkPeriodsService } from '../work-periods/work-periods.service';
 import { ApprovePurchaseOrderDto } from './dto/approve-purchase-order.dto';
 import { CancelPurchaseOrderDto } from './dto/cancel-purchase-order.dto';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import {
-    PurchaseOrder,
-    PurchaseOrderDocument,
+  PurchaseOrder,
+  PurchaseOrderDocument,
 } from './schemas/purchase-order.schema';
 
 @Injectable()
@@ -38,6 +39,8 @@ export class PurchaseOrdersService {
     private readonly ingredientModel: Model<IngredientDocument>,
     @Inject(forwardRef(() => ExpensesService))
     private readonly expensesService: ExpensesService,
+    @Inject(forwardRef(() => WorkPeriodsService))
+    private readonly workPeriodsService: WorkPeriodsService,
   ) {}
 
   private generateOrderNumber(date = new Date()): string {
@@ -103,7 +106,22 @@ export class PurchaseOrdersService {
     };
   }
 
-  async create(createPurchaseOrderDto: CreatePurchaseOrderDto) {
+  async create(createPurchaseOrderDto: CreatePurchaseOrderDto, userRole?: string) {
+    // Check if user is owner or super_admin
+    const normalizedRole = userRole?.toLowerCase();
+    const isOwnerOrSuperAdmin = normalizedRole === 'owner' || normalizedRole === 'super_admin';
+
+    // If not owner/super_admin, check for active work period
+    if (!isOwnerOrSuperAdmin) {
+      const activePeriod = await this.workPeriodsService.findActive(
+        createPurchaseOrderDto.companyId,
+        createPurchaseOrderDto.branchId,
+      );
+      if (!activePeriod) {
+        throw new BadRequestException('Purchase orders can only be recorded during an active work period.');
+      }
+    }
+
     if (!createPurchaseOrderDto.items || createPurchaseOrderDto.items.length === 0) {
       throw new BadRequestException('At least one item is required');
     }
