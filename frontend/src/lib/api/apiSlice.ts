@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { enqueueOfflineOrder, getSnapshot } from '../offline/db';
 import { SNAPSHOT_KEYS } from '../offline/posPrefetcher';
 import { logout } from '../slices/authSlice';
+import { decryptData } from '../utils/crypto';
 
 // Maps URL substrings to snapshot keys — used for offline GET fallback
 const OFFLINE_SNAPSHOT_MAP: Array<{ match: string; key: string }> = [
@@ -16,6 +17,8 @@ const OFFLINE_SNAPSHOT_MAP: Array<{ match: string; key: string }> = [
   { match: '/staff',                  key: SNAPSHOT_KEYS.STAFF },
   { match: '/delivery-zones',         key: SNAPSHOT_KEYS.DELIVERY_ZONES },
   { match: '/customers',              key: SNAPSHOT_KEYS.CUSTOMERS },
+  { match: '/settings/company',       key: SNAPSHOT_KEYS.COMPANY_SETTINGS },
+  { match: '/companies/',             key: SNAPSHOT_KEYS.COMPANY_INFO },
 ];
 
 /** Returns the snapshot key for a given URL, or null if not cacheable */
@@ -26,94 +29,9 @@ const getSnapshotKeyForUrl = (url: string): string | null => {
 };
 // Helper to transparently decrypt AES-encrypted API responses
 const decryptIfNeeded = async (response: any) => {
-  try {
-    // Only run in browser (window/crypto not available during SSR)
-    if (typeof window === 'undefined' || !window.crypto?.subtle) {
-      return response;
-    }
-    if (!response || !response.data) return response;
-    let body = response.data as any;
-    // Handle wrapped format: { success: true, data: { encrypted: true, ... } }
-    if (
-      body &&
-      typeof body === 'object' &&
-      'success' in body &&
-      'data' in body &&
-      body.data &&
-      typeof body.data === 'object' &&
-      'encrypted' in body.data
-    ) {
-      body = body.data;
-    }
-    if (
-      !body ||
-      typeof body !== 'object' ||
-      !body.encrypted ||
-      !body.iv ||
-      !body.data
-    ) {
-      return response;
-    }
-    // Decrypt on the client using the Web Crypto API with a shared key.
-    // NOTE: For real security you should derive this key per-session or
-    //       use TLS only. A hard-coded key only adds light obfuscation.
-    const secret =
-      'ykg44s8k80wsok80s880w0gw';
-    const enc = new TextEncoder();
-    const keyMaterial = await window.crypto.subtle.importKey(
-      'raw',
-      enc.encode(secret),
-      { name: 'PBKDF2' },
-      false,
-      ['deriveKey'],
-    );
-    // Derive a 256-bit key from the secret (must mirror backend derivation)
-    const key = await window.crypto.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: enc.encode('response-encryption-salt'),
-        iterations: 1000,
-        hash: 'SHA-256',
-      },
-      keyMaterial,
-      { name: 'AES-CBC', length: 256 },
-      false,
-      ['decrypt'],
-    );
-    try {
-      const iv = Uint8Array.from(
-        atob(body.iv || ''),
-        (c) => c.charCodeAt(0),
-      );
-      const cipherBytes = Uint8Array.from(
-        atob(body.data || ''),
-        (c) => c.charCodeAt(0),
-      );
-      const decryptedBuffer = await window.crypto.subtle.decrypt(
-        { name: 'AES-CBC', iv },
-        key,
-        cipherBytes,
-      );
-      const decoded = new TextDecoder().decode(decryptedBuffer);
-      // Parse JSON if possible, otherwise keep as string
-      let parsed: any;
-      try {
-        parsed = JSON.parse(decoded);
-      } catch {
-        parsed = decoded;
-      }
-      // Replace entire body with decrypted payload so callers see the ORIGINAL
-      // response shape from the service (e.g. { success, data: {...} }).
-      response.data = parsed;
-    } catch (decryptError) {
-      console.error('Failed to decrypt API response, returning original:', decryptError);
-      return response;
-    }
-    return response;
-  } catch (error) {
-    console.error('Failed to decrypt API response', error);
-    return response;
-  }
+  if (!response || !response.data) return response;
+  response.data = await decryptData(response.data);
+  return response;
 };
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',

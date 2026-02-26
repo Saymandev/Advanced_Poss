@@ -8,6 +8,7 @@
  * - TTL-aware: only re-fetches when data is stale.
  */
 
+import { decryptData } from '../utils/crypto';
 import { isSnapshotFresh, saveSnapshot, TTL } from './db';
 
 const getApiBase = () =>
@@ -23,6 +24,8 @@ export const SNAPSHOT_KEYS = {
   POS_SETTINGS: 'posSettings',
   DELIVERY_ZONES: 'deliveryZones',
   CUSTOMERS: 'customers',
+  COMPANY_SETTINGS: 'companySettings', // New
+  COMPANY_INFO: 'companyInfo',         // New
 } as const;
 
 export type SnapshotKey = (typeof SNAPSHOT_KEYS)[keyof typeof SNAPSHOT_KEYS];
@@ -52,9 +55,34 @@ const fetchJson = async (url: string): Promise<any> => {
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} from ${url}`);
   }
-  const json = await response.json();
-  // Handle both { data: {...} } and raw response shapes
-  return json?.data ?? json;
+  const raw = await response.json();
+  
+  // Decrypt if the response is encrypted
+  const decrypted = await decryptData(raw);
+  
+  // Handle the standard wrapped response shape { success: true, data: ... }
+  // decrypted might already be the data if it was unwrapped during decryption
+  if (decrypted && typeof decrypted === 'object' && 'success' in decrypted && 'data' in decrypted) {
+    return decrypted.data;
+  }
+  
+  return decrypted;
+};
+
+// ─── Helper to extract items from various response shapes ───────────────────
+const extractItems = (raw: any, key: string): any[] => {
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== 'object') return [];
+  
+  // Try common keys: .items, .data, .[key], .data.[key]
+  if (Array.isArray(raw.items)) return raw.items;
+  if (Array.isArray(raw.data)) return raw.data;
+  if (Array.isArray(raw[key])) return raw[key];
+  if (raw.data && Array.isArray(raw.data[key])) return raw.data[key];
+  
+  // If it's a single object that isn't an array, return it as a 1-item array if appropriate,
+  // but usually we expect arrays for items/categories/etc.
+  return [];
 };
 
 // ─── Per-endpoint fetchers ────────────────────────────────────────────────────
@@ -64,7 +92,7 @@ const fetchMenuItems = async (branchId: string): Promise<PrefetchResult> => {
     const params = new URLSearchParams({ limit: '9999', isAvailable: 'true' });
     if (branchId) params.set('branchId', branchId);
     const raw = await fetchJson(`${getApiBase()}/pos/menu-items?${params}`);
-    const items = raw?.menuItems || raw?.items || (Array.isArray(raw) ? raw : []);
+    const items = extractItems(raw, 'menuItems');
     await saveSnapshot(SNAPSHOT_KEYS.MENU_ITEMS, items, TTL.MENU_ITEMS);
     return { key: SNAPSHOT_KEYS.MENU_ITEMS, success: true, count: items.length };
   } catch (error: any) {
@@ -77,7 +105,7 @@ const fetchCategories = async (branchId: string): Promise<PrefetchResult> => {
     const params = new URLSearchParams({ limit: '9999' });
     if (branchId) params.set('branchId', branchId);
     const raw = await fetchJson(`${getApiBase()}/categories?${params}`);
-    const items = raw?.categories || (Array.isArray(raw) ? raw : []);
+    const items = extractItems(raw, 'categories');
     await saveSnapshot(SNAPSHOT_KEYS.CATEGORIES, items, TTL.CATEGORIES);
     return { key: SNAPSHOT_KEYS.CATEGORIES, success: true, count: items.length };
   } catch (error: any) {
@@ -87,12 +115,11 @@ const fetchCategories = async (branchId: string): Promise<PrefetchResult> => {
 
 const fetchPaymentMethods = async (companyId: string, branchId: string): Promise<PrefetchResult> => {
   try {
-    // Use the branch-specific endpoint (the correct one POS actually uses)
     const url = companyId && branchId
       ? `${getApiBase()}/payment-methods/branch/${companyId}/${branchId}`
       : `${getApiBase()}/payment-methods`;
     const raw = await fetchJson(url);
-    const items = raw?.paymentMethods || (Array.isArray(raw) ? raw : []);
+    const items = extractItems(raw, 'paymentMethods');
     await saveSnapshot(SNAPSHOT_KEYS.PAYMENT_METHODS, items, TTL.PAYMENT_METHODS);
     return { key: SNAPSHOT_KEYS.PAYMENT_METHODS, success: true, count: items.length };
   } catch (error: any) {
@@ -106,7 +133,7 @@ const fetchStaff = async (companyId: string, branchId: string): Promise<Prefetch
     if (companyId) params.set('companyId', companyId);
     if (branchId) params.set('branchId', branchId);
     const raw = await fetchJson(`${getApiBase()}/users?${params}`);
-    const items = raw?.users || (Array.isArray(raw) ? raw : []);
+    const items = extractItems(raw, 'users');
     await saveSnapshot(SNAPSHOT_KEYS.STAFF, items, TTL.STAFF);
     return { key: SNAPSHOT_KEYS.STAFF, success: true, count: items.length };
   } catch (error: any) {
@@ -119,23 +146,8 @@ const fetchTables = async (branchId: string): Promise<PrefetchResult> => {
     const params = new URLSearchParams();
     if (branchId) params.set('branchId', branchId);
     const raw = await fetchJson(`${getApiBase()}/pos/tables/available?${params}`);
+    const items = extractItems(raw, 'tables');
     
-    // Handle all potential response shapes
-    let items = [];
-    if (Array.isArray(raw)) {
-      items = raw;
-    } else if (raw?.tables && Array.isArray(raw.tables)) {
-      items = raw.tables;
-    } else if (raw?.items && Array.isArray(raw.items)) {
-      items = raw.items;
-    } else if (raw?.data && Array.isArray(raw.data)) {
-      items = raw.data;
-    } else if (raw?.data?.tables && Array.isArray(raw.data.tables)) {
-      items = raw.data.tables;
-    }
-    
-    // Only save if we got items or if it's explicitly an empty result for a valid branch
-    // This prevents overwriting a good snapshot with empty data if the branchId resolution fails
     if (items.length > 0 || (branchId && raw)) {
       await saveSnapshot(SNAPSHOT_KEYS.TABLES, items, TTL.TABLES);
     }
@@ -161,7 +173,7 @@ const fetchDeliveryZones = async (branchId: string): Promise<PrefetchResult> => 
   try {
     if (!branchId) return { key: SNAPSHOT_KEYS.DELIVERY_ZONES, success: true, count: 0 };
     const raw = await fetchJson(`${getApiBase()}/delivery-zones?branchId=${branchId}&limit=999`);
-    const items = raw?.deliveryZones || (Array.isArray(raw) ? raw : []);
+    const items = extractItems(raw, 'deliveryZones');
     await saveSnapshot(SNAPSHOT_KEYS.DELIVERY_ZONES, items, TTL.DELIVERY_ZONES);
     return { key: SNAPSHOT_KEYS.DELIVERY_ZONES, success: true, count: items.length };
   } catch (error: any) {
@@ -171,13 +183,34 @@ const fetchDeliveryZones = async (branchId: string): Promise<PrefetchResult> => 
 
 const fetchCustomers = async (): Promise<PrefetchResult> => {
   try {
-    // Fetch first 1000 customers for offline search — more than enough for most businesses
     const raw = await fetchJson(`${getApiBase()}/customers?limit=1000&page=1`);
-    const items = raw?.customers || (Array.isArray(raw) ? raw : []);
+    const items = extractItems(raw, 'customers');
     await saveSnapshot(SNAPSHOT_KEYS.CUSTOMERS, items, TTL.CUSTOMERS);
     return { key: SNAPSHOT_KEYS.CUSTOMERS, success: true, count: items.length };
   } catch (error: any) {
     return { key: SNAPSHOT_KEYS.CUSTOMERS, success: false, error: error.message };
+  }
+};
+
+const fetchCompanySettings = async (companyId: string): Promise<PrefetchResult> => {
+  try {
+    if (!companyId) return { key: SNAPSHOT_KEYS.COMPANY_SETTINGS, success: true };
+    const raw = await fetchJson(`${getApiBase()}/settings/company?companyId=${companyId}`);
+    await saveSnapshot(SNAPSHOT_KEYS.COMPANY_SETTINGS, raw, TTL.GENERIC);
+    return { key: SNAPSHOT_KEYS.COMPANY_SETTINGS, success: true };
+  } catch (error: any) {
+    return { key: SNAPSHOT_KEYS.COMPANY_SETTINGS, success: false, error: error.message };
+  }
+};
+
+const fetchCompanyInfo = async (companyId: string): Promise<PrefetchResult> => {
+  try {
+    if (!companyId) return { key: SNAPSHOT_KEYS.COMPANY_INFO, success: true };
+    const raw = await fetchJson(`${getApiBase()}/companies/${companyId}`);
+    await saveSnapshot(SNAPSHOT_KEYS.COMPANY_INFO, raw, TTL.GENERIC);
+    return { key: SNAPSHOT_KEYS.COMPANY_INFO, success: true };
+  } catch (error: any) {
+    return { key: SNAPSHOT_KEYS.COMPANY_INFO, success: false, error: error.message };
   }
 };
 
@@ -194,7 +227,6 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
   const startedAt = Date.now();
   const { branchId, companyId, forceRefresh = false, onProgress } = ctx;
 
-  // Helper: skip if still fresh (unless forceRefresh)
   const shouldSkip = async (key: SnapshotKey, ttl: number): Promise<boolean> => {
     if (forceRefresh) return false;
     return isSnapshotFresh(key, ttl);
@@ -215,8 +247,6 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
     return result;
   };
 
-  // Run all fetchers — tables in parallel with the rest
-  // but we run them concurrently for speed
   const results = await Promise.allSettled([
     runFetcher(SNAPSHOT_KEYS.MENU_ITEMS, TTL.MENU_ITEMS, () => fetchMenuItems(branchId)),
     runFetcher(SNAPSHOT_KEYS.CATEGORIES, TTL.CATEGORIES, () => fetchCategories(branchId)),
@@ -226,6 +256,8 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
     runFetcher(SNAPSHOT_KEYS.POS_SETTINGS, TTL.POS_SETTINGS, () => fetchPOSSettings(branchId)),
     runFetcher(SNAPSHOT_KEYS.DELIVERY_ZONES, TTL.DELIVERY_ZONES, () => fetchDeliveryZones(branchId)),
     runFetcher(SNAPSHOT_KEYS.CUSTOMERS, TTL.CUSTOMERS, () => fetchCustomers()),
+    runFetcher(SNAPSHOT_KEYS.COMPANY_SETTINGS, TTL.GENERIC, () => fetchCompanySettings(companyId)),
+    runFetcher(SNAPSHOT_KEYS.COMPANY_INFO, TTL.GENERIC, () => fetchCompanyInfo(companyId)),
   ]);
 
   const finalResults: PrefetchResult[] = results.map((r, i) => {
