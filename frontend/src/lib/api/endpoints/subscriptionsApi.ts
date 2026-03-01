@@ -126,6 +126,7 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
           }
           return plans.map((plan) => ({
             ...plan,
+            id: plan._id?.toString() || plan.id?.toString() || plan.id,
             // Preserve featureNames from backend (mapped from enabledFeatureKeys)
             // Only create featureList fallback if featureNames is not available
             featureList:
@@ -140,9 +141,9 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
                       plan.features?.multiBranch ? 'Multi-branch Support' : null,
                       plan.features?.aiInsights ? 'AI Insights' : null,
                       plan.features?.accounting ? 'Accounting & Reports' : null,
-                    ].filter(Boolean) as string[]),
-            // Also preserve featureNames if it exists
-            featureNames: plan.featureNames || undefined,
+                     ].filter(Boolean) as string[]),
+             // Also preserve featureNames if it exists
+             featureNames: plan.featureNames || undefined,
           }));
         };
         // Handle { success: true, data: [...] } format (from backend interceptor)
@@ -237,7 +238,12 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         if (!data) {
           return { subscriptions: [], total: 0 };
         }
-        const subscriptions = Array.isArray(data.subscriptions) ? data.subscriptions : [];
+        const subscriptions = Array.isArray(data.subscriptions) 
+          ? data.subscriptions.map((sub: any) => ({
+              ...sub,
+              id: sub._id?.toString() || sub.id?.toString() || sub.id
+            })) 
+          : [];
         const total = typeof data.total === 'number' ? data.total : subscriptions.length;
         return { subscriptions, total };
       },
@@ -248,6 +254,16 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['Subscription'],
+      transformResponse: (response: any): Subscription => {
+        const data = response?.data ?? response;
+        if (data && typeof data === 'object') {
+          return {
+            ...data,
+            id: data._id?.toString() || data.id?.toString() || data.id
+          };
+        }
+        return data;
+      },
     }),
     getSubscriptionByCompany: builder.query<Subscription, { companyId: string }>({
       query: ({ companyId }) => ({
@@ -256,6 +272,16 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       providesTags: ['Subscription'],
       // Handle 404 gracefully - subscription might not exist or be inactive
       keepUnusedDataFor: 60, // Cache for 60 seconds
+      transformResponse: (response: any): Subscription => {
+        const data = response?.data ?? response;
+        if (data && typeof data === 'object') {
+          return {
+            ...data,
+            id: data._id?.toString() || data.id?.toString() || data.id
+          };
+        }
+        return data;
+      },
     }),
     createSubscription: builder.mutation<Subscription, { 
       companyId: string;
@@ -397,12 +423,18 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
         if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
           const data = response.data;
           if (Array.isArray(data)) {
-            return data;
+            return data.map((item: any) => ({
+              ...item,
+              id: item._id?.toString() || item.id?.toString() || item.id
+            }));
           }
         }
         // Handle direct array format
         if (Array.isArray(response)) {
-          return response;
+          return response.map((item: any) => ({
+            ...item,
+            id: item._id?.toString() || item.id?.toString() || item.id
+          }));
         }
         // Fallback: return empty array
         console.warn('Subscription features response format not recognized:', response);

@@ -42,6 +42,13 @@ export interface Booking {
   cancellationReason?: string;
   refundAmount?: number;
   notes?: string;
+  paymentHistory?: {
+    amount: number;
+    method: string;
+    date: string;
+    note?: string;
+    processedBy?: string;
+  }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -342,13 +349,21 @@ export const bookingsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Booking', 'Room'],
     }),
-    checkOut: builder.mutation<Booking, { id: string; notes?: string; additionalCharges?: number }>({
+    checkOut: builder.mutation<Booking, { id: string; notes?: string; additionalCharges?: number; paymentMethod?: string; paymentAmount?: number }>({
       query: ({ id, ...data }) => ({
         url: `/bookings/${id}/check-out`,
         method: 'POST',
         body: data,
       }),
       invalidatesTags: ['Booking', 'Room'],
+    }),
+    recordPayment: builder.mutation<Booking, { id: string; amount: number; method: string; note?: string }>({
+      query: ({ id, ...data }) => ({
+        url: `/bookings/${id}/payments`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Booking'],
     }),
     cancelBooking: builder.mutation<Booking, { id: string; reason?: string; refundAmount?: number }>({
       query: ({ id, ...data }) => ({
@@ -372,5 +387,6 @@ export const {
   useCheckInMutation,
   useCheckOutMutation,
   useCancelBookingMutation,
+  useRecordPaymentMutation,
 } = bookingsApi;
 

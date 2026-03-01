@@ -4,15 +4,21 @@ export interface DashboardStats {
     orders: number;
     completed: number;
     revenue: number;
+    posRevenue?: number;
+    hotelRevenue?: number;
     averageOrderValue: number;
   };
   week?: {
     orders: number;
     revenue: number;
+    posRevenue?: number;
+    hotelRevenue?: number;
   };
   month?: {
     orders: number;
     revenue: number;
+    posRevenue?: number;
+    hotelRevenue?: number;
   };
   active?: {
     orders: number;
@@ -54,6 +60,8 @@ export interface DashboardStats {
 export interface SalesAnalytics {
   period: string;
   totalSales: number;
+  posRevenue?: number;
+  hotelRevenue?: number;
   totalOrders: number;
   averageOrderValue: number;
   salesByCategory: Array<{
@@ -69,6 +77,8 @@ export interface SalesAnalytics {
   salesByDay: Array<{
     day: string;
     sales: number;
+    posRevenue?: number;
+    hotelRevenue?: number;
     orders: number;
   }>;
 }
@@ -131,6 +141,8 @@ export interface FinancialSummary {
   };
   sales: {
     total: number;
+    posSales?: number;
+    hotelRevenue?: number;
     orders: number;
     byPaymentMethod: Record<string, number>;
   };
@@ -274,18 +286,22 @@ export const reportsApi = apiSlice.injectEndpoints({
           };
         }
         // Backend returns: { period, data: [...], summary: { totalRevenue, totalOrders, averageOrderValue } }
-        const transformed = {
+        const transformed: SalesAnalytics = {
           period: actualData.period || 'week',
           totalSales: actualData.summary?.totalRevenue ?? 0,
+          posRevenue: actualData.summary?.posRevenue ?? 0,
+          hotelRevenue: actualData.summary?.hotelRevenue ?? 0,
           totalOrders: actualData.summary?.totalOrders ?? 0,
           averageOrderValue: actualData.summary?.averageOrderValue ?? 0,
+          salesByCategory: [], // Will be fetched separately
+          salesByHour: [], // Will be fetched separately
           salesByDay: (actualData.data || []).map((item: any) => ({
             day: item.date || item.day || '',
             sales: item.revenue || item.sales || 0,
+            posRevenue: item.posRevenue || 0,
+            hotelRevenue: item.hotelRevenue || 0,
             orders: item.orders || 0,
           })),
-          salesByCategory: [], // Will be fetched separately
-          salesByHour: [], // Will be fetched separately
         };
         return transformed;
       },

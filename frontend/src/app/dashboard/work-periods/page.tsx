@@ -21,7 +21,7 @@ import {
   PlayIcon,
   PrinterIcon,
   StopIcon,
-  UserIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -913,6 +913,12 @@ export default function WorkPeriodsPage() {
                   </p>
                 </div>
                 <div>
+                  <span className="text-gray-600 dark:text-gray-400">Hotel Revenue:</span>
+                  <p className="font-semibold text-blue-600 dark:text-blue-400">
+                    {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.hotelRevenue || 0)}
+                  </p>
+                </div>
+                <div>
                   <span className="text-gray-600 dark:text-gray-400">Difference:</span>
                   <p className={`font-semibold ${(selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0)) >= 0
                     ? 'text-green-600'
@@ -967,8 +973,20 @@ export default function WorkPeriodsPage() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Gross Sales</td>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">POS Sales</td>
                         <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">
+                          {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.posSales || 0)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Hotel Revenue</td>
+                        <td className="px-4 py-2 text-right font-semibold text-blue-600 dark:text-blue-400">
+                          {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.hotelRevenue || 0)}
+                        </td>
+                      </tr>
+                      <tr className="bg-gray-50 dark:bg-gray-800/50">
+                        <td className="px-4 py-2 font-bold text-gray-900 dark:text-white">Gross Sales (Total)</td>
+                        <td className="px-4 py-2 text-right font-bold text-gray-900 dark:text-white">
                           {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.grossSales || 0)}
                         </td>
                       </tr>

@@ -309,6 +309,8 @@ export default function ReportsPage() {
   const financialCards = useMemo(() => {
     const net = financialSummary?.net ?? 0;
     const sales = financialSummary?.sales?.total ?? 0;
+    const posSales = financialSummary?.sales?.posSales ?? 0;
+    const hotelRevenue = financialSummary?.sales?.hotelRevenue ?? 0;
     const expenses = financialSummary?.expenses?.total ?? 0;
     const purchases = financialSummary?.purchases?.total ?? 0;
     return [
@@ -318,9 +320,10 @@ export default function ReportsPage() {
         color: net >= 0 ? 'text-green-600' : 'text-red-600',
       },
       {
-        title: 'Sales',
+        title: 'Total Sales',
         value: formatCurrency(sales),
         color: 'text-gray-900 dark:text-white',
+        subtitle: `POS: ${formatCurrency(posSales)} | Hotel: ${formatCurrency(hotelRevenue)}`,
       },
       {
         title: 'Expenses',
@@ -800,6 +803,9 @@ export default function ReportsPage() {
                 <CardContent className="p-4 sm:p-5">
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">{card.title}</p>
                   <p className={`text-lg sm:text-xl md:text-2xl font-bold ${card.color} truncate`} title={card.value}>{card.value}</p>
+                  {card.subtitle && (
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1 truncate">{card.subtitle}</p>
+                  )}
                 </CardContent>
               </Card>
             ))}

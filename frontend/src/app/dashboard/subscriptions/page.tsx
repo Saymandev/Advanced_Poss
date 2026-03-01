@@ -13,42 +13,42 @@ import { Select } from '@/components/ui/Select';
 import { useGetCompaniesQuery, useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
 import { useCreateCheckoutSessionMutation } from '@/lib/api/endpoints/paymentsApi';
 import {
-  PaymentRequest,
-  PaymentRequestStatus,
-  SubscriptionPaymentMethod,
-  useGetPaymentRequestsQuery,
-  useInitializeSubscriptionPaymentMutation,
-  useManualActivateSubscriptionMutation,
-  useVerifyPaymentRequestMutation,
+    PaymentRequest,
+    PaymentRequestStatus,
+    SubscriptionPaymentMethod,
+    useGetPaymentRequestsQuery,
+    useInitializeSubscriptionPaymentMutation,
+    useManualActivateSubscriptionMutation,
+    useVerifyPaymentRequestMutation,
 } from '@/lib/api/endpoints/subscriptionPaymentsApi';
 import {
-  BillingHistory,
-  useCancelSubscriptionMutation,
-  useCreateSubscriptionMutation,
-  useCreateSubscriptionPlanMutation,
-  useDeleteSubscriptionPlanMutation,
-  useGetAllSubscriptionsQuery,
-  useGetBillingHistoryQuery,
-  useGetCurrentSubscriptionQuery,
-  useGetPlanWithFeaturesQuery,
-  useGetSubscriptionByCompanyQuery,
-  useGetSubscriptionPlansQuery,
-  useGetUsageStatsQuery,
-  useReactivateSubscriptionMutation,
-  useUpdateSubscriptionMutation,
-  useUpdateSubscriptionPlanMutation,
+    BillingHistory,
+    useCancelSubscriptionMutation,
+    useCreateSubscriptionMutation,
+    useCreateSubscriptionPlanMutation,
+    useDeleteSubscriptionPlanMutation,
+    useGetAllSubscriptionsQuery,
+    useGetBillingHistoryQuery,
+    useGetCurrentSubscriptionQuery,
+    useGetPlanWithFeaturesQuery,
+    useGetSubscriptionByCompanyQuery,
+    useGetSubscriptionPlansQuery,
+    useGetUsageStatsQuery,
+    useReactivateSubscriptionMutation,
+    useUpdateSubscriptionMutation,
+    useUpdateSubscriptionPlanMutation,
 } from '@/lib/api/endpoints/subscriptionsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-  ArrowTrendingUpIcon,
-  BuildingOffice2Icon,
-  CheckCircleIcon,
-  ClockIcon,
-  CreditCardIcon,
-  DocumentArrowDownIcon,
-  ExclamationTriangleIcon,
-  XCircleIcon,
+    ArrowTrendingUpIcon,
+    BuildingOffice2Icon,
+    CheckCircleIcon,
+    ClockIcon,
+    CreditCardIcon,
+    DocumentArrowDownIcon,
+    ExclamationTriangleIcon,
+    XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -1156,7 +1156,7 @@ export default function SubscriptionsPage() {
 
     try {
       await updateSubscriptionOverride({
-        id: editingSubscription.id,
+        id: editingSubscription.id || editingSubscription._id,
         enabledFeatures: overrideFeatures,
         limits: overrideLimits,
       }).unwrap();

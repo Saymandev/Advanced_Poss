@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
 import { useRegisterCompanyOwnerMutation } from '@/lib/api/endpoints/authApi';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
+import { COUNTRIES } from '@/lib/constants/countries';
 import { setCredentials } from '@/lib/slices/authSlice';
 import { useAppDispatch } from '@/lib/store';
 import {
@@ -22,15 +23,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
-const countries = [
-  { value: 'BD', label: 'Bangladesh' },
-  { value: 'US', label: 'United States' },
-  { value: 'UK', label: 'United Kingdom' },
-  { value: 'CA', label: 'Canada' },
-  { value: 'IN', label: 'India' },
-  { value: 'AU', label: 'Australia' },
-  
-];
 
 const businessTypes = [
   { value: 'restaurant', label: 'Restaurant' },
@@ -72,7 +64,7 @@ export default function RegisterPage() {
     businessType: 'restaurant',
     companyEmail: '',
     companyPhone: '',
-    country: 'USA',
+    country: 'BD',
     subscriptionPackage: defaultPlan,
     
     // Branch Info
@@ -314,7 +306,7 @@ export default function RegisterPage() {
                     onChange={handleChange}
                     className="h-12 bg-gray-900/50 border-gray-700 text-white px-4 py-2 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none"
                   >
-                    {countries.map((country) => (
+                    {COUNTRIES.map((country) => (
                       <option key={country.value} value={country.value}>
                         {country.label}
                       </option>

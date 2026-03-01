@@ -10,20 +10,21 @@ import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { Branch, useCreateBranchMutation, useGetBranchByIdQuery, useGetBranchesQuery, useGetBranchStatsQuery, usePermanentDeleteBranchMutation, useRestoreBranchMutation, useSoftDeleteBranchMutation, useToggleBranchStatusMutation, useUpdateBranchMutation } from '@/lib/api/endpoints/branchesApi';
 import { Staff, useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
+import { COUNTRIES } from '@/lib/constants/countries';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
-    BuildingOfficeIcon,
-    ClockIcon,
-    EnvelopeIcon,
-    ExclamationTriangleIcon,
-    EyeIcon,
-    MapPinIcon,
-    PencilIcon,
-    PhoneIcon,
-    PlusIcon,
-    PowerIcon,
-    TrashIcon
+  BuildingOfficeIcon,
+  ClockIcon,
+  EnvelopeIcon,
+  ExclamationTriangleIcon,
+  EyeIcon,
+  MapPinIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  PowerIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -811,12 +812,7 @@ export default function BranchesPage() {
             />
             <Select
               label="Country"
-              options={[
-                { value: 'US', label: 'United States' },
-                { value: 'CA', label: 'Canada' },
-                { value: 'UK', label: 'United Kingdom' },
-                { value: 'AU', label: 'Australia' },
-              ]}
+              options={COUNTRIES}
               value={formData.address.country}
               onChange={(value) => setFormData({ 
                 ...formData, 
@@ -1171,53 +1167,7 @@ export default function BranchesPage() {
             />
             <Select
               label="Country"
-              options={[
-                { value: 'BD', label: 'Bangladesh' },
-                { value: 'IN', label: 'India' },
-                { value: 'PK', label: 'Pakistan' },
-                { value: 'US', label: 'United States' },
-                { value: 'CA', label: 'Canada' },
-                { value: 'UK', label: 'United Kingdom' },
-                { value: 'AU', label: 'Australia' },
-                { value: 'DE', label: 'Germany' },
-                { value: 'FR', label: 'France' },
-                { value: 'IT', label: 'Italy' },
-                { value: 'ES', label: 'Spain' },
-                { value: 'NL', label: 'Netherlands' },
-                { value: 'BE', label: 'Belgium' },
-                { value: 'CH', label: 'Switzerland' },
-                { value: 'AT', label: 'Austria' },
-                { value: 'SE', label: 'Sweden' },
-                { value: 'NO', label: 'Norway' },
-                { value: 'DK', label: 'Denmark' },
-                { value: 'FI', label: 'Finland' },
-                { value: 'PL', label: 'Poland' },
-                { value: 'CZ', label: 'Czech Republic' },
-                { value: 'GR', label: 'Greece' },
-                { value: 'PT', label: 'Portugal' },
-                { value: 'IE', label: 'Ireland' },
-                { value: 'NZ', label: 'New Zealand' },
-                { value: 'SG', label: 'Singapore' },
-                { value: 'MY', label: 'Malaysia' },
-                { value: 'TH', label: 'Thailand' },
-                { value: 'PH', label: 'Philippines' },
-                { value: 'ID', label: 'Indonesia' },
-                { value: 'VN', label: 'Vietnam' },
-                { value: 'AE', label: 'United Arab Emirates' },
-                { value: 'SA', label: 'Saudi Arabia' },
-                { value: 'ZA', label: 'South Africa' },
-                { value: 'EG', label: 'Egypt' },
-                { value: 'BR', label: 'Brazil' },
-                { value: 'MX', label: 'Mexico' },
-                { value: 'AR', label: 'Argentina' },
-                { value: 'CL', label: 'Chile' },
-                { value: 'CO', label: 'Colombia' },
-                { value: 'JP', label: 'Japan' },
-                { value: 'KR', label: 'South Korea' },
-                { value: 'CN', label: 'China' },
-                { value: 'HK', label: 'Hong Kong' },
-                { value: 'TW', label: 'Taiwan' },
-              ]}
+              options={COUNTRIES}
               value={formData.address.country}
               onChange={(value) => {
                 setFormData({ 
