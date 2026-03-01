@@ -3,6 +3,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { POSModule } from '../pos/pos.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { Transaction, TransactionSchema } from '../transactions/schemas/transaction.schema';
+import { TransactionsModule } from '../transactions/transactions.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { UsersModule } from '../users/users.module';
 import { WorkPeriod, WorkPeriodSchema } from './schemas/work-period.schema';
@@ -14,9 +16,11 @@ import { WorkPeriodsService } from './work-periods.service';
     MongooseModule.forFeature([
       { name: WorkPeriod.name, schema: WorkPeriodSchema },
       { name: User.name, schema: UserSchema },
+      { name: Transaction.name, schema: TransactionSchema },
     ]),
     UsersModule,
     forwardRef(() => POSModule),
+    forwardRef(() => TransactionsModule),
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
   ],

@@ -67,7 +67,16 @@ export class ExpensesService {
     if (expenseData.purchaseOrderId && typeof expenseData.purchaseOrderId === 'string') {
       expenseData.purchaseOrderId = new Types.ObjectId(expenseData.purchaseOrderId);
     }
-    const expense = new this.expenseModel(expenseData);
+
+    const activeWorkPeriod = await this.workPeriodsService.findActive(
+      createExpenseDto.companyId,
+      createExpenseDto.branchId,
+    );
+
+    const expense = new this.expenseModel({
+      ...expenseData,
+      workPeriodId: activeWorkPeriod?._id || undefined,
+    });
     const savedExpense = await expense.save();
 
     // If already paid, record transaction

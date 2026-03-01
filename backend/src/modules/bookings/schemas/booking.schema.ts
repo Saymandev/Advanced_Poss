@@ -146,6 +146,26 @@ export class Booking {
   // Notes
   @Prop({ trim: true })
   notes?: string;
+
+  @Prop({
+    type: [
+      {
+        amount: { type: Number },
+        method: { type: String },
+        date: { type: Date, default: Date.now },
+        note: { type: String },
+        processedBy: { type: Types.ObjectId, ref: 'User' },
+      },
+    ],
+    default: [],
+  })
+  paymentHistory?: {
+    amount: number;
+    method: string;
+    date: Date;
+    note?: string;
+    processedBy?: Types.ObjectId;
+  }[];
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);

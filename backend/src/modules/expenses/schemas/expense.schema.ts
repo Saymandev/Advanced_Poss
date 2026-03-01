@@ -100,6 +100,9 @@ export class Expense {
 
   @Prop({ type: Types.ObjectId, ref: 'PurchaseOrder' })
   purchaseOrderId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'WorkPeriod' })
+  workPeriodId?: Types.ObjectId;
 }
 
 export const ExpenseSchema = SchemaFactory.createForClass(Expense);
@@ -110,6 +113,7 @@ ExpenseSchema.index({ expenseNumber: 1 }, { unique: true });
 ExpenseSchema.index({ category: 1 });
 ExpenseSchema.index({ status: 1 });
 ExpenseSchema.index({ date: -1 });
+ExpenseSchema.index({ workPeriodId: 1 });
 ExpenseSchema.index({ createdBy: 1 });
 ExpenseSchema.index({ isRecurring: 1 });
 

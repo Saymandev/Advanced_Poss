@@ -171,6 +171,9 @@ export class POSOrder {
 
   @Prop({ type: Number, default: 0 })
   platformCommission?: number;
+
+  @Prop({ type: Types.ObjectId, ref: 'WorkPeriod' })
+  workPeriodId?: Types.ObjectId;
 }
 
 export const POSOrderSchema = SchemaFactory.createForClass(POSOrder);
@@ -183,5 +186,6 @@ POSOrderSchema.index({ status: 1 });
 POSOrderSchema.index({ createdAt: -1 });
 POSOrderSchema.index({ branchId: 1, status: 1 });
 POSOrderSchema.index({ branchId: 1, createdAt: -1 });
+POSOrderSchema.index({ workPeriodId: 1 });
 POSOrderSchema.index({ orderType: 1, deliveryStatus: 1 });
 POSOrderSchema.index({ assignedDriverId: 1, deliveryStatus: 1 });

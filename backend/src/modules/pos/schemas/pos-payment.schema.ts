@@ -48,6 +48,9 @@ export class POSPayment {
 
   @Prop({ type: Number })
   changeDue?: number;
+
+  @Prop({ type: Types.ObjectId, ref: 'WorkPeriod' })
+  workPeriodId?: Types.ObjectId;
 }
 
 export const POSPaymentSchema = SchemaFactory.createForClass(POSPayment);
@@ -57,5 +60,6 @@ POSPaymentSchema.index({ orderId: 1 });
 POSPaymentSchema.index({ status: 1 });
 POSPaymentSchema.index({ branchId: 1 });
 POSPaymentSchema.index({ createdAt: -1 });
+POSPaymentSchema.index({ workPeriodId: 1 });
 POSPaymentSchema.index({ transactionId: 1 });
 

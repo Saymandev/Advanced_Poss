@@ -5,7 +5,9 @@ import { CustomersModule } from '../customers/customers.module';
 import { RoomsModule } from '../rooms/rooms.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { TransactionsModule } from '../transactions/transactions.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
 import { Booking, BookingSchema } from './schemas/booking.schema';
@@ -21,6 +23,8 @@ import { Booking, BookingSchema } from './schemas/booking.schema';
     forwardRef(() => WebsocketsModule),
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
+    forwardRef(() => TransactionsModule),
+    forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [BookingsController],
   providers: [BookingsService],

@@ -1,14 +1,22 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { BranchesService } from '../branches/branches.service';
 import { CustomersService } from '../customers/customers.service';
 import { RoomsService } from '../rooms/rooms.service';
+import {
+  TransactionCategory,
+  TransactionType,
+} from '../transactions/schemas/transaction.schema';
+import { TransactionsService } from '../transactions/transactions.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
+import { WorkPeriodsService } from '../work-periods/work-periods.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -23,6 +31,10 @@ export class BookingsService {
     private branchesService: BranchesService,
     private customersService: CustomersService,
     private websocketsGateway: WebsocketsGateway,
+    @Inject(forwardRef(() => TransactionsService))
+    private transactionsService: TransactionsService,
+    @Inject(forwardRef(() => WorkPeriodsService))
+    private workPeriodsService: WorkPeriodsService,
   ) {}
   private async generateBookingNumber(branchId: string): Promise<string> {
     const date = new Date();
@@ -292,6 +304,22 @@ export class BookingsService {
       notes: createBookingDto.notes,
     });
     const savedBooking = await booking.save();
+
+    // If there's an initial deposit, record it as a payment
+    if (createBookingDto.depositAmount && createBookingDto.depositAmount > 0) {
+      await this.recordPayment(
+        savedBooking._id.toString(),
+        {
+          amount: createBookingDto.depositAmount,
+          method: (createBookingDto as any).paymentMethod || 'cash',
+          note: 'Initial room deposit',
+        },
+        userId,
+      );
+    }
+
+    // Populate and return
+    const result = await this.findOne(savedBooking._id.toString());
     // Update room status
     await this.roomsService.update(createBookingDto.roomId, {
       status: 'reserved',
@@ -303,7 +331,7 @@ export class BookingsService {
       'booking:created',
       savedBooking,
     );
-    return savedBooking;
+    return result;
   }
   async findAll(filter: any = {}): Promise<Booking[]> {
     const normalizedFilter: any = { ...filter };
@@ -430,13 +458,31 @@ export class BookingsService {
     if (booking.status !== 'checked_in') {
       throw new BadRequestException('Booking must be checked in before checkout');
     }
-    // Guard: prevent checkout while there is an outstanding balance
-    const hasOutstandingBalance =
-      (booking.balanceAmount ?? booking.totalAmount - (booking.depositAmount || 0)) > 0;
-    if (hasOutstandingBalance) {
+    // Guard: prevent checkout while there is an outstanding balance, unless a payment is provided
+    const balanceAmount = booking.balanceAmount ?? booking.totalAmount - (booking.depositAmount || 0);
+    const paymentAmount = (checkOutDto as any).paymentAmount || 0;
+    const remainingBalance = balanceAmount - paymentAmount;
+
+    if (remainingBalance > 0.01) {
       throw new BadRequestException(
-        'Cannot check out while there is an outstanding balance. Please settle payment first.',
+        `Cannot check out while there is an outstanding balance of ${remainingBalance}. Please settle payment first.`,
       );
+    }
+
+    if (paymentAmount > 0) {
+      await this.recordPayment(
+        id,
+        {
+          amount: paymentAmount,
+          method: (checkOutDto as any).paymentMethod || 'cash',
+          note: 'Final payment at checkout',
+        },
+        userId,
+      );
+      // Re-fetch booking after payment to get updated totals
+      const refreshedBooking = await this.bookingModel.findById(id).exec();
+      booking.depositAmount = refreshedBooking.depositAmount;
+      booking.balanceAmount = refreshedBooking.balanceAmount;
     }
     // Calculate final amount if additional charges
     let finalAmount = booking.totalAmount;
@@ -665,4 +711,66 @@ export class BookingsService {
     }
     return stats;
   }
-}
+
+  /**
+   * Record a payment for a booking and log it in the transaction ledger
+   */
+  async recordPayment(
+    bookingId: string,
+    paymentDto: { amount: number; method: string; note?: string },
+    userId: string,
+  ): Promise<Booking> {
+    const booking = await this.bookingModel.findById(bookingId).exec();
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (paymentDto.amount <= 0) {
+      throw new BadRequestException('Payment amount must be greater than zero');
+    }
+
+    // Update booking balance
+    booking.depositAmount = (booking.depositAmount || 0) + paymentDto.amount;
+    booking.balanceAmount = booking.totalAmount - booking.depositAmount;
+    
+    // Add to history
+    if (!booking.paymentHistory) {
+      booking.paymentHistory = [];
+    }
+    booking.paymentHistory.push({
+      amount: paymentDto.amount,
+      method: paymentDto.method,
+      date: new Date(),
+      note: paymentDto.note,
+      processedBy: userId ? new Types.ObjectId(userId) : undefined,
+    });
+
+    const savedBooking = await booking.save();
+
+    // Record in system-wide ledger
+    try {
+      await this.transactionsService.recordTransaction(
+        {
+          paymentMethodId: paymentDto.method,
+          type: TransactionType.IN,
+          category: TransactionCategory.HOTEL_BOOKING,
+          amount: paymentDto.amount,
+          date: new Date().toISOString(),
+          referenceId: booking._id.toString(),
+          referenceModel: 'Booking',
+          description: `Hotel Payment: ${booking.bookingNumber}`,
+          notes: paymentDto.note || `Payment for booking ${booking.bookingNumber}`,
+        },
+        booking.companyId.toString(),
+        booking.branchId.toString(),
+        userId,
+      );
+    } catch (error) {
+      console.error('❌ Failed to record booking transaction in ledger:', error);
+    }
+
+    const result = await this.findOne(bookingId);
+    this.websocketsGateway.server.emit('bookingUpdated', result);
+    return result;
+  }
+}

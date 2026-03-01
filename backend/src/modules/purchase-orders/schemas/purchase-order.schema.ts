@@ -109,6 +109,9 @@ export class PurchaseOrder {
 
   @Prop({ type: String, default: 'cash' })
   paymentMethod?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'WorkPeriod' })
+  workPeriodId?: Types.ObjectId;
 }
 
 export const PurchaseOrderSchema = SchemaFactory.createForClass(PurchaseOrder);
@@ -118,6 +121,7 @@ PurchaseOrderSchema.index({ orderNumber: 1 }, { unique: true });
 PurchaseOrderSchema.index({ supplierId: 1 });
 PurchaseOrderSchema.index({ status: 1 });
 PurchaseOrderSchema.index({ orderDate: 1 });
+PurchaseOrderSchema.index({ workPeriodId: 1 });
 
 PurchaseOrderSchema.set('toJSON', {
   virtuals: true,

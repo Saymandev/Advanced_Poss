@@ -5,6 +5,7 @@ import { EmailService } from '../../common/services/email.service';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { PDFGeneratorService } from '../pos/pdf-generator.service';
 import { POSService } from '../pos/pos.service';
+import { Transaction, TransactionCategory, TransactionDocument } from '../transactions/schemas/transaction.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { UsersService } from '../users/users.service';
 import { EndWorkPeriodDto } from './dto/end-work-period.dto';
@@ -21,6 +22,7 @@ export class WorkPeriodsService {
     private posService: POSService,
     private pdfGeneratorService: PDFGeneratorService,
     private emailService: EmailService,
+    @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
   ) { }
 
   async findAll(options: {
@@ -93,6 +95,19 @@ export class WorkPeriodsService {
       .exec();
 
     return activeWorkPeriod;
+  }
+
+  /**
+   * Helper to get the active work period ID for a company and branch
+   */
+  async getActiveWorkPeriodId(companyId: string, branchId: string): Promise<Types.ObjectId | null> {
+    const active = await this.workPeriodModel.findOne({
+      companyId: new Types.ObjectId(companyId),
+      branchId: new Types.ObjectId(branchId),
+      status: 'active',
+    }, { _id: 1 }).lean();
+
+    return active ? (active._id as Types.ObjectId) : null;
   }
 
   async startWorkPeriod(
@@ -311,9 +326,17 @@ export class WorkPeriodsService {
       totalByPaymentMethod[method] = (totalByPaymentMethod[method] || 0) + payment.amount;
     });
 
+    // Get Hotel Transactions for this work period
+    const hotelTransactions = await this.transactionModel.find({
+      workPeriodId: new Types.ObjectId(workPeriodId),
+      category: TransactionCategory.HOTEL_BOOKING,
+    }).lean();
+
+    const hotelRevenue = hotelTransactions.reduce((sum, trx) => sum + (trx.amount || 0), 0);
+
     // Calculate payment method percentages and commissions
     const paymentMethodsArray = Object.entries(paymentMethods).map(([method, data]) => {
-      const percentage = grossSales > 0 ? (data.amount / grossSales) * 100 : 0;
+      const percentage = (grossSales + hotelRevenue) > 0 ? (data.amount / (grossSales + hotelRevenue)) * 100 : 0;
       // Commission calculation (example: 2% for cash, 3.5% for card)
       const commissionRate = method === 'cash' ? 0.02 : method === 'card' ? 0.035 : 0;
       const commission = data.amount * commissionRate;
@@ -329,9 +352,11 @@ export class WorkPeriodsService {
 
     return {
       totalOrders,
-      grossSales,
+      grossSales: grossSales + hotelRevenue,
+      posSales: grossSales,
+      hotelRevenue,
       refundTotal,
-      netSales: grossSales - refundTotal,
+      netSales: (grossSales + hotelRevenue) - refundTotal,
       subtotal,
       vatTotal,
       serviceCharge,

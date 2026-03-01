@@ -1,12 +1,12 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards
+    Body,
+    Controller,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -127,6 +127,16 @@ export class BookingsController {
     @Body('refundAmount') refundAmount?: number,
   ) {
     return this.bookingsService.cancel(id, reason, refundAmount);
+  }
+
+  @Post(':id/payments')
+  @ApiOperation({ summary: 'Record payment for booking' })
+  recordPayment(
+    @Param('id') id: string,
+    @Body() paymentDto: { amount: number; method: string; note?: string },
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.bookingsService.recordPayment(id, paymentDto, userId);
   }
 }
 

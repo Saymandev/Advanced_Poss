@@ -4,6 +4,7 @@ import { PaymentMethod, PaymentMethodSchema } from '../payment-methods/schemas/p
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { Transaction, TransactionSchema } from './schemas/transaction.schema';
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
@@ -17,6 +18,7 @@ import { TransactionsService } from './transactions.service';
     RolePermissionsModule,
     forwardRef(() => SubscriptionsModule),
     forwardRef(() => SubscriptionPlansModule),
+    forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [TransactionsController],
   providers: [TransactionsService],

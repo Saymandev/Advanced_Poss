@@ -101,11 +101,11 @@ export class POSService {
       throw new BadRequestException(`You are not assigned to branch ${orderBranchId}. Please assign yourself to this branch first.`);
     }
     // Validate active work period for non-owner users (only owners can create orders without active work period)
+    const activeWorkPeriod = await this.workPeriodsService.findActive(companyId || '', orderBranchId);
     if (creatingUser.role !== 'owner') {
       if (!companyId) {
         throw new BadRequestException('Company ID is required to validate work period');
       }
-      const activeWorkPeriod = await this.workPeriodsService.findActive(companyId, orderBranchId);
       if (!activeWorkPeriod) {
         throw new BadRequestException(
           'No active work period found. Please start a work period from the Work Periods page before creating orders.'
@@ -207,6 +207,7 @@ export class POSService {
       loyaltyPointsRedeemed,
       loyaltyDiscount,
       totalAmount: finalOrderTotal, // Use discounted amount if loyalty was applied
+      workPeriodId: activeWorkPeriod ? activeWorkPeriod._id : undefined,
     };
 
     // Fetch menu item names for effective items
@@ -1158,7 +1159,7 @@ export class POSService {
     if (Math.abs(orderTotal - processPaymentDto.amount) > 0.01) {
       throw new BadRequestException('Payment amount does not match order total');
     }
-    const paymentData = {
+    const paymentData: any = {
       orderId: new Types.ObjectId(processPaymentDto.orderId),
       amount: processPaymentDto.amount,
       method: processPaymentDto.method,
@@ -1175,6 +1176,7 @@ export class POSService {
       },
       amountReceived: processPaymentDto.amountReceived,
       changeDue: processPaymentDto.changeDue,
+      workPeriodId: (await this.workPeriodsService.findActive(companyId || '', branchId))?._id || undefined,
     };
     const payment = new this.posPaymentModel(paymentData);
     const savedPayment = await payment.save();

@@ -16,6 +16,7 @@ export enum TransactionCategory {
   PROFIT_WITHDRAWAL = 'PROFIT_WITHDRAWAL', // Money out to the owner
   CAPITAL_INJECTION = 'CAPITAL_INJECTION', // Money in from the owner
   TRANSFER = 'TRANSFER', // Money moved between payment methods
+  HOTEL_BOOKING = 'HOTEL_BOOKING', // Money in from hotel room payments
   OTHER = 'OTHER',
 }
 
@@ -24,8 +25,11 @@ export class Transaction {
   @Prop({ type: Types.ObjectId, ref: 'Company', required: true })
   companyId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Branch', required: true })
+  @Prop({ type: Types.ObjectId, ref: 'Branch' })
   branchId: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'WorkPeriod' })
+  workPeriodId?: Types.ObjectId;
 
   @Prop({ required: true, unique: true })
   transactionNumber: string;
@@ -80,6 +84,9 @@ TransactionSchema.index({ paymentMethodId: 1, date: -1 });
 TransactionSchema.index({ type: 1 });
 TransactionSchema.index({ category: 1 });
 TransactionSchema.index({ date: -1 });
+TransactionSchema.index({ branchId: 1 });
+TransactionSchema.index({ workPeriodId: 1 });
+TransactionSchema.index({ createdAt: -1 });
 
 // Transform output
 TransactionSchema.set('toJSON', {

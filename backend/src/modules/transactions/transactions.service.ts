@@ -1,13 +1,16 @@
 import {
     BadRequestException,
+    Inject,
     Injectable,
-    NotFoundException
+    NotFoundException,
+    forwardRef
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as fs from 'fs';
 import { Model, Types } from 'mongoose';
 import * as path from 'path';
 import { PaymentMethod } from '../payment-methods/schemas/payment-method.schema';
+import { WorkPeriodsService } from '../work-periods/work-periods.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { Transaction, TransactionCategory, TransactionDocument, TransactionType } from './schemas/transaction.schema';
 
@@ -16,6 +19,8 @@ export class TransactionsService {
   constructor(
     @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
     @InjectModel(PaymentMethod.name) private paymentMethodModel: Model<PaymentMethod>,
+    @Inject(forwardRef(() => WorkPeriodsService))
+    private workPeriodsService: WorkPeriodsService,
   ) {}
 
   private async generateTransactionNumber(companyId: string): Promise<string> {
@@ -129,6 +134,7 @@ export class TransactionsService {
       referenceId: createTransactionDto.referenceId && Types.ObjectId.isValid(createTransactionDto.referenceId) ? new Types.ObjectId(createTransactionDto.referenceId) : undefined,
       createdBy: userId ? new Types.ObjectId(userId) : undefined,
       date: createTransactionDto.date ? new Date(createTransactionDto.date) : new Date(),
+      workPeriodId: await this.workPeriodsService.getActiveWorkPeriodId(companyId, branchId),
     });
 
     try {

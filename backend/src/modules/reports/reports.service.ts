@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { PurchaseOrderStatus } from '../../common/enums/purchase-order-status.enum';
+import { Booking, BookingDocument } from '../bookings/schemas/booking.schema';
 import { CustomersService } from '../customers/customers.service';
 import { Expense, ExpenseDocument } from '../expenses/schemas/expense.schema';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { PurchaseOrder, PurchaseOrderDocument } from '../purchase-orders/schemas/purchase-order.schema';
+import { Transaction, TransactionCategory, TransactionDocument, TransactionType } from '../transactions/schemas/transaction.schema';
 import { WastageService } from '../wastage/wastage.service';
 @Injectable()
 export class ReportsService {
@@ -22,6 +24,10 @@ export class ReportsService {
     private menuItemsService: MenuItemsService,
     private ingredientsService: IngredientsService,
     private wastageService: WastageService,
+    @InjectModel(Booking.name)
+    private bookingModel: Model<BookingDocument>,
+    @InjectModel(Transaction.name)
+    private transactionModel: Model<TransactionDocument>,
   ) {}
   /**
    * Financial summary that combines sales (POS orders), expenses, and purchase orders.
@@ -61,23 +67,44 @@ export class ReportsService {
     if (branchId) purchaseFilter.branchId = new Types.ObjectId(branchId);
     if (companyId) purchaseFilter.companyId = new Types.ObjectId(companyId);
     // Run queries in parallel
-    const [salesOrders, expenses, purchases] = await Promise.all([
+    const [salesOrders, expenses, purchases, hotelTransactions] = await Promise.all([
       this.posOrderModel.find(salesFilter).lean().exec(),
       this.expenseModel.find(expenseFilter).lean().exec(),
       this.purchaseOrderModel.find(purchaseFilter).lean().exec(),
+      this.transactionModel.find({
+        ...expenseFilter, // Uses same date range + branch/company filters
+        category: TransactionCategory.HOTEL_BOOKING,
+        type: TransactionType.IN,
+      }).lean().exec(),
     ]);
     // Sales aggregates
-    const salesTotal = salesOrders.reduce((sum, o: any) => sum + (o.totalAmount || 0), 0);
+    const posSalesTotal = salesOrders.reduce((sum, o: any) => sum + (o.totalAmount || 0), 0);
+    const hotelSalesTotal = hotelTransactions.reduce((sum, t: any) => sum + (t.amount || 0), 0);
+    const salesTotal = posSalesTotal + hotelSalesTotal;
+
     const salesByPayment = salesOrders.reduce((acc: any, o: any) => {
       const method = o.paymentMethod || 'unknown';
       acc[method] = (acc[method] || 0) + (o.totalAmount || 0);
       return acc;
     }, {});
+
+    // Add hotel payments to payment methods breakdown
+    hotelTransactions.forEach((t: any) => {
+      const method = t.paymentMethodId?.toString() || 'unknown';
+      salesByPayment[method] = (salesByPayment[method] || 0) + (t.amount || 0);
+    });
+
     const salesDaily = salesOrders.reduce((acc: any, o: any) => {
       const key = (o.createdAt ? new Date(o.createdAt) : new Date()).toISOString().split('T')[0];
       acc[key] = (acc[key] || 0) + (o.totalAmount || 0);
       return acc;
     }, {});
+
+    // Add hotel daily sales
+    hotelTransactions.forEach((t: any) => {
+      const key = (t.date ? new Date(t.date) : new Date()).toISOString().split('T')[0];
+      salesDaily[key] = (salesDaily[key] || 0) + (t.amount || 0);
+    });
     // Expense aggregates (paid vs unpaid)
     const expenseTotals = expenses.reduce(
       (acc: any, e: any) => {
@@ -141,6 +168,8 @@ export class ReportsService {
       },
       sales: {
         total: salesTotal,
+        posSales: posSalesTotal,
+        hotelRevenue: hotelSalesTotal,
         orders: salesOrders.length,
         byPaymentMethod: salesByPayment,
       },
@@ -457,7 +486,18 @@ export class ReportsService {
     }
     const todayOrders = await this.posOrderModel.find(todayFilter);
     const todayPaid = todayOrders.filter((o) => o.status === 'paid');
-    const todayRevenue = todayPaid.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const todayPosRevenue = todayPaid.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+    // Today's Hotel Revenue
+    const todayHotelTransactions = await this.transactionModel.find({
+      ...todayFilter,
+      date: { $gte: today, $lt: tomorrow },
+      category: TransactionCategory.HOTEL_BOOKING,
+      type: TransactionType.IN,
+    });
+    const todayHotelRevenue = todayHotelTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const todayRevenue = todayPosRevenue + todayHotelRevenue;
     // This week
     const weekFilter: any = {
       createdAt: { $gte: thisWeekStart },
@@ -467,7 +507,18 @@ export class ReportsService {
       weekFilter.branchId = new Types.ObjectId(branchId);
     }
     const weekOrders = await this.posOrderModel.find(weekFilter);
-    const weekRevenue = weekOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const weekPosRevenue = weekOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    
+    // This Week's Hotel Revenue
+    const weekHotelTransactions = await this.transactionModel.find({
+      ...weekFilter,
+      date: { $gte: thisWeekStart },
+      category: TransactionCategory.HOTEL_BOOKING,
+      type: TransactionType.IN,
+    });
+    const weekHotelRevenue = weekHotelTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const weekRevenue = weekPosRevenue + weekHotelRevenue;
     // This month
     const monthFilter: any = {
       createdAt: { $gte: thisMonthStart },
@@ -477,7 +528,18 @@ export class ReportsService {
       monthFilter.branchId = new Types.ObjectId(branchId);
     }
     const monthOrders = await this.posOrderModel.find(monthFilter);
-    const monthRevenue = monthOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const monthPosRevenue = monthOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+    // This Month's Hotel Revenue
+    const monthHotelTransactions = await this.transactionModel.find({
+      ...monthFilter,
+      date: { $gte: thisMonthStart },
+      category: TransactionCategory.HOTEL_BOOKING,
+      type: TransactionType.IN,
+    });
+    const monthHotelRevenue = monthHotelTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const monthRevenue = monthPosRevenue + monthHotelRevenue;
     // Active orders
     const activeFilter: any = {
       status: { $nin: ['paid', 'cancelled'] },
@@ -496,16 +558,22 @@ export class ReportsService {
         orders: todayOrders.length,
         completed: todayPaid.length,
         revenue: todayRevenue,
+        posRevenue: todayPosRevenue,
+        hotelRevenue: todayHotelRevenue,
         averageOrderValue:
-          todayPaid.length > 0 ? todayRevenue / todayPaid.length : 0,
+          todayPaid.length > 0 ? todayPosRevenue / todayPaid.length : 0,
       },
       week: {
         orders: weekOrders.length,
         revenue: weekRevenue,
+        posRevenue: weekPosRevenue,
+        hotelRevenue: weekHotelRevenue,
       },
       month: {
         orders: monthOrders.length,
         revenue: monthRevenue,
+        posRevenue: monthPosRevenue,
+        hotelRevenue: monthHotelRevenue,
       },
       active: {
         orders: activeOrders,
@@ -632,6 +700,18 @@ export class ReportsService {
       filter.branchId = new Types.ObjectId(branchId);
     }
     const orders = await this.posOrderModel.find(filter);
+
+    // Get Hotel Transactions for the same period
+    const hotelFilter: any = {
+      date: { $gte: startDate, $lte: endDate },
+      category: TransactionCategory.HOTEL_BOOKING,
+      type: TransactionType.IN,
+    };
+    if (branchId) {
+      hotelFilter.branchId = new Types.ObjectId(branchId);
+    }
+    const hotelTransactions = await this.transactionModel.find(hotelFilter).lean().exec();
+
     // Also check total orders without status filter for debugging
     const allOrdersCount = await this.posOrderModel.countDocuments({
       branchId: branchId ? new Types.ObjectId(branchId) : undefined,
@@ -653,13 +733,15 @@ export class ReportsService {
       },
     ]);
     // Group by date
-    const dailyData = {};
+    const dailyData: any = {};
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
       const dateKey = currentDate.toISOString().split('T')[0];
       dailyData[dateKey] = {
         date: dateKey,
         revenue: 0,
+        posRevenue: 0,
+        hotelRevenue: 0,
         orders: 0,
         averageOrderValue: 0,
       };
@@ -667,28 +749,42 @@ export class ReportsService {
     }
     orders.forEach((order: any) => {
       const orderDate = order.createdAt || new Date();
-      // Use UTC date to match the dateKey format (YYYY-MM-DD)
       const dateKey = new Date(orderDate).toISOString().split('T')[0];
       if (dailyData[dateKey]) {
         dailyData[dateKey].revenue += (order.totalAmount || 0);
+        dailyData[dateKey].posRevenue += (order.totalAmount || 0);
         dailyData[dateKey].orders += 1;
-      } else {
-        // Log if date key doesn't match (helps debug timezone issues)
       }
     });
-    // Calculate average order value
-    Object.values(dailyData).forEach((day: any) => {
-      day.averageOrderValue = day.orders > 0 ? day.revenue / day.orders : 0;
+
+    // Merge Hotel daily data
+    hotelTransactions.forEach((t: any) => {
+      const tDate = t.date || new Date();
+      const dateKey = new Date(tDate).toISOString().split('T')[0];
+      if (dailyData[dateKey]) {
+        dailyData[dateKey].revenue += (t.amount || 0);
+        dailyData[dateKey].hotelRevenue += (t.amount || 0);
+      }
     });
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+    // Calculate average order value (based on POS orders only for meaningful average)
+    Object.values(dailyData).forEach((day: any) => {
+      day.averageOrderValue = day.orders > 0 ? (day.posRevenue || day.revenue) / day.orders : 0;
+    });
+
+    const posRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const hotelRevenue = hotelTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalRevenue = posRevenue + hotelRevenue;
     const totalOrders = orders.length;
-    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const dailyDataWithOrders = Object.values(dailyData).filter((d: any) => d.orders > 0).length;
+    const averageOrderValue = totalOrders > 0 ? posRevenue / totalOrders : 0;
+    
     return {
       period,
       data: Object.values(dailyData),
       summary: {
         totalRevenue,
+        posRevenue,
+        hotelRevenue,
         totalOrders,
         averageOrderValue,
       },
