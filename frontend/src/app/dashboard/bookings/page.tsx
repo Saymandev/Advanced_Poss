@@ -11,28 +11,28 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import {
-  Booking,
-  useCancelBookingMutation,
-  useCheckInMutation,
-  useCheckOutMutation,
-  useCreateBookingMutation,
-  useGetBookingByIdQuery,
-  useGetBookingStatsQuery,
-  useGetBookingsQuery,
-  useRecordPaymentMutation,
-  useUpdateBookingMutation
+    Booking,
+    useCancelBookingMutation,
+    useCheckInMutation,
+    useCheckOutMutation,
+    useCreateBookingMutation,
+    useGetBookingByIdQuery,
+    useGetBookingStatsQuery,
+    useGetBookingsQuery,
+    useRecordPaymentMutation,
+    useUpdateBookingMutation
 } from '@/lib/api/endpoints/bookingsApi';
 import { useGetPaymentMethodsQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { useGetRoomsByBranchQuery as useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import {
-  BanknotesIcon,
-  CheckCircleIcon,
-  EyeIcon,
-  PencilIcon,
-  PlusIcon,
-  XCircleIcon
+    BanknotesIcon,
+    CheckCircleIcon,
+    EyeIcon,
+    PencilIcon,
+    PlusIcon,
+    XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -49,8 +49,9 @@ export default function BookingsPage() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [checkoutBooking, setCheckoutBooking] = useState<Booking | null>(null);
-  const [checkoutForm, setCheckoutForm] = useState<{ additionalCharges: number; notes: string; paymentMethod: string; paymentAmount: number }>({
+  const [checkoutForm, setCheckoutForm] = useState<{ additionalCharges: number; discount: number; notes: string; paymentMethod: string; paymentAmount: number }>({
     additionalCharges: 0,
+    discount: 0,
     notes: '',
     paymentMethod: 'cash',
     paymentAmount: 0,
@@ -369,6 +370,7 @@ export default function BookingsPage() {
     const balance = booking.balanceAmount ?? (booking.totalAmount - (booking.depositAmount || 0));
     setCheckoutForm({
       additionalCharges: 0,
+      discount: 0,
       notes: '',
       paymentMethod: booking.paymentMethod || 'cash',
       paymentAmount: balance > 0 ? balance : 0,
@@ -384,6 +386,10 @@ export default function BookingsPage() {
         additionalCharges:
           checkoutForm.additionalCharges && checkoutForm.additionalCharges > 0
             ? checkoutForm.additionalCharges
+            : undefined,
+        discount:
+          checkoutForm.discount && checkoutForm.discount > 0
+            ? checkoutForm.discount
             : undefined,
         paymentMethod: checkoutForm.paymentMethod,
         paymentAmount: checkoutForm.paymentAmount,
@@ -1076,28 +1082,64 @@ export default function BookingsPage() {
               </ul>
             </div>
           )}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium mb-1">
-              Additional Charges ({currency})
-            </label>
-            <Input
-              type="number"
-              min="0"
-              value={checkoutForm.additionalCharges}
-              onChange={(e) =>
-                setCheckoutForm((prev) => ({
-                  ...prev,
-                  additionalCharges: Number(e.target.value) || 0,
-                }))
-              }
-              placeholder="0"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium mb-1">
+                Additional Charges ({currency})
+              </label>
+              <Input
+                type="number"
+                min="0"
+                value={checkoutForm.additionalCharges}
+                onChange={(e) => {
+                  const val = Number(e.target.value) || 0;
+                  setCheckoutForm((prev) => {
+                    const currentBalance = (checkoutBooking?.balanceAmount ?? (checkoutBooking ? checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0) : 0));
+                    const newBalance = Math.max(0, currentBalance + val - prev.discount);
+                    return {
+                      ...prev,
+                      additionalCharges: val,
+                      paymentAmount: newBalance
+                    };
+                  });
+                }}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium mb-1">
+                Discount ({currency})
+              </label>
+              <Input
+                type="number"
+                min="0"
+                value={checkoutForm.discount}
+                onChange={(e) => {
+                  const val = Number(e.target.value) || 0;
+                  setCheckoutForm((prev) => {
+                    const currentBalance = (checkoutBooking?.balanceAmount ?? (checkoutBooking ? checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0) : 0));
+                    const newBalance = Math.max(0, currentBalance + prev.additionalCharges - val);
+                    return {
+                      ...prev,
+                      discount: val,
+                      paymentAmount: newBalance
+                    };
+                  });
+                }}
+                placeholder="0"
+              />
+            </div>
           </div>
           <div className="space-y-4 rounded-lg border border-primary-100 dark:border-primary-900 bg-primary-50/30 dark:bg-primary-900/10 p-4">
-            <h4 className="text-sm font-semibold text-primary-900 dark:text-primary-100 flex items-center gap-2">
-              <CheckCircleIcon className="h-4 w-4" />
-              Settle Balance
-            </h4>
+            <div className="flex justify-between items-center pb-2 border-b border-primary-100 dark:border-primary-800">
+              <h4 className="text-sm font-semibold text-primary-900 dark:text-primary-100 flex items-center gap-2">
+                <CheckCircleIcon className="h-4 w-4" />
+                Settle Balance
+              </h4>
+              <div className="text-xs font-medium text-gray-500">
+                Final Balance: {formatCurrency(Math.max(0, (checkoutBooking?.balanceAmount ?? (checkoutBooking ? checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0) : 0)) + checkoutForm.additionalCharges - checkoutForm.discount))}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Payment Method</label>
@@ -1119,7 +1161,7 @@ export default function BookingsPage() {
                   type="number"
                   value={checkoutForm.paymentAmount}
                   onChange={(e) => setCheckoutForm(prev => ({ ...prev, paymentAmount: Number(e.target.value) }))}
-                  max={checkoutBooking ? (checkoutBooking.balanceAmount ?? (checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0))) + checkoutForm.additionalCharges : 0}
+                  max={checkoutBooking ? (checkoutBooking.balanceAmount ?? (checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0))) + checkoutForm.additionalCharges - checkoutForm.discount : 0}
                 />
               </div>
             </div>

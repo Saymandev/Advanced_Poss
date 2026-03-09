@@ -349,7 +349,7 @@ export const bookingsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Booking', 'Room'],
     }),
-    checkOut: builder.mutation<Booking, { id: string; notes?: string; additionalCharges?: number; paymentMethod?: string; paymentAmount?: number }>({
+    checkOut: builder.mutation<Booking, { id: string; notes?: string; additionalCharges?: number; discount?: number; paymentMethod?: string; paymentAmount?: number }>({
       query: ({ id, ...data }) => ({
         url: `/bookings/${id}/check-out`,
         method: 'POST',
