@@ -339,7 +339,7 @@ export default function SuperAdminDashboardPage() {
               {deletedBranches.map((branch: any) => {
                 // Ensure we have the correct ID (MongoDB _id vs id)
                 const branchId = branch.id || branch._id || branch._id?.toString();
-                console.log('🔍 Branch data:', { branchId, branch });
+                
                 return (
                   <div
                     key={branchId}

@@ -13,42 +13,42 @@ import { Select } from '@/components/ui/Select';
 import { useGetCompaniesQuery, useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
 import { useCreateCheckoutSessionMutation } from '@/lib/api/endpoints/paymentsApi';
 import {
-    PaymentRequest,
-    PaymentRequestStatus,
-    SubscriptionPaymentMethod,
-    useGetPaymentRequestsQuery,
-    useInitializeSubscriptionPaymentMutation,
-    useManualActivateSubscriptionMutation,
-    useVerifyPaymentRequestMutation,
+  PaymentRequest,
+  PaymentRequestStatus,
+  SubscriptionPaymentMethod,
+  useGetPaymentRequestsQuery,
+  useInitializeSubscriptionPaymentMutation,
+  useManualActivateSubscriptionMutation,
+  useVerifyPaymentRequestMutation,
 } from '@/lib/api/endpoints/subscriptionPaymentsApi';
 import {
-    BillingHistory,
-    useCancelSubscriptionMutation,
-    useCreateSubscriptionMutation,
-    useCreateSubscriptionPlanMutation,
-    useDeleteSubscriptionPlanMutation,
-    useGetAllSubscriptionsQuery,
-    useGetBillingHistoryQuery,
-    useGetCurrentSubscriptionQuery,
-    useGetPlanWithFeaturesQuery,
-    useGetSubscriptionByCompanyQuery,
-    useGetSubscriptionPlansQuery,
-    useGetUsageStatsQuery,
-    useReactivateSubscriptionMutation,
-    useUpdateSubscriptionMutation,
-    useUpdateSubscriptionPlanMutation,
+  BillingHistory,
+  useCancelSubscriptionMutation,
+  useCreateSubscriptionMutation,
+  useCreateSubscriptionPlanMutation,
+  useDeleteSubscriptionPlanMutation,
+  useGetAllSubscriptionsQuery,
+  useGetBillingHistoryQuery,
+  useGetCurrentSubscriptionQuery,
+  useGetPlanWithFeaturesQuery,
+  useGetSubscriptionByCompanyQuery,
+  useGetSubscriptionPlansQuery,
+  useGetUsageStatsQuery,
+  useReactivateSubscriptionMutation,
+  useUpdateSubscriptionMutation,
+  useUpdateSubscriptionPlanMutation,
 } from '@/lib/api/endpoints/subscriptionsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
-    ArrowTrendingUpIcon,
-    BuildingOffice2Icon,
-    CheckCircleIcon,
-    ClockIcon,
-    CreditCardIcon,
-    DocumentArrowDownIcon,
-    ExclamationTriangleIcon,
-    XCircleIcon,
+  ArrowTrendingUpIcon,
+  BuildingOffice2Icon,
+  CheckCircleIcon,
+  ClockIcon,
+  CreditCardIcon,
+  DocumentArrowDownIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -691,10 +691,7 @@ export default function SubscriptionsPage() {
   const [featureBillingCycle, setFeatureBillingCycle] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
   const [featureSubscriptionPrice, setFeatureSubscriptionPrice] = useState<number>(0);
   
-  // Debug: Log price changes
-  useEffect(() => {
-    console.log('[SubscriptionsPage] featureSubscriptionPrice updated:', featureSubscriptionPrice);
-  }, [featureSubscriptionPrice]);
+  
   const [isFeatureSubscriptionModalOpen, setIsFeatureSubscriptionModalOpen] = useState(false);
   // Super Admin: selected company for feature-based subscription
   const [selectedCompanyForSubscription, setSelectedCompanyForSubscription] = useState<string>('');
@@ -1480,25 +1477,18 @@ export default function SubscriptionsPage() {
     ];
     const handleSavePlan = async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      console.log('🔵 [1] Form submitted');
-      console.log('🔵 [1] editingPlan:', JSON.stringify(editingPlan, null, 2));
-      console.log('🔵 [1] activeTab:', activeTab);
+     
       
       const formData = new FormData(event.currentTarget);
       
-      // Log all form data
-      console.log('🔵 [2] FormData contents:');
-      for (const [key, value] of formData.entries()) {
-        console.log(`  - ${key}:`, value);
-      }
+    
+      
+      
       
       // CRITICAL: Check for both id and _id (MongoDB uses _id, but API might normalize to id)
       const planId = editingPlan?.id || editingPlan?._id;
       const isUpdate = !!planId;
-      console.log('🔵 [3] isUpdate:', isUpdate);
-      console.log('🔵 [3] editingPlan?.id:', editingPlan?.id);
-      console.log('🔵 [3] editingPlan?._id:', editingPlan?._id);
-      console.log('🔵 [3] planId (resolved):', planId);
+      
       
       // Base payload - different for create vs update
       // Note: Currency is handled globally in Settings, not per plan
@@ -1508,9 +1498,7 @@ export default function SubscriptionsPage() {
       const displayName = (formData.get('displayName') as string)?.trim();
       const description = (formData.get('description') as string)?.trim();
       
-      console.log('🔵 [4] Extracted form values:');
-      console.log('  - displayName from form:', displayName);
-      console.log('  - description from form:', description);
+      
       
       if (isUpdate) {
         // For updates: ALWAYS include basic fields from existing plan
@@ -1522,18 +1510,13 @@ export default function SubscriptionsPage() {
         payload.displayName = (displayName && displayName.length > 0) 
           ? displayName 
           : (editingPlan?.displayName || editingPlan?.name || 'Plan');
-        console.log('🟢 [5] displayName resolved:', payload.displayName);
-        console.log('  - form value:', displayName);
-        console.log('  - editingPlan.displayName:', editingPlan?.displayName);
-        console.log('  - editingPlan.name:', editingPlan?.name);
+        
         
         // description: use form value if provided, otherwise use existing plan value
         payload.description = (description && description.length > 0) 
           ? description 
           : (editingPlan?.description || '');
-        console.log('🟢 [5] description resolved:', payload.description);
-        console.log('  - form value:', description);
-        console.log('  - editingPlan.description:', editingPlan?.description);
+        
         
         // price: use form value if provided, otherwise use existing plan value
         const priceValue = formData.get('price') as string;
@@ -1655,9 +1638,7 @@ export default function SubscriptionsPage() {
         payload.limits = limits;
       }
       
-      console.log('🟡 [6] Final payload before API call:');
-      console.log(JSON.stringify(payload, null, 2));
-      console.log('🟡 [6] Payload keys:', Object.keys(payload));
+      
       
       try {
         if (isUpdate) {
@@ -1680,17 +1661,14 @@ export default function SubscriptionsPage() {
             ...(payload.limits && Object.keys(payload.limits).length > 0 && { limits: payload.limits }),
           };
           
-          console.log('🟠 [7] Calling updatePlan with:');
-          console.log('  - id:', updatePlanId);
-          console.log('  - data:', JSON.stringify(finalPayload, null, 2));
+         
           
           await updatePlan({ id: updatePlanId, data: finalPayload }).unwrap();
           toast.success('Plan updated successfully');
           // Manually refetch plans to ensure UI updates
           await refetchPlans();
         } else {
-          console.log('🟠 [7] Calling createPlan with:');
-          console.log('  - data:', JSON.stringify(payload, null, 2));
+          
           
           await createPlan(payload).unwrap();
           toast.success('Plan created successfully');

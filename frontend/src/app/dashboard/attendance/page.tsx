@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   AttendanceRecord,
   useApproveAttendanceMutation,
@@ -20,7 +21,6 @@ import {
   useMarkAbsentMutation,
   useUpdateAttendanceMutation
 } from '@/lib/api/endpoints/attendanceApi';
-import { usePermissions } from '@/hooks/usePermissions';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -93,13 +93,7 @@ export default function AttendancePage() {
   // Debug logging
   useEffect(() => {
     if (branchIdStr) {
-      console.log('🔍 Attendance Debug:', {
-        branchId: branchIdStr,
-        userRole: user?.role,
-        todayAttendanceCount: todayAttendance?.length || 0,
-        todayAttendance,
-        todayError,
-      });
+      
     }
   }, [branchIdStr, user?.role, todayAttendance, todayError]);
   const { data: attendanceStats, isLoading: statsLoading } = useGetAttendanceStatsQuery(
@@ -152,7 +146,7 @@ export default function AttendancePage() {
         ...(checkInNotes?.trim() && { notes: checkInNotes.trim() }),
       };
 
-      console.log('🔍 Attendance Check-In Request:', { branchId: branchIdStr, hasNotes: !!checkInNotes?.trim() });
+      
 
       await checkIn(checkInData).unwrap();
       toast.success('Checked in successfully');

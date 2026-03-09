@@ -27,6 +27,8 @@ export const SNAPSHOT_KEYS = {
   COMPANY_SETTINGS: 'companySettings',
   COMPANY_INFO: 'companyInfo',
   ORDERS: 'orders',
+  BOOKINGS: 'bookings',
+  ROOMS: 'rooms',
 } as const;
 
 export type SnapshotKey = (typeof SNAPSHOT_KEYS)[keyof typeof SNAPSHOT_KEYS];
@@ -96,7 +98,7 @@ const fetchMenuItems = async (branchId: string, companyId: string): Promise<Pref
     const raw = await fetchJson(`${getApiBase()}/pos/menu-items?${params}`);
     const items = extractItems(raw, 'menuItems');
     await saveSnapshot(SNAPSHOT_KEYS.MENU_ITEMS, items, TTL.MENU_ITEMS);
-    console.log(`[POS Offline] 📦 Prefetched ${items.length} menu items for branch ${branchId}`);
+    
     return { key: SNAPSHOT_KEYS.MENU_ITEMS, success: true, count: items.length };
   } catch (error: any) {
     return { key: SNAPSHOT_KEYS.MENU_ITEMS, success: false, error: error.message };
@@ -111,7 +113,7 @@ const fetchCategories = async (branchId: string, companyId: string): Promise<Pre
     const raw = await fetchJson(`${getApiBase()}/categories?${params}`);
     const items = extractItems(raw, 'categories');
     await saveSnapshot(SNAPSHOT_KEYS.CATEGORIES, items, TTL.CATEGORIES);
-    console.log(`[POS Offline] 📂 Prefetched ${items.length} categories for branch ${branchId}`);
+    
     return { key: SNAPSHOT_KEYS.CATEGORIES, success: true, count: items.length };
   } catch (error: any) {
     return { key: SNAPSHOT_KEYS.CATEGORIES, success: false, error: error.message };
@@ -140,7 +142,7 @@ const fetchStaff = async (companyId: string, branchId: string): Promise<Prefetch
     const raw = await fetchJson(`${getApiBase()}/users?${params}`);
     const items = extractItems(raw, 'users');
     await saveSnapshot(SNAPSHOT_KEYS.STAFF, items, TTL.STAFF);
-    console.log(`[POS Offline] 👥 Prefetched ${items.length} staff members for branch ${branchId}`);
+    
     return { key: SNAPSHOT_KEYS.STAFF, success: true, count: items.length };
   } catch (error: any) {
     return { key: SNAPSHOT_KEYS.STAFF, success: false, error: error.message };
@@ -158,7 +160,7 @@ const fetchTables = async (branchId: string, companyId: string): Promise<Prefetc
     if (items.length > 0 || (branchId && raw)) {
       await saveSnapshot(SNAPSHOT_KEYS.TABLES, items, TTL.TABLES);
     }
-    console.log(`[POS Offline] 🪑 Prefetched ${items.length} tables for branch ${branchId}`);
+    
     return { key: SNAPSHOT_KEYS.TABLES, success: true, count: items.length };
   } catch (error: any) {
     return { key: SNAPSHOT_KEYS.TABLES, success: false, error: error.message };
@@ -197,7 +199,7 @@ const fetchCustomers = async (companyId: string, branchId: string): Promise<Pref
     const raw = await fetchJson(`${getApiBase()}/customers?${params}`);
     const items = extractItems(raw, 'customers');
     await saveSnapshot(SNAPSHOT_KEYS.CUSTOMERS, items, TTL.CUSTOMERS);
-    console.log(`[POS Offline] 👤 Prefetched ${items.length} customers for branch ${branchId}`);
+    
     return { key: SNAPSHOT_KEYS.CUSTOMERS, success: true, count: items.length };
   } catch (error: any) {
     return { key: SNAPSHOT_KEYS.CUSTOMERS, success: false, error: error.message };
@@ -233,10 +235,36 @@ const fetchPOSOrders = async (branchId: string): Promise<PrefetchResult> => {
     const raw = await fetchJson(`${getApiBase()}/pos/orders?${params}`);
     const items = extractItems(raw, 'orders');
     await saveSnapshot(SNAPSHOT_KEYS.ORDERS, items, TTL.TABLES); // Use short TTL for orders
-    console.log(`[POS Offline] 🧾 Prefetched ${items.length} recent orders for branch ${branchId}`);
+    
     return { key: SNAPSHOT_KEYS.ORDERS, success: true, count: items.length };
   } catch (error: any) {
     return { key: SNAPSHOT_KEYS.ORDERS, success: false, error: error.message };
+  }
+};
+
+const fetchBookings = async (branchId: string): Promise<PrefetchResult> => {
+  try {
+    if (!branchId) return { key: SNAPSHOT_KEYS.BOOKINGS, success: true, count: 0 };
+    const params = new URLSearchParams({ branchId, limit: '1000' });
+    const raw = await fetchJson(`${getApiBase()}/bookings?${params}`);
+    const items = extractItems(raw, 'bookings');
+    await saveSnapshot(SNAPSHOT_KEYS.BOOKINGS, items, TTL.TABLES); // Use same TTL as tables/orders
+    return { key: SNAPSHOT_KEYS.BOOKINGS, success: true, count: items.length };
+  } catch (error: any) {
+    return { key: SNAPSHOT_KEYS.BOOKINGS, success: false, error: error.message };
+  }
+};
+
+const fetchRooms = async (branchId: string): Promise<PrefetchResult> => {
+  try {
+    if (!branchId) return { key: SNAPSHOT_KEYS.ROOMS, success: true, count: 0 };
+    const params = new URLSearchParams({ branchId, status: 'available', limit: '1000' });
+    const raw = await fetchJson(`${getApiBase()}/rooms?${params}`);
+    const items = extractItems(raw, 'rooms');
+    await saveSnapshot(SNAPSHOT_KEYS.ROOMS, items, TTL.TABLES);
+    return { key: SNAPSHOT_KEYS.ROOMS, success: true, count: items.length };
+  } catch (error: any) {
+    return { key: SNAPSHOT_KEYS.ROOMS, success: false, error: error.message };
   }
 };
 
@@ -253,7 +281,7 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
   const startedAt = Date.now();
   const { branchId, companyId, forceRefresh = false, onProgress } = ctx;
 
-  console.log(`[POS Offline] 🚀 Starting prefetch for branch: ${branchId}, company: ${companyId} (force: ${forceRefresh})`);
+  
 
   const shouldSkip = async (key: SnapshotKey, ttl: number): Promise<boolean> => {
     if (forceRefresh) return false;
@@ -299,6 +327,8 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
     runFetcher(SNAPSHOT_KEYS.COMPANY_SETTINGS, TTL.GENERIC, () => fetchCompanySettings(companyId)),
     runFetcher(SNAPSHOT_KEYS.COMPANY_INFO, TTL.GENERIC, () => fetchCompanyInfo(companyId)),
     runFetcher(SNAPSHOT_KEYS.ORDERS, TTL.TABLES, () => fetchPOSOrders(branchId)),
+    runFetcher(SNAPSHOT_KEYS.BOOKINGS, TTL.TABLES, () => fetchBookings(branchId)),
+    runFetcher(SNAPSHOT_KEYS.ROOMS, TTL.TABLES, () => fetchRooms(branchId)),
   ]);
 
   const finalResults: PrefetchResult[] = results.map((r, i) => {

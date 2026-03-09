@@ -56,7 +56,7 @@ export function FeatureBasedSubscriptionSelector({
           // Handle both { data: {...} } and direct response formats
           const priceData = result?.data || result;
           const totalPrice = priceData?.totalPrice ?? 0;
-          console.log('[FeatureBasedSubscriptionSelector] Price calculated:', { totalPrice, result, selectedFeatures, billingCycle });
+          
           if (onPriceCalculated) {
             onPriceCalculated(totalPrice);
           }
@@ -80,7 +80,7 @@ export function FeatureBasedSubscriptionSelector({
   useEffect(() => {
     if (isPriceCalculated && priceData && priceData.totalPrice && priceData.totalPrice > 0 && onPriceCalculated) {
       const totalPrice = priceData.totalPrice;
-      console.log('[FeatureBasedSubscriptionSelector] Price updated from mutation data:', { totalPrice, priceData });
+      
       onPriceCalculated(totalPrice);
     }
   }, [isPriceCalculated, priceData, onPriceCalculated]);

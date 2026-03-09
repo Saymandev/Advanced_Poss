@@ -19,6 +19,8 @@ const OFFLINE_SNAPSHOT_MAP: Array<{ match: string; key: string }> = [
   { match: '/settings/company',       key: SNAPSHOT_KEYS.COMPANY_SETTINGS },
   { match: '/companies/',             key: SNAPSHOT_KEYS.COMPANY_INFO },
   { match: '/pos/orders',             key: SNAPSHOT_KEYS.ORDERS },
+  { match: '/bookings',               key: SNAPSHOT_KEYS.BOOKINGS },
+  { match: '/rooms',                  key: SNAPSHOT_KEYS.ROOMS },
 ];
 
 /** Returns the snapshot key for a given URL, or null if not cacheable */
@@ -83,7 +85,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
                 ? mergedOrders 
                 : { ...baseData, orders: mergedOrders, total: (baseData.total || 0) + offlineMapped.length };
 
-              console.log(`[Offline] Merged ${offlineMapped.length} pending orders into GET /pos/orders results`);
+              
               return { data: mergedData };
             }
           } catch (e) {
@@ -96,9 +98,9 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
           const itemCount = Array.isArray(items) ? items.length : (typeof items === 'object' && items !== null ? Object.keys(items).length : 'N/A');
           
           if (snapshotKey === SNAPSHOT_KEYS.MENU_ITEMS || snapshotKey === SNAPSHOT_KEYS.CATEGORIES) {
-            console.log(`[Offline] 📦 Serving ${snapshotKey} for ${requestUrl} (${itemCount} items)`);
+            
           } else {
-            console.log(`[Offline] Serving ${requestUrl} from snapshot '${snapshotKey}' (age: ${Math.round((Date.now() - snap.savedAt) / 60000)}m, fresh: ${snap.isFresh}, items: ${itemCount})`);
+            
           }
           return { data: items };
         }
@@ -112,7 +114,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
       try {
         const orderPayload = args.body;
         const offlineId = await enqueueOfflineOrder(orderPayload);
-        console.log(`[Offline] Order queued with id ${offlineId}`);
+        
         const tempOrderNumber = `OFF-${offlineId.slice(0, 4).toUpperCase()}`;
         return {
           data: {
@@ -152,13 +154,13 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
             status: 'pending' // Still pending sync
           });
           
-          console.log(`[Offline] Payment merged into queued order ${orderId}`);
+          
           return { data: { success: true, isOffline: true, merged: true } };
         } else {
           // It's a payment for an existing server order (or we can't find the offline one)
           // Queue it as a standalone payment task.
           const taskId = await enqueueOfflinePayment(paymentPayload);
-          console.log(`[Offline] Standalone payment queued with task ${taskId} for order ${orderId}`);
+          
           return { data: { success: true, isOffline: true, queued: true } };
         }
       } catch (error) {

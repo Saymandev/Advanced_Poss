@@ -8,8 +8,8 @@ import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
-    CurrencyDollarIcon,
-    ShoppingBagIcon,
+  CurrencyDollarIcon,
+  ShoppingBagIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -147,7 +147,7 @@ export default function DashboardPage() {
       console.error('Dashboard stats error:', statsError);
     }
     if (statsData) {
-      console.log('Dashboard stats data:', statsData);
+      
     }
   }, [statsParams, validDateRange, branchId, statsLoading, statsData, statsError]);
   const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useGetPOSOrdersQuery(
@@ -161,19 +161,7 @@ export default function DashboardPage() {
     },
     { skip: !safeDateRange.start || !safeDateRange.end }
   );
-  // Debug: Log orders query
-  useEffect(() => {
-    if (ordersError) {
-      console.error('Dashboard orders error:', ordersError);
-      console.error('Error details:', ordersError);
-    }
-    if (ordersData) {
-      console.log('Dashboard orders data:', ordersData);
-      console.log('Orders count:', ordersData?.orders?.length || 0);
-    }
-    console.log('Orders query skip:', !safeDateRange.start || !safeDateRange.end);
-    console.log('Safe date range:', safeDateRange);
-  }, [ordersLoading, ordersData, ordersError, validDateRange, safeDateRange, branchId]);
+  
   // Get reviews for waiter ratings
   const { data: reviewsData, error: reviewsError } = useGetReviewsQuery(
     { branchId: branchId || undefined, companyId: companyId || undefined },
@@ -224,13 +212,13 @@ export default function DashboardPage() {
   // Transform orders to ensure proper structure
   const orders = useMemo(() => {
     if (!ordersData) {
-      console.log('No ordersData available');
+      
       return [];
     }
     const ordersArray = (ordersData as any)?.orders || (ordersData as any)?.data?.orders || (Array.isArray(ordersData) ? ordersData : []);
-    console.log('Orders array length:', ordersArray.length);
+    
     if (ordersArray.length === 0) {
-      console.log('Orders array is empty');
+      
       return [];
     }
     // Transform orders to ensure all required fields are present

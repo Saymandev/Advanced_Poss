@@ -30,7 +30,7 @@ export const useOfflineSyncManager = () => {
 
   const syncOrders = useCallback(async () => {
     if (!window.navigator.onLine || syncLockRef()) {
-      if (syncLockRef()) console.log('[Sync] Skip: Sync already in progress');
+      
       return;
     }
     
@@ -42,7 +42,7 @@ export const useOfflineSyncManager = () => {
         return;
       }
 
-      console.log(`[Sync] Starting sync for ${orders.length} tasks...`);
+      
       let successCount = 0;
       toast.loading(`Syncing ${orders.length} offline orders...`, { id: 'sync-orders' });
 
