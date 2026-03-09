@@ -1,9 +1,9 @@
 import {
-    BadRequestException,
-    Inject,
-    Injectable,
-    NotFoundException,
-    forwardRef,
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as fs from 'fs';
@@ -13,8 +13,8 @@ import { PurchaseOrderFilterDto } from '../../common/dto/pagination.dto';
 import { PurchaseOrderStatus } from '../../common/enums/purchase-order-status.enum';
 import { ExpensesService } from '../expenses/expenses.service';
 import {
-    Ingredient,
-    IngredientDocument,
+  Ingredient,
+  IngredientDocument,
 } from '../ingredients/schemas/ingredient.schema';
 import { Supplier, SupplierDocument } from '../suppliers/schemas/supplier.schema';
 import { WorkPeriodsService } from '../work-periods/work-periods.service';
@@ -24,8 +24,8 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import {
-    PurchaseOrder,
-    PurchaseOrderDocument,
+  PurchaseOrder,
+  PurchaseOrderDocument,
 } from './schemas/purchase-order.schema';
 
 @Injectable()
@@ -341,8 +341,8 @@ export class PurchaseOrdersService {
   }
 
   async receive(id: string, dto: ReceivePurchaseOrderDto) {
-    console.log(`[DEBUG] PurchaseOrdersService.receive called for ID: ${id}`);
-    console.log(`[DEBUG] Received items: ${JSON.stringify(dto.receivedItems)}`);
+    
+    
     const order = await this.purchaseOrderModel.findById(id);
     if (!order) {
       throw new NotFoundException('Purchase order not found');

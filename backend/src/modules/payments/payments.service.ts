@@ -289,10 +289,7 @@ export class PaymentsService {
         billingCycle: billingCycle || 'monthly',
       };
       
-      console.log('🟡 [StripeWebhook] Feature-based subscription:', {
-        enabledFeaturesCount: enabledFeaturesList.length,
-        billingCycle: billingCycle || 'monthly',
-      });
+      
     } else {
       // Plan-based subscription
       plan = await this.subscriptionPlansService.findByName(planName);
@@ -324,7 +321,7 @@ export class PaymentsService {
           companyName: company.name,
         });
         
-        console.log('🟢 [StripeWebhook] Feature-based subscription created successfully');
+        
         return;
       } catch (error) {
         console.error('🔴 [StripeWebhook] Failed to create feature-based subscription:', error);

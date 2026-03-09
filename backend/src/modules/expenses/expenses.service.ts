@@ -1,9 +1,9 @@
 import {
-    BadRequestException,
-    Inject,
-    Injectable,
-    NotFoundException,
-    forwardRef
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  forwardRef
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as fs from 'fs';
@@ -346,7 +346,7 @@ export class ExpensesService {
   }
 
   private async recordLedgerTransaction(expense: ExpenseDocument) {
-    console.log(`[DEBUG] recordLedgerTransaction called for expense: ${expense.expenseNumber}`);
+   
     const logPath = path.join(process.cwd(), 'txn-debug.log');
     try {
       const companyId = (expense as any).companyId?.toString();

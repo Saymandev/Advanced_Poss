@@ -1,10 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsMongoId, IsOptional, IsString } from 'class-validator';
 
 export class CheckInDto {
   @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
   @IsOptional()
-  @IsString()
+  @IsMongoId()
   checkedInBy?: string;
 
   @ApiPropertyOptional({ example: 'Guest arrived early' })
@@ -12,4 +12,3 @@ export class CheckInDto {
   @IsString()
   notes?: string;
 }
-

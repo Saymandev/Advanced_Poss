@@ -1,7 +1,7 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -19,23 +19,23 @@ import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { UpgradeSubscriptionDto } from './dto/upgrade-subscription.dto';
 import {
-    BillingHistory,
-    BillingHistoryDocument,
-    InvoiceStatus,
-    PaymentStatus,
+  BillingHistory,
+  BillingHistoryDocument,
+  InvoiceStatus,
+  PaymentStatus,
 } from './schemas/billing-history.schema';
 import {
-    SubscriptionPlanDocument,
-    SubscriptionPlan as SubscriptionPlanEntity,
+  SubscriptionPlanDocument,
+  SubscriptionPlan as SubscriptionPlanEntity,
 } from './schemas/subscription-plan.schema';
 import {
-    BillingCycle,
-    Subscription,
-    SubscriptionDocument,
-    SubscriptionLimits,
-    SubscriptionPlan,
-    SubscriptionStatus,
-    UsageMetrics,
+  BillingCycle,
+  Subscription,
+  SubscriptionDocument,
+  SubscriptionLimits,
+  SubscriptionPlan,
+  SubscriptionStatus,
+  UsageMetrics,
 } from './schemas/subscription.schema';
 import { StripeService } from './stripe.service';
 import { SubscriptionFeaturesService } from './subscription-features.service';
@@ -461,12 +461,12 @@ export class SubscriptionsService {
         // Priority: enabledFeatureKeys > legacy features conversion
         if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
           subscriptionData.enabledFeatures = plan.enabledFeatureKeys;
-          console.log(`[Subscriptions] ✅ Set enabledFeatures from plan.enabledFeatureKeys (${plan.enabledFeatureKeys.length} features) for plan '${plan.name}'`);
+          
         } else if (plan.features) {
           // Convert legacy features to feature keys
           const { convertLegacyFeaturesToKeys } = await import('./utils/plan-features.helper');
           subscriptionData.enabledFeatures = convertLegacyFeaturesToKeys(plan.features);
-          console.log(`[Subscriptions] ✅ Converted plan.features to enabledFeatures (${subscriptionData.enabledFeatures.length} features) for plan '${plan.name}'`);
+          
         } else {
           // Fallback: If plan has neither enabledFeatureKeys nor features, set empty array
           // The role-permissions service will fallback to plan lookup, but we ensure enabledFeatures is always defined

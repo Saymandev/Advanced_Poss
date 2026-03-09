@@ -1,16 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  IsArray,
-  IsDate,
-  IsEmail,
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Min,
-  ValidateNested,
+    IsArray,
+    IsDate,
+    IsEmail,
+    IsEnum,
+    IsMongoId,
+    IsNotEmpty,
+    IsNumber,
+    IsOptional,
+    IsString,
+    Min,
+    ValidateNested,
 } from 'class-validator';
 
 class AdditionalChargeDto {
@@ -32,18 +33,18 @@ class AdditionalChargeDto {
 
 export class CreateBookingDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
-  @IsString()
+  @IsMongoId()
   @IsNotEmpty()
   branchId: string;
 
   @ApiProperty({ example: '507f1f77bcf86cd799439012' })
-  @IsString()
+  @IsMongoId()
   @IsNotEmpty()
   roomId: string;
 
   @ApiPropertyOptional({ example: '507f1f77bcf86cd799439013' })
   @IsOptional()
-  @IsString()
+  @IsMongoId()
   guestId?: string;
 
   @ApiProperty({ example: 'John Doe' })

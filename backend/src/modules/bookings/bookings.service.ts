@@ -1,9 +1,9 @@
 import {
-    BadRequestException,
-    Inject,
-    Injectable,
-    NotFoundException,
-    forwardRef,
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -11,8 +11,8 @@ import { BranchesService } from '../branches/branches.service';
 import { CustomersService } from '../customers/customers.service';
 import { RoomsService } from '../rooms/rooms.service';
 import {
-    TransactionCategory,
-    TransactionType,
+  TransactionCategory,
+  TransactionType,
 } from '../transactions/schemas/transaction.schema';
 import { TransactionsService } from '../transactions/transactions.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
@@ -608,23 +608,29 @@ export class BookingsService {
     if (booking.status === 'checked_out' || booking.status === 'cancelled') {
       throw new BadRequestException('Cannot update a checked-out or cancelled booking');
     }
-    // If dates are being updated, check availability
-    if (updateBookingDto.checkInDate || updateBookingDto.checkOutDate) {
+
+    // Handle populated roomId or extract ID correctly
+    const currentRoomId = (booking.roomId as any)?._id?.toString() || booking.roomId.toString();
+
+    // If dates or room are being updated, check availability
+    if (updateBookingDto.checkInDate || updateBookingDto.checkOutDate || updateBookingDto.roomId) {
       const checkInDate = updateBookingDto.checkInDate
         ? new Date(updateBookingDto.checkInDate)
         : booking.checkInDate;
       const checkOutDate = updateBookingDto.checkOutDate
         ? new Date(updateBookingDto.checkOutDate)
         : booking.checkOutDate;
+      const roomIdToCheck = updateBookingDto.roomId || currentRoomId;
+
       const isAvailable = await this.checkRoomAvailability(
-        booking.roomId.toString(),
+        roomIdToCheck,
         checkInDate,
         checkOutDate,
         id,
       );
       if (!isAvailable) {
         throw new BadRequestException(
-          'Room is not available for the updated dates',
+          'Room is not available for the updated dates or selected room',
         );
       }
     }

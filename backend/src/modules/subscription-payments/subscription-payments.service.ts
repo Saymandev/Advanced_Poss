@@ -779,7 +779,7 @@ export class SubscriptionPaymentsService {
   }
   // Manual activation by super admin
   async manualActivation(dto: ManualActivationDto) {
-    console.log('🟡 [ManualActivation] DTO received:', dto);
+  
     const { companyId, planName, enabledFeatures, billingCycle, notes } = dto;
 
     const company = await this.companyModel.findById(companyId);
@@ -787,12 +787,7 @@ export class SubscriptionPaymentsService {
       console.error('🔴 [ManualActivation] Company NOT FOUND for id:', companyId);
       throw new NotFoundException('Company not found');
     }
-    console.log('🟡 [ManualActivation] Company found:', {
-      id: company._id?.toString?.() || companyId,
-      name: company.name,
-      subscriptionPlan: (company as any).subscriptionPlan,
-      subscriptionStatus: (company as any).subscriptionStatus,
-    });
+    
 
     // Check if it's feature-based or plan-based subscription
     const isFeatureBased = enabledFeatures && enabledFeatures.length > 0;
@@ -837,11 +832,7 @@ export class SubscriptionPaymentsService {
         billingCycle: billingCycle || 'monthly',
       };
       
-      console.log('🟡 [ManualActivation] Feature-based subscription:', {
-        enabledFeaturesCount: enabledFeatures.length,
-        price,
-        billingCycle: billingCycle || 'monthly',
-      });
+      
     } else {
       // Plan-based subscription
       if (!planName) {
@@ -853,16 +844,7 @@ export class SubscriptionPaymentsService {
         console.error('🔴 [ManualActivation] Plan NOT FOUND for name:', planName);
         throw new NotFoundException('Subscription plan not found');
       }
-      console.log('🟡 [ManualActivation] Plan found:', {
-        id: (plan as any)._id?.toString?.(),
-        name: plan.name,
-        displayName: (plan as any).displayName,
-        price: (plan as any).price,
-        currency: (plan as any).currency,
-        hasEnabledFeatureKeys: !!(plan as any).enabledFeatureKeys,
-        enabledFeatureKeysCount: (plan as any).enabledFeatureKeys?.length || 0,
-        hasLegacyFeatures: !!(plan as any).features,
-      });
+      
       
       price = plan.price;
       currency = plan.currency || 'BDT';
@@ -917,11 +899,8 @@ export class SubscriptionPaymentsService {
       };
     }
 
-    console.log('🟡 [ManualActivation] Resolved enabledFeatures:', {
-      count: enabledFeaturesList.length,
-      sample: enabledFeaturesList.slice(0, 10),
-    });
-    console.log('🟡 [ManualActivation] Built limits:', limits);
+    
+    
 
     const now = new Date();
     // Use billingCycle from DTO, fallback to plan's billingCycle, then default to MONTHLY
@@ -934,12 +913,7 @@ export class SubscriptionPaymentsService {
       now.getTime() + periodDays * 24 * 60 * 60 * 1000,
     );
 
-    console.log('🟡 [ManualActivation] Cycle & period:', {
-      billingCycle: billingCycle || 'monthly',
-      resolvedCycle: cycle,
-      periodDays,
-      subscriptionEndDate,
-    });
+    
 
     // Find latest subscription for this company (if any)
     let subscription = await this.subscriptionModel
@@ -948,12 +922,7 @@ export class SubscriptionPaymentsService {
       .exec();
 
     if (subscription) {
-      console.log('🟡 [ManualActivation] Existing subscription found:', {
-        id: subscription._id?.toString?.(),
-        plan: subscription.plan,
-        status: subscription.status,
-        isActive: subscription.isActive,
-      });
+      
       subscription.plan = plan.name as any;
       subscription.status = SubscriptionStatus.ACTIVE;
       subscription.billingCycle = cycle;
@@ -974,13 +943,8 @@ export class SubscriptionPaymentsService {
       subscription.price = price;
       subscription.currency = currency;
       await subscription.save();
-      console.log('🟢 [ManualActivation] Updated subscription:', {
-        id: subscription._id?.toString?.(),
-        plan: subscription.plan,
-        status: subscription.status,
-        isActive: subscription.isActive,
-        enabledFeaturesCount: subscription.enabledFeatures?.length || 0,
-      });
+      
+      
     } else {
       // Create a fresh subscription record
       subscription = new this.subscriptionModel({
@@ -1011,13 +975,7 @@ export class SubscriptionPaymentsService {
         isActive: true,
       });
       await subscription.save();
-      console.log('🟢 [ManualActivation] Created new subscription:', {
-        id: subscription._id?.toString?.(),
-        plan: subscription.plan,
-        status: subscription.status,
-        isActive: subscription.isActive,
-        enabledFeaturesCount: subscription.enabledFeatures?.length || 0,
-      });
+      
     }
 
     // Update company subscription summary
@@ -1249,7 +1207,7 @@ export class SubscriptionPaymentsService {
             timestamp: new Date(),
           },
         });
-        console.log('✅ Notification sent to company owner about payment request submission');
+       
       } else {
         console.warn('⚠️ WebsocketsGateway.emitScopedNotification is not available');
       }
@@ -1344,13 +1302,7 @@ export class SubscriptionPaymentsService {
       // Check if it's feature-based or plan-based
       const isFeatureBased = request.enabledFeatures && Array.isArray(request.enabledFeatures) && request.enabledFeatures.length > 0;
       
-      console.log('🟡 [VerifyPaymentRequest] About to call manualActivation with:', {
-        companyId: companyIdString,
-        isFeatureBased,
-        planName: request.planName,
-        enabledFeatures: request.enabledFeatures,
-        billingCycle: request.billingCycle,
-      });
+      
 
       try {
         if (isFeatureBased) {
@@ -1372,7 +1324,7 @@ export class SubscriptionPaymentsService {
             notes: `Verified payment request. Transaction ID: ${request.transactionId}, Phone: ${request.phoneNumber}. ${dto.adminNotes || ''}`,
           });
         }
-        console.log('🟢 [VerifyPaymentRequest] manualActivation completed successfully');
+        
       } catch (err) {
         console.error('🔴 [VerifyPaymentRequest] manualActivation FAILED:', err);
         throw err;
@@ -1424,7 +1376,7 @@ export class SubscriptionPaymentsService {
               timestamp: new Date(),
             },
           });
-          console.log('✅ Notification sent to company owner about rejection');
+         
         } else {
           console.warn('⚠️ WebsocketsGateway.emitScopedNotification is not available');
         }

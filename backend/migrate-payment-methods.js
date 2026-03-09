@@ -18,7 +18,7 @@ async function migrate() {
   const Company = mongoose.model('Company', new mongoose.Schema({}, { strict: false }), 'companies');
 
   const companies = await Company.find({}).select('_id name').lean();
-  console.log('Companies found:', companies.length);
+  
 
   const defaultMethods = [
     { name: 'Cash', code: 'cash', type: 'cash', sortOrder: 1 },
@@ -28,19 +28,19 @@ async function migrate() {
   ];
 
   for (const company of companies) {
-    console.log('\nSeeding for company:', company.name, company._id.toString());
+   
     for (const method of defaultMethods) {
       const exists = await PM.findOne({ code: method.code, companyId: company._id });
       if (!exists) {
         await PM.create({ ...method, companyId: company._id, currentBalance: 0, isActive: true });
-        console.log('  ✅ Created:', method.code);
+        
       } else {
-        console.log('  ℹ️  Already exists:', method.code, '(balance:', exists.currentBalance, ')');
+       
       }
     }
   }
 
-  console.log('\n✅ Migration done!');
+  
   await mongoose.connection.close();
 }
 
