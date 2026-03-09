@@ -17,5 +17,22 @@ export class CheckOutDto {
   @IsNumber()
   @Min(0)
   additionalCharges?: number;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discount?: number;
+
+  @ApiPropertyOptional({ example: 'cash' })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  paymentAmount?: number;
 }
 

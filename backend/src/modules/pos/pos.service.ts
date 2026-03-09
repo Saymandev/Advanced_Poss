@@ -399,6 +399,38 @@ export class POSService {
             `Room service order ${savedOrder.orderNumber}`,
             savedOrder.status === 'paid', // Only mark as already paid if the POS order itself is paid
           );
+          
+          // Automatically mark the POS order as paid if it was charged to room
+          if (savedOrder.status !== 'paid') {
+            const paymentData = {
+              orderId: savedOrder._id,
+              amount: savedOrder.totalAmount,
+              method: 'room_charge',
+              status: 'completed',
+              transactionId: `ROOM-CHARGE-${savedOrder.orderNumber}-${Date.now()}`,
+              processedBy: new Types.ObjectId(userId),
+              processedAt: new Date(),
+              branchId: new Types.ObjectId(branchId),
+              workPeriodId: activeWorkPeriod ? activeWorkPeriod._id : undefined,
+              paymentDetails: {
+                bookingId: createOrderDto.bookingId,
+                roomNumber: createOrderDto.roomNumber,
+              },
+            };
+            const payment = new this.posPaymentModel(paymentData);
+            const savedPayment = await payment.save();
+
+            await this.posOrderModel.findByIdAndUpdate(savedOrder._id, {
+              status: 'paid',
+              paymentMethod: 'room_charge',
+              paymentId: savedPayment._id,
+              completedAt: new Date(),
+            }).exec();
+            
+            savedOrder.status = 'paid';
+            savedOrder.paymentMethod = 'room_charge';
+            (savedOrder as any).paymentId = savedPayment._id;
+          }
         }
         // Update table status if dine-in order
         if (createOrderDto.tableId && createOrderDto.orderType === 'dine-in' && savedOrder.status === 'pending') {

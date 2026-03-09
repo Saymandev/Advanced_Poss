@@ -1,9 +1,9 @@
 import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-  forwardRef,
+    BadRequestException,
+    Inject,
+    Injectable,
+    NotFoundException,
+    forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -11,8 +11,8 @@ import { BranchesService } from '../branches/branches.service';
 import { CustomersService } from '../customers/customers.service';
 import { RoomsService } from '../rooms/rooms.service';
 import {
-  TransactionCategory,
-  TransactionType,
+    TransactionCategory,
+    TransactionType,
 } from '../transactions/schemas/transaction.schema';
 import { TransactionsService } from '../transactions/transactions.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
@@ -458,36 +458,11 @@ export class BookingsService {
     if (booking.status !== 'checked_in') {
       throw new BadRequestException('Booking must be checked in before checkout');
     }
-    // Guard: prevent checkout while there is an outstanding balance, unless a payment is provided
-    const balanceAmount = booking.balanceAmount ?? booking.totalAmount - (booking.depositAmount || 0);
-    const paymentAmount = (checkOutDto as any).paymentAmount || 0;
-    const remainingBalance = balanceAmount - paymentAmount;
 
-    if (remainingBalance > 0.01) {
-      throw new BadRequestException(
-        `Cannot check out while there is an outstanding balance of ${remainingBalance}. Please settle payment first.`,
-      );
-    }
+    // 1. Update totals with additional charges and discounts if provided
+    let totalChanged = false;
 
-    if (paymentAmount > 0) {
-      await this.recordPayment(
-        id,
-        {
-          amount: paymentAmount,
-          method: (checkOutDto as any).paymentMethod || 'cash',
-          note: 'Final payment at checkout',
-        },
-        userId,
-      );
-      // Re-fetch booking after payment to get updated totals
-      const refreshedBooking = await this.bookingModel.findById(id).exec();
-      booking.depositAmount = refreshedBooking.depositAmount;
-      booking.balanceAmount = refreshedBooking.balanceAmount;
-    }
-    // Calculate final amount if additional charges
-    let finalAmount = booking.totalAmount;
     if (checkOutDto.additionalCharges && checkOutDto.additionalCharges > 0) {
-      finalAmount += checkOutDto.additionalCharges;
       booking.additionalCharges = [
         ...(booking.additionalCharges || []),
         {
@@ -496,8 +471,46 @@ export class BookingsService {
           amount: checkOutDto.additionalCharges,
         },
       ];
+      booking.totalAmount += checkOutDto.additionalCharges;
+      totalChanged = true;
     }
-    // Update booking
+
+    if (checkOutDto.discount && checkOutDto.discount > 0) {
+      booking.discount = (booking.discount || 0) + checkOutDto.discount;
+      booking.totalAmount -= checkOutDto.discount;
+      totalChanged = true;
+    }
+
+    if (totalChanged) {
+      booking.balanceAmount = booking.totalAmount - (booking.depositAmount || 0);
+      await (booking as any).save();
+    }
+
+    // 2. Process final payment if provided
+    const paymentAmount = checkOutDto.paymentAmount || 0;
+    if (paymentAmount > 0) {
+      await this.recordPayment(
+        id,
+        {
+          amount: paymentAmount,
+          method: checkOutDto.paymentMethod || 'cash',
+          note: 'Final payment at checkout',
+        },
+        userId,
+      );
+    }
+
+    // 3. Re-fetch and check if balance is settled
+    const settledBooking = await this.findOne(id);
+    const currentBalance = settledBooking.balanceAmount ?? 0;
+
+    if (currentBalance > 0.01) {
+      throw new BadRequestException(
+        `Cannot check out while there is an outstanding balance of ${currentBalance.toFixed(2)}. Please settle payment first (Total: ${settledBooking.totalAmount.toFixed(2)}, Paid: ${settledBooking.depositAmount?.toFixed(2)}).`,
+      );
+    }
+
+    // 4. Update booking status to checked_out
     const updatedBooking = await this.bookingModel
       .findByIdAndUpdate(
         id,
@@ -505,41 +518,38 @@ export class BookingsService {
           status: 'checked_out',
           checkedOutAt: new Date(),
           checkedOutBy: userId ? new Types.ObjectId(userId) : undefined,
-          totalAmount: finalAmount,
-          balanceAmount: finalAmount - (booking.depositAmount || 0),
           notes: checkOutDto.notes
-            ? `${booking.notes || ''}\n${checkOutDto.notes}`.trim()
-            : booking.notes,
+            ? `${settledBooking.notes || ''}\n${checkOutDto.notes}`.trim()
+            : settledBooking.notes,
         },
         { new: true },
       )
       .populate('roomId', 'roomNumber roomType')
       .populate('guestId', 'firstName lastName email phone');
-    // Update room status & clear current booking
+
+    // 5. Update room status & clear current booking
     const rawRoomId = booking.roomId as any;
     const roomIdStr =
       typeof rawRoomId === 'string'
         ? rawRoomId
         : rawRoomId?._id?.toString?.() || rawRoomId?.toString?.();
+
     if (roomIdStr && Types.ObjectId.isValid(roomIdStr)) {
       await this.roomsService.updateStatus(roomIdStr, { status: 'available' } as any);
       await this.roomsService.update(roomIdStr, {
         currentBookingId: null,
         checkedOutAt: new Date(),
       } as any);
-    } else {
-      console.error('[BookingsService.checkOut] Invalid room ID when updating status', {
-        bookingId: (booking as any)._id?.toString?.() || id,
-        roomId: booking.roomId,
-      });
     }
-    // Emit WebSocket event
+
+    // 6. Emit WebSocket event
     if (booking.branchId) {
       const branchId = typeof booking.branchId === 'object' && booking.branchId
         ? (booking.branchId as any)._id?.toString() || booking.branchId.toString()
         : booking.branchId.toString();
       this.websocketsGateway.emitToBranch(branchId, 'booking:checked-out', updatedBooking);
     }
+
     return updatedBooking;
   }
   async cancel(id: string, reason?: string, refundAmount?: number): Promise<Booking> {
