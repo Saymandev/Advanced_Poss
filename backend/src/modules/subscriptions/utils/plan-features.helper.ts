@@ -42,6 +42,15 @@ export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
   multiBranch: [
     FEATURES.BRANCHES,
   ],
+  staff: [
+    FEATURES.STAFF_MANAGEMENT,
+    FEATURES.ROLE_MANAGEMENT,
+    FEATURES.ATTENDANCE,
+  ],
+  hotel: [
+    FEATURES.ROOM_MANAGEMENT,
+    FEATURES.BOOKING_MANAGEMENT,
+  ],
 };
 
 /**
@@ -69,6 +78,8 @@ export function convertLegacyFeaturesToKeys(legacyFeatures: {
   accounting?: boolean;
   aiInsights?: boolean;
   multiBranch?: boolean;
+  staff?: boolean;
+  hotel?: boolean;
 }): string[] {
   const enabledKeys: string[] = [...CORE_FEATURES];
 
@@ -90,6 +101,12 @@ export function convertLegacyFeaturesToKeys(legacyFeatures: {
   if (legacyFeatures.multiBranch) {
     enabledKeys.push(...LEGACY_FEATURE_MAP.multiBranch);
   }
+  if (legacyFeatures.staff) {
+    enabledKeys.push(...LEGACY_FEATURE_MAP.staff);
+  }
+  if (legacyFeatures.hotel) {
+    enabledKeys.push(...LEGACY_FEATURE_MAP.hotel);
+  }
 
   // Remove duplicates
   return [...new Set(enabledKeys)];
@@ -108,22 +125,26 @@ export function isFeatureEnabledInPlan(
       accounting?: boolean;
       aiInsights?: boolean;
       multiBranch?: boolean;
+      staff?: boolean;
+      hotel?: boolean;
     };
   },
   featureKey: string,
 ): boolean {
-  // Check new enabledFeatureKeys array first
-  if (plan.enabledFeatureKeys && plan.enabledFeatureKeys.length > 0) {
-    return plan.enabledFeatureKeys.includes(featureKey);
+  const allKeys: string[] = [...CORE_FEATURES];
+
+  // 1. Add keys from granular array
+  if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys)) {
+    allKeys.push(...plan.enabledFeatureKeys);
   }
 
-  // Fallback to legacy features object
+  // 2. Add keys from legacy bundle object
   if (plan.features) {
-    const legacyKeys = convertLegacyFeaturesToKeys(plan.features);
-    return legacyKeys.includes(featureKey);
+    allKeys.push(...convertLegacyFeaturesToKeys(plan.features));
   }
 
-  return false;
+  // Check if the specific key is in the merged set
+  return [...new Set(allKeys)].includes(featureKey);
 }
 
 /**
@@ -261,4 +282,3 @@ export function normalizeFeatureKeys(featureKeys: string[]): {
     invalidKeys: validation.invalidKeys,
   };
 }
-

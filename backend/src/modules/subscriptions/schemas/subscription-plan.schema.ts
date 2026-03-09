@@ -36,6 +36,8 @@ export class SubscriptionPlan {
       accounting: false,
       aiInsights: false,
       multiBranch: false,
+      staff: true,
+      hotel: false,
       maxUsers: 2,
       maxBranches: 1,
     },
@@ -47,6 +49,8 @@ export class SubscriptionPlan {
     accounting: boolean;
     aiInsights: boolean;
     multiBranch: boolean;
+    staff: boolean;
+    hotel: boolean;
     maxUsers: number;
     maxBranches: number;
   };

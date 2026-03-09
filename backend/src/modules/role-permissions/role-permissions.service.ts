@@ -121,49 +121,41 @@ export class RolePermissionsService {
       subscriptionStatus === 'trial';
     // Get enabled features from subscription
     let enabledFeatures: string[] = [];
-    // Priority 1: Check if feature-based subscription (new flexible model)
-    // BUT: If subscription.enabledFeatures has very few features (< 5), it's likely incomplete
-    // In that case, fall back to plan lookup to get the full feature set
-    if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures) && subscription.enabledFeatures.length >= 5) {
-      enabledFeatures = subscription.enabledFeatures;
-    } else if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures) && subscription.enabledFeatures.length > 0) {
-      // If subscription has some features but less than 5, still use them but also try plan lookup for completeness
-      enabledFeatures = subscription.enabledFeatures;
-      // Continue to plan lookup below to potentially get more features
+
+    // 1. Get features explicitly enabled on the subscription (custom features)
+    if (subscription.enabledFeatures && Array.isArray(subscription.enabledFeatures)) {
+      enabledFeatures = [...subscription.enabledFeatures];
     }
-    // Priority 2: Get features from plan (if subscription.enabledFeatures is empty, undefined, or has too few features)
-    if (enabledFeatures.length < 5 && subscription.plan) {
+
+    // 2. Always merge with features from the plan to ensure completeness
+    if (subscription.plan) {
       try {
-        // Handle both string and object (in case plan is populated)
         const planName = typeof subscription.plan === 'string'
           ? subscription.plan
           : (subscription.plan as any)?.name || subscription.plan;
+        
         const plan = await this.subscriptionPlansService.findByName(planName);
         if (plan) {
-          // Check new enabledFeatureKeys first
-          if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys) && plan.enabledFeatureKeys.length > 0) {
-            enabledFeatures = plan.enabledFeatureKeys;
+          const planKeys: string[] = [];
+          
+          // 2a. Add granular keys from the plan
+          if (plan.enabledFeatureKeys && Array.isArray(plan.enabledFeatureKeys)) {
+            planKeys.push(...plan.enabledFeatureKeys);
           }
-          // Fallback to legacy features object
-          else if (plan.features) {
-            enabledFeatures = convertLegacyFeaturesToKeys(plan.features);
-          } else {
-            console.warn(`[RolePermissions] ⚠️ Plan '${planName}' has no enabledFeatureKeys or features object`);
-            console.warn(`[RolePermissions] Plan object keys:`, Object.keys(plan || {}));
+
+          // 2b. Add bundled keys from the plan (pos, inventory, etc.)
+          if (plan.features) {
+            planKeys.push(...convertLegacyFeaturesToKeys(plan.features));
           }
-        } else {
-          console.error(`[RolePermissions] ❌ Plan '${planName}' NOT FOUND for company ${companyId}`);
+          
+          // Merge all plan-derived keys into enabledFeatures
+          if (planKeys.length > 0) {
+            enabledFeatures = [...new Set([...enabledFeatures, ...planKeys])];
+          }
         }
       } catch (error) {
         console.error(`[RolePermissions] ❌ Error fetching plan '${subscription.plan}':`, error);
-        if (error instanceof Error) {
-          console.error(`[RolePermissions] Error message:`, error.message);
-          console.error(`[RolePermissions] Error stack:`, error.stack);
-        }
-        // Continue to fallback logic
       }
-    } else if (!subscription.plan) {
-      console.warn(`[RolePermissions] ⚠️ Subscription has no plan property for company ${companyId}`);
     }
     // If subscription is active/trial but no features extracted (or very few), return all role features
     // This handles cases where subscription.enabledFeatures is incomplete or plan lookup failed
