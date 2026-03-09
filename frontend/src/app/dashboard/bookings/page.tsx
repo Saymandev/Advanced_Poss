@@ -1,4 +1,5 @@
 'use client';
+import CustomerLookup from '@/components/dashboard/CustomerLookup';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -10,25 +11,28 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import {
-    Booking,
-    useCancelBookingMutation,
-    useCheckInMutation,
-    useCheckOutMutation,
-    useCreateBookingMutation,
-    useGetBookingByIdQuery,
-    useGetBookingStatsQuery,
-    useGetBookingsQuery,
-    useUpdateBookingMutation,
+  Booking,
+  useCancelBookingMutation,
+  useCheckInMutation,
+  useCheckOutMutation,
+  useCreateBookingMutation,
+  useGetBookingByIdQuery,
+  useGetBookingStatsQuery,
+  useGetBookingsQuery,
+  useRecordPaymentMutation,
+  useUpdateBookingMutation
 } from '@/lib/api/endpoints/bookingsApi';
 import { useGetPaymentMethodsQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { useGetRoomsByBranchQuery as useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import {
-    CheckCircleIcon,
-    PencilIcon,
-    PlusIcon,
-    XCircleIcon,
+  BanknotesIcon,
+  CheckCircleIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -56,6 +60,18 @@ export default function BookingsPage() {
   const [cancelForm, setCancelForm] = useState<{ reason: string; refundAmount: number }>({
     reason: '',
     refundAmount: 0,
+  });
+
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewBookingTarget, setViewBookingTarget] = useState<Booking | null>(null);
+
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentBookingTarget, setPaymentBookingTarget] = useState<Booking | null>(null);
+  const [paymentForm, setPaymentForm] = useState<{ amount: number; method: string; reference: string; notes: string }>({
+    amount: 0,
+    method: 'cash',
+    reference: '',
+    notes: '',
   });
   const {
     data: latestCheckoutBooking,
@@ -190,6 +206,7 @@ export default function BookingsPage() {
   const [checkIn] = useCheckInMutation();
   const [checkOut] = useCheckOutMutation();
   const [cancelBooking] = useCancelBookingMutation();
+  const [recordPayment] = useRecordPaymentMutation();
   const [formData, setFormData] = useState<any>({
     roomId: '',
     guestName: '',
@@ -306,6 +323,45 @@ export default function BookingsPage() {
       refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to check in');
+    }
+  };
+
+  const openViewModal = (booking: Booking) => {
+    setViewBookingTarget(booking);
+    setIsViewModalOpen(true);
+  };
+
+  const openPaymentModal = (booking: Booking) => {
+    setPaymentBookingTarget(booking);
+    setPaymentForm({
+      amount: 0,
+      method: 'cash',
+      reference: '',
+      notes: '',
+    });
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!paymentBookingTarget || !paymentForm.amount || paymentForm.amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    
+    try {
+      await recordPayment({
+        id: paymentBookingTarget.id,
+        amount: paymentForm.amount,
+        method: paymentForm.method,
+        note: paymentForm.notes || undefined,
+      }).unwrap();
+      
+      toast.success('Payment recorded successfully');
+      setIsPaymentModalOpen(false);
+      setPaymentBookingTarget(null);
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to record payment');
     }
   };
   const openCheckoutModal = (booking: Booking) => {
@@ -443,6 +499,24 @@ export default function BookingsPage() {
       render: (_: any, booking: Booking) => {
         return (
           <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openViewModal(booking)}
+              title="View Details"
+            >
+              <EyeIcon className="h-4 w-4" />
+            </Button>
+            {booking.status !== 'checked_out' && booking.status !== 'cancelled' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openPaymentModal(booking)}
+                title="Add Payment"
+              >
+                <BanknotesIcon className="h-4 w-4 text-emerald-600" />
+              </Button>
+            )}
             {booking.status === 'pending' && (
               <Button
                 variant="secondary"
@@ -737,6 +811,25 @@ export default function BookingsPage() {
                 min="0"
               />
             </div>
+                        <div className="col-span-2 space-y-2 mb-2">
+              <div className="bg-gray-50 dark:bg-slate-900/40 p-3 rounded-xl border border-gray-200 dark:border-slate-800">
+                <CustomerLookup 
+                  selectedCustomerId={formData.guestPhone}
+                  onSelect={(customer) => {
+                    const firstName = customer.firstName || customer.name || '';
+                    const lastName = customer.lastName || '';
+                    const fullName = `${firstName} ${lastName}`.trim() || 'Customer';
+                    
+                    setFormData({
+                      ...formData,
+                      guestName: fullName,
+                      guestPhone: customer.phone || customer.phoneNumber || '',
+                      guestEmail: customer.email || '',
+                    });
+                  }}
+                />
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium mb-1">Guest Name *</label>
               <Input
@@ -872,6 +965,25 @@ export default function BookingsPage() {
                 onChange={(e) => setFormData({ ...formData, roomRate: Number(e.target.value) })}
                 min="0"
               />
+            </div>
+                        <div className="col-span-2 space-y-2 mb-2">
+              <div className="bg-gray-50 dark:bg-slate-900/40 p-3 rounded-xl border border-gray-200 dark:border-slate-800">
+                <CustomerLookup 
+                  selectedCustomerId={formData.guestPhone}
+                  onSelect={(customer) => {
+                    const firstName = customer.firstName || customer.name || '';
+                    const lastName = customer.lastName || '';
+                    const fullName = `${firstName} ${lastName}`.trim() || 'Customer';
+                    
+                    setFormData({
+                      ...formData,
+                      guestName: fullName,
+                      guestPhone: customer.phone || customer.phoneNumber || '',
+                      guestEmail: customer.email || '',
+                    });
+                  }}
+                />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Guest Name *</label>
@@ -1110,6 +1222,119 @@ export default function BookingsPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* View Booking Modal */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+        title="Booking Details"
+        size="lg"
+      >
+        {viewBookingTarget && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Guest Name</p>
+                <p className="font-medium">{viewBookingTarget.guestName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Contact</p>
+                <p className="font-medium">{viewBookingTarget.guestPhone} {viewBookingTarget.guestEmail && `• ${viewBookingTarget.guestEmail}`}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Room</p>
+                <p className="font-medium">{viewBookingTarget.roomNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Guests</p>
+                <p className="font-medium">{viewBookingTarget.numberOfGuests}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Check In</p>
+                <p className="font-medium">{new Date(viewBookingTarget.checkInDate).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Check Out</p>
+                <p className="font-medium">{new Date(viewBookingTarget.checkOutDate).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Total Amount</p>
+                <p className="font-medium">{formatCurrency(viewBookingTarget.totalAmount || 0)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Balance Amount</p>
+                <p className="font-medium text-amber-600">{formatCurrency(viewBookingTarget.balanceAmount ?? (viewBookingTarget.totalAmount - (viewBookingTarget.depositAmount || 0)))}</p>
+              </div>
+            </div>
+            {viewBookingTarget.specialRequests && (
+              <div>
+                <p className="text-sm text-gray-500">Special Requests</p>
+                <p className="font-medium bg-gray-50 dark:bg-slate-800 p-2 rounded">{viewBookingTarget.specialRequests}</p>
+              </div>
+            )}
+            <div className="flex justify-end pt-4">
+              <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Add Payment Modal */}
+      <Modal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        title="Add Payment"
+      >
+        {paymentBookingTarget && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 dark:bg-slate-800 p-3 rounded-md mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Current Balance: <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(paymentBookingTarget.balanceAmount ?? (paymentBookingTarget.totalAmount - (paymentBookingTarget.depositAmount || 0)))}</span>
+              </p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Payment Method *</label>
+              <Select
+                value={paymentForm.method}
+                onChange={(value) => setPaymentForm(prev => ({ ...prev, method: value }))}
+                options={[
+                  { value: 'cash', label: 'Cash' },
+                  { value: 'card', label: 'Card' },
+                  { value: 'bank_transfer', label: 'Bank Transfer' },
+                  { value: 'mobile_money', label: 'Mobile Money' },
+                ]}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Amount ({currency}) *</label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={paymentForm.amount || ''}
+                onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Notes (Optional)</label>
+              <Input
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="e.g. Deposit for room..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleConfirmPayment}>Record Payment</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

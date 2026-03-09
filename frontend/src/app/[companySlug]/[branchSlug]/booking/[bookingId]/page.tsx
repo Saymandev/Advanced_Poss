@@ -1,19 +1,19 @@
 'use client';
 
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { 
-  useGetBookingDetailsQuery, 
+import {
+  useGetBookingDetailsQuery,
   useGetCompanyBySlugQuery,
 } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
-import { 
-  CheckCircleIcon, 
-  CalendarIcon, 
-  UserIcon,
-  PhoneIcon,
+import {
+  CalendarIcon,
+  CheckCircleIcon,
   EnvelopeIcon,
+  PhoneIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';

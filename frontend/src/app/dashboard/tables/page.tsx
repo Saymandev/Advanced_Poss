@@ -1,4 +1,5 @@
 'use client';
+import CustomerLookup from '@/components/dashboard/CustomerLookup';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -13,17 +14,17 @@ import { Table, useCancelTableReservationMutation, useCreateTableMutation, useDe
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import {
-    CalendarDaysIcon,
-    CheckCircleIcon,
-    ClockIcon,
-    EyeIcon,
-    PencilIcon,
-    PhoneIcon,
-    PlusIcon,
-    TableCellsIcon,
-    TrashIcon,
-    UserGroupIcon,
-    XCircleIcon
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  EyeIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  TableCellsIcon,
+  TrashIcon,
+  UserGroupIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { format, parseISO } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1069,6 +1070,23 @@ export default function TablesPage() {
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
               <UserGroupIcon className="h-4 w-4" /> Customer Details
             </p>
+            <div className="bg-gray-50 dark:bg-slate-900/40 p-3 rounded-xl border border-gray-200 dark:border-slate-800 mb-2 mt-2">
+              <CustomerLookup 
+                selectedCustomerId={resForm.phone}
+                onSelect={(customer) => {
+                  const firstName = customer.firstName || customer.name || '';
+                  const lastName = customer.lastName || '';
+                  const fullName = `${firstName} ${lastName}`.trim() || 'Customer';
+                  
+                  setResForm(f => ({
+                    ...f,
+                    name: fullName,
+                    phone: customer.phone || customer.phoneNumber || '',
+                    email: customer.email || '',
+                  }));
+                }}
+              />
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Full Name *</label>
               <input
