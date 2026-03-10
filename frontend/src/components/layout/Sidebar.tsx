@@ -26,6 +26,7 @@ import {
   ShieldCheckIcon,
   ShoppingBagIcon,
   SparklesIcon,
+  StarIcon,
   TableCellsIcon,
   TagIcon,
   TruckIcon,
@@ -391,6 +392,23 @@ const superAdminNavigation: NavigationItem[] = [
     href: '/dashboard/cms',
     icon: DocumentTextIcon,
     roles: ['super_admin'],
+    children: [
+      {
+        name: 'Pages & Blogs',
+        href: '/dashboard/cms',
+        icon: DocumentTextIcon,
+      },
+      {
+        name: 'Landing Sections',
+        href: '/dashboard/cms?tab=landing',
+        icon: SparklesIcon,
+      },
+      {
+        name: 'Testimonials',
+        href: '/dashboard/cms?tab=testimonials',
+        icon: StarIcon,
+      },
+    ],
   },
   {
     name: 'Payment Methods',

@@ -8,35 +8,39 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import {
-    ContentPage,
-    ContentPageStatus,
-    ContentPageType,
-    CreateContentPageDto,
-    UpdateContentPageDto,
-    useCreateContentPageMutation,
-    useDeleteContentPageMutation,
-    useGetAllContentPagesQuery,
-    useUpdateContentPageMutation,
+  ContentPage,
+  ContentPageStatus,
+  ContentPageType,
+  CreateContentPageDto,
+  UpdateContentPageDto,
+  useCreateContentPageMutation,
+  useDeleteContentPageMutation,
+  useGetAllContentPagesQuery,
+  useUpdateContentPageMutation,
+  useUploadCmsImageMutation
 } from '@/lib/api/endpoints/cmsApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
-import { formatDateTime } from '@/lib/utils';
+import { cn, formatDateTime } from '@/lib/utils';
 import {
-    CheckCircleIcon,
-    DocumentTextIcon,
-    EyeIcon,
-    PencilIcon,
-    PlusIcon,
-    TrashIcon,
-    XCircleIcon,
+  CheckCircleIcon,
+  DocumentTextIcon,
+  EyeIcon,
+  PencilIcon,
+  PhotoIcon,
+  PlusIcon,
+  SparklesIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
-import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function CmsPage() {
   const { user } = useAppSelector((state) => state.auth);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'pages';
 
   useEffect(() => {
     if (!user || user.role !== UserRole.SUPER_ADMIN) {
@@ -51,9 +55,35 @@ export default function CmsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<ContentPageType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<ContentPageStatus | 'all'>('all');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [uploadImage, { isLoading: isUploadingImage }] = useUploadCmsImageMutation();
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const url = await uploadImage(formData).unwrap();
+      setFormData((prev: any) => ({ ...prev, featuredImage: url }));
+      toast.success('Image uploaded successfully');
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to upload image');
+    }
+  };
+
+  // Map tabs to content types
+  const tabToType = useMemo(() => {
+    if (activeTab === 'landing') return ContentPageType.LANDING_SECTION;
+    if (activeTab === 'testimonials') return ContentPageType.PAGE; // We might want a TESTIMONIAL type later
+    return 'all';
+  }, [activeTab]);
 
   const { data: pagesData, isLoading, refetch } = useGetAllContentPagesQuery({
-    type: typeFilter !== 'all' ? typeFilter : undefined,
+    type: tabToType !== 'all' ? tabToType : (typeFilter !== 'all' ? typeFilter : undefined),
     status: statusFilter !== 'all' ? statusFilter : undefined,
     search: searchQuery || undefined,
   });
@@ -73,30 +103,39 @@ export default function CmsPage() {
     return [];
   }, [pagesData]);
 
-  const [formData, setFormData] = useState<Partial<CreateContentPageDto>>({
+  const [formData, setFormData] = useState<any>({
     type: ContentPageType.PAGE,
     title: '',
     slug: '',
     content: '',
     status: ContentPageStatus.DRAFT,
+    configData: '',
   });
 
   const resetForm = () => {
     setFormData({
-      type: ContentPageType.PAGE,
+      type: activeTab === 'landing' ? ContentPageType.LANDING_SECTION : ContentPageType.PAGE,
       title: '',
       slug: '',
       content: '',
       status: ContentPageStatus.DRAFT,
+      configData: '',
     });
   };
 
   const handleCreate = async () => {
     try {
-      if (!formData.title || !formData.slug || !formData.content) {
-        toast.error('Please fill in all required fields');
+      if (!formData.title || !formData.slug) {
+        toast.error('Please fill in required fields');
         return;
       }
+      
+      // Validation for LANDING_SECTION
+      if (formData.type === ContentPageType.LANDING_SECTION && !formData.configData) {
+        toast.error('Config Data is required for landing sections');
+        return;
+      }
+
       await createPage(formData as CreateContentPageDto).unwrap();
       toast.success('Content page created successfully');
       setIsCreateModalOpen(false);
@@ -143,6 +182,7 @@ export default function CmsPage() {
       slug: page.slug,
       excerpt: page.excerpt,
       content: page.content,
+      configData: page.configData ? JSON.stringify(page.configData, null, 2) : '',
       featuredImage: page.featuredImage,
       images: page.images,
       tags: page.tags,
@@ -174,11 +214,11 @@ export default function CmsPage() {
     setIsViewModalOpen(true);
   };
 
-  const columns: { key: keyof ContentPage | string; title: string; render: (value: any, row: ContentPage) => React.ReactNode }[] = [
+  const columns = [
     {
       key: 'title',
       title: 'Title',
-      render: (value, row) => (
+      render: (value: any, row: any) => (
         <div>
           <div className="font-medium text-gray-900 dark:text-white">{value}</div>
           <div className="text-sm text-gray-500 dark:text-gray-400">/{row.slug}</div>
@@ -188,46 +228,47 @@ export default function CmsPage() {
     {
       key: 'type',
       title: 'Type',
-      render: (value) => (
-        <Badge variant={value === ContentPageType.BLOG ? 'success' : value === ContentPageType.CAREER ? 'warning' : 'info'}>
-          {value}
+      render: (value: any) => (
+        <Badge variant={
+          value === ContentPageType.BLOG ? 'success' : 
+          value === ContentPageType.CAREER ? 'warning' : 
+          value === ContentPageType.LANDING_SECTION ? 'info' : 'secondary'
+        }>
+          {value.replace('_', ' ')}
         </Badge>
       ),
     },
     {
       key: 'status',
       title: 'Status',
-      render: (value) => (
+      render: (value: any) => (
         <Badge variant={value === ContentPageStatus.PUBLISHED ? 'success' : value === ContentPageStatus.DRAFT ? 'warning' : 'secondary'}>
           {value}
         </Badge>
       ),
     },
     {
-      key: 'isFeatured',
-      title: 'Featured',
-      render: (value) => (
-        value ? (
-          <CheckCircleIcon className="w-5 h-5 text-green-500" />
-        ) : (
-          <XCircleIcon className="w-5 h-5 text-gray-400" />
-        )
-      ),
-    },
-    {
-      key: 'viewCount',
-      title: 'Views',
-      render: (value) => value || 0,
+      key: 'details',
+      title: 'Details',
+      render: (_: any, row: any) => (
+        <div className="text-xs text-gray-500">
+          {row.type === ContentPageType.LANDING_SECTION ? (
+            <span>Structured Config</span>
+          ) : (
+            <span>{row.viewCount || 0} views</span>
+          )}
+        </div>
+      )
     },
     {
       key: 'createdAt',
       title: 'Created',
-      render: (value) => formatDateTime(value),
+      render: (value: any) => formatDateTime(value),
     },
     {
       key: 'actions',
       title: 'Actions',
-      render: (_value, row) => (
+      render: (_value: any, row: any) => (
         <div className="flex items-center space-x-2">
           <button
             onClick={() => openViewModal(row)}
@@ -267,16 +308,24 @@ export default function CmsPage() {
     );
   }
 
+  const tabs = [
+    { id: 'pages', label: 'Pages & Blogs', icon: DocumentTextIcon },
+    { id: 'landing', label: 'Landing Sections', icon: SparklesIcon },
+    { id: 'testimonials', label: 'Testimonials', icon: CheckCircleIcon },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
             <DocumentTextIcon className="w-8 h-8 text-purple-600" />
-            Content Management
+            Powerful CMS
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Manage blog posts, career listings, and help center articles
+            {activeTab === 'landing' 
+              ? 'Manage structured landing page data and site configuration' 
+              : 'Manage blog posts, career listings, and help center articles'}
           </p>
         </div>
         <Button
@@ -287,8 +336,27 @@ export default function CmsPage() {
           className="flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
-          Create Content Page
+          Create {activeTab === 'landing' ? 'Landing Section' : 'Content Page'}
         </Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 dark:border-gray-800 gap-6">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => router.push(`/dashboard/cms?tab=${tab.id}`)}
+            className={cn(
+              "flex items-center gap-2 py-4 border-b-2 transition-colors font-medium",
+              activeTab === tab.id
+                ? "border-purple-600 text-purple-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            )}
+          >
+            <tab.icon className="w-5 h-5" />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Filters */}
@@ -296,21 +364,23 @@ export default function CmsPage() {
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Input
-              placeholder="Search pages..."
+              placeholder="Search content..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Select
-              value={typeFilter}
-              onChange={(value) => setTypeFilter(value as ContentPageType | 'all')}
-              options={[
-                { value: 'all', label: 'All Types' },
-                { value: ContentPageType.BLOG, label: 'Blog' },
-                { value: ContentPageType.CAREER, label: 'Career' },
-                { value: ContentPageType.HELP_CENTER, label: 'Help Center' },
-                { value: ContentPageType.PAGE, label: 'Page' },
-              ]}
-            />
+            {activeTab === 'pages' && (
+              <Select
+                value={typeFilter}
+                onChange={(value) => setTypeFilter(value as ContentPageType | 'all')}
+                options={[
+                  { value: 'all', label: 'All Types' },
+                  { value: ContentPageType.BLOG, label: 'Blog' },
+                  { value: ContentPageType.CAREER, label: 'Career' },
+                  { value: ContentPageType.HELP_CENTER, label: 'Help Center' },
+                  { value: ContentPageType.PAGE, label: 'Page' },
+                ]}
+              />
+            )}
             <Select
               value={statusFilter}
               onChange={(value) => setStatusFilter(value as ContentPageStatus | 'all')}
@@ -328,7 +398,9 @@ export default function CmsPage() {
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Content Pages ({pages.length})</CardTitle>
+          <CardTitle>
+            {tabs.find(t => t.id === activeTab)?.label} ({pages.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -348,24 +420,41 @@ export default function CmsPage() {
           setIsCreateModalOpen(false);
           resetForm();
         }}
-        title="Create Content Page"
+        title={`Create ${activeTab === 'landing' ? 'Landing Section' : 'Content'}`}
         size="xl"
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Type *
-            </label>
-            <Select
-              value={formData.type}
-              onChange={(value) => setFormData({ ...formData, type: value as ContentPageType })}
-              options={[
-                { value: ContentPageType.PAGE, label: 'Page' },
-                { value: ContentPageType.BLOG, label: 'Blog' },
-                { value: ContentPageType.CAREER, label: 'Career' },
-                { value: ContentPageType.HELP_CENTER, label: 'Help Center' },
-              ]}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Type *
+              </label>
+              <Select
+                value={formData.type}
+                onChange={(value) => setFormData({ ...formData, type: value as ContentPageType })}
+                options={[
+                  { value: ContentPageType.PAGE, label: 'Page' },
+                  { value: ContentPageType.BLOG, label: 'Blog' },
+                  { value: ContentPageType.CAREER, label: 'Career' },
+                  { value: ContentPageType.HELP_CENTER, label: 'Help Center' },
+                  { value: ContentPageType.LANDING_SECTION, label: 'Landing Section' },
+                ]}
+                disabled={activeTab === 'landing'}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Status
+              </label>
+              <Select
+                value={formData.status}
+                onChange={(value) => setFormData({ ...formData, status: value as ContentPageStatus })}
+                options={[
+                  { value: ContentPageStatus.DRAFT, label: 'Draft' },
+                  { value: ContentPageStatus.PUBLISHED, label: 'Published' },
+                ]}
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -374,44 +463,95 @@ export default function CmsPage() {
             <Input
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Enter title"
+              placeholder={activeTab === 'landing' ? "e.g., Landing Page Features" : "Enter title"}
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Slug *
+              Slug / Key *
             </label>
             <Input
               value={formData.slug}
               onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-              placeholder="url-friendly-slug"
+              placeholder="e.g., features-section"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Content * (HTML)
+              Featured Image
             </label>
-            <textarea
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              placeholder="Enter HTML content"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
-              rows={10}
-            />
+            <div className="flex items-center gap-4">
+              {formData.featuredImage ? (
+                <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group">
+                  <img
+                    src={formData.featuredImage}
+                    alt="Featured"
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    onClick={() => setFormData({ ...formData, featuredImage: '' })}
+                    className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 hover:text-purple-600 hover:border-purple-600 transition-colors"
+                  disabled={isUploadingImage}
+                >
+                  <PhotoIcon className="w-6 h-6" />
+                  <span className="text-[10px] mt-1">{isUploadingImage ? 'Uploading...' : 'Upload'}</span>
+                </button>
+              )}
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageUpload}
+              />
+              <div className="flex-1">
+                <Input
+                  value={formData.featuredImage || ''}
+                  onChange={(e) => setFormData({ ...formData, featuredImage: e.target.value })}
+                  placeholder="Or enter image URL"
+                />
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Status
-            </label>
-            <Select
-              value={formData.status}
-              onChange={(value) => setFormData({ ...formData, status: value as ContentPageStatus })}
-              options={[
-                { value: ContentPageStatus.DRAFT, label: 'Draft' },
-                { value: ContentPageStatus.PUBLISHED, label: 'Published' },
-              ]}
-            />
-          </div>
+
+          {formData.type === ContentPageType.LANDING_SECTION ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Structured Config (JSON) *
+              </label>
+              <textarea
+                value={formData.configData}
+                onChange={(e) => setFormData({ ...formData, configData: e.target.value })}
+                placeholder='{ "items": [ { "title": "...", "icon": "..." } ] }'
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white font-mono text-sm"
+                rows={12}
+              />
+              <p className="text-xs text-gray-500 mt-1">Provide a valid JSON object for structured section data.</p>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Content * (HTML)
+              </label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                placeholder="Enter page content"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                rows={10}
+              />
+            </div>
+          )}
+
           <div className="flex justify-end space-x-2 pt-4">
             <Button
               variant="secondary"
@@ -423,7 +563,7 @@ export default function CmsPage() {
               Cancel
             </Button>
             <Button onClick={handleCreate} disabled={isCreating}>
-              {isCreating ? 'Creating...' : 'Create'}
+              {isCreating ? 'Creating...' : 'Create Content'}
             </Button>
           </div>
         </div>
@@ -437,68 +577,110 @@ export default function CmsPage() {
           setSelectedPage(null);
           resetForm();
         }}
-        title="Edit Content Page"
+        title={`Edit ${selectedPage?.type === ContentPageType.LANDING_SECTION ? 'Landing Section' : 'Content'}`}
         size="xl"
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Type
-            </label>
-            <Select
-              value={formData.type}
-              onChange={(value) => setFormData({ ...formData, type: value as ContentPageType })}
-              options={[
-                { value: ContentPageType.PAGE, label: 'Page' },
-                { value: ContentPageType.BLOG, label: 'Blog' },
-                { value: ContentPageType.CAREER, label: 'Career' },
-                { value: ContentPageType.HELP_CENTER, label: 'Help Center' },
-              ]}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Title *
+              </label>
+              <Input
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Status
+              </label>
+              <Select
+                value={formData.status}
+                onChange={(value) => setFormData({ ...formData, status: value as ContentPageStatus })}
+                options={[
+                  { value: ContentPageStatus.DRAFT, label: 'Draft' },
+                  { value: ContentPageStatus.PUBLISHED, label: 'Published' },
+                  { value: ContentPageStatus.ARCHIVED, label: 'Archived' },
+                ]}
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Title *
-            </label>
-            <Input
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Slug *
+              Slug / Key
             </label>
             <Input
               value={formData.slug}
               onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Content * (HTML)
+              Featured Image
             </label>
-            <textarea
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
-              rows={10}
-            />
+            <div className="flex items-center gap-4">
+              {formData.featuredImage ? (
+                <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group">
+                  <img
+                    src={formData.featuredImage}
+                    alt="Featured"
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    onClick={() => setFormData({ ...formData, featuredImage: '' })}
+                    className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 hover:text-purple-600 hover:border-purple-600 transition-colors"
+                  disabled={isUploadingImage}
+                >
+                  <PhotoIcon className="w-6 h-6" />
+                  <span className="text-[10px] mt-1">{isUploadingImage ? 'Uploading...' : 'Upload'}</span>
+                </button>
+              )}
+              <div className="flex-1">
+                <Input
+                  value={formData.featuredImage || ''}
+                  onChange={(e) => setFormData({ ...formData, featuredImage: e.target.value })}
+                  placeholder="Or enter image URL"
+                />
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Status
-            </label>
-            <Select
-              value={formData.status}
-              onChange={(value) => setFormData({ ...formData, status: value as ContentPageStatus })}
-              options={[
-                { value: ContentPageStatus.DRAFT, label: 'Draft' },
-                { value: ContentPageStatus.PUBLISHED, label: 'Published' },
-                { value: ContentPageStatus.ARCHIVED, label: 'Archived' },
-              ]}
-            />
-          </div>
+
+          {formData.type === ContentPageType.LANDING_SECTION ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Structured Config (JSON)
+              </label>
+              <textarea
+                value={formData.configData}
+                onChange={(e) => setFormData({ ...formData, configData: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white font-mono text-sm"
+                rows={12}
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Content (HTML)
+              </label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                rows={10}
+              />
+            </div>
+          )}
+
           <div className="flex justify-end space-x-2 pt-4">
             <Button
               variant="secondary"
@@ -511,7 +693,7 @@ export default function CmsPage() {
               Cancel
             </Button>
             <Button onClick={handleEdit} disabled={isUpdating}>
-              {isUpdating ? 'Updating...' : 'Update'}
+              {isUpdating ? 'Updating...' : 'Update Content'}
             </Button>
           </div>
         </div>
@@ -524,32 +706,35 @@ export default function CmsPage() {
           setIsViewModalOpen(false);
           setSelectedPage(null);
         }}
-        title={selectedPage?.title || 'View Content Page'}
+        title={selectedPage?.title || 'View Content'}
         size="xl"
       >
         {selectedPage && (
           <div className="space-y-4">
-            <div>
-              <strong>Type:</strong> {selectedPage.type}
+            <div className="flex gap-4">
+              <Badge>{selectedPage.type}</Badge>
+              <Badge variant="secondary">{selectedPage.status}</Badge>
             </div>
             <div>
-              <strong>Slug:</strong> {selectedPage.slug}
+              <strong>Slug:</strong> <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{selectedPage.slug}</code>
             </div>
-            <div>
-              <strong>Status:</strong> {selectedPage.status}
-            </div>
-            {selectedPage.excerpt && (
+            
+            {selectedPage.type === ContentPageType.LANDING_SECTION ? (
               <div>
-                <strong>Excerpt:</strong> {selectedPage.excerpt}
+                <strong>Structured Data:</strong>
+                <pre className="mt-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg overflow-auto max-h-[400px] text-xs font-mono">
+                  {JSON.stringify(selectedPage.configData, null, 2)}
+                </pre>
+              </div>
+            ) : (
+              <div>
+                <strong>Content Preview:</strong>
+                <div
+                  className="mt-2 p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
+                  dangerouslySetInnerHTML={{ __html: selectedPage.content || '' }}
+                />
               </div>
             )}
-            <div>
-              <strong>Content:</strong>
-              <div
-                className="mt-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                dangerouslySetInnerHTML={{ __html: selectedPage.content }}
-              />
-            </div>
           </div>
         )}
       </Modal>

@@ -5,6 +5,7 @@ export enum ContentPageType {
   CAREER = 'career',
   HELP_CENTER = 'help_center',
   PAGE = 'page',
+  LANDING_SECTION = 'landing_section',
 }
 
 export enum ContentPageStatus {
@@ -21,6 +22,7 @@ export interface ContentPage {
   slug: string;
   excerpt?: string;
   content: string;
+  configData?: any;
   featuredImage?: string;
   images?: string[];
   tags?: string[];
@@ -68,7 +70,8 @@ export interface CreateContentPageDto {
   title: string;
   slug: string;
   excerpt?: string;
-  content: string;
+  content?: string;
+  configData?: any;
   featuredImage?: string;
   images?: string[];
   tags?: string[];
@@ -96,6 +99,7 @@ export interface CreateContentPageDto {
 export interface UpdateContentPageDto extends Partial<CreateContentPageDto> {}
 
 export const cmsApi = apiSlice.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     // Public endpoints
     getPublicContentPages: builder.query<ContentPage[], { type?: ContentPageType; featured?: boolean; limit?: number }>({
@@ -109,6 +113,9 @@ export const cmsApi = apiSlice.injectEndpoints({
           method: 'GET',
         };
       },
+      transformResponse: (response: any) => {
+        return response.data || response || [];
+      },
     }),
 
     getContentPageBySlug: builder.query<ContentPage, string>({
@@ -116,13 +123,19 @@ export const cmsApi = apiSlice.injectEndpoints({
         url: `/cms/public/slug/${slug}`,
         method: 'GET',
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
 
-    getCategories: builder.query<string[], ContentPageType>({
+    getCmsCategories: builder.query<string[], ContentPageType>({
       query: (type) => ({
         url: `/cms/categories?type=${type}`,
         method: 'GET',
       }),
+      transformResponse: (response: any) => {
+        return response.data || response || [];
+      },
     }),
 
     // Admin endpoints (require auth)
@@ -138,6 +151,9 @@ export const cmsApi = apiSlice.injectEndpoints({
           method: 'GET',
         };
       },
+      transformResponse: (response: any) => {
+        return response.data || response || [];
+      },
       providesTags: ['ContentPages'],
     }),
 
@@ -146,6 +162,9 @@ export const cmsApi = apiSlice.injectEndpoints({
         url: `/cms/${id}`,
         method: 'GET',
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
       providesTags: (result, error, id) => [{ type: 'ContentPages', id }],
     }),
 
@@ -182,18 +201,27 @@ export const cmsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['ContentPages'],
     }),
+    
+    uploadCmsImage: builder.mutation<string, FormData>({
+      query: (formData) => ({
+        url: '/cms/upload',
+        method: 'POST',
+        body: formData,
+      }),
+    }),
   }),
 });
 
 export const {
   useGetPublicContentPagesQuery,
   useGetContentPageBySlugQuery,
-  useGetCategoriesQuery,
+  useGetCmsCategoriesQuery,
   useGetAllContentPagesQuery,
   useGetContentPageByIdQuery,
   useCreateContentPageMutation,
   useUpdateContentPageMutation,
   useDeleteContentPageMutation,
   useHardDeleteContentPageMutation,
+  useUploadCmsImageMutation,
 } = cmsApi;
 

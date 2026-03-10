@@ -4,7 +4,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { ContentPageType, useGetCategoriesQuery, useGetPublicContentPagesQuery } from '@/lib/api/endpoints/cmsApi';
+import { ContentPageType, useGetCmsCategoriesQuery, useGetPublicContentPagesQuery } from '@/lib/api/endpoints/cmsApi';
 import { MagnifyingGlassIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
@@ -18,7 +18,7 @@ export default function HelpCenterPage() {
     featured: false,
   });
 
-  const { data: categories = [] } = useGetCategoriesQuery(ContentPageType.HELP_CENTER);
+  const { data: categories = [] } = useGetCmsCategoriesQuery(ContentPageType.HELP_CENTER);
 
   const filteredArticles = useMemo(() => {
     let filtered = articles;
