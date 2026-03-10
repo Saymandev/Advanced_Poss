@@ -317,3 +317,42 @@
   animation: scaleIn 0.6s ease-out;
 }
 
+/* Premium Keyword Animations */
+@keyframes reveal-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-reveal-up {
+  animation: reveal-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes title-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px rgba(253, 186, 116, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(253, 186, 116, 0.6));
+  }
+}
+
+.animate-title-glow {
+  animation: title-glow 4s ease-in-out infinite;
+}
+
+/* Subtle float for ampersand */
+@keyframes ampersand-float {
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  50% { transform: translateY(-5px) rotate(5deg); }
+}
+
+.animate-ampersand {
+  display: inline-block;
+  animation: ampersand-float 3s ease-in-out infinite;
+}
