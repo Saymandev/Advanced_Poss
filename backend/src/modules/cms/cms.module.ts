@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { CmsController } from './cms.controller';
 import { CmsService } from './cms.service';
 import { ContentPage, ContentPageSchema } from './schemas/content-page.schema';
@@ -11,7 +12,7 @@ import { ContentPage, ContentPageSchema } from './schemas/content-page.schema';
     ]),
   ],
   controllers: [CmsController],
-  providers: [CmsService],
+  providers: [CmsService, CloudinaryService],
   exports: [CmsService],
 })
 export class CmsModule {}

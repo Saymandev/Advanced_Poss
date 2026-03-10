@@ -8,6 +8,7 @@ export enum ContentPageType {
   CAREER = 'career',
   HELP_CENTER = 'help_center',
   PAGE = 'page', // Generic page
+  LANDING_SECTION = 'landing_section', // Landing page sections (Features, Industries, etc.)
 }
 
 export enum ContentPageStatus {
@@ -35,8 +36,11 @@ export class ContentPage {
   @Prop({ trim: true })
   excerpt?: string;
 
-  @Prop({ required: true })
-  content: string; // HTML or Markdown content
+  @Prop({ required: false })
+  content: string; // HTML or Markdown content (made optional for LANDING_SECTION)
+
+  @Prop({ type: Object })
+  configData?: Record<string, any>; // Structured data for landing sections (JSON)
 
   @Prop()
   featuredImage?: string;

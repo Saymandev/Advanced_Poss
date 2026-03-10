@@ -30,8 +30,13 @@ export class CreateContentPageDto {
   @MaxLength(500)
   excerpt?: string;
 
+  @ValidateIf((o) => o.type !== ContentPageType.LANDING_SECTION)
   @IsString()
   content: string;
+
+  @IsOptional()
+  @IsString()
+  configData?: any; // Will be parsed/stored as object in service if string, or just object
 
   @IsOptional()
   @IsUrl()

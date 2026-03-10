@@ -1,16 +1,22 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-  ForbiddenException,
+    Body,
+    Controller,
+    Delete,
+    FileTypeValidator,
+    ForbiddenException,
+    Get,
+    MaxFileSizeValidator,
+    Param,
+    ParseFilePipe,
+    Patch,
+    Post,
+    Query,
+    UploadedFile,
+    UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -20,8 +26,8 @@ import { CmsService } from './cms.service';
 import { CreateContentPageDto } from './dto/create-content-page.dto';
 import { UpdateContentPageDto } from './dto/update-content-page.dto';
 import {
-  ContentPageStatus,
-  ContentPageType,
+    ContentPageStatus,
+    ContentPageType,
 } from './schemas/content-page.schema';
 
 @ApiTags('CMS')
@@ -29,6 +35,40 @@ import {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class CmsController {
   constructor(private readonly cmsService: CmsService) { }
+
+  @Post('upload')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload an image to CMS (Super Admin only)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  uploadFile(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: /(jpg|jpeg|png|gif|webp)$/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @CurrentUser() user: any,
+  ) {
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can upload CMS images');
+    }
+    return this.cmsService.uploadImage(file);
+  }
 
   @Post()
   @ApiBearerAuth()

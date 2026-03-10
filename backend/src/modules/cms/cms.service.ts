@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { CreateContentPageDto } from './dto/create-content-page.dto';
 import { UpdateContentPageDto } from './dto/update-content-page.dto';
 import {
@@ -18,8 +19,14 @@ import {
 export class CmsService {
   constructor(
     @InjectModel(ContentPage.name)
-    private contentPageModel: Model<ContentPageDocument>,
+    private readonly contentPageModel: Model<ContentPageDocument>,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
+
+  async uploadImage(file: Express.Multer.File): Promise<string> {
+    const result = await this.cloudinaryService.uploadImage(file.buffer, 'cms');
+    return result.secure_url;
+  }
 
   async create(
     createContentPageDto: CreateContentPageDto,
@@ -40,6 +47,16 @@ export class CmsService {
       createdBy: new Types.ObjectId(userId),
       status: createContentPageDto.status || ContentPageStatus.DRAFT,
     };
+
+    // Parse configData if it's a string
+    if (typeof createContentPageDto.configData === 'string') {
+      try {
+        contentPageData.configData = JSON.parse(createContentPageDto.configData);
+      } catch (e) {
+        // If not valid JSON, keep as is or set as empty object
+        contentPageData.configData = {};
+      }
+    }
 
     // Set publishedAt if status is published
     if (contentPageData.status === ContentPageStatus.PUBLISHED) {
@@ -201,6 +218,15 @@ export class CmsService {
 
     if (updateContentPageDto.slug) {
       updateData.slug = updateContentPageDto.slug.toLowerCase();
+    }
+
+    // Parse configData if it's a string
+    if (typeof updateContentPageDto.configData === 'string') {
+      try {
+        updateData.configData = JSON.parse(updateContentPageDto.configData);
+      } catch (e) {
+        // If not valid JSON, keep as is
+      }
     }
 
     // Set publishedAt if status is being changed to published
