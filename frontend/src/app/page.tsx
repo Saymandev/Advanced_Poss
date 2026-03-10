@@ -7,9 +7,12 @@ import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsA
 import { useGetPublicStatsQuery, useGetPublicTestimonialsQuery } from '@/lib/api/endpoints/systemFeedbackApi';
 import { cn } from '@/lib/utils';
 import {
+  AcademicCapIcon,
   ArrowRightIcon,
   BellAlertIcon,
   BoltIcon,
+  BuildingStorefrontIcon,
+  CakeIcon,
   ChartBarIcon,
   CheckCircleIcon,
   ChevronLeftIcon,
@@ -18,12 +21,15 @@ import {
   CreditCardIcon,
   DevicePhoneMobileIcon,
   GlobeAltIcon,
+  HomeIcon,
   PlayIcon,
   ShieldCheckIcon,
   SparklesIcon,
   StarIcon,
+  TruckIcon,
   UserGroupIcon
 } from '@heroicons/react/24/outline';
+import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -185,7 +191,39 @@ const featureMapping: Record<string, { icon: any; title: string; description: st
 };
 const REVERSION_THRESHOLD = 20;
 
+// Helper to get hex color from tailwind class
+const getHexColor = (twClass: string) => {
+  const colors: Record<string, string> = {
+    'blue-500': '#3b82f6',
+    'cyan-500': '#06b6d4',
+    'indigo-500': '#6366f1',
+    'green-500': '#22c55e',
+    'emerald-500': '#10b981',
+    'orange-500': '#f97316',
+    'red-500': '#ef4444',
+    'purple-500': '#a855f7',
+    'pink-500': '#ec4899',
+    'rose-500': '#f43f5e',
+    'teal-500': '#14b8a6',
+    'yellow-500': '#eab308',
+    'violet-500': '#8b5cf6',
+    'sky-500': '#0ea5e9',
+    'blue-600': '#2563eb',
+    'indigo-600': '#4f46e5',
+    'purple-600': '#9333ea',
+  };
+  const key = twClass ? twClass.replace('from-', '').replace('to-', '').replace('via-', '').trim() : '';
+  return colors[key] || '#6366f1'; // Default indigo
+};
+
 export default function LandingPage() {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    e.currentTarget.style.setProperty("--mouse-x", `${x}px`);
+    e.currentTarget.style.setProperty("--mouse-y", `${y}px`);
+  };
   const { data: plansData, isLoading: isLoadingPlans } = useGetSubscriptionPlansQuery({});
   const { data: statsData, isLoading: isLoadingStats } = useGetPublicStatsQuery();
   const { data: testimonialsData = [], isLoading: isLoadingTestimonials } = useGetPublicTestimonialsQuery({ limit: 3 });
@@ -542,23 +580,24 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="relative pt-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white via-gray-50 to-white dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 overflow-hidden">
+      <section id="features" className="relative pt-24 px-4 sm:px-6 lg:px-8 bg-white dark:bg-gray-900 overflow-hidden">
         {/* Background decoration */}
-        <div className="absolute inset-0 bg-grid-pattern opacity-5 dark:opacity-10"></div>
+        <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-[500px] h-[500px] bg-primary-200/20 dark:bg-primary-900/10 rounded-full blur-[120px] pointer-events-none animate-slow-drift"></div>
+        <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-secondary-200/20 dark:bg-secondary-900/10 rounded-full blur-[120px] pointer-events-none animate-slow-drift" style={{ animationDelay: '-5s' }}></div>
         
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-20">
-            <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full bg-primary-100 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800">
+            <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full bg-primary-100 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 animate-fade-in">
               <SparklesIcon className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-              <span className="text-sm font-semibold text-primary-700 dark:text-primary-300">Powerful Features</span>
+              <span className="text-sm font-semibold text-primary-700 dark:text-primary-300 uppercase tracking-wider">Powerful Features</span>
             </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 dark:text-white mb-6">
+            <h2 className="text-4xl md:text-5xl lg:text-7xl font-extrabold text-gray-900 dark:text-white mb-6 tracking-tight">
               <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
                 Everything You Need
               </span>
             </h2>
-            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Powerful features to run your restaurant smoothly and efficiently
+            <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed">
+              Powerful tools designed to run your hospitality business smoothly, efficiently, and profitably.
             </p>
           </div>
 
@@ -584,29 +623,54 @@ export default function LandingPage() {
               {features.map((feature, index) => (
                 <div
                   key={feature.key || index}
-                  className="group relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-gray-200/50 dark:border-gray-700/50 hover:border-primary-300 dark:hover:border-primary-700 overflow-hidden"
-                  style={{ animationDelay: `${index * 100}ms` }}
+                  className="group relative"
+                  onMouseMove={handleMouseMove}
                 >
-                {/* Gradient overlay on hover */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity duration-500`}></div>
-                
-                {/* Icon */}
-                <div className={`relative w-16 h-16 bg-gradient-to-br ${feature.gradient} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-lg`}>
-                  <feature.icon className="w-8 h-8 text-white" />
-                  <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} rounded-2xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity`}></div>
+                  <div className="glass-card-premium p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 overflow-hidden h-full">
+                    <div className="spotlight-overlay"></div>
+                    <svg className="border-trace-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id={`gradient-${feature.key || index}`} x1="0%" y1="100%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor={getHexColor(feature.gradient.split(' ')[0])} />
+                          <stop offset="100%" stopColor={getHexColor(feature.gradient.split(' ')[1] || feature.gradient.split(' ')[2] || 'blue-500')} />
+                        </linearGradient>
+                      </defs>
+                      <path 
+                        d="M 6,100 L 94,100 Q 100,100 100,94 L 100,6 Q 100,0 94,0 L 6,0 Q 0,0 0,6 L 0,94 Q 0,100 6,100 Z"
+                        pathLength="1000"
+                        className="border-trace-path"
+                        style={{ 
+                          stroke: `url(#gradient-${feature.key || index})`,
+                          animationDelay: `${index * -1.2}s`
+                        } as any}
+                      />
+                    </svg>
+
+                    {/* Gradient overlay on hover */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity duration-500`}></div>
+                    
+                    {/* Icon */}
+                    <motion.div 
+                      whileHover={{ scale: 1.15, rotate: 8, y: -5 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 12 }}
+                      className={`relative w-16 h-16 bg-gradient-to-br ${feature.gradient} rounded-2xl flex items-center justify-center mb-6 shadow-xl z-20`}
+                    >
+                      <feature.icon className="w-8 h-8 text-white animate-soft-float" />
+                      <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} rounded-2xl blur-xl opacity-40 group-hover:opacity-60 transition-opacity`}></div>
+                    </motion.div>
+                    
+                    {/* Content */}
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                      {feature.title}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm md:text-base">
+                      {feature.description}
+                    </p>
+                    
+                    {/* Decorative element */}
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  </div>
                 </div>
-                
-                {/* Content */}
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {feature.description}
-                </p>
-                
-                {/* Decorative element */}
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </div>
             ))}
             </div>
           )}
@@ -614,50 +678,114 @@ export default function LandingPage() {
       </section>
 
       {/* Built For Your Business Section */}
-      <section id="who-we-serve" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-white dark:bg-gray-900 overflow-hidden">
+      <section id="who-we-serve" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900/50 overflow-hidden">
+        {/* Background blobs for depth */}
+        <div className="absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-200/20 dark:bg-indigo-900/10 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-purple-200/20 dark:bg-purple-900/10 rounded-full blur-[100px] pointer-events-none"></div>
+
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800">
+            <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 animate-fade-in">
               <UserGroupIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">Who We Serve</span>
+              <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Who We Serve</span>
             </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 dark:text-white mb-6">
-              <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+            <h2 className="text-4xl md:text-5xl lg:text-7xl font-extrabold text-gray-900 dark:text-white mb-6 tracking-tight">
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 Built For Your Business
               </span>
             </h2>
-            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Custom-built solutions for your specific hospitality needs
+            <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed">
+              Tailored POS solutions optimized for the unique workflows of every hospitality sector.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Restaurants & Fine Dining */}
-            <div className="bg-gray-50 dark:bg-gray-800/50 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all">
-              <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Restaurants & Fine Dining</h3>
-              <p className="text-gray-600 dark:text-gray-300">Master your table turnover, recipe costing, and kitchen communication.</p>
-            </div>
-            {/* Cafes & Bakeries */}
-            <div className="bg-gray-50 dark:bg-gray-800/50 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all">
-              <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Cafes, Bakeries & Juice Bars</h3>
-              <p className="text-gray-600 dark:text-gray-300">Lightning-fast checkouts, custom order modifiers and scale integrations for weighed items.</p>
-            </div>
-            {/* Hotels & Resorts */}
-            <div className="bg-gray-50 dark:bg-gray-800/50 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all">
-              <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Hotels, Resorts & Guest Houses</h3>
-              <p className="text-gray-600 dark:text-gray-300">Unified room bookings, seamless check ins and connected room service billing.</p>
-            </div>
-            {/* Food Trucks */}
-            <div className="bg-gray-50 dark:bg-gray-800/50 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all">
-              <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Food Trucks & Cloud Kitchens</h3>
-              <p className="text-gray-600 dark:text-gray-300">Maximize your delivery integrations and rely on offline sync when you are on the move.</p>
-            </div>
-            {/* Community Centers */}
-            <div className="bg-gray-50 dark:bg-gray-800/50 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all relative overflow-hidden group">
-              <div className="absolute top-2 right-2 bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-300 px-3 py-1 rounded-full text-xs font-bold">Coming Soon</div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Community Centers & Banquet Halls</h3>
-              <p className="text-gray-600 dark:text-gray-300">Complete venue reservation, bulk catering management and large scale event ledgers.</p>
-            </div>
+            {[
+              {
+                title: 'Restaurants & Fine Dining',
+                description: 'Master your table turnover, recipe costing, and kitchen communication.',
+                icon: BuildingStorefrontIcon,
+                gradient: 'from-orange-500 to-red-500'
+              },
+              {
+                title: 'Cafes, Bakeries & Juice Bars',
+                description: 'Lightning-fast checkouts, custom order modifiers and scale integrations.',
+                icon: CakeIcon,
+                gradient: 'from-yellow-500 to-orange-500'
+              },
+              {
+                title: 'Hotels, Resorts & Guest Houses',
+                description: 'Unified room bookings, seamless check ins and connected room service billing.',
+                icon: HomeIcon,
+                gradient: 'from-blue-500 to-indigo-500'
+              },
+              {
+                title: 'Food Trucks & Cloud Kitchens',
+                description: 'Maximize your delivery integrations and rely on offline sync on the move.',
+                icon: TruckIcon,
+                gradient: 'from-emerald-500 to-teal-500'
+              },
+              {
+                title: 'Community Centers & Banquet Halls',
+                description: 'Complete venue reservation, bulk catering and large scale event ledgers.',
+                icon: AcademicCapIcon,
+                gradient: 'from-purple-500 to-pink-500',
+                isComingSoon: true
+              }
+            ].map((item, index) => (
+              <div
+                key={index}
+                className="group relative"
+                onMouseMove={handleMouseMove}
+              >
+                <div className="glass-card-premium p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 overflow-hidden h-full">
+                  <div className="spotlight-overlay"></div>
+                  <svg className="border-trace-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id={`gradient-serve-${index}`} x1="0%" y1="100%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor={getHexColor(item.gradient.split(' ')[0])} />
+                        <stop offset="100%" stopColor={getHexColor(item.gradient.split(' ')[1])} />
+                      </linearGradient>
+                    </defs>
+                    <path 
+                      d="M 6,100 L 94,100 Q 100,100 100,94 L 100,6 Q 100,0 94,0 L 6,0 Q 0,0 0,6 L 0,94 Q 0,100 6,100 Z"
+                      pathLength="1000"
+                      className="border-trace-path"
+                      style={{ 
+                        stroke: `url(#gradient-serve-${index})`,
+                        animationDelay: `${index * -1.5}s`
+                      } as any}
+                    />
+                  </svg>
+
+                  <motion.div 
+                    whileHover={{ scale: 1.1, rotate: 5, y: -4 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 12 }}
+                    className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center mb-6 shadow-lg z-20`}
+                  >
+                    <item.icon className="w-7 h-7 text-white" />
+                  </motion.div>
+                  
+                  {item.isComingSoon && (
+                    <div className="absolute top-4 right-4 z-10">
+                      <span className="bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-indigo-200 dark:border-indigo-800">
+                        Coming Soon
+                      </span>
+                    </div>
+                  )}
+
+                  <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    {item.title}
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
+                    {item.description}
+                  </p>
+
+                  {/* Bottom accent gradient */}
+                  <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.gradient} opacity-0 group-hover:opacity-100 transition-opacity`}></div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

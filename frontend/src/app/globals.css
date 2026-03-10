@@ -347,6 +347,22 @@
 }
 
 /* Subtle float for ampersand */
+@keyframes slow-drift {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(2%, 3%) scale(1.05);
+  }
+  66% {
+    transform: translate(-1%, 4%) scale(0.98);
+  }
+}
+
+.animate-slow-drift {
+  animation: slow-drift 20s ease-in-out infinite;
+}
+
 @keyframes ampersand-float {
   0%, 100% { transform: translateY(0) rotate(-5deg); }
   50% { transform: translateY(-5px) rotate(5deg); }
@@ -355,4 +371,113 @@
 .animate-ampersand {
   display: inline-block;
   animation: ampersand-float 3s ease-in-out infinite;
+}
+
+/* Premium Border Fill Animation */
+@keyframes border-fill {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0;
+  }
+  25% {
+    width: 100%;
+    height: 0;
+    opacity: 1;
+  }
+  50% {
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+  }
+}
+
+/* Moving Border Shine */
+@keyframes border-shine {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-border-shine {
+  background-size: 200% 200%;
+  animation: border-shine 4s linear infinite;
+}
+
+/* Glass card enhancement */
+.glass-card {
+  @apply backdrop-blur-xl border border-white/20 dark:border-white/10;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .glass-card {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+/* Soft Float for icons */
+@keyframes soft-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.05); }
+}
+
+.animate-soft-float {
+  animation: soft-float 5s ease-in-out infinite;
+}
+
+/* Premium SVG Border Trace - Starts Bottom Left */
+@keyframes border-trace-custom {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.border-trace-svg {
+  position: absolute;
+  inset: -1px;
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
+  fill: none;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 10;
+}
+
+.border-trace-path {
+  stroke-width: 1.5px;
+  stroke-dasharray: 200 800; /* Segment length vs Gap */
+  animation: border-trace-custom 10s linear infinite;
+  stroke-linecap: round;
+}
+
+/* Enhancing the glass card for the SVG overlay */
+.glass-card-premium {
+  @apply bg-white/40 dark:bg-gray-800/20 backdrop-blur-2xl border border-white/20 dark:border-white/10;
+  position: relative;
+  z-index: 1;
+}
+/* Elite Spotlight Mask */
+.spotlight-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    400px circle at var(--mouse-x) var(--mouse-y),
+    rgba(255, 255, 255, 0.08),
+    transparent 80%
+  );
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.group:hover .spotlight-overlay {
+  opacity: 1;
 }
