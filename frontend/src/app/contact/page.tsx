@@ -2,6 +2,8 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Footer } from '@/components/ui/Footer';
+import { Navbar } from '@/components/ui/Navbar';
 import { Input } from '@/components/ui/Input';
 import { useSubmitGeneralContactFormMutation } from '@/lib/api/endpoints/publicApi';
 import { EnvelopeIcon, MapPinIcon, PhoneIcon } from '@heroicons/react/24/outline';
@@ -90,31 +92,7 @@ function ContactFormContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <img
-                src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
-                alt="Raha Pos Solutions logo"
-                className="h-10 w-auto"
-              />
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button variant="ghost">Home</Button>
-              </Link>
-              <Link href="/auth/login">
-                <Button variant="ghost">Login</Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button>Get Started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-primary-600 to-secondary-600 text-white py-20">
@@ -149,10 +127,10 @@ function ContactFormContent() {
                       <div>
                         <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Email</h3>
                         <a
-                          href="mailto:support@rahapos.com"
+                          href="mailto:support@raha.bd"
                           className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                         >
-                          support@rahapos.com
+                          support@raha.bd
                         </a>
                       </div>
                     </div>
@@ -163,13 +141,21 @@ function ContactFormContent() {
                         </div>
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Phone</h3>
-                        <a
-                          href="tel:+1234567890"
-                          className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                        >
-                          +1 (234) 567-890
-                        </a>
+                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Phone (Bangladesh)</h3>
+                        <div className="flex flex-col">
+                          <a
+                            href="tel:+8809696774922"
+                            className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                          >
+                            +880 9696 774922
+                          </a>
+                          <a
+                            href="tel:+8801921120200"
+                            className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                          >
+                            +880 1921 120200
+                          </a>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-start gap-4">
@@ -181,9 +167,9 @@ function ContactFormContent() {
                       <div>
                         <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Address</h3>
                         <p className="text-gray-600 dark:text-gray-400">
-                          123 Business Street<br />
-                          Suite 100<br />
-                          City, State 12345
+                          House 652, Ward 2<br />
+                          Mizmizi, Shiddirgonj<br />
+                          Narayanganj, Bangladesh
                         </p>
                       </div>
                     </div>
@@ -271,52 +257,7 @@ function ContactFormContent() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 dark:bg-black text-white py-12 px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <img
-                  src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
-                  alt="Raha Pos Solutions logo"
-                  className="h-10 w-auto"
-                />
-              </div>
-              <p className="text-gray-400">
-                The most powerful restaurant management system
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/#features" className="hover:text-white transition-colors">Features</Link></li>
-                <li><Link href="/#pricing" className="hover:text-white transition-colors">Pricing</Link></li>
-                <li><Link href="/security" className="hover:text-white transition-colors">Security</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
-                <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                <li><Link href="/careers" className="hover:text-white transition-colors">Careers</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/help-center" className="hover:text-white transition-colors">Help Center</Link></li>
-                <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-                <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
-                <li><Link href="/terms" className="hover:text-white transition-colors">Terms</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

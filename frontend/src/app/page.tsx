@@ -3,6 +3,8 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Button } from '@/components/ui/Button';
+import { Footer } from '@/components/ui/Footer';
+import { Navbar } from '@/components/ui/Navbar';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { useGetPublicStatsQuery, useGetPublicTestimonialsQuery } from '@/lib/api/endpoints/systemFeedbackApi';
 import { cn } from '@/lib/utils';
@@ -441,61 +443,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-black relative overflow-hidden">
-
-      {/* Navigation */}
-      <nav 
-        className={cn(
-          "fixed top-0 w-full z-50 transition-all duration-300 border-b",
-          isScrolled 
-            ? "bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-gray-200/50 dark:border-gray-800/50 shadow-md py-2" 
-            : "bg-white/10 dark:bg-gray-900/10 backdrop-blur-md border-white/10 py-3"
-        )}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14">
-            <div className="flex items-center space-x-3 group cursor-pointer">
-              <div className="relative flex items-center">
-                <img
-                  src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
-                  alt="Raha Pos Solutions logo"
-                  className="h-10 w-auto"
-                />
-              </div>
-              
-            </div>
-            <div className="hidden md:flex items-center space-x-4">
-              <Link href="/auth/login">
-                <Button variant="ghost" className={cn(
-                  "transition-colors",
-                  isScrolled 
-                    ? "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" 
-                    : "text-white hover:bg-white/10"
-                )}>
-                  Login
-                </Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                  Get Started
-                </Button>
-              </Link>
-            </div>
-            {/* Mobile menu */}
-            <div className="md:hidden flex items-center space-x-2">
-              <Link href="/auth/login">
-                <Button variant="ghost" size="sm" className={cn(
-                  isScrolled ? "text-gray-700 dark:text-gray-300" : "text-white"
-                )}>
-                  Login
-                </Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button size="sm" className="bg-gradient-to-r from-primary-600 to-secondary-600">Start</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar transparent />
 
       {/* Hero Section */}
       <section className="relative pt-20 sm:pt-24 pb-16 sm:pb-22 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center">
@@ -528,7 +476,7 @@ export default function LandingPage() {
               </span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl text-white/95 mb-8 sm:mb-12 max-w-4xl mx-auto leading-relaxed font-light drop-shadow-lg px-4">
-              Whether you run a busy corner cafe or a multi room resort, Raha adapts to your workflow.
+              Whether you run a busy corner cafe or a multi room resort Raha adapts to your workflow.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
               <Link href="/contact" className="group w-full sm:w-auto">
@@ -806,7 +754,7 @@ export default function LandingPage() {
             </div>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 dark:text-white mb-6">
               <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Simple, Transparent Pricing
+                Simple & Transparent Pricing
               </span>
             </h2>
             <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
@@ -1309,53 +1257,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 dark:bg-black text-white py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <img
-                  src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
-                  alt="Raha Pos Solutions logo"
-                  className=" h-10 w-auto"
-                />
-              </div>
-              <p className="text-gray-400">
-                The most powerful restaurant management system
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><Link href="/security" className="hover:text-white transition-colors">Security</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
-                <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                <li><Link href="/careers" className="hover:text-white transition-colors">Careers</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/help-center" className="hover:text-white transition-colors">Help Center</Link></li>
-                <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-                <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
-                <li><Link href="/terms" className="hover:text-white transition-colors">Terms</Link></li>
-              </ul>
-            </div>
-          </div>
-            <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.</p>
-            <p className="mt-2 text-sm">A product of <a href="https://infotigo.com/" target="_blank" rel="noopener noreferrer" className="text-primary-400 font-semibold hover:text-primary-300 transition-colors">Infotigo IT</a></p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
