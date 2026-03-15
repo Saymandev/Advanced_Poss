@@ -87,6 +87,8 @@ export interface CompanySettings {
     paperWidth?: number;
     wifi?: string;
     wifiPassword?: string;
+    bin?: string;
+    mushak?: string;
   };
   createdAt: string;
   updatedAt: string;

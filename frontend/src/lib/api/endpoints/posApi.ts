@@ -672,11 +672,20 @@ export const posApi = apiSlice.injectEndpoints({
         header: string;
         footer: string;
         showLogo: boolean;
+        logoUrl?: string;
+        fontSize?: number;
+        paperWidth?: number;
+        wifi?: string;
+        wifiPassword?: string;
+        bin?: string;
+        mushak?: string;
       };
       printerSettings: {
         enabled: boolean;
         printerId: string;
         autoPrint: boolean;
+        printerType?: string;
+        paperSize?: string;
       };
     }, { branchId?: string }>({
       query: (params) => ({
