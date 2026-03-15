@@ -96,6 +96,8 @@ export default function POSSettingsPage() {
     paperWidth: 80,
     wifi: '',
     wifiPassword: '',
+    bin: '',
+    mushak: '',
     printerEnabled: false,
     printerId: '',
     printerType: 'thermal' as 'thermal' | 'laser' | 'inkjet',
@@ -268,6 +270,8 @@ export default function POSSettingsPage() {
         paperWidth: settingsData.receiptSettings?.paperWidth || companySettings?.receiptSettings?.paperWidth || 80,
         wifi: settingsData.receiptSettings?.wifi || companySettings?.receiptSettings?.wifi || '',
         wifiPassword: settingsData.receiptSettings?.wifiPassword || companySettings?.receiptSettings?.wifiPassword || '',
+        bin: settingsData.receiptSettings?.bin || companySettings?.receiptSettings?.bin || '',
+        mushak: settingsData.receiptSettings?.mushak || companySettings?.receiptSettings?.mushak || '',
         printerEnabled: settingsData.printerSettings?.enabled ?? false,
         printerId: settingsData.printerSettings?.printerId || '',
         printerType: settingsData.printerSettings?.printerType || 'thermal',
@@ -335,6 +339,8 @@ export default function POSSettingsPage() {
           paperWidth: formData.paperWidth,
           wifi: formData.wifi,
           wifiPassword: formData.wifiPassword,
+          bin: formData.bin,
+          mushak: formData.mushak,
         },
         printerSettings: {
           enabled: formData.printerEnabled,
@@ -968,6 +974,29 @@ export default function POSSettingsPage() {
               onChange={(e) => setFormData({ ...formData, wifiPassword: e.target.value })}
               placeholder="Enter WiFi password"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                BIN (Optional)
+              </label>
+              <Input
+                value={formData.bin}
+                onChange={(e) => setFormData({ ...formData, bin: e.target.value })}
+                placeholder="Enter BIN number"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Mushak 6.3 (Optional)
+              </label>
+              <Input
+                value={formData.mushak}
+                onChange={(e) => setFormData({ ...formData, mushak: e.target.value })}
+                placeholder="Enter Mushak number"
+              />
+            </div>
           </div>
 
           <div>

@@ -865,7 +865,45 @@ export default function LandingPage() {
                     <div className="space-y-3 mb-4 relative z-10">
                       {featureList.length > 0 ? (
                         <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                          {featureList.map((feature, idx) => (
+                          {((): string[] => {
+                            const priorityList = [
+                              'online ordering',
+                              'qr ordering',
+                              'inventory',
+                              'stock',
+                              'accounting',
+                              'sales tracking',
+                              'analytics',
+                              'unlimited',
+                              'kds',
+                              'display system',
+                              'loyalty',
+                              'discount',
+                              'feedback',
+                              'backup',
+                              'security'
+                            ];
+
+                            // Clean and refine feature names for display
+                            const refinedFeatures = featureList.map(f => {
+                              let name = f;
+                              if (name.toLowerCase() === 'kds') name = 'Kitchen Display System';
+                              if (name.toLowerCase() === 'cds') name = 'Customer Display System';
+                              return name;
+                            });
+
+                            return [...refinedFeatures].sort((a, b) => {
+                              const aLower = a.toLowerCase();
+                              const bLower = b.toLowerCase();
+                              const aIdx = priorityList.findIndex(p => aLower.includes(p));
+                              const bIdx = priorityList.findIndex(p => bLower.includes(p));
+                              
+                              if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                              if (aIdx !== -1) return -1;
+                              if (bIdx !== -1) return 1;
+                              return 0;
+                            });
+                          })().map((feature, idx) => (
                             <div key={idx} className="flex items-start gap-2">
                               <CheckCircleIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
                                 isPopular ? 'text-white' : 'text-green-500'

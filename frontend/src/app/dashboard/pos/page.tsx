@@ -5493,6 +5493,7 @@ export default function POSPage() {
                   lineHeight: '1.3',
                   maxWidth: '300px',
                   margin: '0 auto',
+                  color: '#000',
                 }}
               />
             </div>

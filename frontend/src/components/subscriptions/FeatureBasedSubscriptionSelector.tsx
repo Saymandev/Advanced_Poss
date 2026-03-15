@@ -96,11 +96,34 @@ export function FeatureBasedSubscriptionSelector({
       }
       grouped[category].push(feature);
     });
-    // Sort features within each category
-    Object.keys(grouped).forEach((category) => {
-      grouped[category].sort((a, b) => a.name.localeCompare(b.name));
+    // Category sorting priority
+    const categoryPriority = ['Sales', 'Inventory', 'Financial', 'Customer', 'AI', 'Kitchen', 'Staffing', 'System', 'Hospitality'];
+    const sortedCategories = Object.keys(grouped).sort((a, b) => {
+      const aIdx = categoryPriority.findIndex(p => a.includes(p));
+      const bIdx = categoryPriority.findIndex(p => b.includes(p));
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return a.localeCompare(b);
     });
-    return grouped;
+
+    const reordered: Record<string, any[]> = {};
+    sortedCategories.forEach(category => {
+      // Feature sorting priority within category
+      const featurePriority = ['sales', 'order', 'online', 'qr', 'inventory', 'stock', 'accounting', 'analytics', 'dashboard', 'ai'];
+      reordered[category] = grouped[category].sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        const aIdx = featurePriority.findIndex(p => aName.includes(p));
+        const bIdx = featurePriority.findIndex(p => bName.includes(p));
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    });
+
+    return reordered;
   }, [featuresData]);
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) =>
