@@ -37,6 +37,14 @@ export class ReceiptSettingsDto {
   @IsOptional()
   @IsString()
   wifiPassword?: string;
+
+  @IsOptional()
+  @IsString()
+  bin?: string;
+
+  @IsOptional()
+  @IsString()
+  mushak?: string;
 }
 
 export class PrinterSettingsDto {

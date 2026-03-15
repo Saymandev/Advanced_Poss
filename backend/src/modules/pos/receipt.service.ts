@@ -486,7 +486,7 @@ export class ReceiptService {
       orderId: order._id,
       branchId: order.branchId,
       tableNumber: tableNumber,
-      orderType: (order as any).orderType || 'dine-in',
+      orderType: (order as any).orderType || (order as any).type || 'dine-in',
       waiterName: waiterName,
       customerInfo: order.customerInfo || undefined,
       items: safeItems,
@@ -519,6 +519,8 @@ export class ReceiptService {
         footer: settings?.receiptSettings?.footer || companySettings?.receiptSettings?.footer || 'Thank you for your visit!',
         fontSize: settings?.receiptSettings?.fontSize || companySettings?.receiptSettings?.fontSize || 12,
         paperWidth: settings?.receiptSettings?.paperWidth || companySettings?.receiptSettings?.paperWidth || 80,
+        bin: settings?.receiptSettings?.bin || companySettings?.receiptSettings?.bin || undefined,
+        mushak: settings?.receiptSettings?.mushak || companySettings?.receiptSettings?.mushak || undefined,
         // Determine logo URL: use custom logoUrl if provided, otherwise use company logo if showLogo is enabled
         logoUrl: (() => {
           const customLogoUrl = settings?.receiptSettings?.logoUrl;
@@ -584,6 +586,7 @@ export class ReceiptService {
   // Generate receipt HTML
   async generateReceiptHTML(orderId: string): Promise<string> {
     const receiptData = await this.generateReceiptData(orderId);
+
     // Generate QR code image if order review URL exists
     let qrCodeImageData = '';
     if (receiptData.orderReviewUrl) {
@@ -593,6 +596,56 @@ export class ReceiptService {
         console.error('Failed to generate QR code for receipt:', error);
       }
     }
+
+    // Log receipt data for debugging as requested by user
+    console.log('📄 [Receipt Debug] Generated Receipt Data:', JSON.stringify(receiptData, null, 2));
+
+    const itemsHtml = receiptData.items.map(item => {
+        const notesHtml = item.notes ? `<tr><td colspan="4" style="font-size: 0.85em; font-style: italic; color: #000; padding: 2px 0 2px 10px; opacity: 0.8;">- ${item.notes}</td></tr>` : '';
+        return `
+        <tr>
+            <td style="width: 12%;">${item.quantity}</td>
+            <td style="width: 48%; padding-left: 5px;">${item.name}</td>
+            <td style="width: 20%; text-align: right;">${item.price.toFixed(0)}</td>
+            <td style="width: 20%; text-align: right;">${(item.quantity * item.price).toFixed(0)}</td>
+        </tr>
+        ${notesHtml}
+      `;
+    }).join('');
+
+    const taxHtml = receiptData.taxRate > 0 ? `
+    <div class="total-row">
+        <span>VAT (${receiptData.taxRate}%) :</span>
+        <span>${receiptData.taxAmount.toFixed(2)}</span>
+    </div>` : '';
+
+    const serviceChargeHtml = receiptData.serviceCharge > 0 ? `
+    <div class="total-row">
+        <span>S.C (${receiptData.serviceCharge}%) :</span>
+        <span>${receiptData.serviceChargeAmount.toFixed(2)}</span>
+    </div>` : '';
+
+    const discountHtml = receiptData.discountAmount > 0 ? `
+    <div class="total-row">
+        <span>Discount :</span>
+        <span>-${receiptData.discountAmount.toFixed(2)}</span>
+    </div>` : '';
+
+    const deliveryFeeHtml = receiptData.deliveryFee > 0 ? `
+    <div class="total-row">
+        <span>Delivery Fee :</span>
+        <span>${receiptData.deliveryFee.toFixed(2)}</span>
+    </div>` : '';
+
+    const binHtml = receiptData.receiptSettings.bin ? `<p style="margin-top: 5px; font-weight: bold;">BIN: ${receiptData.receiptSettings.bin}</p>` : '';
+    const mushakHtml = receiptData.receiptSettings.mushak ? `<p style="margin-top: 2px;">(Mushak ${receiptData.receiptSettings.mushak})</p>` : '';
+
+    const qrHtml = (receiptData.orderReviewUrl && qrCodeImageData) ? `
+    <div class="review-qr text-center" style="width: 100%; margin-top: 20px;">
+        <p style="font-size: 0.85em; margin-bottom: 8px; color: #000 !important; font-weight: bold;">Scan to review your experience</p>
+        <img src="${qrCodeImageData}" alt="Review QR" style="display: block; margin: 0 auto; width: 130px; height: 130px; border: 1px solid #eee;" />
+    </div>` : '';
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -600,266 +653,180 @@ export class ReceiptService {
     <meta charset="UTF-8">
     <title>Receipt - ${receiptData.orderNumber}</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Courier New', monospace;
+            background-color: #ffffff !important;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+        }
+        .receipt-container {
+            font-family: 'Courier New', Courier, monospace;
             font-size: ${receiptData.receiptSettings.fontSize || 12}px;
-            line-height: 1.4;
-            margin: 0;
-            padding: 20px;
-            max-width: ${receiptData.receiptSettings.paperWidth || 80}mm;
-            margin: 0 auto;
-            background: #ffffff;
-            color: #1f2937;
+            line-height: 1.2;
+            padding: 15px;
+            width: ${receiptData.receiptSettings.paperWidth || 80}mm;
+            background: #ffffff !important;
+            color: #000000 !important;
         }
-        .header {
+        .text-center { text-align: center !important; }
+        .text-right { text-align: right !important; }
+        .font-bold { font-weight: bold !important; }
+        .separator-double { 
+            margin: 10px 0; 
             text-align: center;
-            border-bottom: 2px dotted #000;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-            color: #111827;
-        }
-        .header .logo {
-            max-width: 100px;
-            max-height: 100px;
-            width: 100px;
-            height: 100px;
-            display: block;
-            margin: 0 auto 15px auto;
-            object-fit: contain;
-            border-radius: 50%;
-            border: 2px dotted #e5e7eb;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 18px;
             font-weight: bold;
-            color: #111827;
+            color: #000 !important;
+            letter-spacing: -1px;
+        }
+        .separator-dashed { 
+            margin: 10px 0; 
+            text-align: center;
+            color: #000 !important;
+            letter-spacing: -1px;
+        }
+        .header { margin-bottom: 15px; }
+        .header h1 { 
+            font-size: 1.6em; 
+            margin: 8px 0; 
+            color: #000 !important;
+            font-weight: bold !important;
+            line-height: 1.1;
+        }
+        .header p { 
+            font-size: 1em; 
+            margin-bottom: 3px;
+            color: #000 !important;
         }
         .order-info {
-            margin-bottom: 20px;
-            color: #111827;
+            margin: 15px 0;
+            font-size: 1em;
+            color: #000 !important;
         }
-        .order-info div {
-            margin-bottom: 5px;
+        .items-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 10px 0; 
+            font-size: 1em;
+            color: #000 !important;
         }
-        .items {
-            margin-bottom: 20px;
-            color: #111827;
+        .items-table th { 
+            padding: 8px 0; 
+            text-align: left;
+            color: #000 !important;
+            font-weight: bold !important;
         }
-        .item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            padding-bottom: 5px;
-            border-bottom: 1px dotted #ccc;
-            color: #111827;
+        .items-table td { 
+            padding: 6px 0; 
+            vertical-align: top;
+            color: #000 !important;
         }
-        .item-name {
-            flex: 1;
+        .totals { 
+            margin-top: 10px; 
+            color: #000 !important;
         }
-        .item-quantity {
-            margin: 0 10px;
+        .total-row { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 5px; 
+            font-size: 1.1em;
+            color: #000 !important;
         }
-        .item-price {
-            font-weight: bold;
-            color: #111827;
+        .grand-total { 
+            font-size: 1.4em; 
+            font-weight: bold !important; 
+            margin: 12px 0; 
+            color: #000 !important;
         }
-        .totals {
-            border-top: 2px dotted #000;
-            padding-top: 10px;
-            margin-top: 20px;
-            color: #111827;
+        .footer { 
+            margin-top: 25px; 
+            font-size: 1.1em;
+            font-weight: bold !important;
+            color: #000 !important;
         }
-        .total-line {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            color: #111827;
-        }
-        .total-line.final {
-            font-weight: bold;
-            font-size: 16px;
-            border-top: 1px dotted #000;
-            padding-top: 10px;
-            margin-top: 10px;
-            color: #0f172a;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px dotted #000;
-            color: #111827;
-        }
-        .payment-info {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f5f5f5;
-            border-radius: 5px;
-            color: #111827;
-        }
-        .notes {
-            margin-top: 15px;
-            font-style: italic;
-            color: #111827;
-        }
+        .review-qr { margin: 15px 0; }
+        .review-qr img { width: 100px; height: 100px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        ${receiptData.receiptSettings.showLogo && receiptData.receiptSettings.logoUrl ? 
-          `<img src="${receiptData.receiptSettings.logoUrl}" alt="Logo" class="logo">` : ''}
-        ${receiptData.receiptSettings.header ? `<div style="font-size: 11px; margin-bottom: 5px; color: #666;">${receiptData.receiptSettings.header}</div>` : ''}
-        <h1>${receiptData.restaurantName || receiptData.receiptSettings.header || 'Restaurant'}</h1>
-        ${receiptData.restaurantAddress ? `<div style="font-size: 10px; margin-top: 5px; color: #333; font-weight: 600;">${receiptData.restaurantAddress}</div>` : ''}
-        ${receiptData.restaurantPhone ? `<div style="font-size: 10px; margin-top: 3px; color: #333; font-weight: 600;">Phone: ${receiptData.restaurantPhone}</div>` : ''}
-        ${receiptData.restaurantWifi ? `<div style="font-size: 10px; margin-top: 3px; color: #333;">Wifi: ${receiptData.restaurantWifi}${receiptData.restaurantWifiPassword ? ` Password: ${receiptData.restaurantWifiPassword}` : ''}</div>` : ''}
-    </div>
-    <div class="order-info">
-        <div><strong>Invoice No:</strong> ${receiptData.orderNumber}</div>
-        <div><strong>Order Type:</strong> ${(receiptData.orderType || 'dine-in').toUpperCase().replace('-', ' ')}</div>
-        <div><strong>Date:</strong> ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, receiptData.timeFormat)}</div>
-        <div><strong>Waiter:</strong> ${receiptData.waiterName || 'Default Waiter'}</div>
-        ${receiptData.tableNumber && receiptData.tableNumber !== 'N/A' ? `<div><strong>Table:</strong> ${receiptData.tableNumber}</div>` : ''}
-        ${receiptData.customerInfo?.name ? `<div><strong>Customer:</strong> ${receiptData.customerInfo.name}</div>` : ''}
-        ${receiptData.customerInfo?.email ? `<div><strong>Email:</strong> ${receiptData.customerInfo.email}</div>` : ''}
-        ${receiptData.customerInfo?.phone ? `<div style="font-size: 11px; font-weight: bold; margin-top: 2px;"><strong>Phone:</strong> ${receiptData.customerInfo.phone}</div>` : ''}
-        ${receiptData.orderType === 'delivery' && receiptData.customerInfo?.addressLine1 ? `
-        <div style="font-size: 11px; font-weight: bold; margin-top: 4px; border: 1px dashed #ccc; padding: 4px;">
-            <strong>DELIVERY ADDRESS:</strong><br/>
-            ${receiptData.customerInfo.addressLine1}
-            ${receiptData.customerInfo.addressLine2 ? `<br/>${receiptData.customerInfo.addressLine2}` : ''}
-            <br/>${receiptData.customerInfo.city}${receiptData.customerInfo.state ? `, ${receiptData.customerInfo.state}` : ''}
-            ${receiptData.customerInfo.postalCode ? `<br/>ZIP: ${receiptData.customerInfo.postalCode}` : ''}
-        </div>` : ''}
-    </div>
-    <div class="items">
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+    <div class="receipt-container">
+        <div class="header text-center">
+            <div class="separator-double">=======================================</div>
+            <h1>${receiptData.restaurantName.toUpperCase()}</h1>
+            <p style="white-space: pre-wrap;">${receiptData.restaurantAddress}</p>
+            <p>Tel: ${receiptData.restaurantPhone}</p>
+            ${binHtml}
+            ${mushakHtml}
+            <div class="separator-double">=======================================</div>
+        </div>
+
+        <div class="order-info">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <div style="flex: 1;">Bill No : ${receiptData.orderNumber}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <div>Date : ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, '24h').split(',')[0]}</div>
+                <div>Time : ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, '12h').split(',')[1].trim()}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <div>Table : ${receiptData.tableNumber}</div>
+                <div>Waiter: ${receiptData.waiterName}</div>
+            </div>
+        </div>
+
+        <div class="separator-dashed">---------------------------------------</div>
+
+        <table class="items-table">
             <thead>
-                <tr style="border-bottom: 1px dotted #000;">
-                    <th style="text-align: left; padding: 3px 0; font-size: 10px; font-weight: bold;">Item Description</th>
-                    <th style="text-align: center; padding: 3px 0; font-size: 10px; font-weight: bold;">Qty</th>
-                    <th style="text-align: right; padding: 3px 0; font-size: 10px; font-weight: bold;">Price</th>
-                    <th style="text-align: right; padding: 3px 0; font-size: 10px; font-weight: bold;">T.Price</th>
+                <tr>
+                    <th style="width: 12%; text-align: left;">Qty</th>
+                    <th style="width: 48%; text-align: left;">Item</th>
+                    <th style="width: 20%; text-align: right;">Rate</th>
+                    <th style="width: 20%; text-align: right;">Amount</th>
                 </tr>
             </thead>
             <tbody>
-                ${receiptData.items.map(item => {
-                  const itemPrice = this.formatCurrency(item.price, receiptData.currency);
-                  const itemTotal = this.formatCurrency(item.quantity * item.price, receiptData.currency);
-                  return `
-                    <tr style="border-bottom: 1px dotted #ccc;">
-                        <td style="padding: 3px 0; font-size: 10px;">${item.name || 'Menu Item'}</td>
-                        <td style="text-align: center; padding: 3px 0; font-size: 10px;">${item.quantity}</td>
-                        <td style="text-align: right; padding: 3px 0; font-size: 10px;">${itemPrice}</td>
-                        <td style="text-align: right; padding: 3px 0; font-size: 10px; font-weight: bold;">${itemTotal}</td>
-                    </tr>
-                    ${item.notes ? `<tr><td colspan="4" style="padding: 2px 0 5px 0; font-size: 9px; color: #666; font-style: italic;">Note: ${item.notes}</td></tr>` : ''}
-                `;
-                }).join('')}
+                ${itemsHtml}
             </tbody>
         </table>
-    </div>
-    <div class="totals">
-        <div class="total-line">
-            <span>Subtotal:</span>
-            <span>${this.formatCurrency(receiptData.subtotal, receiptData.currency)}</span>
-        </div>
-        ${receiptData.taxRate > 0 ? `
-            <div class="total-line">
-                <span>VAT ${receiptData.taxRate}%:</span>
-                <span>${this.formatCurrency(receiptData.taxAmount, receiptData.currency)}</span>
+
+        <div class="separator-dashed">---------------------------------------</div>
+
+        <div class="totals">
+            <div class="total-row">
+                <span>Subtotal :</span>
+                <span>${receiptData.subtotal.toFixed(2)}</span>
             </div>
-        ` : ''}
-        ${receiptData.serviceCharge > 0 ? `
-            <div class="total-line">
-                <span>Service Charge (${receiptData.serviceCharge}%):</span>
-                <span>${this.formatCurrency(receiptData.serviceChargeAmount, receiptData.currency)}</span>
-            </div>
-        ` : ''}
-        ${receiptData.deliveryFee > 0 ? `
-            <div class="total-line">
-                <span>Delivery Fee:</span>
-                <span>${this.formatCurrency(receiptData.deliveryFee, receiptData.currency)}</span>
-            </div>
-        ` : ''}
-        <div class="total-line final">
-            <span>Total:</span>
-            <span>${receiptData.currency} ${this.formatCurrency(receiptData.totalAmount, receiptData.currency)}</span>
-        </div>
-        ${receiptData.amountReceived > 0 ? `
-            <div class="total-line" style="margin-top: 10px;">
-                <span>Amount Received:</span>
-                <span>${this.formatCurrency(receiptData.amountReceived, receiptData.currency)}</span>
-            </div>
-            <div class="total-line">
-                <span>Change Due:</span>
-                <span>${this.formatCurrency(receiptData.changeDue, receiptData.currency)}</span>
-            </div>
-        ` : ''}
-    </div>
-    ${receiptData.paymentMethod ? `
-        <div class="payment-info">
-            <div><strong>Payment Method:</strong> ${receiptData.paymentMethod.toUpperCase()}</div>
-            ${receiptData.paymentDetails?.transactionId ? `<div><strong>Transaction ID:</strong> ${receiptData.paymentDetails.transactionId}</div>` : ''}
-            ${receiptData.paymentDetails?.referenceNumber ? `<div><strong>Reference:</strong> ${receiptData.paymentDetails.referenceNumber}</div>` : ''}
-        </div>
-    ` : ''}
-    <div class="footer">
-        <div style="text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px dotted #000;">
-            <div style="font-weight: bold; font-size: 11px; text-decoration: underline; margin-bottom: 10px;">GUEST BILL</div>
-            ${receiptData.orderReviewUrl && qrCodeImageData ? `
-                <div style="margin-bottom: 10px;">
-                    <div style="font-size: 10px; margin-bottom: 8px; color: #111827;">
-                        Please rate our service of this order.
-                    </div>
-                    <div style="display: flex; justify-content: center; margin-bottom: 8px;">
-                        <img src="${qrCodeImageData}" alt="Order Review QR Code" style="width: 120px; height: 120px;" />
-                    </div>
-                    ${receiptData.publicUrl ? `
-                    <div style="font-size: 9px; color: #333; word-break: break-all;">
-                        ${receiptData.publicUrl}
-                    </div>
-                    ` : ''}
-                </div>
-            ` : ''}
-            <div style="font-size: 11px; margin-top: 10px; margin-bottom: 8px;">
-                ${receiptData.receiptSettings.footer || 'Thank you. Come again.'}
-            </div>
-            <div style="font-size: 9px; color: #666; margin-top: 10px;">
-                Powered By: Raha Pos Solutions
-            </div>
+            ${taxHtml}
+            ${serviceChargeHtml}
+            ${discountHtml}
+            ${deliveryFeeHtml}
             
-            ${receiptData.orderType === 'delivery' ? `
-            <div style="margin-top: 30px; border-top: 1px solid #000; padding-top: 20px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                    <div style="width: 45%; border-top: 1px solid #111; padding-top: 5px; font-size: 10px; text-align: center;">
-                        Customer Signature
-                    </div>
-                    <div style="width: 45%; border-top: 1px solid #111; padding-top: 5px; font-size: 10px; text-align: center;">
-                        Date & Time
-                    </div>
-                </div>
-                <div style="font-size: 9px; text-align: center; font-style: italic; color: #666; margin-bottom: 15px;">
-                    Please sign upon receiving your order.
-                </div>
-                
-                <div style="border: 2px solid #edeff2; padding: 10px; margin-top: 20px; background: #f8fafc;">
-                    <div style="font-weight: bold; font-size: 12px; margin-bottom: 8px; color: #1e293b;">DRIVER VOUCHER</div>
-                    <div style="font-size: 10px; color: #475569;">Keep this copy for store records.</div>
-                    <div style="margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 8px;">
-                        <span style="font-size: 10px;">Receiver Name: ____________________</span>
-                    </div>
-                    <div style="margin-top: 10px;">
-                        <span style="font-size: 10px;">Signature: _________________________</span>
-                    </div>
-                </div>
+            <div class="separator-double">=======================================</div>
+            <div class="total-row grand-total">
+                <span>GRAND TOTAL (${receiptData.currency}) :</span>
+                <span>${receiptData.totalAmount.toFixed(2)}</span>
             </div>
-            ` : ''}
+            <div class="separator-double">=======================================</div>
         </div>
+
+        <div class="payment-details" style="margin: 10px 0; font-size: 1em;">
+            <div>Paid by: ${receiptData.paymentMethod ? receiptData.paymentMethod.toUpperCase() : 'N/A'}</div>
+            <div>Change: ${receiptData.changeDue.toFixed(2)} (Tendered: ${receiptData.amountReceived.toFixed(0)})</div>
+        </div>
+
+        <div class="separator-double" style="margin-top: 15px;">=======================================</div>
+
+        <div class="footer text-center">
+            <p>${receiptData.receiptSettings.footer || 'Thank you for your visit!'}</p>
+            <p>Please come again.</p>
+            <br/>
+            <p style="font-size: 0.85em; opacity: 0.9; font-weight: normal;">Powered by Raha Pos Solutions</p>
+            <div class="separator-double">=======================================</div>
+        </div>
+
+        ${qrHtml}
     </div>
 </body>
 </html>`;

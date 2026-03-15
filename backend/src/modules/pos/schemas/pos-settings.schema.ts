@@ -12,6 +12,8 @@ export interface ReceiptSettings {
   paperWidth?: number;
   wifi?: string;
   wifiPassword?: string;
+  bin?: string;
+  mushak?: string;
 }
 
 export interface PrinterSettings {

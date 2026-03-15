@@ -112,20 +112,12 @@ export class SubscriptionPlansService {
     // Only update fields that are explicitly provided in the DTO
     // CRITICAL: Check for undefined AND null to prevent accidental overwrites
     // Frontend now only sends fields with actual values, so we can safely update what's provided
-    
     if (updateDto.displayName !== undefined && updateDto.displayName !== null && updateDto.displayName !== '') {
       updateData.displayName = updateDto.displayName;
-      
-    } else {
-      
     }
-    
     
     if (updateDto.description !== undefined && updateDto.description !== null && updateDto.description !== '') {
       updateData.description = updateDto.description;
-      
-    } else {
-      
     }
     // Price: Only update if explicitly provided (frontend now only sends if field has value)
     if (updateDto.price !== undefined && updateDto.price !== null) {

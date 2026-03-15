@@ -1,0 +1,169 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt - POS-2F0B-20260309-0001</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            padding: 10px;
+            width: 80mm;
+            margin: 0 auto;
+            background: #ffffff;
+            color: #000000;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
+        .separator-double { margin: 5px 0; border-top: 2px double #000; }
+        .separator-dashed { margin: 5px 0; border-top: 1px dashed #000; }
+        .header { margin-bottom: 10px; }
+        .header h1 { font-size: 1.4em; margin-bottom: 2px; }
+        .header p { font-size: 0.9em; margin-bottom: 1px; }
+        .items-table { width: 100%; border-collapse: collapse; margin: 5px 0; font-size: 0.9em; }
+        .items-table th { border-bottom: 1px dashed #000; padding: 3px 0; text-align: left; }
+        .items-table td { padding: 3px 0; vertical-align: top; }
+        .totals { margin-top: 5px; }
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 1.1em; }
+        .grand-total { font-size: 1.3em; font-weight: bold; margin-top: 5px; padding-top: 5px; border-top: 1px dashed #000; }
+        .footer { margin-top: 15px; font-size: 0.9em; }
+        .review-qr { margin: 10px 0; }
+        .review-qr img { width: 100px; height: 100px; }
+    </style>
+</head>
+<body>
+    <div class="header text-center">
+        <div class="separator-double">=======================================</div>
+        <h1>MAIN BRANCH</h1>
+        <p></p>
+        <p>123 Main Street, Demo City, DC, 12345, USA</p>
+        <p>Tel: +1234567890</p>
+        
+        
+        <div class="separator-double">=======================================</div>
+    </div>
+
+    <div class="order-info">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <div style="flex: 1; min-width: 150px;">Bill No : POS-2F0B-20260309-0001</div>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <div>Date : 03/09/2026</div>
+            <div>Time : 12:30:50 PM</div>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <div>Table : N/A</div>
+            <div>Waiter: Jane Manager</div>
+        </div>
+    </div>
+
+    <div class="separator-dashed">---------------------------------------</div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="width: 10%;">Qty</th>
+                <th style="width: 50%;">Item</th>
+                <th style="width: 20%; text-align: right;">Rate</th>
+                <th style="width: 20%; text-align: right;">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            
+        <tr>
+            <td>1</td>
+            <td>Coffee</td>
+            <td class="text-right">4</td>
+            <td class="text-right">4</td>
+        </tr>
+        
+      
+        <tr>
+            <td>1</td>
+            <td>Caesar Salad</td>
+            <td class="text-right">12</td>
+            <td class="text-right">12</td>
+        </tr>
+        
+      
+        <tr>
+            <td>1</td>
+            <td>Beef Steak</td>
+            <td class="text-right">30</td>
+            <td class="text-right">30</td>
+        </tr>
+        
+      
+        <tr>
+            <td>1</td>
+            <td>Chicken Wings</td>
+            <td class="text-right">13</td>
+            <td class="text-right">13</td>
+        </tr>
+        
+      
+        <tr>
+            <td>1</td>
+            <td>Ice Cream</td>
+            <td class="text-right">5</td>
+            <td class="text-right">5</td>
+        </tr>
+        
+      
+        </tbody>
+    </table>
+
+    <div class="separator-dashed">---------------------------------------</div>
+
+    <div class="totals">
+        <div class="total-row">
+            <span>Subtotal :</span>
+            <span>63.95</span>
+        </div>
+        
+    <div class="total-row">
+        <span>VAT (1.5%) :</span>
+        <span>0.96</span>
+    </div>
+        
+    <div class="total-row">
+        <span>S.C (0.02%) :</span>
+        <span>0.01</span>
+    </div>
+        
+        
+        
+        <div class="separator-dashed">---------------------------------------</div>
+        <div class="total-row grand-total">
+            <span>GRAND TOTAL (BDT) :</span>
+            <span>64.92</span>
+        </div>
+        <div class="separator-double">=======================================</div>
+    </div>
+
+    <div class="payment-details">
+        <div>Paid by: CASH</div>
+        <div>Change: 0.00 (Tendered: 65)</div>
+    </div>
+
+    <div class="separator-double" style="margin-top: 15px;">=======================================</div>
+
+    <div class="footer text-center">
+        <p>Thank you for your visit!</p>
+        <p>Please come again.</p>
+        <br/>
+        <p style="font-size: 0.8em;">Powered by Raha Pos Solutions</p>
+        <div class="separator-double">=======================================</div>
+    </div>
+
+    
+    <div class="review-qr text-center">
+        <p style="font-size: 0.7em; margin-bottom: 5px;">Scan to review your experience</p>
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAACWCAYAAAA8AXHiAAAAAklEQVR4AewaftIAAAp8SURBVO3BUW4jyZIAQfcC739l3ybwAhCEbKXIYc3OR5rZHxzHh10cxw0ujuMGD75Q+bSKFZVR8S6Vp4oVlVGxojIqVlRGxVAZFSsqKxW/pbJSsaMyKobKp1U8XRzHDS6O4wYP/qLiXSrvUtmpGBXfqYyKoTIqVlRWKobKispOxVD5JJV3VbxL5buL47jBxXHc4MEvqOxUvKJipWJHZVQ8qexUDJVRMVRGxVAZFSsqKxW/VTFURsVQGSqjYqi8S2Wn4icXx3GDi+O4wYP/AJVRsaIyKobKdxVDZVSMiqGyojIqhsqoWKkYKqNipeJJZUXlXRX/tovjuMHFcdzgwb9IZVSsqIyKUTFURsVPKobKSsVQWVFZUXmFyqgYKt9VrKjsVPx/ujiOG1wcxw0e/ELFJ1QMlR2VHZWnihWVUTFUdip2VFZURsVQWal4UtmpGCpDZVS8q+KfujiOG1wcxw0e/IXKp6mMiqEyKobKqBgqo+JJZVR8msqoWKkYKq9QeaoYKqNiqIyKobKiMipWVD7p4jhucHEcN3jwRcV/lcqKylPFUBkVOyo7Fa+o2FH5ScVQGRU7KqNipeIuF8dxg4vjuIH9wYbKSsWKyk7FUFmpWFEZFb+lcqeKoTIqdlTeUbGiMiqGykrFUBkV77g4jhtcHMcNHnyhslMxVFYqhspOxYrKSsVvqaxUDJVR8S6VUTFUVipGxTtURsVOxVAZKp90cRw3uDiOGzz4i4qdiqEyVN6lslKxovJUMVQ+QeUTKlZUvqsYKqNiqIyKlYp3VQyVlYqfXBzHDS6O4wYPvqjYUVmp2FEZKisVOyqj4ruKFZWViqEyKobKSsVQ2VH5JJWViqEyKkbFisqOyqj47uI4bnBxHDewP/gflZWKV6iMihWVUbGislPxE5VRMVRGxYrKJ1T8Uyo7FUNlp2KojIqhslLxk4vjuMHFcdzA/mBDZadiR+XfVrGi8oqKFZVXVAyVUfETlZWKoTIqXqEyKl6hMiqeLo7jBhfHcYMHX6isVAyVFZVPqFhR+a2KofKKik+oWFEZFd+pjIpR8QqVUbGisqOyU/HdxXHc4OI4bmB/sKEyKobKqNhRWanYUVmp+E7lFRUrKqNiR+UVFUPlu4qhMipeobJSMVR2KobKSsXTxXHc4MEXKjsqo2JFZVSMiqEyVFYqViqGylPFqBgqOyorFUNlpWJUDJWVik9SWakYFUNlqIyKofKKiu8ujuMGF8dxgwd/UTFURsVQGRWjYqiMipWKV6j8UxVD5RNURsVQWVEZFd+pvKJiqIyKHZWVih2VUfF0cRw3uDiOGzz4omKlYqjsqIyKV6iMipWK36p4RcVKxVBZqRgqKyq/VfEJKqNiqIyKoTJURsVvXRzHDS6O4wYPvlAZFUNlVKyojIqh8i6VUfFPqaxUrKjsqOxUDJVRMVSeKnZU3qUyKobKqBgqKxVD5buL47jBxXHc4MEXFUNlVLxCZaViqAyVlYrfUhkVKxUrKisVQ2VUDJVRsaLyWyo7FSsqKxU7Fa9Q+cnFcdzg4jhu8OAvKobKqBgqKxXvqniFylPFisorKobKqBgqr6gYKkNlVPxEZaisVAyVHZVR8YqKn1wcxw0ujuMG9gcLKqNiReUTKlZUdip+ojIqdlTuVPFbKqPiXSqfVvGTi+O4wcVx3ODBFyqjYkVlpWJHZUdlVAyVn6isVLyrYkflFSorFb+lslKxU7GjsqMyKr67OI4bXBzHDR58UTFURsUrVEbFKyqGyqj4p1RGxVDZURkVn6byVLGislLxLpVRsVIxVFZURsXTxXHc4OI4bvDgLypWKobKSsUnVPxWxU7FUBkVQ2Wl4hUVQ2Wl4juVUTFURsWKyqjYqfiEiu8ujuMGF8dxgwdfqKxUDJUVlVdUDJVRMVR2Kr5TWal4hconVAyVFZV3qLxC5RUqOyqj4uniOG5wcRw3ePALKisV71LZqVhRGSpPFXeqWFEZFUNlVIyKlYonlZWKT6sYKqNiqIyK37o4jhtcHMcNHnxRsaLyCpWdihWVUbFT8V3FisqKyqgYKkNlVIyKofIulaeKoTIqdio+QWVUDJVRMVRGxdPFcdzg4jhu8OALlVExKobKisqo2FEZFSsqKxXfqaxUrFSsqIyKobJTsaLyWyorKisV71JZqRgqKyo/uTiOG1wcxw0e/IXKqBgVOyqjYqisqKxUDJWh8lsqr6h4hcpKxUrFUBkVTyo7FSsqo2KlYqjsVOyofHdxHDe4OI4bPPiLihWVUbFSsVKxozJUdiqeVEbFUBkVQ2VU7FQMlVGxUzFUVlSeKl6hsqLyioqhslIxVH5ycRw3uDiOGzz4omJFZVSsVAyVlYqhMipGxSdVDJVRMVRGxYrKisqoGCqvqHhSWalYqXiFyqj4hIrvLo7jBvYHGyqvqBgqr6jYUflJxVAZFSsqOxU7Ku+q+InKSsUrVFYqVlRGxW9dHMcNLo7jBvYH/6MyKnZUdiqGyqgYKisVQ2VUDJXvKobKqNhRWakYKqNiRWVU7Kg8VQyVlYqhMipWVEbFu1RGxU8ujuMGF8dxgwdfVAyVV1SsqHxCxUrFk8pQ2VEZFaPiXSqjYkVlVHynslIxVFZUdlRWKt6lMiqeLo7jBhfHcQP7gwWVlYqhslMxVEbFispKxYrKU8UrVFYqXqEyKlZURsVPVN5VMVRGxVBZqRgqo2Ko7FQ8XRzHDS6O4wYPvlDZURkVr6hYURkVKyqjYlR8pzIqdiqGyqgYKq9Q2VH5ScWKyqgYKqPiE1TecXEcN7g4jhs8+KJiqIyKHZWViqEyKkbFTsVQGRW/pbJTsVMxVHYqhsqo+C2VUfEKlVHxiooVlVHx3cVx3ODiOG7w4BdUVipGxYrKisqoGCqjYqiMindUDJUdlXdVvELlqWKo7KjsVAyVUTFURsWKyqgYKqPi6eI4bnBxHDd48IXKTsWOyqgYKqNiR2VFZVQ8qYyKnYoVlR2VHZWViqHyT1XsqKyorKiMilHxWxfHcYOL47jBgy8qPqHiXRVDZUflqWJFZVQMlZ2KHZWVihWVn6iMihWVUTFURsVKxY7KUFmp+MnFcdzg4jhu8OALlU+reIXKqNhReVIZFaNiqKxUDJUVlVGxorJSsVPxpLKislPxCpVRsVMxVH5ycRw3uDiOGzz4i4p3qaxUDJVRsaIyKobKqPiJyqhYUdmp2KkYKisVQ+UnKjsqo+IVFZ9Q8d3Fcdzg4jhu8OAXVHYqPq1iqKyoPFUMlVExVEbFjsorVEbFisqo+K5iqKxUDJUVlRWVT6gYKqPi6eI4bnBxHDd48C9SWVEZFTsVv6WyojIq3qWyojIqRsVQGRXfVQyVobJTsaKyUjFURsU7Lo7jBhfHcYMH/wEVQ2VU/JbKqFhRWVEZFUNlVAyVUTFURsWKyorKU8VQGRVDZVR8gsq7Kr67OI4bXBzHDR78QsUnVPzbVFYqVlRGxVB5hcqo+Deo7FTsqKyojIqfXBzHDS6O4wYP/kLl36IyKnZU3lExVFYqVip2KnYqhsqoeFIZFUNlRWWnYqiMiqHyCpWViqeL47jBxXHcwP7gOD7s4jhu8H8nCKehPX+y+AAAAABJRU5ErkJggg==" alt="Review QR" />
+    </div>
+</body>
+</html>

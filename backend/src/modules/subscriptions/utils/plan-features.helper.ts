@@ -152,61 +152,59 @@ export function isFeatureEnabledInPlan(
  */
 export function getFeaturesByCategory() {
   const categories: Record<string, { key: string; name: string }[]> = {
-    Overview: [
-      { key: FEATURES.DASHBOARD, name: 'Dashboard' },
-      { key: FEATURES.REPORTS, name: 'Reports' },
-    ],
-    Staff: [
-      { key: FEATURES.STAFF_MANAGEMENT, name: 'Staff Management' },
-      { key: FEATURES.ROLE_MANAGEMENT, name: 'Role Management' },
-      { key: FEATURES.ATTENDANCE, name: 'Attendance' },
-    ],
-    Menu: [
-      { key: FEATURES.MENU_MANAGEMENT, name: 'Menu Management' },
-      { key: FEATURES.CATEGORIES, name: 'Categories' },
-      { key: FEATURES.QR_MENUS, name: 'QR Menus' },
-    ],
-    Orders: [
-      { key: FEATURES.ORDER_MANAGEMENT, name: 'Order Management' },
-      { key: FEATURES.DELIVERY_MANAGEMENT, name: 'Delivery Management' },
+    'Sales & POS': [
+      { key: FEATURES.ORDER_MANAGEMENT, name: 'Sales & Order Management' },
       { key: FEATURES.TABLE_MANAGEMENT, name: 'Table Management' },
-      { key: FEATURES.KITCHEN_DISPLAY, name: 'Kitchen Display' },
-      { key: FEATURES.CUSTOMER_DISPLAY, name: 'Customer Display' },
-      { key: FEATURES.POS_SETTINGS, name: 'POS Settings' },
+      { key: FEATURES.KITCHEN_DISPLAY, name: 'Kitchen Display System' },
+      { key: FEATURES.CUSTOMER_DISPLAY, name: 'Customer Display System' },
       { key: FEATURES.PRINTER_MANAGEMENT, name: 'Printer Management' },
-      { key: FEATURES.DIGITAL_RECEIPTS, name: 'Digital Receipts' },
-    ],
-    Customers: [
-      { key: FEATURES.CUSTOMER_MANAGEMENT, name: 'Customer Management' },
-      { key: FEATURES.LOYALTY_PROGRAM, name: 'Loyalty Program' },
-      { key: FEATURES.MARKETING, name: 'Marketing' },
-    ],
-    'AI Features': [
-      { key: FEATURES.AI_MENU_OPTIMIZATION, name: 'AI Menu Optimization' },
-      { key: FEATURES.AI_CUSTOMER_LOYALTY, name: 'AI Customer Loyalty' },
-      { key: FEATURES.AI_INSIGHTS, name: 'AI Business Insights' },
+      { key: FEATURES.POS_SETTINGS, name: 'Point of Sale Settings' },
+      { key: FEATURES.DIGITAL_RECEIPTS, name: 'Digital Receipt System' },
+      { key: FEATURES.DELIVERY_MANAGEMENT, name: 'Delivery Management' },
     ],
     Inventory: [
       { key: FEATURES.INVENTORY, name: 'Inventory Management' },
-      { key: FEATURES.SUPPLIERS, name: 'Suppliers' },
-      { key: FEATURES.PURCHASE_ORDERS, name: 'Purchase Orders' },
+      { key: FEATURES.SUPPLIERS, name: 'Supplier Management' },
+      { key: FEATURES.PURCHASE_ORDERS, name: 'Purchase Order Tracking' },
       { key: FEATURES.WASTAGE_MANAGEMENT, name: 'Wastage Management' },
     ],
     Financial: [
+      { key: FEATURES.ACCOUNTING, name: 'Advanced Accounting' },
       { key: FEATURES.EXPENSES, name: 'Expense Management' },
-      { key: FEATURES.ACCOUNTING, name: 'Accounting' },
-      { key: FEATURES.WORK_PERIODS, name: 'Work Periods' },
+      { key: FEATURES.REPORTS, name: 'Sales & Analytics Reports' },
+      { key: FEATURES.WORK_PERIODS, name: 'Work Period Management' },
+    ],
+    'Customer & Marketing': [
+      { key: FEATURES.CUSTOMER_MANAGEMENT, name: 'Customer CRM' },
+      { key: FEATURES.LOYALTY_PROGRAM, name: 'Loyalty & Rewards' },
+      { key: FEATURES.AI_CUSTOMER_LOYALTY, name: 'AI-Powered Customer Loyalty' },
+      { key: FEATURES.MARKETING, name: 'Campaign Marketing' },
+    ],
+    'AI Features': [
+      { key: FEATURES.AI_MENU_OPTIMIZATION, name: 'AI Menu Optimization' },
+      { key: FEATURES.AI_INSIGHTS, name: 'Interactive Business AI' },
+    ],
+    'Kitchen & Menu': [
+      { key: FEATURES.MENU_MANAGEMENT, name: 'Menu Engineering' },
+      { key: FEATURES.CATEGORIES, name: 'Category Management' },
+      { key: FEATURES.QR_MENUS, name: 'Dynamic QR Menu' },
+    ],
+    Staffing: [
+      { key: FEATURES.STAFF_MANAGEMENT, name: 'Staff Management' },
+      { key: FEATURES.ATTENDANCE, name: 'Employee Attendance' },
+      { key: FEATURES.ROLE_MANAGEMENT, name: 'Advanced Role Access' },
     ],
     System: [
-      { key: FEATURES.SETTINGS, name: 'Settings' },
-      { key: FEATURES.BRANCHES, name: 'Branches' },
+      { key: FEATURES.DASHBOARD, name: 'Live Dashboard' },
+      { key: FEATURES.BRANCHES, name: 'Branch Management' },
       { key: 'multi-branch', name: 'Multi-Branch Support' },
-      { key: FEATURES.NOTIFICATIONS, name: 'Notifications' },
-      { key: FEATURES.CMS, name: 'CMS & Gallery' },
+      { key: FEATURES.SETTINGS, name: 'System Settings' },
+      { key: FEATURES.NOTIFICATIONS, name: 'Instant Notifications' },
+      { key: FEATURES.CMS, name: 'Website Content & Gallery' },
     ],
-    Hotel: [
+    Hospitality: [
       { key: FEATURES.ROOM_MANAGEMENT, name: 'Room Management' },
-      { key: FEATURES.BOOKING_MANAGEMENT, name: 'Booking Management' },
+      { key: FEATURES.BOOKING_MANAGEMENT, name: 'Booking & Reservation' },
     ],
   };
 

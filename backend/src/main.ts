@@ -51,7 +51,7 @@ async function bootstrap() {
     origin: (origin, callback) => {
       // Allow if request has no origin (like mobile apps or curl) or matches whitelist
       if (!origin || 
-          origin === frontendUrl || 'https://raha.bd' ||
+          origin === frontendUrl || origin === 'https://raha.bd' ||
           origin === 'http://localhost:3000' || 
           
           origin.includes('raha.bd')) {

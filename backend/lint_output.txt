@@ -1,0 +1,10 @@
+
+D:\Advanced_Poss\backend\src\main.ts
+  53:11  error  Unexpected constant condition  no-constant-condition
+
+D:\Advanced_Poss\backend\src\modules\subscriptions\subscription-plans.service.ts
+  119:12  error  Empty block statement  no-empty
+  127:12  error  Empty block statement  no-empty
+
+✖ 3 problems (3 errors, 0 warnings)
+
