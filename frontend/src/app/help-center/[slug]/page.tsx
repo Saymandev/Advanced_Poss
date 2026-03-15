@@ -52,7 +52,7 @@ export default function HelpArticlePage() {
       <Navbar />
 
       {/* Article */}
-      <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <header className="mb-8">
           {article.category && (
             <span className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium mb-4">
