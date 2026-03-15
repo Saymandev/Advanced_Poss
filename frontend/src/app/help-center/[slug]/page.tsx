@@ -7,7 +7,6 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Footer } from '@/components/ui/Footer';
 import { Navbar } from '@/components/ui/Navbar';
 import { useGetContentPageBySlugQuery } from '@/lib/api/endpoints/cmsApi';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -54,13 +53,6 @@ export default function HelpArticlePage() {
 
       {/* Article */}
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link href="/help-center">
-          <Button variant="ghost" className="mb-8">
-            <ArrowLeftIcon className="w-4 h-4 mr-2" />
-            Back to Help Center
-          </Button>
-        </Link>
-
         <header className="mb-8">
           {article.category && (
             <span className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium mb-4">
