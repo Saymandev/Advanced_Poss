@@ -674,17 +674,14 @@ export class ReceiptService {
         .text-right { text-align: right !important; }
         .font-bold { font-weight: bold !important; }
         .separator-double { 
-            margin: 10px 0; 
+            margin: 8px 0; 
             text-align: center;
-            font-weight: bold;
             color: #000 !important;
-            letter-spacing: -1px;
         }
         .separator-dashed { 
-            margin: 10px 0; 
+            margin: 8px 0; 
             text-align: center;
             color: #000 !important;
-            letter-spacing: -1px;
         }
         .header { margin-bottom: 15px; }
         .header h1 { 
@@ -752,13 +749,13 @@ export class ReceiptService {
 <body>
     <div class="receipt-container">
         <div class="header text-center">
-            <div class="separator-double">=======================================</div>
+            <div class="separator-double">---------------------------------------</div>
             <h1>${receiptData.restaurantName.toUpperCase()}</h1>
             <p style="white-space: pre-wrap;">${receiptData.restaurantAddress}</p>
             <p>Tel: ${receiptData.restaurantPhone}</p>
             ${binHtml}
             ${mushakHtml}
-            <div class="separator-double">=======================================</div>
+            <div class="separator-double">---------------------------------------</div>
         </div>
 
         <div class="order-info">
@@ -803,12 +800,12 @@ export class ReceiptService {
             ${discountHtml}
             ${deliveryFeeHtml}
             
-            <div class="separator-double">=======================================</div>
+            <div class="separator-double">---------------------------------------</div>
             <div class="total-row grand-total">
                 <span>GRAND TOTAL (${receiptData.currency}) :</span>
                 <span>${receiptData.totalAmount.toFixed(2)}</span>
             </div>
-            <div class="separator-double">=======================================</div>
+            <div class="separator-double">---------------------------------------</div>
         </div>
 
         <div class="payment-details" style="margin: 10px 0; font-size: 1em;">
@@ -816,14 +813,14 @@ export class ReceiptService {
             <div>Change: ${receiptData.changeDue.toFixed(2)} (Tendered: ${receiptData.amountReceived.toFixed(0)})</div>
         </div>
 
-        <div class="separator-double" style="margin-top: 15px;">=======================================</div>
+        <div class="separator-double" style="margin-top: 15px;">---------------------------------------</div>
 
         <div class="footer text-center">
             <p>${receiptData.receiptSettings.footer || 'Thank you for your visit!'}</p>
             <p>Please come again.</p>
             <br/>
             <p style="font-size: 0.85em; opacity: 0.9; font-weight: normal;">Powered by Raha Pos Solutions</p>
-            <div class="separator-double">=======================================</div>
+            <div class="separator-double">---------------------------------------</div>
         </div>
 
         ${qrHtml}
