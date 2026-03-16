@@ -125,8 +125,10 @@ export class UsersService {
     // CRITICAL: Filter by companyId - only show employees from this company
     if (query.companyId) {
       try {
-        const companyIdObj = new Types.ObjectId(query.companyId);
-        query.companyId = companyIdObj;
+        const companyIdStr = query.companyId.toString();
+        const companyIdObj = new Types.ObjectId(companyIdStr);
+        // Match both string and ObjectId to handle database inconsistencies
+        query.companyId = { $in: [companyIdStr, companyIdObj] };
       } catch (error) {
         // If companyId is not a valid ObjectId, use string format
         query.companyId = query.companyId.toString();
@@ -139,7 +141,7 @@ export class UsersService {
     if (query.branchId) {
       try {
         const branchIdStr = query.branchId.toString();
-        const branchIdObj = new Types.ObjectId(query.branchId);
+        const branchIdObj = new Types.ObjectId(branchIdStr);
         // Include branch match OR no branch assigned (global staff)
         query.$or = [
           { branchId: { $in: [branchIdStr, branchIdObj] } },
