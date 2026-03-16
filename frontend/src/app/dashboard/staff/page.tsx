@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { useGetBranchesQuery } from '@/lib/api/endpoints/branchesApi';
-import { CreateStaffRequest, Staff, useCreateStaffMutation, useDeactivateStaffMutation, useDeleteStaffMutation, useGetStaffByIdQuery, useGetStaffQuery, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
+import { CreateStaffRequest, Staff, useCreateStaffMutation, useDeactivateStaffMutation, useDeleteStaffMutation, useGetStaffByIdQuery, useGetStaffQuery, useUnlockStaffMutation, useUpdateStaffMutation } from '@/lib/api/endpoints/staffApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -18,6 +18,7 @@ import {
   CurrencyDollarIcon,
   EnvelopeIcon,
   EyeIcon,
+  LockOpenIcon,
   PencilIcon,
   PhoneIcon,
   PlusIcon,
@@ -89,6 +90,7 @@ export default function StaffPage() {
   const [updateStaff, { isLoading: isUpdating }] = useUpdateStaffMutation();
   const [deleteStaff] = useDeleteStaffMutation();
   const [deactivateStaff] = useDeactivateStaffMutation();
+  const [unlockStaff, { isLoading: isUnlocking }] = useUnlockStaffMutation();
 
   // Extract staff from API response
   const staff = useMemo(() => {
@@ -360,6 +362,18 @@ export default function StaffPage() {
     }
   };
 
+  const handleUnlock = async (staffId: string) => {
+    if (!confirm('Are you sure you want to unlock this account?')) return;
+
+    try {
+      await unlockStaff(staffId).unwrap();
+      toast.success('Account unlocked successfully');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to unlock account');
+    }
+  };
+
   const openViewModal = (staff: Staff) => {
     setSelectedStaffId(staff.id);
     setIsViewModalOpen(true);
@@ -521,6 +535,17 @@ export default function StaffPage() {
           >
             <PencilIcon className="w-4 h-4" />
           </Button>
+          {row.lockUntil && new Date(row.lockUntil) > new Date() && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleUnlock(row.id)}
+              className="text-orange-600 hover:text-orange-700"
+              title="Unlock Account"
+            >
+              <LockOpenIcon className="w-4 h-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

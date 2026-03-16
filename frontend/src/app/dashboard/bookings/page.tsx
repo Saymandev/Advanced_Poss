@@ -367,13 +367,36 @@ export default function BookingsPage() {
   };
   const openCheckoutModal = (booking: Booking) => {
     setCheckoutBooking(booking);
-    const balance = booking.balanceAmount ?? (booking.totalAmount - (booking.depositAmount || 0));
+    
+    // Calculate overstay
+    const scheduledCheckOut = new Date(booking.checkOutDate);
+    scheduledCheckOut.setHours(0, 0, 0, 0);
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let overstayCharges = 0;
+    let overstayNotes = '';
+    
+    if (today > scheduledCheckOut) {
+      const diffTime = today.getTime() - scheduledCheckOut.getTime();
+      const extraNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (extraNights > 0) {
+        overstayCharges = extraNights * booking.roomRate;
+        overstayNotes = `Overstay charge for ${extraNights} extra night(s)`;
+      }
+    }
+
+    const currentBalance = booking.balanceAmount ?? (booking.totalAmount - (booking.depositAmount || 0));
+    const finalBalance = Math.max(0, currentBalance + overstayCharges);
+    
     setCheckoutForm({
-      additionalCharges: 0,
+      additionalCharges: overstayCharges,
       discount: 0,
-      notes: '',
+      notes: overstayNotes,
       paymentMethod: booking.paymentMethod || 'cash',
-      paymentAmount: balance > 0 ? balance : 0,
+      paymentAmount: Number(finalBalance.toFixed(2)),
     });
     setIsCheckoutModalOpen(true);
   };
@@ -1137,7 +1160,7 @@ export default function BookingsPage() {
                 Settle Balance
               </h4>
               <div className="text-xs font-medium text-gray-500">
-                Final Balance: {formatCurrency(Math.max(0, (checkoutBooking?.balanceAmount ?? (checkoutBooking ? checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0) : 0)) + checkoutForm.additionalCharges - checkoutForm.discount))}
+                Final Balance: {formatCurrency(Number(((checkoutBooking?.balanceAmount ?? (checkoutBooking ? checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0) : 0)) + checkoutForm.additionalCharges - checkoutForm.discount).toFixed(2)))}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1160,8 +1183,8 @@ export default function BookingsPage() {
                 <Input
                   type="number"
                   value={checkoutForm.paymentAmount}
-                  onChange={(e) => setCheckoutForm(prev => ({ ...prev, paymentAmount: Number(e.target.value) }))}
-                  max={checkoutBooking ? (checkoutBooking.balanceAmount ?? (checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0))) + checkoutForm.additionalCharges - checkoutForm.discount : 0}
+                  onChange={(e) => setCheckoutForm(prev => ({ ...prev, paymentAmount: Number(Number(e.target.value).toFixed(2)) }))}
+                  max={Number(((checkoutBooking ? (checkoutBooking.balanceAmount ?? (checkoutBooking.totalAmount - (checkoutBooking.depositAmount || 0))) + checkoutForm.additionalCharges - checkoutForm.discount : 0)).toFixed(2))}
                 />
               </div>
             </div>

@@ -33,6 +33,8 @@ export interface Staff {
   skills?: string[];
   certifications?: string[];
   notes?: string;
+  loginAttempts: number;
+  lockUntil?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -173,6 +175,8 @@ export const staffApi = apiSlice.injectEndpoints({
             skills: user.skills || [],
             certifications: user.certifications || [],
             notes: user.notes,
+            loginAttempts: user.loginAttempts || 0,
+            lockUntil: user.lockUntil,
             createdAt: user.createdAt || new Date().toISOString(),
             updatedAt: user.updatedAt || new Date().toISOString(),
           }) as Staff),
@@ -207,6 +211,8 @@ export const staffApi = apiSlice.injectEndpoints({
           skills: data.skills || [],
           certifications: data.certifications || [],
           notes: data.notes,
+          loginAttempts: data.loginAttempts || 0,
+          lockUntil: data.lockUntil,
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
         } as Staff;
@@ -308,6 +314,13 @@ export const staffApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Attendance'],
     }),
+    unlockStaff: builder.mutation<Staff, string>({
+      query: (id) => ({
+        url: `/users/${id}/unlock`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: (result, error, id) => [{ type: 'Staff', id }, { type: 'Staff', id: 'LIST' }],
+    }),
   }),
 });
 
@@ -324,4 +337,5 @@ export const {
   useGetStaffPerformanceQuery,
   useClockInMutation,
   useClockOutMutation,
+  useUnlockStaffMutation,
 } = staffApi;
