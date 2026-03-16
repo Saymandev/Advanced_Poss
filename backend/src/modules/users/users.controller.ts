@@ -142,6 +142,13 @@ export class UsersController {
     return this.usersService.updatePassword(id, dto.newPassword);
   }
 
+  @Patch(':id/unlock')
+  @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
+  @ApiOperation({ summary: 'Unlock user account' })
+  unlock(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.unlock(id, req.user.companyId);
+  }
+
   @Get('branch/:branchId/role/:role')
   @RequiresFeature(FEATURES.STAFF_MANAGEMENT, FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get employees by branch and role' })

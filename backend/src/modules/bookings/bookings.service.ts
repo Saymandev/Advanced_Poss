@@ -147,7 +147,7 @@ export class BookingsService {
     booking.additionalCharges = updatedCharges as any;
     booking.totalAmount = Math.round(newTotalAmount * 100) / 100;
     booking.depositAmount = depositAmount;
-    booking.balanceAmount = balanceAmount;
+    booking.balanceAmount = Math.round(balanceAmount * 100) / 100;
     booking.paymentStatus = paymentStatus as any;
     const saved = await booking.save();
     // Emit WebSocket event for real-time updates
@@ -482,7 +482,7 @@ export class BookingsService {
     }
 
     if (totalChanged) {
-      booking.balanceAmount = booking.totalAmount - (booking.depositAmount || 0);
+      booking.balanceAmount = Math.round((booking.totalAmount - (booking.depositAmount || 0)) * 100) / 100;
       await (booking as any).save();
     }
 
@@ -688,7 +688,7 @@ export class BookingsService {
       tax: amounts.tax,
       serviceCharge: amounts.serviceCharge,
       totalAmount: amounts.totalAmount,
-      balanceAmount: amounts.totalAmount - (booking.depositAmount || 0),
+      balanceAmount: Math.round((amounts.totalAmount - (booking.depositAmount || 0)) * 100) / 100,
     };
     const updatedBooking = await this.bookingModel
       .findByIdAndUpdate(id, updateData, { new: true })
@@ -747,7 +747,7 @@ export class BookingsService {
 
     // Update booking balance
     booking.depositAmount = (booking.depositAmount || 0) + paymentDto.amount;
-    booking.balanceAmount = booking.totalAmount - booking.depositAmount;
+    booking.balanceAmount = Math.round((booking.totalAmount - booking.depositAmount) * 100) / 100;
     
     // Add to history
     if (!booking.paymentHistory) {

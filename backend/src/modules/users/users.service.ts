@@ -589,6 +589,30 @@ export class UsersService {
     }
   }
 
+  async unlock(id: string, companyId: string): Promise<User> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    const user = await this.userModel.findOneAndUpdate(
+      { 
+        _id: new Types.ObjectId(id),
+        companyId: new Types.ObjectId(companyId)
+      },
+      { 
+        loginAttempts: 0, 
+        lockUntil: null 
+      },
+      { new: true }
+    ).select('-password -pin').exec();
+
+    if (!user) {
+      throw new NotFoundException('User not found or you do not have permission');
+    }
+
+    return user;
+  }
+
   async remove(id: string): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid user ID');
