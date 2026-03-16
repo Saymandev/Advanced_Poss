@@ -68,15 +68,8 @@ export class RolePermissionsService {
       roleFeatures = permission.features || [];
     }
 
-    // CRITICAL: Merge default features into roleFeatures if they are missing
-    // This ensures newly added system features are available to existing roles without manual migration
-    const defaultFeatures = DEFAULT_ROLE_FEATURES[role] || [];
-    const missingDefaults = defaultFeatures.filter(f => !roleFeatures.includes(f));
-    if (missingDefaults.length > 0) {
-      roleFeatures = [...roleFeatures, ...missingDefaults];
-    }
-
     // Filter features based on subscription - only return features enabled in subscription
+
     // CRITICAL: Query for active subscriptions that are NOT expired
     // This prevents expired subscriptions from being used even if isActive hasn't been fixed yet
     const subscription = await this.subscriptionModel
