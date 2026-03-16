@@ -52,29 +52,36 @@ export default function StaffPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const branchId = (user as any)?.branchId || 
-                   (companyContext as any)?.branchId || 
-                   (companyContext as any)?.branches?.[0]?._id ||
-                   (companyContext as any)?.branches?.[0]?.id;
-
+  const [branchFilter, setBranchFilter] = useState('all');
+  
   const companyId = (user as any)?.companyId || 
                     (companyContext as any)?.companyId;
 
+  const currentBranchId = (user as any)?.branchId || 
+                    (companyContext as any)?.branchId || 
+                    (companyContext as any)?.branches?.[0]?._id ||
+                    (companyContext as any)?.branches?.[0]?.id;
+
   const queryParams = useMemo(() => {
     const params: any = {
-      branchId: branchId || undefined,
       page: currentPage,
       limit: itemsPerPage,
     };
+    
+    // Use local branchFilter if set, otherwise fallback to currentBranchId
+    const effectiveBranchId = branchFilter === 'all' ? undefined : (branchFilter === 'current' ? currentBranchId : branchFilter);
+    if (effectiveBranchId) {
+      params.branchId = effectiveBranchId;
+    }
     
     if (searchQuery) params.search = searchQuery;
     if (roleFilter !== 'all') params.role = roleFilter;
     
     return params;
-  }, [branchId, searchQuery, roleFilter, currentPage, itemsPerPage]);
+  }, [branchFilter, currentBranchId, searchQuery, roleFilter, currentPage, itemsPerPage]);
 
   const { data: staffResponse, isLoading, error, refetch } = useGetStaffQuery(queryParams, { 
-    skip: !branchId,
+    skip: !companyId || (branchFilter === 'current' && !currentBranchId),
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
   });
@@ -226,7 +233,7 @@ export default function StaffPage() {
       return;
     }
 
-    if (!companyId || !branchId) {
+    if (!companyId || !currentBranchId) {
       toast.error('Company or Branch ID is missing');
       return;
     }
@@ -240,7 +247,7 @@ export default function StaffPage() {
         role: formData.role || 'waiter',
         password: formData.password,
         pin: formData.pin || undefined,
-        branchId: formData.branchId || undefined,
+        branchId: formData.branchId || currentBranchId,
         companyId,
       };
 
@@ -570,7 +577,7 @@ export default function StaffPage() {
   ];
 
   // Show warning if branchId is missing
-  if (!branchId && !isLoading) {
+  if (!currentBranchId && !isLoading) {
     return (
       <div className="space-y-6">
         <Card>
@@ -608,7 +615,7 @@ export default function StaffPage() {
 
               for (const item of data) {
                 try {
-                  if (!companyId || !branchId) {
+                  if (!companyId || !currentBranchId) {
                     toast.error('Company or Branch ID is missing');
                     return;
                   }
@@ -621,7 +628,7 @@ export default function StaffPage() {
                     role: item.role || item.Role || 'waiter',
                     password: item.password || item.Password || 'TempPassword123!', // Generate temp password
                     pin: item.pin || item.PIN || undefined,
-                    branchId,
+                    branchId: currentBranchId,
                     companyId,
                   };
 
@@ -747,6 +754,18 @@ export default function StaffPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="text-sm sm:text-base"
+              />
+            </div>
+            <div className="w-full sm:w-64">
+              <Select
+                options={[
+                  { value: 'all', label: 'All Branches' },
+                  { value: 'current', label: 'Current Branch' },
+                  ...branches.map(b => ({ value: (b as any).id || (b as any)._id, label: b.name }))
+                ]}
+                value={branchFilter}
+                onChange={setBranchFilter}
+                placeholder="Filter by branch"
               />
             </div>
             <div className="w-full sm:w-48">
