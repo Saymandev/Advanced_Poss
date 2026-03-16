@@ -49,7 +49,11 @@ export class UsersController {
   @Get()
   @RequiresFeature(FEATURES.STAFF_MANAGEMENT, FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
   @ApiOperation({ summary: 'Get all users with pagination, filtering, and search' })
-  findAll(@Query() filterDto: UserFilterDto) {
+  findAll(@Query() filterDto: UserFilterDto, @Request() req: any) {
+    // If not super admin, enforce company filtering
+    if (req.user.role !== UserRole.SUPER_ADMIN) {
+      filterDto.companyId = req.user.companyId;
+    }
     return this.usersService.findAll(filterDto);
   }
 

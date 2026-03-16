@@ -594,11 +594,18 @@ export class UsersService {
       throw new BadRequestException('Invalid user ID');
     }
 
+    const query: any = { _id: new Types.ObjectId(id) };
+    
+    // Flexible companyId matching (pattern from findAll)
+    try {
+      const companyIdObj = new Types.ObjectId(companyId);
+      query.companyId = { $in: [companyId, companyIdObj] };
+    } catch (error) {
+      query.companyId = companyId.toString();
+    }
+
     const user = await this.userModel.findOneAndUpdate(
-      { 
-        _id: new Types.ObjectId(id),
-        companyId: new Types.ObjectId(companyId)
-      },
+      query,
       { 
         loginAttempts: 0, 
         lockUntil: null 
