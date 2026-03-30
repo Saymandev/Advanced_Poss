@@ -22,10 +22,18 @@ import {
 } from '@/lib/api/endpoints/roomsApi';
 import { useAppSelector } from '@/lib/store';
 import {
+  ArchiveBoxXMarkIcon,
+  ArrowRightOnRectangleIcon,
+  BuildingOfficeIcon,
+  ChartBarIcon,
+  CheckBadgeIcon,
+  CheckCircleIcon,
   PencilIcon,
   PhotoIcon,
   PlusIcon,
   TrashIcon,
+  WrenchScrewdriverIcon,
+  XCircleIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
@@ -417,47 +425,102 @@ export default function RoomsPage() {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Total Rooms</div>
-              <div className="text-2xl font-bold">{stats.total || 0}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Rooms</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={(stats.total || 0).toString()}>
+                    {stats.total || 0}
+                  </p>
+                </div>
+                <BuildingOfficeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+              </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Available</div>
-              <div className="text-2xl font-bold text-green-600">{stats.available || 0}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Available</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={(stats.available || 0).toString()}>
+                    {stats.available || 0}
+                  </p>
+                </div>
+                <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
+              </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Occupied</div>
-              <div className="text-2xl font-bold text-red-600">{stats.occupied || 0}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Occupied</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate" title={(stats.occupied || 0).toString()}>
+                    {stats.occupied || 0}
+                  </p>
+                </div>
+                <ArrowRightOnRectangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0" />
+              </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Reserved</div>
-              <div className="text-2xl font-bold text-yellow-600">{stats.reserved || 0}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Reserved</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={(stats.reserved || 0).toString()}>
+                    {stats.reserved || 0}
+                  </p>
+                </div>
+                <CheckBadgeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
+              </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Maintenance</div>
-              <div className="text-2xl font-bold text-blue-600">{stats.maintenance || 0}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Maintenance</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate" title={(stats.maintenance || 0).toString()}>
+                    {stats.maintenance || 0}
+                  </p>
+                </div>
+                <WrenchScrewdriverIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+              </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Out of Order</div>
-              <div className="text-2xl font-bold text-gray-600">{stats.outOfOrder || 0}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Out of Order</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-600 dark:text-gray-400 truncate" title={(stats.outOfOrder || 0).toString()}>
+                    {stats.outOfOrder || 0}
+                  </p>
+                </div>
+                <ArchiveBoxXMarkIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 flex-shrink-0" />
+              </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Occupancy Rate</div>
-              <div className="text-2xl font-bold">{stats.occupancyRate || 0}%</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Occupancy Rate</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-600 truncate" title={`${stats.occupancyRate || 0}%`}>
+                    {stats.occupancyRate || 0}%
+                  </p>
+                </div>
+                <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
+              </div>
             </CardContent>
           </Card>
         </div>

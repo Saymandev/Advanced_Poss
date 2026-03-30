@@ -28,11 +28,17 @@ import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import {
     BanknotesIcon,
+    CalendarDaysIcon,
+    ChartBarIcon,
+    CheckBadgeIcon,
+    ClockIcon,
     CheckCircleIcon,
     EyeIcon,
     PencilIcon,
     PlusIcon,
-    XCircleIcon
+    XCircleIcon,
+    ArrowLeftOnRectangleIcon,
+    ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -639,56 +645,115 @@ export default function BookingsPage() {
         </div>
       </div>
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-4">
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Total Bookings</div>
-              <div className="text-2xl font-bold">{stats.total || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Pending</div>
-              <div className="text-2xl font-bold text-yellow-600">{stats.pending || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Confirmed</div>
-              <div className="text-2xl font-bold text-green-600">{stats.confirmed || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Checked In</div>
-              <div className="text-2xl font-bold text-blue-600">{stats.checkedIn || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Checked Out</div>
-              <div className="text-2xl font-bold text-gray-600">{stats.checkedOut || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Cancelled</div>
-              <div className="text-2xl font-bold text-red-600">{stats.cancelled || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Revenue</div>
-              <div className="text-2xl font-bold">
-                {formatCurrency(stats.totalRevenue || 0)}
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Bookings</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={(stats.total || 0).toString()}>
+                    {stats.total || 0}
+                  </p>
+                </div>
+                <CalendarDaysIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600">Avg Value</div>
-              <div className="text-2xl font-bold">
-                {formatCurrency(stats.averageBookingValue || 0)}
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Pending</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={(stats.pending || 0).toString()}>
+                    {stats.pending || 0}
+                  </p>
+                </div>
+                <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Confirmed</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={(stats.confirmed || 0).toString()}>
+                    {stats.confirmed || 0}
+                  </p>
+                </div>
+                <CheckBadgeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Checked In</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate" title={(stats.checkedIn || 0).toString()}>
+                    {stats.checkedIn || 0}
+                  </p>
+                </div>
+                <ArrowLeftOnRectangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Checked Out</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-600 dark:text-gray-400 truncate" title={(stats.checkedOut || 0).toString()}>
+                    {stats.checkedOut || 0}
+                  </p>
+                </div>
+                <ArrowRightOnRectangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Cancelled</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate" title={(stats.cancelled || 0).toString()}>
+                    {stats.cancelled || 0}
+                  </p>
+                </div>
+                <XCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Revenue</p>
+                  <p className="text-sm sm:text-base md:text-lg font-bold text-emerald-600 truncate" title={formatCurrency(stats.totalRevenue || 0)}>
+                    {formatCurrency(stats.totalRevenue || 0)}
+                  </p>
+                </div>
+                <BanknotesIcon className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Avg Value</p>
+                  <p className="text-sm sm:text-base md:text-lg font-bold text-purple-600 truncate" title={formatCurrency(stats.averageBookingValue || 0)}>
+                    {formatCurrency(stats.averageBookingValue || 0)}
+                  </p>
+                </div>
+                <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
               </div>
             </CardContent>
           </Card>

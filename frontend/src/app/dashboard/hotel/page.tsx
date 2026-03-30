@@ -15,6 +15,21 @@ import {
     useGetRoomStatsQuery,
 } from '@/lib/api/endpoints/roomsApi';
 import { useAppSelector } from '@/lib/store';
+import {
+    ArchiveBoxXMarkIcon,
+    ArrowLeftOnRectangleIcon,
+    ArrowRightOnRectangleIcon,
+    BanknotesIcon,
+    BuildingOfficeIcon,
+    CalendarDaysIcon,
+    ChartBarIcon,
+    CheckBadgeIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    PresentationChartBarIcon,
+    WrenchScrewdriverIcon,
+    XCircleIcon,
+} from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
@@ -178,50 +193,87 @@ export default function HotelDashboardPage() {
             <CardTitle>Room Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Total Rooms</div>
-                  <div className="text-2xl font-bold">{roomStats.total || 0}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Available</div>
-                  <div className="text-2xl font-bold text-green-600">
-                    {roomStats.available || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Rooms</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={(roomStats.total || 0).toString()}>
+                        {roomStats.total || 0}
+                      </p>
+                    </div>
+                    <BuildingOfficeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Occupied</div>
-                  <div className="text-2xl font-bold text-red-600">
-                    {roomStats.occupied || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Available</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={(roomStats.available || 0).toString()}>
+                        {roomStats.available || 0}
+                      </p>
+                    </div>
+                    <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Reserved</div>
-                  <div className="text-2xl font-bold text-yellow-600">
-                    {roomStats.reserved || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Occupied</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate" title={(roomStats.occupied || 0).toString()}>
+                        {roomStats.occupied || 0}
+                      </p>
+                    </div>
+                    <ArrowRightOnRectangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Maintenance</div>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {roomStats.maintenance || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Reserved</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={(roomStats.reserved || 0).toString()}>
+                        {roomStats.reserved || 0}
+                      </p>
+                    </div>
+                    <CheckBadgeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Occupancy Rate</div>
-                  <div className="text-2xl font-bold">
-                    {roomStats.occupancyRate || 0}%
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Maintenance</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate" title={(roomStats.maintenance || 0).toString()}>
+                        {roomStats.maintenance || 0}
+                      </p>
+                    </div>
+                    <WrenchScrewdriverIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Occupancy Rate</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-600 truncate" title={`${roomStats.occupancyRate || 0}%`}>
+                        {roomStats.occupancyRate || 0}%
+                      </p>
+                    </div>
+                    <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
@@ -237,71 +289,116 @@ export default function HotelDashboardPage() {
             <CardTitle>Booking Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Total Bookings</div>
-                  <div className="text-2xl font-bold">
-                    {bookingStats.total || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Bookings</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate" title={(bookingStats.total || 0).toString()}>
+                        {bookingStats.total || 0}
+                      </p>
+                    </div>
+                    <CalendarDaysIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Pending</div>
-                  <div className="text-2xl font-bold text-yellow-600">
-                    {bookingStats.pending || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Pending</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate" title={(bookingStats.pending || 0).toString()}>
+                        {bookingStats.pending || 0}
+                      </p>
+                    </div>
+                    <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Confirmed</div>
-                  <div className="text-2xl font-bold text-green-600">
-                    {bookingStats.confirmed || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Confirmed</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate" title={(bookingStats.confirmed || 0).toString()}>
+                        {bookingStats.confirmed || 0}
+                      </p>
+                    </div>
+                    <CheckBadgeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Checked In</div>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {bookingStats.checkedIn || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Checked In</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 truncate" title={(bookingStats.checkedIn || 0).toString()}>
+                        {bookingStats.checkedIn || 0}
+                      </p>
+                    </div>
+                    <ArrowLeftOnRectangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Checked Out</div>
-                  <div className="text-2xl font-bold text-gray-600">
-                    {bookingStats.checkedOut || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Checked Out</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-600 dark:text-gray-400 truncate" title={(bookingStats.checkedOut || 0).toString()}>
+                        {bookingStats.checkedOut || 0}
+                      </p>
+                    </div>
+                    <ArrowRightOnRectangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
+
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Cancelled</div>
-                  <div className="text-2xl font-bold text-red-600">
-                    {bookingStats.cancelled || 0}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Cancelled</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate" title={(bookingStats.cancelled || 0).toString()}>
+                        {bookingStats.cancelled || 0}
+                      </p>
+                    </div>
+                    <XCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-4">
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Total Revenue</div>
-                  <div className="text-2xl font-bold">
-                    {formatCurrency(bookingStats.totalRevenue || 0)}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Total Revenue</p>
+                      <p className="text-sm sm:text-base md:text-lg font-bold text-emerald-600 truncate" title={formatCurrency(bookingStats.totalRevenue || 0)}>
+                        {formatCurrency(bookingStats.totalRevenue || 0)}
+                      </p>
+                    </div>
+                    <BanknotesIcon className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-600">Average Booking Value</div>
-                  <div className="text-2xl font-bold">
-                    {formatCurrency(bookingStats.averageBookingValue || 0)}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Average Booking Value</p>
+                      <p className="text-sm sm:text-base md:text-lg font-bold text-purple-600 truncate" title={formatCurrency(bookingStats.averageBookingValue || 0)}>
+                        {formatCurrency(bookingStats.averageBookingValue || 0)}
+                      </p>
+                    </div>
+                    <PresentationChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>

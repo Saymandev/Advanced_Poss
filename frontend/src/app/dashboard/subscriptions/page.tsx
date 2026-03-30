@@ -2963,10 +2963,11 @@ export default function SubscriptionsPage() {
                     </div>
                   )}
                 </div>
-                {/* Show Upgrade/Downgrade/Switch button for all NON-current plans.
+                {/* Show Upgrade/Downgrade/Switch button for all NON-current plans,
+                    OR if the user is currently on a trial and needs to buy the plan.
                     Use effectiveSubscription.planKey vs plan.name as the single source of truth,
                     because backend doesn't always expose a normalized `id` field here. */}
-                {(!effectiveSubscription || effectiveSubscription.planKey !== plan.name) && (
+                {(!effectiveSubscription || effectiveSubscription.planKey !== plan.name || effectiveSubscription.isTrial) && (
                   <Button
                     onClick={() => {
                       setSelectedPlan(plan);
@@ -2977,10 +2978,13 @@ export default function SubscriptionsPage() {
                     disabled={isUpdating}
                   >
                     <ArrowTrendingUpIcon className="w-4 h-4 mr-2" />
-                    {plan.price > (effectiveSubscription?.plan?.price || 0) ? 'Upgrade' : plan.price < (effectiveSubscription?.plan?.price || 0) ? 'Downgrade' : 'Switch'} to {plan.displayName || plan.name}
+                    {effectiveSubscription?.isTrial && effectiveSubscription?.planKey === plan.name 
+                      ? `Activate Paid ${plan.displayName || plan.name}`
+                      : (plan.price > (effectiveSubscription?.plan?.price || 0) ? 'Upgrade' : plan.price < (effectiveSubscription?.plan?.price || 0) ? 'Downgrade' : 'Switch') + ` to ${plan.displayName || plan.name}`
+                    }
                   </Button>
                 )}
-                {effectiveSubscription?.planKey === plan.name && (
+                {effectiveSubscription?.planKey === plan.name && !effectiveSubscription?.isTrial && (
                   <div className="w-full text-center py-2 px-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg font-medium">
                     Current Plan
                   </div>

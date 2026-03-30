@@ -61,10 +61,27 @@ export default function CheckoutPage() {
     address: '',
     city: '',
     zipCode: '',
-    deliveryType: 'delivery', // delivery or pickup
+    deliveryType: 'delivery', // delivery, pickup, or dining
     paymentMethod: 'cash', // cash or card
     specialInstructions: '',
+    tableNumber: '',
   });
+
+  const [qrTableNumber, setQrTableNumber] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const table = sessionStorage.getItem('qr_table_number');
+      if (table) {
+        setQrTableNumber(table);
+        setFormData(prev => ({ 
+          ...prev, 
+          deliveryType: 'dining',
+          tableNumber: table 
+        }));
+      }
+    }
+  }, []);
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isLoadingCart, setIsLoadingCart] = useState(true);
@@ -156,6 +173,8 @@ export default function CheckoutPage() {
       if (!formData.address.trim()) {
         errors.address = 'Delivery address is required';
       }
+    } else if (formData.deliveryType === 'dining' && !formData.tableNumber) {
+      errors.tableNumber = 'Table number is required for dine-in';
     }
 
     // Check minimum order amount for selected zone
@@ -204,6 +223,7 @@ export default function CheckoutPage() {
           zipCode: formData.zipCode.trim() || undefined,
         } : undefined,
         deliveryType: formData.deliveryType,
+        tableNumber: formData.tableNumber || undefined,
         paymentMethod: formData.paymentMethod,
         specialInstructions: formData.specialInstructions.trim() || undefined,
         ...(selectedZone && formData.deliveryType === 'delivery' ? { deliveryZoneId: selectedZone.id } : {}),
@@ -261,9 +281,10 @@ export default function CheckoutPage() {
     if (selectedZone.freeDeliveryAbove && subtotal >= selectedZone.freeDeliveryAbove) {
       deliveryFee = 0;
     }
-  } else if (formData.deliveryType === 'delivery' && !selectedZone && zonesLoading === false) {
     // Fallback fee if no zone detected (only if zones have finished loading)
     deliveryFee = 50;
+  } else if (formData.deliveryType === 'dining') {
+    deliveryFee = 0;
   }
   
   const total = subtotal + tax + deliveryFee;
@@ -444,9 +465,45 @@ export default function CheckoutPage() {
                       />
                       <span className="text-gray-900 dark:text-white">Pickup</span>
                     </label>
+                    {qrTableNumber && (
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 transition-colors">
+                        <input
+                          type="radio"
+                          value="dining"
+                          checked={formData.deliveryType === 'dining'}
+                          onChange={(e) => setFormData({ ...formData, deliveryType: e.target.value })}
+                          className="w-4 h-4 text-primary-600"
+                        />
+                        <span className="text-primary-900 dark:text-primary-100 font-semibold">
+                          Dine-in (Table {qrTableNumber})
+                        </span>
+                      </label>
+                    )}
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Table Number (Visible if manual dining selected) */}
+              {formData.deliveryType === 'dining' && !qrTableNumber && (
+                <Card>
+                  <CardContent className="p-4 md:p-6">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4">
+                      Table Specification
+                    </h2>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Table Number *
+                      </label>
+                      <Input
+                        value={formData.tableNumber}
+                        onChange={(e) => setFormData({ ...formData, tableNumber: e.target.value })}
+                        placeholder="Enter your table number"
+                        required
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Delivery Address */}
               {formData.deliveryType === 'delivery' && (
@@ -548,23 +605,36 @@ export default function CheckoutPage() {
                 </Card>
               )}
 
-              {/* Payment Method */}
               <Card>
                 <CardContent className="p-4 md:p-6">
                   <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4">
                     Payment Method
                   </h2>
                   <div className="space-y-3">
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <input
-                        type="radio"
-                        value="cash"
-                        checked={formData.paymentMethod === 'cash'}
-                        onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                        className="w-4 h-4 text-primary-600"
-                      />
-                      <span className="text-gray-900 dark:text-white">Cash on Delivery</span>
-                    </label>
+                    {formData.deliveryType === 'dining' ? (
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                        <input
+                          type="radio"
+                          value="cash"
+                          checked={formData.paymentMethod === 'cash'}
+                          onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                          className="w-4 h-4 text-primary-600"
+                        />
+                        <span className="text-gray-900 dark:text-white">Cash at Table</span>
+                      </label>
+                    ) : (
+                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                        <input
+                          type="radio"
+                          value="cash"
+                          checked={formData.paymentMethod === 'cash'}
+                          onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                          className="w-4 h-4 text-primary-600"
+                        />
+                        <span className="text-gray-900 dark:text-white">Cash on Delivery</span>
+                      </label>
+                    )}
+                    
                     <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                       <input
                         type="radio"

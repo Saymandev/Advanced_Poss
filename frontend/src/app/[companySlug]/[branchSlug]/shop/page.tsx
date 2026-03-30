@@ -55,6 +55,17 @@ export default function BranchShopPage() {
     }
     return [];
   });
+
+  // Capture table number from URL and store in sessionStorage
+  const tableNumber = searchParams.get('table');
+  useEffect(() => {
+    if (tableNumber) {
+      sessionStorage.setItem('qr_table_number', tableNumber);
+      // Also clear any previous table status to ensure a fresh session
+      sessionStorage.removeItem('lastOrderStatus');
+    }
+  }, [tableNumber]);
+
   // Show error toast if API errors occur
   useEffect(() => {
     if (companyError) {
@@ -228,6 +239,15 @@ export default function BranchShopPage() {
                 Select items from our menu
               </p>
             </div>
+            
+            {tableNumber && (
+              <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 px-4 py-2 rounded-lg flex items-center gap-2 animate-pulse">
+                <span className="text-primary-600 dark:text-primary-400 font-bold text-sm sm:text-base">
+                  📍 Table {tableNumber}
+                </span>
+              </div>
+            )}
+
             <Link href={`/${companySlug}/${branchSlug}/cart`} className="w-full sm:w-auto">
               <Button className="relative w-full sm:w-auto">
                 <ShoppingCartIcon className="w-5 h-5 mr-2" />

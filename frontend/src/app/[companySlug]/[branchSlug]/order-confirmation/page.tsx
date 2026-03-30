@@ -128,10 +128,10 @@ export default function OrderConfirmationPage() {
           </div>
           
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Order Confirmed!
+            Order Received! 🛎️
           </h1>
           <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 mb-4 md:mb-6">
-            Thank you for your order. We're preparing it now.
+            Thank you for your order. We have sent it to the restaurant for confirmation.
           </p>
 
           {orderId && orderId !== 'pending' && (
@@ -154,7 +154,8 @@ export default function OrderConfirmationPage() {
               What's Next?
             </h3>
             <ul className="text-sm sm:text-base text-gray-700 dark:text-gray-300 space-y-1.5 md:space-y-2">
-              <li>• You'll receive a confirmation email shortly</li>
+              <li>• The restaurant will review and accept your order shortly.</li>
+              <li>• Your status will update to &quot;Confirmed&quot; once accepted.</li>
               <li>• Estimated preparation time: 20-30 minutes</li>
               {company?.phone && (
                 <li className="flex items-center gap-2">
