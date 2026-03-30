@@ -167,12 +167,7 @@ export const authApi = apiSlice.injectEndpoints({
         body: data,
       }),
       transformResponse: (response: any) => {
-        // Handle different response structures
-        // Backend returns: { success: true, data: { user, company, branch, ... } }
-        // Or direct: { user, company, branch, ... }
         const data = response?.data || response;
-        
-        // If response already has success and data structure
         if (response?.success && response?.data) {
           return {
             success: true,
@@ -185,8 +180,6 @@ export const authApi = apiSlice.injectEndpoints({
             },
           };
         }
-        
-        // If response is direct (shouldn't happen with TransformInterceptor, but handle it)
         if (data?.user) {
           return {
             success: true,
@@ -199,8 +192,6 @@ export const authApi = apiSlice.injectEndpoints({
             },
           };
         }
-        
-        // Fallback - return as is
         return response;
       },
     }),
@@ -232,7 +223,6 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'GET',
       }),
       transformResponse: (response: any) => {
-        // Handle TransformInterceptor wrapper: { success: true, data: ... }
         const data = response?.data || response;
         return {
           secret: data.secret,
@@ -265,6 +255,12 @@ export const authApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+    verifyEmail: builder.mutation<{ success: boolean; message: string }, string>({
+      query: (token) => ({
+        url: `/auth/verify-email/${token}`,
+        method: 'GET',
+      }),
+    }),
   }),
 });
 
@@ -280,5 +276,6 @@ export const {
   useEnable2FAMutation,
   useDisable2FAMutation,
   useVerifyPinMutation,
+  useVerifyEmailMutation,
 } = authApi;
 
