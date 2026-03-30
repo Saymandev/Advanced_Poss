@@ -506,7 +506,9 @@
 }
 
 .phone-input-container .react-tel-input .country-list {
-  @apply !bg-gray-800 !text-white !border-gray-700 !rounded-lg !mt-1 !shadow-2xl !scrollbar-thin !scrollbar-thumb-gray-600;
+  @apply !bg-gray-800 !text-white !border-gray-700 !rounded-lg !mt-1 !shadow-2xl;
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 transparent;
 }
 
 .phone-input-container .react-tel-input .country-list .country:hover {
