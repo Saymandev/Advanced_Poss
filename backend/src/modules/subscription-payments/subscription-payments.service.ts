@@ -909,17 +909,26 @@ export class SubscriptionPaymentsService {
       (plan.billingCycle as BillingCycle) || 
       BillingCycle.MONTHLY;
     const periodDays = getBillingCycleDays(cycle);
-    const subscriptionEndDate = new Date(
-      now.getTime() + periodDays * 24 * 60 * 60 * 1000,
-    );
 
-    
-
-    // Find latest subscription for this company (if any)
+    // Find latest subscription for this company (if any) to check for trial status
     let subscription = await this.subscriptionModel
       .findOne({ companyId: company._id })
       .sort({ createdAt: -1 })
       .exec();
+    
+    // Calculate trial carry-over if applicable
+    let trialExtensionMs = 0;
+    if (subscription && 
+        (subscription.status === SubscriptionStatus.TRIAL || (subscription as any).status === 'trial') && 
+        subscription.trialEndDate && 
+        subscription.trialEndDate > now) {
+      trialExtensionMs = subscription.trialEndDate.getTime() - now.getTime();
+      console.log(`[ManualActivation] 💡 Found active trial for ${company.name}. Carrying over ${Math.round(trialExtensionMs / (1000 * 60 * 60 * 1000 * 24))} remaining days.`);
+    }
+
+    const subscriptionEndDate = new Date(
+      now.getTime() + (periodDays * 24 * 60 * 60 * 1000) + trialExtensionMs,
+    );
 
     if (subscription) {
       

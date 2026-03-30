@@ -15,6 +15,7 @@ import { RoomsModule } from '../rooms/rooms.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { SystemFeedbackModule } from '../system-feedback/system-feedback.module';
 import { UsersModule } from '../users/users.module';
+import { TablesModule } from '../tables/tables.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
 import { PublicController } from './public.controller';
 import { PublicService } from './public.service';
@@ -41,6 +42,7 @@ import { ContactForm, ContactFormSchema } from './schemas/contact-form.schema';
     forwardRef(() => SubscriptionsModule), // For subscription limit validation
     forwardRef(() => RoomsModule), // For public room browsing
     forwardRef(() => BookingsModule), // For public bookings
+    TablesModule,
   ],
   controllers: [PublicController],
   providers: [PublicService],

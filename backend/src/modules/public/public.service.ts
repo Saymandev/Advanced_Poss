@@ -13,6 +13,7 @@ import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/schemas/order.schema';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SystemFeedbackService } from '../system-feedback/system-feedback.service';
+import { TablesService } from '../tables/tables.service';
 import { UsersService } from '../users/users.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { SubmitContactFormDto } from './dto/submit-contact-form.dto';
@@ -38,6 +39,7 @@ export class PublicService {
     private systemFeedbackService: SystemFeedbackService,
     private subscriptionsService: SubscriptionsService,
     private branchesService: BranchesService,
+    private tablesService: TablesService,
   ) {}
 
   async createOrder(orderData: any) {
@@ -150,6 +152,34 @@ export class PublicService {
       }
       
       const total = subtotal + taxAmount + deliveryFee;
+      
+      // Handle table lookup for dine-in orders
+      let tableId = null;
+      let orderType = orderData.deliveryType || 'delivery';
+      
+      if (orderData.tableNumber && !orderData.tableId) {
+        try {
+          const tables = await this.tablesService.findAll({ 
+            branchId: orderData.branchId,
+            tableNumber: orderData.tableNumber.toString()
+          });
+          if (tables && tables.length > 0) {
+            tableId = (tables[0] as any)._id?.toString() || (tables[0] as any).id;
+            orderType = 'dine-in';
+            // Dine-in orders don't have delivery fees
+            deliveryFee = 0;
+          }
+        } catch (error) {
+          console.error('Table lookup failed for public order:', error);
+        }
+      } else if (orderData.tableId) {
+        tableId = orderData.tableId;
+        orderType = 'dine-in';
+        deliveryFee = 0;
+      }
+      
+      // Recalculate total if delivery fee was removed
+      const finalTotal = subtotal + taxAmount + deliveryFee;
 
       // Get default waiter for the branch (owner or first user)
       let waiterId = orderData.branchId; // Fallback to branchId as ObjectId
@@ -172,7 +202,9 @@ export class PublicService {
         companyId: new Types.ObjectId(orderData.companyId),
         branchId: new Types.ObjectId(orderData.branchId),
         orderNumber,
-        type: orderData.deliveryType || 'delivery',
+        type: orderType,
+        tableId: tableId ? new Types.ObjectId(tableId) : undefined,
+        tableNumber: orderData.tableNumber, // Store raw table number for reference
         customerId: customerId ? new Types.ObjectId(customerId) : undefined,
         waiterId: new Types.ObjectId(waiterId),
         items,
@@ -181,8 +213,8 @@ export class PublicService {
         taxAmount,
         deliveryFee,
         deliveryZoneId: deliveryZoneId ? new Types.ObjectId(deliveryZoneId) : undefined,
-        total,
-        remainingAmount: total,
+        total: finalTotal,
+        remainingAmount: finalTotal,
         status: 'pending',
         paymentStatus: 'pending',
         paymentMethod: orderData.paymentMethod || 'cash',
