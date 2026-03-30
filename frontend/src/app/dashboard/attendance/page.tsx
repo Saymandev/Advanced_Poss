@@ -126,17 +126,22 @@ export default function AttendancePage() {
   const [deleteAttendance, { isLoading: _isDeleting }] = useDeleteAttendanceMutation();
 
   const handleCheckIn = async () => {
-    const branchId = user?.branchId || (user as any)?.companyContext?.branchId || (user as any)?.companyContext?.branches?.[0]?._id || (user as any)?.companyContext?.branches?.[0]?.id;
+    // Determine branchId using multiple fallbacks for different user roles (Employee vs Owner/Admin)
+    const rawBranchId = user?.branchId || 
+                     (user as any)?.companyContext?.branchId || 
+                     (user as any)?.companyContext?.branches?.[0]?._id || 
+                     (user as any)?.companyContext?.branches?.[0]?.id;
 
-    if (!branchId) {
-      toast.error('Branch ID is required. Please select a branch.');
+    if (!rawBranchId) {
+      toast.error('Branch context not found. Please try logging in again or selecting a branch.');
       return;
     }
 
-    const branchIdStr = typeof branchId === 'string' ? branchId : branchId.toString();
+    const branchIdStr = typeof rawBranchId === 'string' ? rawBranchId : rawBranchId.toString();
 
-    if (!branchIdStr || branchIdStr === 'undefined' || branchIdStr.trim() === '') {
-      toast.error('Invalid branch ID. Please select a branch.');
+    // Final guard against invalid ID strings
+    if (!branchIdStr || branchIdStr === 'undefined' || branchIdStr === 'null' || branchIdStr.trim() === '') {
+      toast.error('Invalid branch ID. Please select a branch from settings.');
       return;
     }
 
@@ -146,7 +151,9 @@ export default function AttendancePage() {
         ...(checkInNotes?.trim() && { notes: checkInNotes.trim() }),
       };
 
-      
+      // Debug logging to troubleshoot 400 Bad Request
+      console.log('--- Attendance Check-In FRONTEND DEBUG ---');
+      console.log('Sending Payload:', checkInData);
 
       await checkIn(checkInData).unwrap();
       toast.success('Checked in successfully');
@@ -156,7 +163,9 @@ export default function AttendancePage() {
       refetchTodayAttendance();
     } catch (error: any) {
       console.error('❌ Attendance Check-In Error:', error);
-      toast.error(error?.data?.message || error?.message || 'Failed to check in');
+      // More descriptive error message
+      const errorMessage = error?.data?.message || error?.message || 'Failed to check in';
+      toast.error(errorMessage);
     }
   };
 
