@@ -8,8 +8,8 @@ export class AttendanceCheckInDto {
   userId?: string;
 
   @ApiProperty({ example: '507f1f77bcf86cd799439012' })
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'branchId must be a string' })
+  @IsNotEmpty({ message: 'branchId is required' })
   branchId: string;
 
   @ApiPropertyOptional({ example: 'Checked in from home office' })

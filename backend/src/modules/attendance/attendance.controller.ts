@@ -40,6 +40,12 @@ export class AttendanceController {
   @RequiresFeature(FEATURES.ATTENDANCE)
   @ApiOperation({ summary: 'Check in for work' })
   checkIn(@Body() checkInDto: AttendanceCheckInDto, @Request() req: any) {
+    // Debug logging to troubleshoot 400 Bad Request / branchId issue
+    console.log('--- Attendance Check-In DEBUG ---');
+    console.log('Request Body:', checkInDto);
+    console.log('Context User ID:', req.user?.id);
+    console.log('Context Branch ID:', req.user?.branchId);
+    
     // Use authenticated user's ID (required)
     if (!req.user?.id) {
       throw new BadRequestException('User ID is required');
