@@ -4,7 +4,10 @@ import { IsEmail, IsEnum, IsNotEmpty, IsPhoneNumber, IsString, Length, Matches }
 export enum CompanyType {
   RESTAURANT = 'restaurant',
   CAFE = 'cafe',
+  BAKERY = 'bakery',
   BAR = 'bar',
+  FOOD_TRUCK = 'food_truck',
+  OTHER = 'other',
 }
 
 export enum SubscriptionPackage {

@@ -392,6 +392,66 @@ export class EmailService {
     `;
   }
 
+  async sendWelcomeEmail(
+    email: string,
+    ownerName: string,
+    companyName: string,
+  ): Promise<boolean> {
+    const subject = `Welcome to RestaurantPOS, ${ownerName}!`;
+    const frontendUrl = this.configService.get('frontend.url');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0;">Welcome Aboard! 🚀</h1>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #ddd;">
+          <p>Dear ${ownerName},</p>
+          
+          <p>We are thrilled to have you join <strong>RestaurantPOS</strong>! Your account for <strong>${companyName}</strong> has been successfully created.</p>
+          
+          <p>Our goal is to help you streamline your operations, manage your staff more effectively, and grow your business with our all-in-one POS and management system.</p>
+          
+          <div style="background: #fff; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0;"><strong>Quick Next Steps:</strong></p>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+              <li><strong>Verify your email:</strong> Click the link in the activation email we just sent you.</li>
+              <li><strong>Complete your profile:</strong> Add your business logo and configure your settings.</li>
+              <li><strong>Add your menu:</strong> Start adding categories and products to your POS.</li>
+              <li><strong>Set up staff:</strong> Create accounts for your managers and waiters.</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${frontendUrl}/dashboard" 
+               style="background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+              Go to Your Dashboard
+            </a>
+          </div>
+          
+          <p style="margin-top: 30px;">If you have any questions or need help getting started, our team is always here to support you at <a href="mailto:support@restaurantpos.com" style="color: #667eea;">support@restaurantpos.com</a>.</p>
+          
+          <p>Happy Selling!<br><strong>The RestaurantPOS Team</strong></p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+          <p>This is an automated email. Please do not reply to this message.</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    return await this.sendEmail(email, subject, html);
+  }
+
   async sendVerificationEmail(
     email: string,
     verificationToken: string,

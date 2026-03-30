@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Types } from 'mongoose';
+import * as crypto from 'crypto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { EmailService } from '../../common/services/email.service';
 import { GeneratorUtil } from '../../common/utils/generator.util';
@@ -502,6 +503,9 @@ export class AuthService {
     // Using PasswordUtil.generate() ensures it meets all password complexity requirements
     const tempPassword = PasswordUtil.generate(16);
 
+    // Generate a secure verification token for email activation
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
     // Create the owner user
     // Skip password validation for temporary password during registration (user logs in with PIN)
     // Note: PIN will be hashed by users.service.ts - pass plain PIN here
@@ -515,6 +519,8 @@ export class AuthService {
       role: UserRole.OWNER,
       companyId: (company as any)._id.toString(),
       branchId: (branch as any)._id.toString(),
+      isEmailVerified: false,
+      emailVerificationToken: verificationToken,
     }, true); // skipPasswordValidation = true for registration
 
     // Update company with owner ID
@@ -565,6 +571,27 @@ export class AuthService {
       });
     } catch (error) {
       this.logger.warn(`Failed to create super-admin notification for new company: ${error?.message || error}`);
+    }
+
+    // Send Welcome and Activation Emails
+    try {
+      // 1. Send Welcome Email
+      await this.emailService.sendWelcomeEmail(
+        companyEmail,
+        `${firstName} ${lastName}`,
+        companyName
+      );
+
+      // 2. Send Verification/Activation Email
+      await this.emailService.sendVerificationEmail(
+        companyEmail,
+        verificationToken,
+        firstName
+      );
+
+      this.logger.log(`✅ Welcome and Activation emails sent to ${companyEmail}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to send registration emails to ${companyEmail}: ${error?.message || error}`);
     }
 
     // Format branch address for response

@@ -87,5 +87,13 @@ export class CreateUserDto {
   @IsOptional()
   @IsDateString()
   joinedDate?: string;
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  isEmailVerified?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  emailVerificationToken?: string;
 }
 
