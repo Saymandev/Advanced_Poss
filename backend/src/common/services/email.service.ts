@@ -44,7 +44,7 @@ export class EmailService {
     try {
       const emailConfig = this.configService.get('email');
       await this.transporter.sendMail({
-        from: emailConfig?.from || 'noreply@restaurantpos.com',
+        from: emailConfig?.from || 'noreply@rahapossolution.com',
         to,
         subject,
         html,
@@ -152,7 +152,7 @@ export class EmailService {
           
           <p style="margin-top: 30px;">If you have any questions, please don't hesitate to contact our support team.</p>
           
-          <p>Best regards,<br><strong>RestaurantPOS Team</strong></p>
+          <p>Best regards,<br><strong>Raha Pos Solution Team</strong></p>
         </div>
         
         <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
@@ -255,7 +255,7 @@ export class EmailService {
           
           <p style="margin-top: 30px;">If you need assistance, our support team is here to help.</p>
           
-          <p>Best regards,<br><strong>RestaurantPOS Team</strong></p>
+          <p>Best regards,<br><strong>Raha Pos Solution Team</strong></p>
         </div>
         
         <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
@@ -397,7 +397,7 @@ export class EmailService {
     ownerName: string,
     companyName: string,
   ): Promise<boolean> {
-    const subject = `Welcome to RestaurantPOS, ${ownerName}!`;
+    const subject = `Welcome to Raha Pos Solution, ${ownerName}!`;
     const frontendUrl = this.configService.get('frontend.url');
 
     const html = `
@@ -416,7 +416,7 @@ export class EmailService {
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #ddd;">
           <p>Dear ${ownerName},</p>
           
-          <p>We are thrilled to have you join <strong>RestaurantPOS</strong>! Your account for <strong>${companyName}</strong> has been successfully created.</p>
+          <p>We are thrilled to have you join <strong>Raha Pos Solution</strong>! Your account for <strong>${companyName}</strong> has been successfully created.</p>
           
           <p>Our goal is to help you streamline your operations, manage your staff more effectively, and grow your business with our all-in-one POS and management system.</p>
           
@@ -437,9 +437,9 @@ export class EmailService {
             </a>
           </div>
           
-          <p style="margin-top: 30px;">If you have any questions or need help getting started, our team is always here to support you at <a href="mailto:support@restaurantpos.com" style="color: #667eea;">support@restaurantpos.com</a>.</p>
+          <p style="margin-top: 30px;">If you have any questions or need help getting started, our team is always here to support you at <a href="mailto:support@rahapossolution.com" style="color: #667eea;">support@rahapossolution.com</a>.</p>
           
-          <p>Happy Selling!<br><strong>The RestaurantPOS Team</strong></p>
+          <p>Happy Selling!<br><strong>The Raha Pos Solution Team</strong></p>
         </div>
         
         <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
@@ -478,7 +478,7 @@ export class EmailService {
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #ddd;">
           <p>Dear ${name},</p>
           
-          <p>Thank you for registering with RestaurantPOS! Please verify your email address to complete your registration.</p>
+          <p>Thank you for registering with Raha Pos Solution Please verify your email address to complete your registration.</p>
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="${verificationUrl}" 
@@ -496,7 +496,7 @@ export class EmailService {
           
           <p style="margin-top: 30px;">If you didn't create an account, please ignore this email.</p>
           
-          <p>Best regards,<br><strong>RestaurantPOS Team</strong></p>
+          <p>Best regards,<br><strong>Raha Pos Solution Team</strong></p>
         </div>
         
         <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
@@ -583,7 +583,7 @@ export class EmailService {
           
           <p style="margin-top: 30px;">We'll notify you once your order is ready!</p>
           
-          <p>Best regards,<br><strong>RestaurantPOS Team</strong></p>
+          <p>Best regards,<br><strong>Raha Pos Solution Team</strong></p>
         </div>
         
         <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
@@ -639,7 +639,7 @@ export class EmailService {
           
           <p style="margin-top: 30px;">Visit us soon to redeem your loyalty points and enjoy great savings!</p>
           
-          <p>Best regards,<br><strong>RestaurantPOS Team</strong></p>
+          <p>Best regards,<br><strong>Raha Pos Solution Team</strong></p>
         </div>
         
         <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
