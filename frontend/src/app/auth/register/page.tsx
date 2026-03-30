@@ -20,8 +20,10 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
 
 
 const businessTypes = [
@@ -88,6 +90,23 @@ export default function RegisterPage() {
       [e.target.name]: e.target.value,
     });
   };
+
+  const handlePhoneChange = (name: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Synchronize country selection with phone inputs
+  useEffect(() => {
+    // We don't necessarily want to wipe the phone number if the user already typed something,
+    // but we can ensure the prefix is set if the field is empty or only contains a prefix.
+    const countryCode = formData.country.toLowerCase();
+    
+    // You could optionally reset or pre-fill the prefix here, 
+    // but the PhoneInput's 'country' prop will handle the flag and prefix UI automatically.
+  }, [formData.country]);
 
   const validateStep1 = () => {
     if (!formData.companyName || !formData.companyEmail || !formData.companyPhone) {
@@ -326,16 +345,18 @@ export default function RegisterPage() {
                     />
                   </div>
 
-                  <div className="relative">
-                    <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                    <Input
-                      type="tel"
-                      name="companyPhone"
+                  <div className="relative phone-input-container">
+                    <PhoneInput
+                      country={formData.country.toLowerCase()}
                       value={formData.companyPhone}
-                      onChange={handleChange}
-                      placeholder="+1-234-567-8900"
-                      className="pl-11 h-12 bg-gray-900/50 border-gray-700 text-white"
-                      required
+                      onChange={(value) => handlePhoneChange('companyPhone', value)}
+                      containerClass="w-full"
+                      inputClass="!w-full !h-12 !bg-gray-900/50 !border-gray-700 !text-white !pl-12 !rounded-lg focus:!border-primary-500"
+                      buttonClass="!bg-transparent !border-gray-700 !rounded-l-lg hover:!bg-gray-800"
+                      dropdownClass="!bg-gray-800 !text-white !border-gray-700"
+                      searchClass="!bg-gray-900 !text-white"
+                      placeholder="Company Phone"
+                      enableSearch
                     />
                   </div>
                 </div>
@@ -455,16 +476,18 @@ export default function RegisterPage() {
                     required
                   />
 
-                  <div className="md:col-span-2 relative">
-                    <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                    <Input
-                      type="tel"
-                      name="phoneNumber"
+                  <div className="md:col-span-2 relative phone-input-container">
+                    <PhoneInput
+                      country={formData.country.toLowerCase()}
                       value={formData.phoneNumber}
-                      onChange={handleChange}
-                      placeholder="+1-234-567-8900"
-                      className="pl-11 h-12 bg-gray-900/50 border-gray-700 text-white"
-                      required
+                      onChange={(value) => handlePhoneChange('phoneNumber', value)}
+                      containerClass="w-full"
+                      inputClass="!w-full !h-12 !bg-gray-900/50 !border-gray-700 !text-white !pl-12 !rounded-lg focus:!border-primary-500"
+                      buttonClass="!bg-transparent !border-gray-700 !rounded-l-lg hover:!bg-gray-800"
+                      dropdownClass="!bg-gray-800 !text-white !border-gray-700"
+                      searchClass="!bg-gray-900 !text-white"
+                      placeholder="Owner Phone"
+                      enableSearch
                     />
                   </div>
 

@@ -481,3 +481,46 @@
 .group:hover .spotlight-overlay {
   opacity: 1;
 }
+
+/* Phone Input Custom Styling */
+.phone-input-container .react-tel-input .form-control {
+  @apply !w-full !h-12 !bg-gray-900/50 !border-gray-700 !text-white !pl-12 !rounded-lg transition-all;
+}
+
+.phone-input-container .react-tel-input .form-control:focus {
+  @apply !border-primary-500 !ring-2 !ring-primary-500/20 !outline-none;
+}
+
+.phone-input-container .react-tel-input .flag-dropdown {
+  @apply !bg-transparent !border-gray-700 !rounded-l-lg transition-colors border-r-0;
+}
+
+.phone-input-container .react-tel-input .flag-dropdown:hover,
+.phone-input-container .react-tel-input .flag-dropdown.open {
+  @apply !bg-gray-800;
+}
+
+.phone-input-container .react-tel-input .selected-flag:hover,
+.phone-input-container .react-tel-input .selected-flag:focus {
+  @apply !bg-gray-800;
+}
+
+.phone-input-container .react-tel-input .country-list {
+  @apply !bg-gray-800 !text-white !border-gray-700 !rounded-lg !mt-1 !shadow-2xl !scrollbar-thin !scrollbar-thumb-gray-600;
+}
+
+.phone-input-container .react-tel-input .country-list .country:hover {
+  @apply !bg-gray-700;
+}
+
+.phone-input-container .react-tel-input .country-list .country.highlight {
+  @apply !bg-primary-900/30;
+}
+
+.phone-input-container .react-tel-input .country-list .search {
+  @apply !bg-gray-900 !border-gray-700 !p-2;
+}
+
+.phone-input-container .react-tel-input .country-list .search-box {
+  @apply !bg-gray-800 !text-white !border-gray-700 !rounded !ml-0 !w-full;
+}
