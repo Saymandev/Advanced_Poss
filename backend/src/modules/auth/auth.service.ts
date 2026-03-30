@@ -436,9 +436,12 @@ export class AuthService {
       package: subscriptionPackage,
       firstName,
       lastName,
-      phoneNumber,
+      phoneNumber: rawPhoneNumber,
       pin,
     } = registerDto;
+
+    // Sanitize phone number (remove spaces and dashes)
+    const phoneNumber = rawPhoneNumber.replace(/[\s-]/g, '');
 
     // Check if company email already exists
     const existingCompany = await this.companiesService.findByEmail(companyEmail);

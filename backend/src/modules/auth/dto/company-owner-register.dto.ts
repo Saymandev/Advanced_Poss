@@ -106,10 +106,13 @@ export class CompanyOwnerRegisterDto {
 
   @ApiProperty({
     description: 'Owner phone number',
-    example: '+1234567890',
+    example: '+1 234 567 8901',
   })
   @IsNotEmpty()
-  @IsPhoneNumber()
+  @IsString()
+  @Matches(/^\+?[\d\s-]{7,20}$/, {
+    message: 'phoneNumber must be a valid phone number',
+  })
   phoneNumber: string;
 
   @ApiProperty({
