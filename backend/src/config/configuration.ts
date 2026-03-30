@@ -37,7 +37,7 @@ export default () => ({
     port: parseInt(process.env.EMAIL_PORT, 10) || 587,
     user: process.env.EMAIL_USER,
     password: process.env.EMAIL_PASSWORD,
-    from: process.env.EMAIL_FROM || 'noreply@restaurantpos.com',
+    from: process.env.EMAIL_FROM || 'noreply@rahapossolution.com',
   },
 
   cloudinary: {
@@ -68,7 +68,7 @@ export default () => ({
   },
 
   superAdmin: {
-    email: process.env.SUPER_ADMIN_EMAIL || 'admin@restaurantpos.com',
+    email: process.env.SUPER_ADMIN_EMAIL || 'admin@rahapossolution.com',
     password: process.env.SUPER_ADMIN_PASSWORD || 'Admin@123456',
     firstName: process.env.SUPER_ADMIN_FIRST_NAME || 'Super',
     lastName: process.env.SUPER_ADMIN_LAST_NAME || 'Admin',
