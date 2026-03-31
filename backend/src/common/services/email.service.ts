@@ -44,7 +44,7 @@ export class EmailService {
     try {
       const emailConfig = this.configService.get('email');
       await this.transporter.sendMail({
-        from: emailConfig?.from || 'noreply@rahapossolution.com',
+        from: emailConfig?.from || emailConfig?.user || 'noreply@rahapossolution.com',
         to,
         subject,
         html,
