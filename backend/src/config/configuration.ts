@@ -37,8 +37,10 @@ export default () => ({
     port: parseInt(process.env.EMAIL_PORT, 10) || 587,
     user: process.env.EMAIL_USER,
     password: process.env.EMAIL_PASSWORD,
-    from: process.env.EMAIL_FROM || 'noreply@rahapossolution.com',
+    from: process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_FROM || 'noreply@rahapossolution.com',
+    fromName: process.env.EMAIL_FROM_NAME || 'Raha POS Solution',
   },
+
 
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME,

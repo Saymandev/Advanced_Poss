@@ -43,8 +43,11 @@ export class EmailService {
 
     try {
       const emailConfig = this.configService.get('email');
+      const fromName = emailConfig?.fromName || 'Raha POS Solution';
+      const fromAddress = emailConfig?.from || emailConfig?.user || 'noreply@rahapossolution.com';
+      
       await this.transporter.sendMail({
-        from: emailConfig?.from || emailConfig?.user || 'noreply@rahapossolution.com',
+        from: `"${fromName}" <${fromAddress}>`,
         to,
         subject,
         html,
