@@ -50,15 +50,43 @@ export function OfflineBanner({
 
   // Show sync warning if we have errors (e.g. tablet sync failed)
   if (isOnline && syncErrors.length > 0) {
+    const formatSyncErrors = (errors: string[]) => {
+      if (!errors || errors.length === 0) return '';
+      
+      const cleanedErrors = errors.map(err => {
+        // 1. Handle "resource: HTTP 403 from https://..." pattern
+        const resourceMatch = err.match(/^([^:]+):/);
+        const resource = resourceMatch ? resourceMatch[1] : 'data';
+        
+        if (err.includes('HTTP 403')) return `${resource}: Access Denied`;
+        if (err.includes('HTTP 401')) return `${resource}: Unauthorized`;
+        if (err.includes('HTTP 404')) return `${resource}: Not Found`;
+        if (err.includes('HTTP 500')) return `${resource}: Server Error`;
+        if (err.includes('Network Error')) return `${resource}: Network Error`;
+        
+        // 2. Fallback: truncate long messages and remove URLs
+        let cleaned = err.split(' from https://')[0]; // Remove URL part
+        if (cleaned.length > 40) cleaned = cleaned.substring(0, 37) + '...';
+        return cleaned;
+      });
+
+      // 3. Limit visible errors to 2, then say "+ X more"
+      const MAX_VISIBLE = 4;
+      if (cleanedErrors.length <= MAX_VISIBLE) {
+        return cleanedErrors.join(', ');
+      }
+      return `${cleanedErrors.slice(0, MAX_VISIBLE).join(', ')} and ${cleanedErrors.length - MAX_VISIBLE} more`;
+    };
+
     return (
       <div className="flex items-center justify-between gap-2 px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 text-rose-400 text-xs">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-hidden">
           <SignalSlashIcon className="h-3.5 w-3.5 shrink-0" />
-          <span>Warning: Some data failed to sync ({syncErrors.join(', ')}).</span>
+          <span className="truncate whitespace-nowrap">Warning: Some data failed to sync ({formatSyncErrors(syncErrors)}).</span>
         </div>
         <button
           onClick={onSyncNow}
-          className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 transition-colors"
+          className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 transition-colors shrink-0"
         >
           <ArrowPathIcon className="h-3 w-3" />
           Retry Sync
@@ -66,6 +94,7 @@ export function OfflineBanner({
       </div>
     );
   }
+
 
   // Show sync success with pending orders when came back online
   if (isOnline && pendingCount > 0) {
