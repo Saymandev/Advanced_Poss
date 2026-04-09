@@ -3384,29 +3384,7 @@ export default function POSPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 pb-40">
-          {/* Order Configuration */}
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              {ORDER_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => {
-                const isActive = orderType === value;
-                return (
-                  <Button
-                    key={value}
-                    size="sm"
-                    variant={isActive ? 'primary' : 'secondary'}
-                    onClick={() => handleOrderTypeChange(value)}
-                    className={cn(
-                      "flex-1 items-center gap-2 rounded-xl px-3 py-2.5 text-xs transition-all",
-                      isActive ? "bg-sky-600 hover:bg-sky-500 shadow-md shadow-sky-900/20 text-white" : "bg-gray-50 dark:bg-slate-900/50"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{label}</span>
-                  </Button>
-                );
-              })}
-            </div>
-
             <div className="grid gap-3">
               {/* Context Details */}
               <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30 p-4 space-y-4">
