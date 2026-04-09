@@ -68,7 +68,9 @@ import {
   TableCellsIcon,
   TrashIcon,
   TruckIcon,
+  UserIcon,
   UserGroupIcon,
+  ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -398,7 +400,8 @@ export default function POSPage() {
     }
     return false;
   });
-  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+  const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
+  const [isCartSidebarCollapsed, setIsCartSidebarCollapsed] = useState(false);
   const [orderNotes, setOrderNotes] = useState('');
   const [selectedWaiterId, setSelectedWaiterId] = useState<string>('');
   const [discountMode, setDiscountMode] = useState<'full' | 'item'>('full');
@@ -441,7 +444,6 @@ export default function POSPage() {
   const [fullPaymentReceived, setFullPaymentReceived] = useState<string>('0');
   const [multiPayments, setMultiPayments] = useState<SplitPaymentRow[]>([]);
   const [paymentSuccessOrder, setPaymentSuccessOrder] = useState<PaymentSuccessState | null>(null);
-  const [isQueueCollapsed, setIsQueueCollapsed] = useState(true);
   const [queueTab, setQueueTab] = useState<'active' | 'history'>('active');
   const [queueStatusFilter, setQueueStatusFilter] = useState<'all' | 'pending' | 'paid' | 'cancelled'>('pending');
   const [queueOrderTypeFilter, setQueueOrderTypeFilter] = useState<'all' | 'dine-in' | 'delivery' | 'takeaway'>('all');
@@ -468,7 +470,7 @@ export default function POSPage() {
     const urlOrderId = searchParams.get('orderId');
     if (urlOrderId) {
       setQueueDetailId(urlOrderId);
-      setIsQueueCollapsed(false); // Open the queue sidebar to show details
+      setIsQueueModalOpen(true); // Open the queue modal to show details
       setQueueTab('history'); // Usually these are confirmed/past orders
     }
   }, [searchParams]);
@@ -1717,7 +1719,7 @@ export default function POSPage() {
         }
       }
       setHasStartedOrder(true);
-      setIsCartModalOpen(true);
+      setIsCartSidebarCollapsed(false);
       setOccupiedTableModal(null);
       toast.success('Order loaded. You can now edit items.');
     } catch (error: any) {
@@ -1732,7 +1734,7 @@ export default function POSPage() {
       setSelectedTable(occupiedTableModal.tableId);
       setGuestCount(Math.min(guestCount, table.orderDetails.remainingSeats));
       setHasStartedOrder(true);
-      setIsCartModalOpen(true);
+      setIsCartSidebarCollapsed(false);
       setOccupiedTableModal(null);
       toast.success(`Starting new order for ${table.orderDetails.remainingSeats} remaining seats`);
     } else {
@@ -1947,7 +1949,7 @@ export default function POSPage() {
       }
       setCustomerInfo({ name: '', phone: '', email: '' });
       setHasStartedOrder(false);
-      setIsCartModalOpen(false);
+
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to create order');
     }
@@ -2235,7 +2237,7 @@ export default function POSPage() {
           setCustomerInfo({ name: '', phone: '', email: '' });
           setHasStartedOrder(false);
           setIsPaymentModalOpen(false);
-          setIsCartModalOpen(false);
+    
           return;
         } catch (error: any) {
           toast.error(error?.data?.message || 'Failed to create booking');
@@ -2366,7 +2368,7 @@ export default function POSPage() {
       setCustomerInfo({ name: '', phone: '', email: '' });
       setHasStartedOrder(false);
       setIsPaymentModalOpen(false);
-      setIsCartModalOpen(false);
+
     } catch (error: any) {
       console.error('Payment flow failed:', error);
       toast.error(error?.data?.message || 'Failed to process payment');
@@ -2923,7 +2925,7 @@ export default function POSPage() {
             <div className="flex flex-wrap items-center gap-2 justify-between sm:justify-end relative w-full sm:w-auto">
               <Button
                 variant="secondary"
-                onClick={() => setIsCartModalOpen(true)}
+                onClick={() => setIsCartSidebarCollapsed(false)}
                 className="flex items-center gap-1 sm:gap-2 rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 relative z-10 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
               >
                 <ShoppingCartIcon className="h-4 w-4" />
@@ -3344,397 +3346,433 @@ export default function POSPage() {
       </div>
     </div>
   );
-  const renderQueuePanel = () => {
-    if (isQueueCollapsed) {
+
+  const renderCartSidebar = () => {
+    if (isCartSidebarCollapsed) {
       return (
-        <>
-          {/* Mobile: Floating button to open queue */}
-          <button
-            onClick={() => setIsQueueCollapsed(false)}
-            className="fixed bottom-4 right-4 z-50 xl:hidden flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/50 transition-all"
-            aria-label="Open Orders Queue"
+        <aside className="hidden xl:flex xl:w-16 xl:flex-col xl:items-center xl:justify-center border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 transition-all duration-300 ease-in-out">
+          <Button
+            variant="ghost"
+            onClick={() => setIsCartSidebarCollapsed(false)}
+            className="flex flex-col items-center gap-2 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white"
           >
-            <ClipboardDocumentListIcon className="h-6 w-6" />
-          </button>
-          {/* Desktop: Side collapsed panel */}
-          <aside className="hidden xl:flex xl:w-16 xl:flex-col xl:items-center xl:justify-center border-l border-gray-200 dark:border-slate-900/50 bg-white dark:bg-slate-950/60">
-            <Button
-              variant="ghost"
-              onClick={() => setIsQueueCollapsed(false)}
-              className="flex flex-col items-center gap-2 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white"
-            >
-              <ChevronLeftIcon className="h-5 w-5" />
-              <span className="text-xs font-medium">Queue</span>
-            </Button>
-          </aside>
-        </>
+            <ChevronRightIcon className="h-5 w-5" />
+            <span className="text-xs font-medium [writing-mode:vertical-lr] rotate-180">Cart</span>
+          </Button>
+        </aside>
       );
     }
     return (
-      <>
-        <div
-          className="fixed inset-0 z-30 bg-black/50 dark:bg-slate-950/70 backdrop-blur-sm xl:hidden"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setIsQueueCollapsed(true);
-          }}
-        />
-        <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-sm sm:max-w-md flex-col border-l border-gray-200 dark:border-slate-900 bg-white dark:bg-slate-950/95 shadow-xl xl:static xl:z-auto xl:max-w-xs xl:bg-white xl:dark:bg-slate-950/80 min-h-0">
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900/70 px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Orders</p>
-              <p className="text-xs text-gray-600 dark:text-slate-400">
-                {queueTab === 'active' ? 'Active queue' : 'Completed orders'}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleQueueRefresh}
-                disabled={queueLoading}
-                className="h-9 w-9 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
-                title="Refresh"
-              >
-                <ArrowPathIcon className={`h-4 w-4 ${queueLoading ? 'animate-spin' : ''}`} />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsQueueCollapsed(true);
-                }}
-                className="h-9 w-9 rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80"
-                title="Collapse queue"
-                type="button"
-              >
-                <ChevronRightIcon className="h-4 w-4" />
-              </Button>
-            </div>
+      <aside className="flex flex-col h-full w-full xl:w-[450px] border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/95 transition-all duration-300 ease-in-out overflow-hidden shadow-2xl relative">
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 px-4 py-4 min-h-[64px] bg-white dark:bg-slate-950 z-10 transition-colors">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <ShoppingCartIcon className="h-5 w-5 text-sky-500" />
+              Order Cart
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-slate-400">Current checkout session</p>
           </div>
-          <div className="border-b border-gray-300 dark:border-slate-900/70 px-4 py-3 space-y-3">
-            <div className="flex items-center gap-2">
-              {(['active', 'history'] as const).map((tab) => {
-                const isActive = queueTab === tab;
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsCartSidebarCollapsed(true)}
+            className="h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 hidden xl:flex"
+            title="Collapse cart"
+          >
+            <ChevronLeftIcon className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 pb-40">
+          {/* Order Configuration */}
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {ORDER_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => {
+                const isActive = orderType === value;
                 return (
                   <Button
-                    key={tab}
-                    variant={isActive ? 'primary' : 'secondary'}
+                    key={value}
                     size="sm"
-                    onClick={() => setQueueTab(tab)}
-                    className={`rounded-full px-4 py-1.5 text-xs uppercase tracking-wide ${
-                      isActive
-                        ? 'bg-sky-600 hover:bg-sky-500 text-white'
-                        : 'bg-gray-100 dark:bg-slate-900/70 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800/70'
-                    }`}
+                    variant={isActive ? 'primary' : 'secondary'}
+                    onClick={() => handleOrderTypeChange(value)}
+                    className={cn(
+                      "flex-1 items-center gap-2 rounded-xl px-3 py-2.5 text-xs transition-all",
+                      isActive ? "bg-sky-600 hover:bg-sky-500 shadow-md shadow-sky-900/20 text-white" : "bg-gray-50 dark:bg-slate-900/50"
+                    )}
                   >
-                    {tab === 'active' ? 'Active' : 'History'}
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
                   </Button>
                 );
               })}
             </div>
-            <div className="grid gap-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Type</label>
-                <select
-                  value={queueOrderTypeFilter}
-                  onChange={(event) => setQueueOrderTypeFilter(event.target.value as typeof queueOrderTypeFilter)}
-                  className="flex-1 rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/70 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-                >
-                  <option value="all">All Types</option>
-                  {ORDER_TYPE_OPTIONS.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {queueTab === 'history' && (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Status</label>
-                  <select
-                    value={queueStatusFilter}
-                    onChange={(event) => setQueueStatusFilter(event.target.value as typeof queueStatusFilter)}
-                    className="flex-1 rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/70 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-                  >
-                    {ORDER_STATUS_FILTERS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="relative">
-                <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500" />
-                <Input
-                  value={queueSearchInput}
-                  onChange={(event) => setQueueSearchInput(event.target.value)}
-                  placeholder="Search order # or customer"
-                  className="pl-9 pr-3 py-2 text-sm h-10 bg-white dark:bg-slate-950/80 border border-gray-300 dark:border-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:border-sky-600 focus:ring-sky-600/40"
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/70 px-3 py-2 text-xs text-gray-700 dark:text-slate-300">
-                <span>{queueOrders.length} order{queueOrders.length === 1 ? '' : 's'} listed</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-300">{formatCurrency(queueTotalAmount)}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-            {queueLoading ? (
-              [...Array(5)].map((_, index) => (
-                <div key={index} className="h-24 rounded-2xl border border-gray-300 dark:border-slate-900/60 bg-gray-100 dark:bg-slate-900/40 animate-pulse" />
-              ))
-            ) : queueOrders.length === 0 ? (
-              <div className="rounded-2xl border border-gray-300 dark:border-slate-900/60 bg-gray-50 dark:bg-slate-950/70 p-6 text-center text-sm text-gray-600 dark:text-slate-400">
-                No orders found with the selected filters.
-              </div>
-            ) : (
-              queueOrders.map((order: any, index: number) => {
-                const orderId = resolveOrderId(order);
-                const derivedKey = orderId || order.orderNumber || `order-${index}`;
-                const canAct = Boolean(orderId);
-                return (
-                <div
-                  key={derivedKey}
-                  className="rounded-2xl border border-gray-300 dark:border-slate-900/60 bg-white dark:bg-slate-950/70 p-4 shadow-sm transition hover:border-sky-800/50 hover:shadow-sky-900/20"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                        {order.orderNumber || (orderId ? `Order ${orderId?.slice(-6)}` : 'Order')}
-                      </p>
-                      <p className="text-xs text-gray-600 dark:text-slate-500">{order.createdAt ? formatDateTime(order.createdAt) : 'N/A'}</p>
-                    </div>
-                    <Badge className={ORDER_STATUS_STYLES[order.status as 'pending' | 'paid' | 'cancelled'] || ORDER_STATUS_STYLES.pending}>
-                      {ORDER_STATUS_LABELS[order.status as 'pending' | 'paid' | 'cancelled'] || order.status}
-                    </Badge>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-slate-300">
-                    <span className="rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/70 px-3 py-1 text-gray-900 dark:text-slate-200">
-                      {getOrderTypeLabel(order.orderType as OrderType)}
-                    </span>
-                    <span className="rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/70 px-3 py-1 text-gray-900 dark:text-slate-200">
-                      {formatCurrency(Number(order.totalAmount || 0))}
-                    </span>
-                    {order.paymentMethod && (
-                      <span className="rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/70 px-3 py-1 text-gray-900 dark:text-slate-200">
-                        Payment: {order.paymentMethod}
-                      </span>
-                    )}
-                    {order?.customerInfo?.name && (
-                      <span className="rounded-full border border-gray-300 dark:border-slate-800 bg-gray-100 dark:bg-slate-900/70 px-3 py-1 text-gray-900 dark:text-slate-200">
-                        {order.customerInfo.name}
-                      </span>
-                    )}
-                  </div>
-                  {order.notes && (
-                    <p className="mt-2 rounded-lg border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/80 px-3 py-2 text-xs text-gray-600 dark:text-slate-400">
-                      {order.notes}
-                    </p>
-                  )}
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => canAct && handleQueueViewDetails(orderId)}
-                      disabled={!canAct}
-                      className="rounded-lg bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
+
+            <div className="grid gap-3">
+              {/* Context Details */}
+              <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30 p-4 space-y-4">
+                {orderType === 'dine-in' ? (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Seating Assignment</label>
+                    <select
+                      value={selectedTable}
+                      onChange={(event) => handleTableSelection(event.target.value)}
+                      disabled={tablesLoading || tables.length === 0}
+                      className="w-full rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-500/20 outline-none transition-all"
                     >
-                      View
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => canAct && handleViewReceipt(orderId)}
-                      disabled={!canAct}
-                      className="rounded-lg bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
-                    >
-                      Receipt
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => canAct && handlePrintReceipt(orderId, false)}
-                      disabled={!canAct}
-                      className="rounded-lg bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 disabled:opacity-40"
-                    >
-                      Print
-                    </Button>
-                    {order.status === 'pending' && (
-                      <>
-                        {order.orderType !== 'dine-in' && order.isPublic && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={async () => {
-                              if (!canAct) return;
-                              try {
-                                await updateOrder({
-                                  id: orderId,
-                                  data: { status: 'confirmed' }
-                                }).unwrap();
-                                toast.success('Order confirmed');
-                                refetchQueue();
-                              } catch (error: any) {
-                                toast.error(error?.data?.message || 'Failed to confirm order');
-                              }
-                            }}
-                            disabled={!canAct}
-                            className="rounded-lg bg-sky-500/15 text-sky-700 dark:text-sky-200 hover:bg-sky-500/25 disabled:opacity-60"
-                          >
-                            Confirm
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={async () => {
-                            if (!canAct) return;
-                            try {
-                              await updateOrder({
-                                id: orderId,
-                                data: { status: 'paid' }
-                              }).unwrap();
-                              toast.success('Order marked as paid');
-                              refetchQueue();
-                            } catch (error: any) {
-                              toast.error(error?.data?.message || 'Failed to update order status');
-                            }
-                          }}
-                          disabled={!canAct}
-                          className="rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
-                        >
-                          Mark Paid
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => canAct && handleQueueCancel(orderId)}
-                          disabled={!canAct || queueActionOrderId === orderId}
-                          className="rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
-                        >
-                          {queueActionOrderId === orderId ? 'Cancelling...' : 'Cancel'}
-                        </Button>
-                      </>
-                    )}
-                    {['confirmed', 'preparing', 'ready', 'served'].includes(order.status) && (
-                      <>
-                        {order.status === 'confirmed' && order.orderType !== 'dine-in' && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={async () => {
-                              if (!canAct) return;
-                              try {
-                                await updateOrder({
-                                  id: orderId,
-                                  data: { status: 'preparing' }
-                                }).unwrap();
-                                toast.success('Order is now preparing');
-                                refetchQueue();
-                              } catch (error: any) {
-                                toast.error(error?.data?.message || 'Failed to update order status');
-                              }
-                            }}
-                            disabled={!canAct}
-                            className="rounded-lg bg-blue-500/15 text-blue-700 dark:text-blue-200 hover:bg-blue-500/25 disabled:opacity-60"
-                          >
-                            Set Preparing
-                          </Button>
-                        )}
-                        {order.status === 'preparing' && order.orderType !== 'dine-in' && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={async () => {
-                              if (!canAct) return;
-                              try {
-                                await updateOrder({
-                                  id: orderId,
-                                  data: { status: 'ready' }
-                                }).unwrap();
-                                toast.success('Order is ready');
-                                refetchQueue();
-                              } catch (error: any) {
-                                toast.error(error?.data?.message || 'Failed to update order status');
-                              }
-                            }}
-                            disabled={!canAct}
-                            className="rounded-lg bg-purple-500/15 text-purple-700 dark:text-purple-200 hover:bg-purple-500/25 disabled:opacity-60"
-                          >
-                            Set Ready
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={async () => {
-                            if (!canAct) return;
-                            try {
-                              await updateOrder({
-                                id: orderId,
-                                data: { status: 'paid' }
-                              }).unwrap();
-                              toast.success('Order marked as paid');
-                              refetchQueue();
-                            } catch (error: any) {
-                              toast.error(error?.data?.message || 'Failed to update order status');
-                            }
-                          }}
-                          disabled={!canAct}
-                          className="rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
-                        >
-                          Mark Paid
-                        </Button>
-                      </>
-                    )}
-                    {order.status === 'paid' && (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => canAct && handleOpenRefundModal(orderId, order.totalAmount)}
-                          disabled={!canAct}
-                          className="rounded-lg bg-orange-500/15 text-orange-700 dark:text-orange-200 hover:bg-orange-500/25 disabled:opacity-60"
-                        >
-                          Refund
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={async () => {
-                            if (!canAct) return;
-                            try {
-                              await updateOrder({
-                                id: orderId,
-                                data: { status: 'pending' }
-                              }).unwrap();
-                              toast.success('Order marked as pending');
-                              refetchQueue();
-                            } catch (error: any) {
-                              toast.error(error?.data?.message || 'Failed to update order status');
-                            }
-                          }}
-                          disabled={!canAct}
-                          className="rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-200 hover:bg-amber-500/25 disabled:opacity-60"
-                        >
-                          Mark Pending
-                        </Button>
+                      <option value="">{tablesLoading ? 'Loading tables…' : 'Select table'}</option>
+                      {tables.map((table: any) => (
+                        <option key={table.id} value={table.id} disabled={table.status === 'occupied' || table.status === 'reserved'}>
+                          {table.number || table.tableNumber || table.name || table.id} {table.status ? `(${getTableStatusText(table)})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedTable && activeTable && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Guest Count</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max={activeTable.capacity || 99}
+                          value={guestCount}
+                          onChange={(e) => setGuestCount(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="rounded-xl border-gray-200 dark:border-slate-800"
+                        />
                       </div>
                     )}
                   </div>
+                ) : requiresRoomService ? (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Room Booking</label>
+                    <select
+                      value={roomServiceBookingId}
+                      onChange={(event) => setRoomServiceBookingId(event.target.value)}
+                      className="w-full rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2.5 text-sm"
+                    >
+                      <option value="">Select Room</option>
+                      {roomServiceBookings.map((b: Booking) => (
+                        <option key={b.id} value={b.id}>Room {b.roomNumber} - {b.guestName}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
+                {/* Waiter Selection */}
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Service Staff</label>
+                  <select
+                    value={selectedWaiterId}
+                    onChange={(event) => setSelectedWaiterId(event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-500/20 outline-none"
+                  >
+                    <option value="">Select Waiter</option>
+                    {waiterOptions.map((w) => (
+                      <option key={w.id} value={w.id}>{w.name} {w.activeOrdersCount > 0 ? `(${w.activeOrdersCount} active)` : ''}</option>
+                    ))}
+                  </select>
                 </div>
-              );})
-            )}
+              </div>
+
+              {/* Customer Info */}
+              <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Customer Profile</label>
+                  <Button size="sm" variant="ghost" onClick={() => setIsCustomerLookupOpen(true)} className="h-6 text-[10px] text-sky-500 hover:bg-sky-500/10">Lookup</Button>
+                </div>
+                <div className="space-y-2">
+                  <Input
+                    value={customerInfo.name}
+                    onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+                    placeholder="Guest Name"
+                    className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800"
+                  />
+                  <Input
+                    value={customerInfo.phone}
+                    onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                    placeholder="Phone Number"
+                    className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </aside>
-      </>
+
+          {/* Cart Items */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white px-1">Order Details</h3>
+            <div className="space-y-3">
+              {cart.length === 0 ? (
+                <div className="py-16 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-[2rem] bg-gray-50/50 dark:bg-slate-900/20">
+                  <ShoppingCartIcon className="h-12 w-12 mb-4 opacity-20" />
+                  <p className="text-sm font-medium">Your cart is empty</p>
+                  <p className="text-[10px] opacity-60">Add items from the menu to start</p>
+                </div>
+              ) : (
+                cart.map((item) => {
+                  const itemDiscountAmount = discountMode === 'item' ? getItemDiscountAmount(item) : 0;
+                  return (
+                    <div key={item.id} className="group relative bg-white dark:bg-slate-900/40 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 transition-all hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-500/5 hover:-translate-y-0.5">
+                      <div className="flex justify-between gap-4 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-tight mb-1 truncate">{item.name}</h4>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-sky-500">{formatCurrency(item.price)}</span>
+                            {itemDiscountAmount > 0 && <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[9px] font-bold">SALE</Badge>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-950 rounded-xl p-1 h-fit border border-gray-200 dark:border-slate-800">
+                          <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-500 transition-all">
+                            <MinusIcon className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="text-xs font-black w-7 text-center">{item.quantity}</span>
+                          <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-500 transition-all">
+                            <PlusIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {(item.modifiersNote || item.notes) && (
+                        <div className="mb-3 p-2.5 bg-gray-50 dark:bg-slate-950/50 rounded-xl text-[10px] text-slate-500 dark:text-slate-400 italic border border-gray-200 dark:border-slate-900">
+                          {item.modifiersNote && <div>{item.modifiersNote}</div>}
+                          {item.notes && <div>{item.notes}</div>}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800/50 mt-auto">
+                        <div className="flex gap-3">
+                          <button onClick={() => setNoteEditor({ itemId: item.id, value: item.notes || '' })} className="text-[10px] font-bold text-slate-400 hover:text-sky-500 transition-colors uppercase tracking-wider">Note</button>
+                          <button onClick={() => removeFromCart(item.id)} className="text-[10px] font-bold text-slate-400 hover:text-rose-500 transition-colors uppercase tracking-wider">Remove</button>
+                        </div>
+                        <span className="text-sm font-black text-gray-900 dark:text-white">{formatCurrency((item.price * item.quantity) - itemDiscountAmount)}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Discount Section */}
+          <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/20 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-1">Promotions</label>
+              <div className="flex bg-gray-200 dark:bg-slate-950 rounded-xl p-1 border border-gray-300 dark:border-slate-800">
+                <button onClick={() => setDiscountMode('full')} className={cn("px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all", discountMode === 'full' ? "bg-sky-600 text-white shadow-md shadow-sky-900/30" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300")}>Global</button>
+                <button onClick={() => setDiscountMode('item')} className={cn("px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all", discountMode === 'item' ? "bg-sky-600 text-white shadow-md shadow-sky-900/30" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300")}>Items</button>
+              </div>
+            </div>
+            {discountMode === 'full' ? (
+              <div className="flex gap-2">
+                <Input value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} type="number" className="h-10 text-xs rounded-xl" placeholder="Discount Amount" />
+                <select value={discountType} onChange={(e) => setDiscountType(e.target.value as 'percent' | 'amount')} className="h-10 bg-white dark:bg-slate-950 text-xs border border-gray-200 dark:border-slate-800 rounded-xl px-3 outline-none focus:ring-2 focus:ring-sky-500/20 transition-all font-bold">
+                  <option value="percent">%</option>
+                  <option value="amount">$</option>
+                </select>
+              </div>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={() => setIsItemDiscountModalOpen(true)} className="w-full h-10 text-xs rounded-xl border-dashed border-2 hover:border-sky-500 hover:bg-sky-500/5 transition-all">Manage Line Item Discounts</Button>
+            )}
+            <textarea
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              placeholder="Internal notes (not visible to customer)..."
+              className="w-full h-20 rounded-2xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 p-4 text-xs outline-none focus:border-sky-500/50 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500/10 transition-all resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer Summary & Checkout */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 bg-white dark:bg-slate-950 border-t border-gray-200 dark:border-slate-800 space-y-5 shadow-[0_-20px_50px_-20px_rgba(0,0,0,0.3)] dark:shadow-[0_-20px_50px_-20px_rgba(0,0,0,0.8)] z-20 transition-all">
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-medium text-slate-500">
+              <span>Subtotal</span>
+              <span className="text-gray-900 dark:text-slate-300">{formatCurrency(orderSummary.subtotal)}</span>
+            </div>
+            {orderSummary.discount > 0 && (
+              <div className="flex justify-between text-xs font-bold text-emerald-500">
+                <span>Discount Applied</span>
+                <span>-{formatCurrency(orderSummary.discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-xs font-medium text-slate-500">
+              <span>Tax ({taxRate}%)</span>
+              <span className="text-gray-900 dark:text-slate-300">{formatCurrency(orderSummary.tax)}</span>
+            </div>
+            <div className="flex justify-between items-end pt-3 border-t border-gray-100 dark:border-slate-900/50">
+              <span className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tighter">Grand Total</span>
+              <span className="text-3xl font-black text-emerald-500 tracking-tighter drop-shadow-sm">{formatCurrency(orderSummary.total)}</span>
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            {paymentMode === 'pay-later' && (
+              <Button
+                variant="secondary"
+                onClick={handleCreateOrder}
+                disabled={checkoutBlocked || (orderType !== 'room-booking' && cart.length === 0)}
+                className="flex-1 h-14 rounded-2xl bg-gray-100 dark:bg-slate-900 hover:bg-gray-200 dark:hover:bg-slate-800 border-none transition-all"
+              >
+                <div className="flex flex-col items-center gap-0.5">
+                  <ClockIcon className="h-5 w-5 text-slate-500" />
+                  <span className="text-[10px] font-black uppercase text-slate-500">Save</span>
+                </div>
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              onClick={() => setIsPaymentModalOpen(true)}
+              disabled={checkoutBlocked || (orderType !== 'room-booking' && orderType !== 'room-service' && cart.length === 0)}
+              className="flex-[3.5] h-14 rounded-2xl bg-sky-600 hover:bg-sky-500 text-sm font-black gap-3 shadow-xl shadow-sky-600/20 active:scale-95 transition-all text-white border-none"
+            >
+              <CreditCardIcon className="h-6 w-6" />
+              COMPLETE PAYMENT (ENTER)
+            </Button>
+          </div>
+        </div>
+      </aside>
     );
   };
+
+  const renderQueueModal = () => (
+    <Modal
+      isOpen={isQueueModalOpen}
+      onClose={() => setIsQueueModalOpen(false)}
+      title="Global Orders Queue"
+      size="xl"
+    >
+      <div className="flex flex-col h-[75vh] bg-gray-50 dark:bg-slate-950 rounded-b-3xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900 px-8 py-5 bg-white dark:bg-slate-950 z-10">
+          <div className="flex items-center gap-6">
+            {(['active', 'history'] as const).map((tab) => {
+              const isActive = queueTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setQueueTab(tab)}
+                  className={cn(
+                    "relative py-2 text-sm font-black uppercase tracking-widest transition-all",
+                    isActive ? "text-sky-500" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  )}
+                >
+                  {tab === 'active' ? 'Active' : 'History'}
+                  {isActive && <div className="absolute -bottom-1 left-0 right-0 h-1 bg-sky-500 rounded-full shadow-lg shadow-sky-500/40" />}
+                </button>
+              );
+            })}
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleQueueRefresh}
+            disabled={queueLoading}
+            className="h-11 w-11 p-0 rounded-2xl bg-gray-100 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all shadow-sm"
+          >
+            <ArrowPathIcon className={cn("h-5 w-5 text-gray-700 dark:text-slate-300", queueLoading && "animate-spin")} />
+          </Button>
+        </div>
+
+        <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-white/50 dark:bg-slate-950/50 border-b border-gray-200 dark:border-slate-900/50 backdrop-blur-md">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-1">Channel Filter</label>
+            <select
+              value={queueOrderTypeFilter}
+              onChange={(e) => setQueueOrderTypeFilter(e.target.value as any)}
+              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-xs font-bold focus:ring-4 focus:ring-sky-500/10 transition-all outline-none"
+            >
+              <option value="all">All Channels</option>
+              {ORDER_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          {queueTab === 'history' && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-1">Status Overview</label>
+              <select
+                value={queueStatusFilter}
+                onChange={(e) => setQueueStatusFilter(e.target.value as any)}
+                className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-xs font-bold focus:ring-4 focus:ring-sky-500/10 transition-all outline-none"
+              >
+                {ORDER_STATUS_FILTERS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="space-y-2 relative">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-1">Quick Search</label>
+            <div className="relative">
+              <MagnifyingGlassIcon className="h-4 w-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={queueSearchInput}
+                onChange={(e) => setQueueSearchInput(e.target.value)}
+                placeholder="Order ID, Customer..."
+                className="pl-11 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-xs font-bold"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar bg-gray-50 dark:bg-slate-950/20">
+          {queueLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="relative w-12 h-12">
+                <div className="absolute inset-0 border-4 border-sky-500/10 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-t-sky-500 rounded-full animate-spin"></div>
+              </div>
+              <p className="text-xs font-black uppercase tracking-widest text-slate-500 animate-pulse">Syncing Orders...</p>
+            </div>
+          ) : queueOrders.length === 0 ? (
+            <div className="text-center py-32 flex flex-col items-center gap-4 border-2 border-dashed border-gray-200 dark:border-slate-900 rounded-[3rem]">
+              <ClipboardDocumentIcon className="h-16 w-16 text-slate-200 dark:text-slate-800" />
+              <div className="space-y-1">
+                <p className="text-sm font-black dark:text-white uppercase">No records found</p>
+                <p className="text-xs text-slate-500">Try adjusting your filters or search terms</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {queueOrders.map((order: any) => {
+                const orderId = resolveOrderId(order);
+                const canAct = Boolean(orderId);
+                const statusInfo = ORDER_STATUS_STYLES[order.status] || ORDER_STATUS_STYLES.pending;
+                return (
+                  <div key={orderId || Math.random()} className="bg-white dark:bg-slate-900/40 border border-gray-200 dark:border-slate-800/60 rounded-3xl p-6 hover:shadow-2xl hover:shadow-black/5 hover:-translate-y-1 transition-all duration-300 group">
+                    <div className="flex justify-between items-start mb-5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                           <span className="text-[10px] font-black uppercase text-sky-500 bg-sky-500/10 px-2 py-0.5 rounded-md">ID: {order.orderNumber || orderId?.slice(-6)}</span>
+                           {order.isPublic && <Badge className="bg-amber-500/10 text-amber-500 border-none text-[8px]">ONLINE</Badge>}
+                        </div>
+                        <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5"><ClockIcon className="h-3 w-3" /> {formatDateTime(order.createdAt)}</div>
+                      </div>
+                      <div className={cn("px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm", statusInfo)}>
+                        {ORDER_STATUS_LABELS[order.status] || order.status}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-3 mb-6">
+                      <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-slate-950 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-800">
+                        <UserIcon className="h-3 w-3 text-slate-400" />
+                        <span className="text-[10px] font-black text-gray-700 dark:text-slate-300 truncate max-w-[120px]">{order.customerInfo?.name || 'Walk-in Guest'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-slate-950 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-800">
+                        <CurrencyDollarIcon className="h-3 w-3 text-emerald-500" />
+                        <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(order.totalAmount)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-5 border-t border-gray-100 dark:border-slate-800/50">
+                      <Button size="sm" variant="secondary" onClick={() => handleQueueViewDetails(orderId)} className="flex-1 h-11 rounded-2xl bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:bg-gray-100 dark:hover:bg-slate-800 text-[10px] font-black uppercase tracking-widest transition-all">Full Details</Button>
+                      <Button size="sm" variant="secondary" onClick={() => handlePrintReceipt(orderId, false)} className="h-11 w-11 p-0 rounded-2xl bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:bg-sky-500 hover:text-white transition-all"><PrinterIcon className="h-5 w-5" /></Button>
+                      {order.status === 'pending' && (
+                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 h-11 rounded-2xl flex-[0.8] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all text-white border-none" onClick={() => updateOrder({ id: orderId, data: { status: 'paid' }}).then(refetchQueue)}>Settle Payment</Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -3745,42 +3783,23 @@ export default function POSPage() {
       switch (event.key) {
         case 'F1':
           event.preventDefault();
-          setIsQueueCollapsed((prev) => !prev);
+          setIsQueueModalOpen((prev) => !prev);
           break;
         case 'F2':
           event.preventDefault();
-          if (cart.length > 0) {
-            setIsPaymentModalOpen(true);
-          }
-          break;
-        case 'F3':
-          event.preventDefault();
-          clearCart();
-          break;
-        case 'F4':
-          event.preventDefault();
-          setShowKeyboardShortcuts(!showKeyboardShortcuts);
-          break;
-        case 'F5':
-          event.preventDefault();
-          setIsCalculatorOpen(true);
+          // setIsPaymentModalOpen(true); replaced by direct cart interaction or repurposed
           break;
         case 'Escape':
           event.preventDefault();
           setIsPaymentModalOpen(false);
           setShowKeyboardShortcuts(false);
           setIsCalculatorOpen(false);
-          setIsQueueCollapsed(true);
+          setIsQueueModalOpen(false);
           break;
         case 'Enter':
           event.preventDefault();
           if (cart.length > 0 && !checkoutBlocked) {
-            // In pay-first mode, Enter should open payment modal instead of creating pending order
-            if (paymentMode === 'pay-first') {
-              setIsPaymentModalOpen(true);
-            } else {
-              handleCreateOrder();
-            }
+             setIsPaymentModalOpen(true);
           }
           break;
       }
@@ -3939,14 +3958,14 @@ export default function POSPage() {
               </div>
             <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-start lg:justify-end w-full lg:w-auto">
               <Button
-                variant={isQueueCollapsed ? 'secondary' : 'primary'}
+                variant={isQueueModalOpen ? 'primary' : 'secondary'}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setIsQueueCollapsed((prev) => !prev);
+                  setIsQueueModalOpen(true);
                 }}
                 className={`flex items-center gap-1 sm:gap-2 rounded-xl text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 ${
-                  isQueueCollapsed
+                  !isQueueModalOpen
                     ? 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80'
                     : 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25'
                 }`}
@@ -3978,761 +3997,14 @@ export default function POSPage() {
           </div>
         </div>
       </div>
-      <div className="flex flex-1 overflow-hidden flex-col xl:flex-row min-h-0">
+      <div className="flex flex-1 overflow-hidden flex-col xl:flex-row-reverse min-h-0">
         <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
           {isOrderingActive ? renderOrderingWorkspace() : renderPreOrderView()}
         </div>
-        {renderQueuePanel()}
+        {renderCartSidebar()}
       </div>
+      {renderQueueModal()}
       {/* Order Cart Modal */}
-      <Modal
-        isOpen={isCartModalOpen}
-        onClose={() => setIsCartModalOpen(false)}
-        title="Order Cart"
-        size="xl"
-      >
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {ORDER_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => {
-                const isActive = orderType === value;
-                return (
-                <Button
-                    key={value}
-                    size="sm"
-                    variant={isActive ? 'primary' : 'secondary'}
-                    onClick={() => handleOrderTypeChange(value)}
-                    className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${
-                      isActive ? 'bg-sky-600 hover:bg-sky-500 text-white shadow shadow-sky-700/30' : 'bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/70'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </Button>
-                );
-              })}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Table</p>
-                {orderType === 'dine-in' ? (
-                  <div className="space-y-3">
-                    <select
-                      value={selectedTable}
-                      onChange={(event) => handleTableSelection(event.target.value)}
-                      disabled={tablesLoading || tables.length === 0}
-                      className="w-full rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <option value="">
-                        {tablesLoading ? 'Loading tables…' : 'Select a table'}
-                      </option>
-                      {tables.map((table: any) => {
-                        const remainingSeats = table.orderDetails?.remainingSeats ?? table.capacity ?? 0;
-                        const isFullyOccupied = remainingSeats === 0 && table.status === 'occupied';
-                        const isReserved = table.status === 'reserved';
-                        return (
-                          <option 
-                            key={table.id} 
-                            value={table.id} 
-                            disabled={isFullyOccupied || isReserved}
-                          >
-                            {table.number || table.tableNumber || table.name || table.id}
-                            {table.status ? ` • ${getTableStatusText(table)}` : ''}
-                            {table.capacity ? ` • ${table.capacity} seats` : ''}
-                            {table.orderDetails?.remainingSeats !== undefined && table.orderDetails.remainingSeats > 0 
-                              ? ` • ${table.orderDetails.remainingSeats} remaining` 
-                              : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {selectedTable && activeTable && (
-                      <div className="space-y-2">
-                        <label className="block text-xs text-gray-600 dark:text-slate-400">
-                          Number of Guests
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max={activeTable.orderDetails?.remainingSeats !== undefined 
-                            ? activeTable.orderDetails.remainingSeats 
-                            : (activeTable.capacity || 99)}
-                          value={guestCount}
-                          onChange={(e) => {
-                            // Calculate max seats correctly: use remaining seats if table has orders, otherwise use full capacity
-                            const maxSeats = activeTable.orderDetails?.remainingSeats !== undefined
-                              ? activeTable.orderDetails.remainingSeats // Don't add guestCount - remainingSeats already accounts for existing orders
-                              : (activeTable.capacity || 99);
-                            const inputValue = parseInt(e.target.value) || 0;
-                            const value = Math.max(1, Math.min(maxSeats, inputValue));
-                            setGuestCount(value);
-                            if (typeof window !== 'undefined') {
-                              localStorage.setItem('pos_guestCount', value.toString());
-                            }
-                          }}
-                          className="w-full rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none"
-                          placeholder="Enter guest count"
-                        />
-                        <p className="text-xs text-gray-600 dark:text-slate-500">
-                          {activeTable.orderDetails?.remainingSeats 
-                            ? `${activeTable.orderDetails.remainingSeats} seats available (${activeTable.orderDetails.usedSeats} already used)` 
-                            : activeTable.capacity 
-                              ? `${activeTable.capacity - guestCount} seats will remain available` 
-                              : 'Enter guest count'}
-                        </p>
-                      </div>
-                    )}
-                    {tables.length === 0 && !tablesLoading ? (
-                      <p className="text-xs text-slate-400">No tables available for this branch.</p>
-                    ) : (
-                      <div className="flex items-center justify-between text-xs text-gray-600 dark:text-slate-400">
-                        <span>
-                          {selectedTable
-                            ? `Currently assigned to table ${activeTable?.number || activeTable?.tableNumber || selectedTable}`
-                            : 'Select a table to continue with a dine-in order.'}
-                        </span>
-                        {selectedTable && activeTable && (
-                          <Badge className={`${getTableStatus(activeTable)} border border-white/10`}>
-                            {getTableStatusText(activeTable)}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-700 dark:text-slate-300">Table not required for this order type.</p>
-                )}
-            </div>
-              <div className="space-y-1 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Assigned Waiter</p>
-                <select
-                  value={selectedWaiterId}
-                  onChange={(event) => setSelectedWaiterId(event.target.value)}
-                  disabled={staffLoading || !branchId}
-                  className="w-full rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {staffLoading ? (
-                    <option value="">Loading waiters...</option>
-                  ) : staffError ? (
-                    <option value="">Error loading waiters</option>
-                  ) : waiterOptions.length === 0 ? (
-                    <option value="">No waiters found for this branch</option>
-                  ) : (
-                    waiterOptions.map((waiter) => (
-                      <option key={waiter.id} value={waiter.id} className="bg-slate-900">
-                        {waiter.name}{waiter.isGlobal ? ' (Global)' : ''}
-                        {waiter.activeOrdersCount > 0 ? ` (${waiter.activeOrdersCount} active order${waiter.activeOrdersCount > 1 ? 's' : ''})` : ''}
-                      </option>
-                    ))
-                  )}
-                </select>
-                {(() => {
-                  const selectedWaiter = waiterOptions.find(w => w.id === selectedWaiterId);
-                  return selectedWaiter && selectedWaiter.activeOrdersCount > 0 ? (
-                    <div className="mt-2 flex items-center gap-2 text-xs">
-                      <div className="flex items-center gap-1">
-                        <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
-                        <span className="text-amber-400">
-                          Waiter has {selectedWaiter.activeOrdersCount} active order{selectedWaiter.activeOrdersCount > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    </div>
-                  ) : null;
-                })()}
-                {!branchId && (
-                  <p className="text-xs text-slate-400 mt-1">Branch not selected</p>
-                )}
-              </div>
-              </div>
-            <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Customer</p>
-                  <div className="text-sm text-gray-900 dark:text-slate-200">
-                    {customerInfo.name ? customerInfo.name : 'Guest customer'}
-                  </div>
-                  {customerInfo.phone && (
-                    <div className="text-xs text-gray-600 dark:text-slate-400">{customerInfo.phone}</div>
-                        )}
-                      </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedCustomerId && (
-                    <Badge className="bg-emerald-500/10 text-emerald-200 border border-emerald-500/30">
-                      Linked
-                    </Badge>
-                  )}
-                  {selectedCustomer && (
-                    <Badge className="bg-amber-500/10 text-amber-200 border border-amber-500/30">
-                      {selectedCustomer.loyaltyPoints || 0} Points
-                    </Badge>
-                  )}
-                  {loyaltyRedemption.pointsRedeemed > 0 && (
-                    <Badge className="bg-purple-500/10 text-purple-200 border border-purple-500/30">
-                      -{formatCurrency(loyaltyRedemption.discount)} Discount
-                    </Badge>
-                  )}
-                        <Button
-                          size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setCustomerSearchTerm('');
-                      setIsCustomerLookupOpen(true);
-                    }}
-                    className="bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80"
-                        >
-                    Lookup
-                        </Button>
-                  {selectedCustomerId && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={clearCustomerSelection}
-                      className="text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100"
-                    >
-                      Clear
-                    </Button>
-                  )}
-                      </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Input
-                  value={customerInfo.name}
-                  onChange={(event) => setCustomerInfo({ ...customerInfo, name: event.target.value })}
-                  placeholder="Customer name"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                />
-                <Input
-                  value={customerInfo.phone}
-                  onChange={(event) => setCustomerInfo({ ...customerInfo, phone: event.target.value })}
-                  placeholder="Phone"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                />
-                <Input
-                  value={customerInfo.email}
-                  onChange={(event) => setCustomerInfo({ ...customerInfo, email: event.target.value })}
-                  placeholder="Email"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                />
-              </div>
-              {selectedCustomer && (
-                <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-amber-200">Available Points:</span>
-                    <span className="font-semibold text-amber-100">{selectedCustomer.loyaltyPoints || 0}</span>
-                  </div>
-                  {loyaltyRedemption.pointsRedeemed > 0 && (
-                    <div className="mt-2 pt-2 border-t border-amber-500/30">
-                      <div className="flex items-center justify-between text-xs text-amber-300">
-                        <span>Redeeming:</span>
-                        <span>{loyaltyRedemption.pointsRedeemed} points</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-amber-200 mt-1">
-                        <span>Discount Applied:</span>
-                        <span className="font-semibold">-{formatCurrency(loyaltyRedemption.discount)}</span>
-                      </div>
-                    </div>
-                  )}
-                  {cartSubtotal >= 1000 && loyaltyRedemption.pointsRedeemed === 0 && (selectedCustomer.loyaltyPoints || 0) >= 2000 && (
-                    <div className="mt-2 text-xs text-amber-300">
-                      💡 You can redeem {Math.floor((selectedCustomer.loyaltyPoints || 0) / 2000) * 2000} points for {formatCurrency(Math.floor((selectedCustomer.loyaltyPoints || 0) / 2000) * 20)} discount
-                    </div>
-                  )}
-                  {cartSubtotal < 1000 && (selectedCustomer.loyaltyPoints || 0) >= 2000 && (
-                    <div className="mt-2 text-xs text-amber-400">
-                      ⚠️ Minimum order amount {formatCurrency(1000)} required for loyalty redemption
-                    </div>
-                  )}
-                </div>
-              )}
-          </div>
-          {/* Delivery Details Section */}
-          {orderType === 'delivery' && (
-            <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Delivery Details</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input
-                  value={deliveryDetails.contactName}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, contactName: e.target.value })}
-                  placeholder="Contact Name *"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                  required
-                />
-                <Input
-                  value={deliveryDetails.contactPhone}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, contactPhone: e.target.value })}
-                  placeholder="Contact Phone *"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                  required
-                />
-                <Input
-                  value={deliveryDetails.addressLine1}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, addressLine1: e.target.value })}
-                  placeholder="Address Line 1 *"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
-                  required
-                />
-                <Input
-                  value={deliveryDetails.addressLine2}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, addressLine2: e.target.value })}
-                  placeholder="Address Line 2"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
-                />
-                <Input
-                  value={deliveryDetails.city}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, city: e.target.value })}
-                  placeholder="City *"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                  required
-                />
-                <Input
-                  value={deliveryDetails.state}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, state: e.target.value })}
-                  placeholder="State/Province"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                />
-                <Input
-                  value={deliveryDetails.postalCode}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, postalCode: e.target.value })}
-                  placeholder="Postal Code"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                />
-                {/* Delivery Zone & Fee */}
-                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-600 dark:text-slate-400 mb-1">Delivery Zone</label>
-                    <select
-                      className="w-full rounded-md bg-white dark:bg-slate-950/60 border border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 text-sm px-3 py-2"
-                      value={(deliveryDetails as any).zoneId || ''}
-                      onChange={(e) => {
-                        const zoneId = e.target.value;
-                        const selectedZone = deliveryZones.find((z) => z.id === zoneId);
-                        setDeliveryDetails({
-                          ...deliveryDetails,
-                          ...(zoneId ? { zoneId } : {}),
-                        } as any);
-                        if (selectedZone) {
-                          const fee = selectedZone.deliveryCharge ?? 0;
-                          const feeStr = fee.toString();
-                          setDeliveryFee(feeStr);
-                          if (typeof window !== 'undefined') {
-                            localStorage.setItem('pos_deliveryFee', feeStr);
-                          }
-                        }
-                      }}
-                      disabled={zonesLoading || deliveryZones.length === 0}
-                    >
-                      <option value="">
-                        {zonesLoading
-                          ? 'Loading zones...'
-                          : deliveryZones.length === 0
-                            ? 'No delivery zones configured'
-                            : 'Select delivery zone'}
-                      </option>
-                      {deliveryZones.map((zone) => (
-                        <option key={zone.id} value={zone.id}>
-                          {zone.name} ({formatCurrency(zone.deliveryCharge)})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 dark:text-slate-400 mb-1">Delivery Fee</label>
-                    <Input
-                      value={deliveryFee}
-                      onChange={(e) => {
-                        setDeliveryFee(e.target.value);
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('pos_deliveryFee', e.target.value);
-                        }
-                      }}
-                      placeholder="0.00"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      readOnly={!isOwnerOrManager}
-                      className={cn(
-                        "bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100",
-                        !isOwnerOrManager && "opacity-70 cursor-not-allowed bg-gray-50 dark:bg-slate-900"
-                      )}
-                    />
-                  </div>
-                </div>
-                <Input
-                  value={deliveryDetails.instructions}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, instructions: e.target.value })}
-                  placeholder="Delivery Instructions"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
-                />
-                <Input
-                  value={deliveryDetails.assignedDriver}
-                  onChange={(e) => setDeliveryDetails({ ...deliveryDetails, assignedDriver: e.target.value })}
-                  placeholder="Assigned Driver"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
-                />
-              </div>
-              {!deliveryIsValid && (
-                <p className="text-xs text-amber-400 mt-2">
-                  * Required fields: {missingDeliveryFields.join(', ')}
-                </p>
-              )}
-            </div>
-          )}
-          {/* Takeaway Details Section */}
-          {orderType === 'takeaway' && (
-            <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500">Takeaway Details</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input
-                  value={takeawayDetails.contactName}
-                  onChange={(e) => setTakeawayDetails({ ...takeawayDetails, contactName: e.target.value })}
-                  placeholder="Contact Name *"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                  required
-                />
-                <Input
-                  value={takeawayDetails.contactPhone}
-                  onChange={(e) => setTakeawayDetails({ ...takeawayDetails, contactPhone: e.target.value })}
-                  placeholder="Contact Phone *"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                  required
-                />
-                <Input
-                  value={takeawayDetails.instructions}
-                  onChange={(e) => setTakeawayDetails({ ...takeawayDetails, instructions: e.target.value })}
-                  placeholder="Pickup Instructions"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
-                />
-                <Input
-                  value={takeawayDetails.assignedDriver}
-                  onChange={(e) => setTakeawayDetails({ ...takeawayDetails, assignedDriver: e.target.value })}
-                  placeholder="Assigned Staff"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100 sm:col-span-2"
-                />
-              </div>
-              {!takeawayIsValid && (
-                <p className="text-xs text-amber-400 mt-2">
-                  * Required fields: {missingTakeawayFields.join(', ')}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Items in Cart</h3>
-            <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-300 dark:border-slate-850 bg-white dark:bg-slate-950/70">
-            {cart.length === 0 ? (
-                <div className="py-12 text-center text-gray-600 dark:text-slate-500">
-                  <ShoppingCartIcon className="mx-auto mb-3 h-10 w-10 opacity-40" />
-                  <p>No items yet. Add menu items to begin.</p>
-              </div>
-            ) : (
-                cart.map((item) => {
-                  const itemDiscount = discountMode === 'item' ? itemDiscounts[item.id] : undefined;
-                  const itemDiscountAmount = discountMode === 'item' ? getItemDiscountAmount(item) : 0;
-                  return (
-                    <div key={item.id} className="border-b border-gray-300 dark:border-slate-900 last:border-b-0 px-4 py-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-gray-900 dark:text-slate-100">{item.name}</h4>
-                            <Badge className="bg-gray-100 dark:bg-slate-900/70 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-800">
-                              {formatCurrency(item.price)}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-gray-600 dark:text-slate-500">{item.category}</p>
-                          {item.modifiersNote ? (
-                            <p className="text-xs text-gray-600 dark:text-slate-400">{item.modifiersNote}</p>
-                          ) : null}
-                          {item.notes ? (
-                            <p className="text-xs text-gray-600 dark:text-slate-400">Note: {item.notes}</p>
-                          ) : null}
-                          {itemDiscountAmount > 0 && (
-                            <p className="text-xs text-emerald-300">
-                              Discount: {formatCurrency(itemDiscountAmount)}{' '}
-                              {itemDiscount?.type === 'percent' ? `(${itemDiscount?.value}% )` : ''}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="h-8 w-8 p-0 text-gray-700 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100"
-                        >
-                          <MinusIcon className="h-4 w-4" />
-                        </Button>
-                          <span className="w-8 text-center text-sm font-semibold text-gray-900 dark:text-slate-200">{item.quantity}</span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="h-8 w-8 p-0 text-gray-700 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100"
-                        >
-                          <PlusIcon className="h-4 w-4" />
-                        </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setNoteEditor({ itemId: item.id, value: item.notes || '' })}
-                            className="h-8 w-8 p-0 text-sky-300 hover:text-sky-100"
-                            title="Add note"
-                          >
-                            <PencilSquareIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removeFromCart(item.id)}
-                            className="h-8 w-8 p-0 text-rose-400 hover:text-rose-200"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                      <div className="mt-3 flex items-center justify-between text-sm text-gray-700 dark:text-slate-300">
-                        <span>Line total</span>
-                        <span className="font-semibold text-gray-900 dark:text-slate-100">
-                          {formatCurrency(item.price * item.quantity - itemDiscountAmount)}
-                      </span>
-                    </div>
-              </div>
-                  );
-                })
-            )}
-            </div>
-          </div>
-          <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-850 bg-gray-50 dark:bg-slate-950/70 p-4">
-            <div className="flex flex-wrap items-center gap-4 text-sm">
-              <span className="font-semibold text-gray-900 dark:text-slate-100">Discount</span>
-              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
-                <input
-                  type="radio"
-                  name="discount-mode"
-                  value="full"
-                  checked={discountMode === 'full'}
-                  onChange={() => setDiscountMode('full')}
-                  className="h-4 w-4 text-sky-500"
-                />
-                Full order
-              </label>
-              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
-                <input
-                  type="radio"
-                  name="discount-mode"
-                  value="item"
-                  checked={discountMode === 'item'}
-                  onChange={() => setDiscountMode('item')}
-                  className="h-4 w-4 text-sky-500"
-                />
-                Item wise
-              </label>
-                </div>
-            {discountMode === 'full' ? (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Input
-                  value={discountValue}
-                  onChange={(event) => setDiscountValue(event.target.value)}
-                  placeholder="0"
-                  type="number"
-                  min="0"
-                  className="bg-white dark:bg-slate-950/60 border-gray-300 dark:border-slate-850 text-gray-900 dark:text-slate-100"
-                />
-                <select
-                  value={discountType}
-                  onChange={(event) => setDiscountType(event.target.value as 'percent' | 'amount')}
-                  className="rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:border-sky-500 focus:outline-none"
-                >
-                  <option value="percent">Percent</option>
-                  <option value="amount">Amount</option>
-                </select>
-                </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setIsItemDiscountModalOpen(true)}
-                  className="bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80"
-                >
-                  Manage item discounts
-                </Button>
-                <span className="text-xs text-gray-600 dark:text-slate-400">
-                  Discounts apply per item; open the editor to adjust amounts.
-                  </span>
-                </div>
-            )}
-              </div>
-              <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-900 dark:text-slate-100">Order Notes</label>
-            <textarea
-              value={orderNotes}
-              onChange={(event) => setOrderNotes(event.target.value)}
-              placeholder="Kitchen or cashier notes, customer requests, etc."
-              className="w-full min-h-[100px] rounded-xl border border-gray-300 dark:border-slate-850 bg-white dark:bg-slate-950/70 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-600/40"
-            />
-          </div>
-          <div className="rounded-xl border border-gray-300 dark:border-slate-850 bg-gray-50 dark:bg-slate-950/75 p-4 space-y-2 text-sm">
-            <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
-              <span>Subtotal</span>
-              <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.subtotal)}</span>
-            </div>
-            {orderSummary.discount > 0 && (
-              <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-300">
-                <span>Discount</span>
-                <span>-{formatCurrency(orderSummary.discount)}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
-              <span>Tax ({taxRate}%)</span>
-              <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.tax)}</span>
-            </div>
-            {orderSummary.deliveryFee > 0 && (
-              <div className="flex items-center justify-between text-gray-700 dark:text-slate-300">
-                <span>Delivery Fee</span>
-                <span className="text-gray-900 dark:text-slate-100">{formatCurrency(orderSummary.deliveryFee)}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between border-t border-gray-300 dark:border-slate-800 pt-3 text-base font-semibold text-emerald-600 dark:text-emerald-400">
-              <span>Total Due</span>
-              <span>{formatCurrency(orderSummary.total)}</span>
-            </div>
-          </div>
-          {/* Payment Method Selection - Quick Access */}
-          <div className="rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-gray-900 dark:text-slate-200">Payment Method</label>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsPaymentModalOpen(true)}
-                className="text-xs text-sky-400 hover:text-sky-300"
-              >
-                Change
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {paymentMethodsLoading ? (
-                <div className="col-span-full text-center text-gray-600 dark:text-slate-400 py-2 text-xs">Loading payment methods...</div>
-              ) : paymentMethods.length > 0 ? (
-                paymentMethods.slice(0, 6).map((method) => {
-                  const isSelected = fullPaymentMethod === method.code;
-                  return (
-                    <Button
-                      key={method.id}
-                      size="sm"
-                      variant={isSelected ? 'primary' : 'secondary'}
-                      onClick={() => setFullPaymentMethod(method.code)}
-                      className={`flex items-center justify-center gap-2 text-xs ${
-                        isSelected
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                          : 'bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800/80'
-                      }`}
-                    >
-                      {method.icon ? (
-                        <span>{method.icon}</span>
-                      ) : method.type === 'cash' ? (
-                        '💵'
-                      ) : (
-                        <CreditCardIcon className="h-3 w-3" />
-                      )}
-                      <span className="truncate">{method.displayName || method.name}</span>
-                    </Button>
-                  );
-                })
-              ) : (
-                <div className="col-span-full text-center text-gray-600 dark:text-slate-400 py-2 text-xs">
-                  No payment methods available
-                </div>
-              )}
-            </div>
-            {fullPaymentMethod && (
-              <div className="text-xs text-gray-600 dark:text-slate-400">
-                Selected: <span className="font-semibold text-gray-900 dark:text-slate-200">
-                  {paymentMethods.find(m => m.code === fullPaymentMethod)?.displayName || fullPaymentMethod}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs text-gray-600 dark:text-slate-500">
-              {selectedWaiterName ? `Assigned waiter: ${selectedWaiterName}` : 'Waiter not set'}
-            </div>
-            <div className="flex flex-col gap-2">
-              {checkoutBlocked && (
-                <div className="text-xs text-rose-400">
-                  {requiresTable && !selectedTable && 'Please select a table'}
-                  {requiresDeliveryDetails && !deliveryIsValid && `Missing: ${missingDeliveryFields.join(', ')}`}
-                  {requiresTakeawayDetails && !takeawayIsValid && `Missing: ${missingTakeawayFields.join(', ')}`}
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => setIsCalculatorOpen(true)}
-                  className="flex items-center gap-2 bg-gray-100 dark:bg-slate-900/80 text-gray-700 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80"
-                  title="Calculator (F5)"
-                >
-                  <CurrencyDollarIcon className="h-4 w-4" />
-                  Calculator
-                </Button>
-                {paymentMode === 'pay-later' && (
-                  <Button 
-                    variant="secondary" 
-                    onClick={handleCreateOrder} 
-                    disabled={
-                      checkoutBlocked 
-                      || (orderType !== 'room-booking' && cart.length === 0)
-                      || (orderType === 'room-booking' && !roomBookingIsValid)
-                    }
-                    title={
-                      checkoutBlocked 
-                        ? (requiresTable && !selectedTable ? 'Select a table first' 
-                          : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` 
-                          : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` 
-                          : requiresRoomService && !roomServiceIsValid ? 'Select a booking/room for room service' 
-                          : requiresRoomBooking && !roomBookingIsValid ? 'Complete room booking details (select room, dates, and guest info)' 
-                          : '') 
-                        : (orderType === 'room-booking' && !roomBookingIsValid) 
-                          ? 'Complete room booking details' 
-                          : (orderType !== 'room-booking' && cart.length === 0) 
-                            ? 'Add items to cart first' 
-                            : ''
-                    }
-                  >
-                    <ClockIcon className="mr-2 h-4 w-4" />
-                    Create Order
-                  </Button>
-                )}
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    // If payment method is selected and it's not cash, open payment modal for amount entry
-                    const selectedMethod = paymentMethods.find(m => m.code === fullPaymentMethod);
-                    const needsAmountEntry = selectedMethod?.code !== 'cash' || paymentMode === 'pay-first';
-                    if (needsAmountEntry) {
-                      setIsPaymentModalOpen(true);
-                    } else {
-                      handlePayment();
-                    }
-                  }}
-                  disabled={
-                    (orderType !== 'room-booking' && orderType !== 'room-service' && cart.length === 0) 
-                    || (orderType === 'room-booking' && checkoutBlocked)
-                    || (orderType === 'room-service' && checkoutBlocked)
-                    || (orderType !== 'room-booking' && orderType !== 'room-service' && checkoutBlocked)
-                  }
-                  className="bg-emerald-600 hover:bg-emerald-500"
-                  title={checkoutBlocked ? (requiresTable && !selectedTable ? 'Select a table first' : requiresDeliveryDetails && !deliveryIsValid ? `Complete delivery details: ${missingDeliveryFields.join(', ')}` : requiresTakeawayDetails && !takeawayIsValid ? `Complete takeaway details: ${missingTakeawayFields.join(', ')}` : requiresRoomService && !roomServiceIsValid ? 'Select a booking/room for room service' : requiresRoomBooking && !roomBookingIsValid ? 'Complete room booking details' : '') : (orderType === 'room-booking' || orderType === 'room-service') ? '' : cart.length === 0 ? 'Add items to cart first' : paymentMode === 'pay-first' ? 'Pay-first mode: Payment required before order creation' : ''}
-                >
-                  <CreditCardIcon className="mr-2 h-4 w-4" />
-                  {paymentMode === 'pay-first' ? 'Checkout' : 'Checkout'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Modal>
       {/* Refund Modal */}
       <Modal
         isOpen={isRefundModalOpen}
