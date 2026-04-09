@@ -3350,20 +3350,20 @@ export default function POSPage() {
   const renderCartSidebar = () => {
     if (isCartSidebarCollapsed) {
       return (
-        <aside className="hidden xl:flex xl:w-16 xl:flex-col xl:items-center xl:justify-center border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 transition-all duration-300 ease-in-out">
+        <aside className="hidden xl:flex xl:w-16 xl:flex-col xl:items-center xl:justify-center border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 transition-all duration-300 ease-in-out">
           <Button
             variant="ghost"
             onClick={() => setIsCartSidebarCollapsed(false)}
             className="flex flex-col items-center gap-2 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white"
           >
-            <ChevronRightIcon className="h-5 w-5" />
+            <ChevronLeftIcon className="h-5 w-5" />
             <span className="text-xs font-medium [writing-mode:vertical-lr] rotate-180">Cart</span>
           </Button>
         </aside>
       );
     }
     return (
-      <aside className="flex flex-col h-full w-full xl:w-[450px] border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/95 transition-all duration-300 ease-in-out overflow-hidden shadow-2xl relative">
+      <aside className="flex flex-col h-full w-full xl:w-[450px] border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/95 transition-all duration-300 ease-in-out overflow-hidden shadow-2xl relative">
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 px-4 py-4 min-h-[64px] bg-white dark:bg-slate-950 z-10 transition-colors">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -3379,7 +3379,7 @@ export default function POSPage() {
             className="h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 hidden xl:flex"
             title="Collapse cart"
           >
-            <ChevronLeftIcon className="h-4 w-4" />
+            <ChevronRightIcon className="h-4 w-4" />
           </Button>
         </div>
 
@@ -3997,7 +3997,7 @@ export default function POSPage() {
           </div>
         </div>
       </div>
-      <div className="flex flex-1 overflow-hidden flex-col xl:flex-row-reverse min-h-0">
+      <div className="flex flex-1 overflow-hidden flex-col xl:flex-row min-h-0">
         <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
           {isOrderingActive ? renderOrderingWorkspace() : renderPreOrderView()}
         </div>
