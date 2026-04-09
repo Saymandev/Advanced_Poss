@@ -2923,15 +2923,6 @@ export default function POSPage() {
               </Button>
             </div>
             <div className="flex flex-wrap items-center gap-2 justify-between sm:justify-end relative w-full sm:w-auto">
-              <Button
-                variant="secondary"
-                onClick={() => setIsCartSidebarCollapsed(false)}
-                className="flex items-center gap-1 sm:gap-2 rounded-xl bg-gray-100 dark:bg-slate-900/80 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-800/80 relative z-10 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
-              >
-                <ShoppingCartIcon className="h-4 w-4" />
-                <span className="hidden sm:inline">Open Order Cart</span>
-                <span className="sm:hidden">Cart</span>
-              </Button>
               {/* Payment Mode Toggle - In the middle */}
               <div className="flex items-center gap-1 sm:gap-2 rounded-xl border border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-2 sm:px-3 py-1.5 sm:py-2 relative overflow-visible">
                 <span className="text-xs font-medium text-gray-600 dark:text-slate-400 whitespace-nowrap hidden sm:inline">
@@ -3575,9 +3566,12 @@ export default function POSPage() {
               <span>Tax ({taxRate}%)</span>
               <span className="text-gray-900 dark:text-slate-300">{formatCurrency(orderSummary.tax)}</span>
             </div>
-            <div className="flex justify-between items-end pt-3 border-t border-gray-100 dark:border-slate-900/50">
-              <span className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tighter">Grand Total</span>
-              <span className="text-3xl font-black text-emerald-500 tracking-tighter drop-shadow-sm">{formatCurrency(orderSummary.total)}</span>
+            <div className="flex justify-between items-end pt-5 border-t border-gray-100 dark:border-slate-900/50">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Final Amount</span>
+                <span className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tighter">Grand Total</span>
+              </div>
+              <span className="text-4xl font-black text-emerald-500 tracking-tighter drop-shadow-md">{formatCurrency(orderSummary.total)}</span>
             </div>
           </div>
           
