@@ -3883,7 +3883,7 @@ export default function POSPage() {
         </Card>
       </div>
     ) : (
-    <div className="h-screen flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100">
+    <div className="h-[calc(100vh-4.1rem)] flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden -mt-6 -mx-4">
       {/* Offline Status Banner — Enterprise */}
       <OfflineBanner
         isOfflineReady={isOfflineReady}

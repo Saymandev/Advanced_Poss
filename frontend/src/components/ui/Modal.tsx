@@ -30,9 +30,9 @@ export function Modal({
 }: ModalProps) {
   if (!isOpen) return null;
 
-  // Extract z-index from className if provided, otherwise use default z-50
+  // Extract z-index from className if provided, otherwise use default z-100
   const zIndexMatch = className?.match(/z-\[?(\d+)\]?/);
-  const zIndexValue = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 50;
+  const zIndexValue = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 100;
 
   return (
     <div className="fixed inset-0 overflow-y-auto animate-fade-in" style={{ zIndex: zIndexValue }}>
