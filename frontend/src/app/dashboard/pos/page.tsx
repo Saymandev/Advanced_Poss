@@ -3860,6 +3860,23 @@ export default function POSPage() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [cart.length, selectedTable, showKeyboardShortcuts, handleCreateOrder, requiresTable, checkoutBlocked, paymentMode, setIsPaymentModalOpen, clearCart]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Listen for sidebar state changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Check initial state if possible (though sidebar-toggle is the standard)
+    const handleSidebarToggle = (event: CustomEvent) => {
+      setSidebarCollapsed(event.detail.collapsed);
+    };
+
+    window.addEventListener('sidebar-toggle', handleSidebarToggle as EventListener);
+    return () => {
+      window.removeEventListener('sidebar-toggle', handleSidebarToggle as EventListener);
+    };
+  }, []);
+
   return (
     !isOwnerOrManager && !workPeriodLoading && !activeWorkPeriod ? (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -3883,7 +3900,10 @@ export default function POSPage() {
         </Card>
       </div>
     ) : (
-    <div className="h-[calc(100vh-4.1rem)] flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden -mt-6 -mx-4">
+    <div className={cn(
+      "fixed inset-0 top-16 z-0 flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden transition-all duration-300",
+      sidebarCollapsed ? "left-0 lg:left-16" : "left-0 lg:left-64"
+    )}>
       {/* Offline Status Banner — Enterprise */}
       <OfflineBanner
         isOfflineReady={isOfflineReady}

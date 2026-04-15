@@ -281,7 +281,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 max-h-96 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 z-50 overflow-hidden">
+        <div className="absolute right-0 sm:right-4 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-h-[80vh] sm:max-h-96 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
             <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
