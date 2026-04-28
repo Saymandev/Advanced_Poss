@@ -90,20 +90,19 @@ export class MenuItemsService {
         : query.branchId;
       // Remove branchId from query (we'll add it back in $or)
       delete query.branchId;
+      
       // Build branch filter: include items for this branch OR company-wide items
-      // Ensure companyId is applied to both conditions in $or
-      const branchConditions: any[] = [
-        { branchId: branchIdObjectId }, // Items for this specific branch
-        { branchId: null }, // Company-wide items (available to all branches)
-      ];
-      // Apply companyId to both conditions if provided
       if (companyIdObjectId) {
-        branchConditions[0].companyId = companyIdObjectId;
-        branchConditions[1].companyId = companyIdObjectId;
-        // Remove companyId from top level since it's now in $or conditions
-        delete query.companyId;
+        query.$or = [
+          { branchId: branchIdObjectId, companyId: companyIdObjectId },
+          { branchId: null, companyId: companyIdObjectId },
+        ];
+        delete query.companyId; // Remove companyId from top level since it's now in $or conditions
+      } else {
+        // If companyId is completely missing, DO NOT apply the `{ branchId: null }` fallback.
+        // Doing so would return company-wide items from ALL companies, causing cross-tenant leaks.
+        query.branchId = branchIdObjectId;
       }
-      query.$or = branchConditions;
     }
     // Build search conditions if provided
     if (search) {

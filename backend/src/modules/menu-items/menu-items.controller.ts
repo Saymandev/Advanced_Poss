@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFiles,
   UseGuards,
   UseInterceptors
@@ -75,7 +76,10 @@ export class MenuItemsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all menu items with pagination, filtering, and search' })
-  findAll(@Query() filterDto: MenuItemFilterDto) {
+  findAll(@Query() filterDto: MenuItemFilterDto, @Req() req: any) {
+    if (!filterDto.companyId && req.user?.companyId) {
+      filterDto.companyId = req.user.companyId;
+    }
     return this.menuItemsService.findAll(filterDto);
   }
 

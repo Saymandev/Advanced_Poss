@@ -72,7 +72,7 @@ export class Transaction {
   @Prop({ required: true })
   balanceAfter: number; // The running balance of the PaymentMethod after this transaction
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   createdBy: Types.ObjectId;
 }
 
