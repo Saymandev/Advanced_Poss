@@ -691,7 +691,15 @@ export default function CategoriesPage() {
         }}
         title="Create New Category"
       >
-        <div className="space-y-4">
+        <div 
+          className="space-y-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleCreate();
+            }
+          }}
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Category Name *
@@ -892,7 +900,15 @@ export default function CategoriesPage() {
         }}
         title="Edit Category"
       >
-        <div className="space-y-4">
+        <div 
+          className="space-y-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleEdit();
+            }
+          }}
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Category Name *

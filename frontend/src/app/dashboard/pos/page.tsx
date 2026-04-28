@@ -623,8 +623,8 @@ export default function POSPage() {
   const missingTakeawayFields = useMemo(() => {
     if (!requiresTakeawayDetails) return [] as string[];
     const missing: string[] = [];
-    if (!takeawayDetails.contactName.trim()) missing.push('contact name');
-    if (!takeawayDetails.contactPhone.trim()) missing.push('contact phone');
+    // Takeaway details (Name/Phone) are completely optional, so we don't strictly require them
+    // to unlock the Pay button.
     return missing;
   }, [requiresTakeawayDetails, takeawayDetails]);
   // Socket.IO for real-time updates

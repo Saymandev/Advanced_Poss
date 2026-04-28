@@ -620,28 +620,37 @@ export default function PurchaseOrdersPage() {
           <div>
             <h3 className="font-medium text-gray-900 dark:text-white mb-4">Order Items</h3>
             {/* Add New Item */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <Select
-                options={ingredients?.items?.map(i => ({ value: i.id, label: i.name })) || []}
-                value={newItem.ingredientId}
-                onChange={(value) => setNewItem({ ...newItem, ingredientId: value })}
-                placeholder="Select ingredient"
-              />
-              <Input
-                type="number"
-                placeholder="Quantity"
-                value={newItem.quantity}
-                onChange={(e) => setNewItem({ ...newItem, quantity: parseFloat(e.target.value) || 0 })}
-              />
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="Unit Price"
-                value={newItem.unitPrice}
-                onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg items-end">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Ingredient</label>
+                <Select
+                  options={ingredients?.items?.map(i => ({ value: i.id, label: i.name })) || []}
+                  value={newItem.ingredientId}
+                  onChange={(value) => setNewItem({ ...newItem, ingredientId: value })}
+                  placeholder="Select ingredient"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Quantity</label>
+                <Input
+                  type="number"
+                  placeholder="Quantity"
+                  value={newItem.quantity}
+                  onChange={(e) => setNewItem({ ...newItem, quantity: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Unit Price</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Unit Price"
+                  value={newItem.unitPrice}
+                  onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
               <div className="flex gap-2">
-                <Button onClick={addItem} className="flex-1">
+                <Button onClick={addItem} className="flex-1 h-10">
                   Add
                 </Button>
               </div>
