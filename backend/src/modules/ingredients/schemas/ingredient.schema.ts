@@ -25,8 +25,8 @@ export class Ingredient {
 
   @Prop({
     type: String,
-    enum: ['food', 'beverage', 'packaging', 'cleaning', 'other'],
     default: 'food',
+    trim: true,
   })
   category: string;
 

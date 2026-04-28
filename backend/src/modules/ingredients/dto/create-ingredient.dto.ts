@@ -41,10 +41,11 @@ export class CreateIngredientDto {
   image?: string;
 
   @ApiProperty({
-    enum: ['food', 'beverage', 'packaging', 'cleaning', 'other'],
+    description: 'Category of the ingredient (e.g., food, beverage, dairy)',
     example: 'food',
   })
-  @IsEnum(['food', 'beverage', 'packaging', 'cleaning', 'other'])
+  @IsString()
+  @IsNotEmpty()
   category: string;
 
   @ApiProperty({
