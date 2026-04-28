@@ -110,6 +110,7 @@ export function Combobox({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation(); // Stop Enter from bubbling up and submitting parent forms
       setIsUserTyping(false);
       if (filteredOptions.length > 0) {
         handleSelectOption(filteredOptions[0].value);

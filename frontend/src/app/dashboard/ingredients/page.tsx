@@ -763,7 +763,15 @@ export default function IngredientsPage() {
         title="Add New Ingredient"
         className="max-w-2xl"
       >
-        <div className="space-y-4">
+        <div 
+          className="space-y-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleCreate();
+            }
+          }}
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Ingredient Name"
@@ -920,7 +928,15 @@ export default function IngredientsPage() {
         title="Edit Ingredient"
         className="max-w-2xl"
       >
-        <div className="space-y-4">
+        <div 
+          className="space-y-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleEdit();
+            }
+          }}
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Ingredient Name"
