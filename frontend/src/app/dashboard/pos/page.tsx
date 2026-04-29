@@ -2035,11 +2035,7 @@ export default function POSPage() {
       }
     }
     if (isTakeaway) {
-      const hasContact = takeawayDetails.contactName.trim() && takeawayDetails.contactPhone.trim();
-      if (!hasContact) {
-        toast.error('Please provide contact name and phone for takeaway orders');
-        return;
-      }
+      // Takeaway details are completely optional
     }
     if (isRoomBooking) {
       if (!selectedRoomId) {
@@ -3506,9 +3502,9 @@ export default function POSPage() {
                           )}
 
                           <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-slate-800/50 mt-auto">
-                            <div className="flex gap-3">
-                              <button onClick={() => setNoteEditor({ itemId: item.id, value: item.notes || '' })} className="text-[10px] font-bold text-slate-400 hover:text-sky-500 transition-colors uppercase tracking-wider">Note</button>
-                              <button onClick={() => removeFromCart(item.id)} className="text-[10px] font-bold text-slate-400 hover:text-rose-500 transition-colors uppercase tracking-wider">Remove</button>
+                            <div className="flex gap-2">
+                              <button onClick={() => setNoteEditor({ itemId: item.id, value: item.notes || '' })} className="text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-sky-100 hover:text-sky-600 dark:bg-slate-800 dark:hover:bg-sky-900/50 px-2.5 py-1 rounded transition-colors uppercase tracking-wider">Note</button>
+                              <button onClick={() => removeFromCart(item.id)} className="text-[10px] font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 hover:text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 px-2.5 py-1 rounded flex items-center gap-1 transition-colors uppercase tracking-wider"><TrashIcon className="w-3 h-3" /> Remove</button>
                             </div>
                             <span className="text-sm font-black text-gray-900 dark:text-white">{formatCurrency((item.price * item.quantity) - itemDiscountAmount)}</span>
                           </div>
