@@ -424,6 +424,11 @@ export default function POSPage() {
   const [isCustomerLookupOpen, setIsCustomerLookupOpen] = useState(false);
   const [cartActiveTab, setCartActiveTab] = useState<'items' | 'settings' | 'customer'>('items');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  
+  // Inline Quantity Editing State
+  const [editingQuantityItemId, setEditingQuantityItemId] = useState<string | null>(null);
+  const [editingQuantityValue, setEditingQuantityValue] = useState<string>('');
+
   const [modifierEditor, setModifierEditor] = useState<{
     item: any;
     quantity: number;
@@ -590,13 +595,11 @@ export default function POSPage() {
       deliveryDetails.addressLine1.trim() !== ''
       && deliveryDetails.city.trim() !== ''
       && deliveryDetails.contactPhone.trim() !== ''
+      && deliveryDetails.contactPhone.trim() !== ''
       && (deliveryDetails as any).zoneId
     );
-  const takeawayIsValid = !requiresTakeawayDetails
-    || (
-      takeawayDetails.contactName.trim() !== ''
-      && takeawayDetails.contactPhone.trim() !== ''
-    );
+  // Takeaway details (Name/Phone) are optional, so it is always valid
+  const takeawayIsValid = true;
   const roomBookingIsValid = !requiresRoomBooking || (
     selectedRoomId !== '' &&
     checkInDate !== '' &&
@@ -1441,6 +1444,18 @@ export default function POSPage() {
       ));
     }
   };
+
+  const handleQuantitySubmit = (itemId: string) => {
+    const qty = parseInt(editingQuantityValue);
+    if (!isNaN(qty) && qty > 0) {
+      updateQuantity(itemId, qty);
+    } else if (qty === 0) {
+      removeFromCart(itemId);
+    }
+    setEditingQuantityItemId(null);
+    setEditingQuantityValue('');
+  };
+
   const updateItemNote = useCallback((itemId: string, note: string) => {
     setCart((prev) =>
       prev.map((item) => (item.id === itemId ? { ...item, notes: note.trim() || undefined } : item))
@@ -3449,7 +3464,34 @@ export default function POSPage() {
                               <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 hover:bg-white dark:hover:bg-slate-800 rounded-md text-slate-400 hover:text-rose-500 transition-all">
                                 <MinusIcon className="h-3.5 w-3.5" />
                               </button>
-                              <span className="text-xs font-black w-7 text-center">{item.quantity}</span>
+                              
+                              {editingQuantityItemId === item.id ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  autoFocus
+                                  className="w-10 text-center text-xs font-black bg-white dark:bg-slate-800 border border-sky-500 rounded p-1 outline-none"
+                                  value={editingQuantityValue}
+                                  onChange={(e) => setEditingQuantityValue(e.target.value)}
+                                  onBlur={() => handleQuantitySubmit(item.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleQuantitySubmit(item.id);
+                                    if (e.key === 'Escape') setEditingQuantityItemId(null);
+                                  }}
+                                />
+                              ) : (
+                                <span 
+                                  className="text-xs font-black w-8 text-center cursor-pointer hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-500/10 rounded py-0.5 transition-colors"
+                                  onClick={() => {
+                                    setEditingQuantityItemId(item.id);
+                                    setEditingQuantityValue(item.quantity.toString());
+                                  }}
+                                  title="Click to type quantity"
+                                >
+                                  {item.quantity}
+                                </span>
+                              )}
+
                               <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 hover:bg-white dark:hover:bg-slate-800 rounded-md text-slate-400 hover:text-emerald-500 transition-all">
                                 <PlusIcon className="h-3.5 w-3.5" />
                               </button>
