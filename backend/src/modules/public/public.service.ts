@@ -155,7 +155,17 @@ export class PublicService {
       
       // Handle table lookup for dine-in orders
       let tableId = null;
-      let orderType = orderData.deliveryType || 'delivery';
+      // Map customer-facing delivery types to backend-compatible order types
+      // Customer checkout uses: 'delivery', 'pickup', 'dining'
+      // Order schema accepts: 'dine-in', 'takeaway', 'delivery'
+      const deliveryTypeMap: Record<string, string> = {
+        'pickup': 'takeaway',
+        'dining': 'dine-in',
+        'dine-in': 'dine-in',
+        'takeaway': 'takeaway',
+        'delivery': 'delivery',
+      };
+      let orderType = deliveryTypeMap[orderData.deliveryType] || 'delivery';
       
       if (orderData.tableNumber && !orderData.tableId) {
         try {
