@@ -595,8 +595,6 @@ export default function POSPage() {
       deliveryDetails.addressLine1.trim() !== ''
       && deliveryDetails.city.trim() !== ''
       && deliveryDetails.contactPhone.trim() !== ''
-      && deliveryDetails.contactPhone.trim() !== ''
-      && (deliveryDetails as any).zoneId
     );
   // Takeaway details (Name/Phone) are optional, so it is always valid
   const takeawayIsValid = true;
@@ -3596,6 +3594,150 @@ export default function POSPage() {
                         ))}
                       </select>
                     </div>
+                  ) : requiresDeliveryDetails ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <TruckIcon className="h-4 w-4 text-sky-500" />
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Delivery Details</label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Name</label>
+                          <Input
+                            value={deliveryDetails.contactName}
+                            onChange={(e) => setDeliveryDetails({...deliveryDetails, contactName: e.target.value})}
+                            placeholder="Recipient name"
+                            className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Phone *</label>
+                          <Input
+                            value={deliveryDetails.contactPhone}
+                            onChange={(e) => setDeliveryDetails({...deliveryDetails, contactPhone: e.target.value})}
+                            placeholder="+880..."
+                            className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Address Line 1 *</label>
+                        <Input
+                          value={deliveryDetails.addressLine1}
+                          onChange={(e) => setDeliveryDetails({...deliveryDetails, addressLine1: e.target.value})}
+                          placeholder="Street address, area..."
+                          className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Address Line 2</label>
+                        <Input
+                          value={deliveryDetails.addressLine2}
+                          onChange={(e) => setDeliveryDetails({...deliveryDetails, addressLine2: e.target.value})}
+                          placeholder="Apt, suite, floor (optional)"
+                          className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">City *</label>
+                          <Input
+                            value={deliveryDetails.city}
+                            onChange={(e) => setDeliveryDetails({...deliveryDetails, city: e.target.value})}
+                            placeholder="City"
+                            className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Postal Code</label>
+                          <Input
+                            value={deliveryDetails.postalCode}
+                            onChange={(e) => setDeliveryDetails({...deliveryDetails, postalCode: e.target.value})}
+                            placeholder="Postal code"
+                            className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                          />
+                        </div>
+                      </div>
+                      {deliveryZones.length > 0 && (
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Delivery Zone</label>
+                          <select
+                            value={(deliveryDetails as any).zoneId || ''}
+                            onChange={(e) => {
+                              const zone = deliveryZones.find((z: any) => (z.id || z._id) === e.target.value);
+                              setDeliveryDetails({...deliveryDetails, zoneId: e.target.value} as any);
+                              if (zone) {
+                                setDeliveryFee(String((zone as any).deliveryCharge || 0));
+                              }
+                            }}
+                            className="w-full rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-sky-500/20 transition-all"
+                          >
+                            <option value="">Select zone (optional)</option>
+                            {deliveryZones.map((zone: any) => (
+                              <option key={zone.id || zone._id} value={zone.id || zone._id}>
+                                {zone.name} — {formatCurrency(zone.deliveryCharge || 0)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Delivery Fee</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={deliveryFee}
+                          onChange={(e) => setDeliveryFee(e.target.value)}
+                          placeholder="0"
+                          className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Instructions</label>
+                        <textarea
+                          value={deliveryDetails.instructions}
+                          onChange={(e) => setDeliveryDetails({...deliveryDetails, instructions: e.target.value})}
+                          placeholder="Delivery instructions, landmarks..."
+                          className="w-full h-16 rounded-xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 p-3 text-xs outline-none focus:border-sky-500/50 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500/10 transition-all resize-none"
+                        />
+                      </div>
+                    </div>
+                  ) : requiresTakeawayDetails ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBagIcon className="h-4 w-4 text-sky-500" />
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Takeaway Details</label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Name</label>
+                          <Input
+                            value={takeawayDetails.contactName}
+                            onChange={(e) => setTakeawayDetails({...takeawayDetails, contactName: e.target.value})}
+                            placeholder="Customer name (optional)"
+                            className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Phone</label>
+                          <Input
+                            value={takeawayDetails.contactPhone}
+                            onChange={(e) => setTakeawayDetails({...takeawayDetails, contactPhone: e.target.value})}
+                            placeholder="+880... (optional)"
+                            className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Instructions</label>
+                        <textarea
+                          value={takeawayDetails.instructions}
+                          onChange={(e) => setTakeawayDetails({...takeawayDetails, instructions: e.target.value})}
+                          placeholder="Preparation instructions, pickup time..."
+                          className="w-full h-16 rounded-xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 p-3 text-xs outline-none focus:border-sky-500/50 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500/10 transition-all resize-none"
+                        />
+                      </div>
+                    </div>
                   ) : (
                     <div className="py-4 text-center">
                       <p className="text-xs text-slate-400 italic font-medium">No seating requirements for {orderType}</p>
@@ -4631,15 +4773,15 @@ export default function POSPage() {
                       {getOrderTypeLabel(queueDetail.orderType as OrderType)}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Payment</p>
-                    <p className="text-sm font-semibold text-slate-100">
+                  <div className="rounded-xl border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/70 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500 mb-1">Payment</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                       {queueDetail.paymentMethod ? queueDetail.paymentMethod : 'Not recorded'}
                     </p>
                   </div>
                   {queueDetail.customerInfo && (
-                    <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3 sm:col-span-2">
-                      <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Customer</p>
+                    <div className="rounded-xl border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/70 px-4 py-3 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500 mb-1">Customer</p>
                       <div className="space-y-1 text-sm text-gray-900 dark:text-slate-200">
                         {queueDetail.customerInfo.name && <p>{queueDetail.customerInfo.name}</p>}
                         {queueDetail.customerInfo.phone && <p>{queueDetail.customerInfo.phone}</p>}
@@ -4688,23 +4830,23 @@ export default function POSPage() {
                         );
                       })
                     ) : (
-                      <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-6 text-center text-xs text-slate-400">
+                      <div className="rounded-xl border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/70 px-4 py-6 text-center text-xs text-gray-500 dark:text-slate-400">
                         No line items recorded for this order.
                       </div>
                     )}
                   </div>
                 </div>
                 {queueDetail.notes && (
-                  <div className="rounded-xl border border-slate-900 bg-slate-950/70 px-4 py-3 text-sm text-slate-200">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-1">Order Notes</p>
+                  <div className="rounded-xl border border-gray-300 dark:border-slate-900 bg-gray-50 dark:bg-slate-950/70 px-4 py-3 text-sm text-gray-800 dark:text-slate-200">
+                    <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-slate-500 mb-1">Order Notes</p>
                     <p className="whitespace-pre-line">{queueDetail.notes}</p>
                   </div>
                 )}
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-1 text-sm text-slate-300">
+                  <div className="space-y-1 text-sm text-gray-600 dark:text-slate-300">
                     <div className="flex items-center gap-2">
-                      <CurrencyDollarIcon className="h-4 w-4 text-emerald-300" />
-                      <span className="font-semibold text-emerald-300">
+                      <CurrencyDollarIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-300">
                         {formatCurrency(Number(queueDetail.totalAmount || 0))}
                       </span>
                     </div>
@@ -5114,24 +5256,24 @@ export default function POSPage() {
       >
         {occupiedTableModal && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-orange-500/40 bg-orange-500/10 p-4">
-              <p className="text-sm text-orange-200">
+            <div className="rounded-xl border border-orange-300 dark:border-orange-500/40 bg-orange-50 dark:bg-orange-500/10 p-4">
+              <p className="text-sm text-orange-700 dark:text-orange-200">
                 This table has an active order. Choose an action below:
               </p>
             </div>
             {occupiedTableModal.orderDetails && (
-              <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <div className="space-y-3 rounded-xl border border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-slate-400">Token Number</p>
-                    <p className="font-semibold text-slate-100">{occupiedTableModal.orderDetails.tokenNumber || occupiedTableModal.orderDetails.orderNumber}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Token Number</p>
+                    <p className="font-semibold text-gray-900 dark:text-slate-100">{occupiedTableModal.orderDetails.tokenNumber || occupiedTableModal.orderDetails.orderNumber}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">Order Amount</p>
-                    <p className="font-semibold text-emerald-400">{formatCurrency(occupiedTableModal.orderDetails.totalAmount || 0)}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Order Amount</p>
+                    <p className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(occupiedTableModal.orderDetails.totalAmount || 0)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">Order Status</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Order Status</p>
                     {(() => {
                       // Get order status from multiple possible locations
                       const orderDetails = occupiedTableModal.orderDetails;
@@ -5159,8 +5301,8 @@ export default function POSPage() {
                   </div>
                   {occupiedTableModal.orderDetails.waiterName && (
                     <div>
-                      <p className="text-xs text-slate-400">Waiter</p>
-                      <p className="font-semibold text-slate-100">{occupiedTableModal.orderDetails.waiterName}</p>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">Waiter</p>
+                      <p className="font-semibold text-gray-900 dark:text-slate-100">{occupiedTableModal.orderDetails.waiterName}</p>
                     </div>
                   )}
                   {occupiedTableModal.orderDetails.holdCount > 0 && (
@@ -5170,8 +5312,8 @@ export default function POSPage() {
                     </div>
                   )}
                   <div className="col-span-2">
-                    <p className="text-xs text-slate-400">Used Seats</p>
-                    <p className="font-semibold text-slate-100">
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Used Seats</p>
+                    <p className="font-semibold text-gray-900 dark:text-slate-100">
                       {occupiedTableModal.orderDetails.usedSeats || 0} / {tables.find((t: any) => t.id === occupiedTableModal.tableId)?.capacity || 0}
                     </p>
                   </div>
@@ -5395,39 +5537,39 @@ export default function POSPage() {
       >
         {paymentSuccessOrder && (
           <div className="space-y-5">
-            <div className="rounded-2xl border border-emerald-600/40 bg-emerald-500/10 p-6 text-emerald-100">
-              <p className="text-sm uppercase tracking-[0.3em] text-emerald-200">Order</p>
-              <h3 className="text-2xl font-semibold">
+            <div className="rounded-2xl border border-emerald-300 dark:border-emerald-600/40 bg-emerald-50 dark:bg-emerald-500/10 p-6 text-emerald-800 dark:text-emerald-100">
+              <p className="text-sm uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-200">Order</p>
+              <h3 className="text-2xl font-semibold text-emerald-800 dark:text-emerald-100">
                 {paymentSuccessOrder.orderNumber ? `Order #${paymentSuccessOrder.orderNumber}` : paymentSuccessOrder.orderId}
               </h3>
-              <p className="mt-2 text-sm text-emerald-100/80">
+              <p className="mt-2 text-sm text-emerald-600/80 dark:text-emerald-100/80">
                 {paymentSuccessOrder.summary || 'Payment recorded successfully.'}
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Total Paid</p>
-                <p className="text-xl font-semibold text-emerald-300">
+              <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/70 p-4">
+                <p className="text-xs uppercase tracking-[0.3em] text-gray-500 dark:text-slate-500">Total Paid</p>
+                <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-300">
                   {formatCurrency(paymentSuccessOrder.totalPaid)}
                 </p>
               </div>
               {paymentSuccessOrder.changeDue !== undefined && (
-                <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Change Due</p>
-                  <p className="text-xl font-semibold text-amber-300">
+                <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.3em] text-gray-500 dark:text-slate-500">Change Due</p>
+                  <p className="text-xl font-semibold text-amber-600 dark:text-amber-300">
                     {formatCurrency(paymentSuccessOrder.changeDue)}
                   </p>
                 </div>
               )}
             </div>
             {paymentSuccessOrder.breakdown && paymentSuccessOrder.breakdown.length > 0 && (
-              <div className="rounded-xl border border-slate-850 bg-slate-950/70 p-4 space-y-2">
-                <p className="text-sm font-semibold text-slate-100">Payment Breakdown</p>
-                <div className="space-y-1 text-sm text-slate-300">
+              <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/70 p-4 space-y-2">
+                <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Payment Breakdown</p>
+                <div className="space-y-1 text-sm text-gray-600 dark:text-slate-300">
                   {paymentSuccessOrder.breakdown.map((row) => (
                     <div key={`${row.method}-${row.amount}`} className="flex items-center justify-between">
                       <span className="capitalize">{row.method}</span>
-                      <span className="font-semibold text-slate-100">{formatCurrency(row.amount)}</span>
+                      <span className="font-semibold text-gray-900 dark:text-slate-100">{formatCurrency(row.amount)}</span>
                     </div>
                   ))}
                 </div>
