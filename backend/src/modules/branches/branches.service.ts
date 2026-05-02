@@ -313,7 +313,8 @@ export class BranchesService {
 
   async findOne(id: string): Promise<Branch> {
     if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid branch ID');
+      // Fallback: if it's not a valid ObjectId, try finding by slug
+      return this.findBySlugOnly(id);
     }
 
     const branch = await this.branchModel
@@ -355,26 +356,74 @@ export class BranchesService {
     return branch;
   }
 
+  async findBySlugOnly(slug: string): Promise<Branch> {
+    const normalizedSlug = slug?.trim()?.toLowerCase();
+    let branch = await this.branchModel
+      .findOne({ slug: normalizedSlug })
+      .populate('companyId', 'name email slug')
+      .populate('managerId', 'firstName lastName email')
+      .lean();
+
+    if (!branch && slug !== normalizedSlug) {
+      branch = await this.branchModel
+        .findOne({ slug })
+        .populate('companyId', 'name email slug')
+        .populate('managerId', 'firstName lastName email')
+        .lean();
+    }
+
+    if (!branch) {
+      throw new NotFoundException(`Branch with slug/ID "${slug}" not found`);
+    }
+
+    return branch as any;
+  }
+
   async findBySlug(companyId: string, branchSlug: string): Promise<Branch> {
     // Validate companyId before using it
     if (!Types.ObjectId.isValid(companyId)) {
       throw new BadRequestException(`Invalid company ID format: ${companyId}`);
     }
 
+    // Normalize slug for comparison (URLs are case-insensitive in practice)
+    const normalizedSlug = branchSlug?.trim()?.toLowerCase();
+
     // First, try to find branch by company + slug (preferred, multi-tenant safe)
     let branch = await this.branchModel
       .findOne({
         companyId: new Types.ObjectId(companyId),
-        slug: branchSlug,
+        slug: normalizedSlug,
       })
       .populate('companyId', 'name email slug')
       .populate('managerId', 'firstName lastName email')
       .lean();
 
-    // Fallback: in case companyId casting or historical data causes mismatch,
+    // Fallback 1: Try finding by ID if the branchSlug looks like an ObjectId
+    // This helps with legacy QR codes or misconfigured URLs
+    if (!branch && Types.ObjectId.isValid(branchSlug)) {
+      branch = await this.branchModel
+        .findOne({
+          _id: new Types.ObjectId(branchSlug),
+          companyId: new Types.ObjectId(companyId),
+        })
+        .populate('companyId', 'name email slug')
+        .populate('managerId', 'firstName lastName email')
+        .lean();
+    }
+
+    // Fallback 2: in case companyId casting or historical data causes mismatch,
     // try to find by slug only. This keeps old data working while still preferring
     // the stricter company+slug match above.
-    if (!branch) {
+    if (!branch && normalizedSlug) {
+      branch = await this.branchModel
+        .findOne({ slug: normalizedSlug })
+        .populate('companyId', 'name email slug')
+        .populate('managerId', 'firstName lastName email')
+        .lean();
+    }
+
+    // Fallback 3: try exact match if normalization changed anything (though unlikely with slugs)
+    if (!branch && branchSlug !== normalizedSlug) {
       branch = await this.branchModel
         .findOne({ slug: branchSlug })
         .populate('companyId', 'name email slug')
@@ -383,7 +432,7 @@ export class BranchesService {
     }
 
     if (!branch) {
-      throw new NotFoundException('Branch not found');
+      throw new NotFoundException(`Branch "${branchSlug}" not found`);
     }
 
     return branch as any;
