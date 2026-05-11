@@ -691,4 +691,24 @@ export class TablesService {
       console.error('Failed to emit table status change via cron:', error);
     }
   }
+
+  async incrementScanCount(branchId: string, tableNumber: string): Promise<void> {
+    try {
+      await this.tableModel.updateOne(
+        { 
+          branchId: new Types.ObjectId(branchId), 
+          $or: [
+            { tableNumber: tableNumber },
+            { number: tableNumber }
+          ]
+        },
+        { 
+          $inc: { scanCount: 1 },
+          $set: { lastScanAt: new Date() }
+        }
+      ).exec();
+    } catch (error) {
+      console.error('Failed to increment table scan count:', error);
+    }
+  }
 }

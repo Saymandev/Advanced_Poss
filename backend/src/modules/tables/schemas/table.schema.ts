@@ -68,6 +68,12 @@ export class Table {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ default: 0 })
+  scanCount: number;
+
+  @Prop()
+  lastScanAt?: Date;
 }
 
 export const TableSchema = SchemaFactory.createForClass(Table);

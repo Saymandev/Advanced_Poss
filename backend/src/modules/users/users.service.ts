@@ -117,10 +117,25 @@ export class UsersService {
 
     // CRITICAL: Filter out super_admin users unless explicitly requested
     if (!query.includeSuperAdmins) {
-      query.role = { $ne: 'super_admin' };
-    } else {
-      delete query.includeSuperAdmins;
+      if (query.role) {
+        // Support comma-separated roles or arrays
+        const roles = Array.isArray(query.role) 
+          ? query.role 
+          : typeof query.role === 'string' 
+            ? query.role.split(',').map(r => r.trim()) 
+            : [query.role];
+        
+        const filteredRoles = roles.filter(r => r !== 'super_admin');
+        query.role = filteredRoles.length > 1 ? { $in: filteredRoles } : filteredRoles[0];
+        
+        if (filteredRoles.length === 0) {
+          query.role = { $in: [] }; // Nothing matches if they only asked for super_admin
+        }
+      } else {
+        query.role = { $ne: 'super_admin' };
+      }
     }
+    delete query.includeSuperAdmins;
 
     // CRITICAL: Filter by companyId - only show employees from this company
     if (query.companyId) {

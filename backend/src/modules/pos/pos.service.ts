@@ -1864,6 +1864,26 @@ export class POSService {
         cancellationReason: `Full refund: ${reason}`,
       }).exec();
     }
+    // Record transaction for the refund
+    try {
+      await this.transactionsService.recordTransaction(
+        {
+          paymentMethodId: order.paymentMethod || 'cash',
+          type: TransactionType.OUT,
+          category: TransactionCategory.REFUND,
+          amount: amount,
+          date: new Date().toISOString(),
+          description: `Refund for Order #${order.orderNumber}. Reason: ${reason}`,
+          referenceId: orderId,
+        },
+        order.companyId.toString(),
+        branchId,
+        userId,
+      );
+    } catch (trxError) {
+      console.error('❌ [processRefund] Failed to record transaction:', trxError);
+    }
+
     return savedRefund;
   }
   // Get order history for a specific table

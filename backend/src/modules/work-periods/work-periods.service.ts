@@ -326,6 +326,17 @@ export class WorkPeriodsService {
       totalByPaymentMethod[method] = (totalByPaymentMethod[method] || 0) + payment.amount;
     });
 
+    const refundDetails = payments
+      .filter(p => p.amount < 0)
+      .map(p => ({
+        id: p._id || p.id,
+        amount: Math.abs(p.amount),
+        method: p.method,
+        reason: (p as any).paymentDetails?.refundReason || 'No reason',
+        orderId: (p as any).paymentDetails?.originalOrderId,
+        createdAt: p.createdAt
+      }));
+
     // Get Hotel Transactions for this work period
     const hotelTransactions = await this.transactionModel.find({
       workPeriodId: new Types.ObjectId(workPeriodId),
@@ -363,6 +374,7 @@ export class WorkPeriodsService {
       voidCount,
       cancelCount,
       paymentMethods: paymentMethodsArray,
+      refundDetails,
       orders: orders.orders.map((order: any) => ({
         id: order._id || order.id,
         orderNumber: order.orderNumber,

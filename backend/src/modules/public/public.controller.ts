@@ -117,7 +117,11 @@ export class PublicController {
   async getBranchMenuById(
     @Param('branchId') branchId: string,
     @Query('type') menuType?: string,
+    @Query('table') tableNumber?: string,
   ) {
+    if (tableNumber) {
+      await this.publicService.incrementTableScan(branchId, tableNumber);
+    }
     const branch = await this.branchesService.findOne(branchId);
     if (!branch || !(branch as any).isActive) {
       throw new NotFoundException('Branch not found or inactive');
@@ -175,6 +179,7 @@ export class PublicController {
     @Param('companySlug') companySlug: string,
     @Param('branchSlug') branchSlug: string,
     @Query('type') menuType?: string,
+    @Query('table') tableNumber?: string,
   ) {
     // Step 1: Find company by unique slug (company slug is always unique)
     const company = await this.companiesService.findBySlug(companySlug);
@@ -187,6 +192,11 @@ export class PublicController {
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
     if (!branch) {
       throw new NotFoundException(`Branch with slug "${branchSlug}" not found for company "${companySlug}"`);
+    }
+
+    let branchId = (branch as any)._id?.toString() || (branch as any).id;
+    if (tableNumber && branchId) {
+      await this.publicService.incrementTableScan(branchId, tableNumber);
     }
     // Step 3: Verify branch actually belongs to the company (handle ObjectId/string formats)
     // Extract branch companyId - handle both populated ObjectId and string formats
@@ -204,7 +214,6 @@ export class PublicController {
     // Normalize both IDs to strings for comparison
     const normalizedBranchCompanyId = branchCompanyId?.toString();
     const normalizedCompanyId = companyId?.toString();
-    let branchId = (branch as any)._id?.toString() || (branch as any).id;
     let actualBranch = branch;
     // Step 4: If branch companyId doesn't match, find the correct branch for this company
     if (normalizedBranchCompanyId && normalizedCompanyId && normalizedBranchCompanyId !== normalizedCompanyId) {

@@ -557,5 +557,9 @@ export class PublicService {
     const customer = new this.customerModel(customerData);
     return customer.save();
   }
+
+  async incrementTableScan(branchId: string, tableNumber: string): Promise<void> {
+    await this.tablesService.incrementScanCount(branchId, tableNumber);
+  }
 }
 
