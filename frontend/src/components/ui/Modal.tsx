@@ -1,6 +1,9 @@
+'use client';
+
 import { cn } from '@/lib/utils';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   isOpen: boolean;
@@ -29,17 +32,19 @@ export function Modal({
   size = 'md',
   className
 }: ModalProps) {
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
 
-  // Extract z-index from className if provided, otherwise use default z-[9999]
-  const zIndexMatch = className?.match(/z-\[?(\d+)\]?/);
-  const zIndexValue = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 9999;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   // Strip z-index related classes from the className before applying to inner div
   const cleanedClassName = className?.replace(/z-\[\d+\]/g, '').replace(/z-\d+/g, '').trim();
 
-  return (
-    <div className="fixed inset-0 overflow-y-auto animate-fade-in" style={{ zIndex: zIndexValue }}>
+  const modalContent = (
+    <div className="fixed inset-0 overflow-y-auto animate-fade-in" style={{ zIndex: 9999 }}>
       <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
@@ -74,6 +79,10 @@ export function Modal({
       </div>
     </div>
   );
+
+  // Use React Portal to render at document.body level,
+  // escaping any parent stacking contexts (e.g., sidebar's z-50)
+  return createPortal(modalContent, document.body);
 }
 
 interface ConfirmModalProps {
