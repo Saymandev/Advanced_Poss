@@ -730,6 +730,7 @@ export default function MenuItemsPage() {
     setFormData({
       ...formData,
       ingredients: [...formData.ingredients, { ingredientId: '', quantity: 0, unit: 'pcs' }],
+      trackInventory: true,
     });
   };
   const updateIngredient = (index: number, field: 'ingredientId' | 'quantity' | 'unit', value: string | number) => {
@@ -742,7 +743,7 @@ export default function MenuItemsPage() {
         ...newIngredients[index],
         [field]: field === 'quantity' ? Number(value) : String(value),
       };
-      return { ...prev, ingredients: newIngredients };
+      return { ...prev, ingredients: newIngredients, trackInventory: true };
     });
   };
   const removeIngredient = (index: number) => {
