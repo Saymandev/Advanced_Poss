@@ -20,6 +20,8 @@ export interface Table {
   };
   createdAt: string;
   updatedAt: string;
+  scanCount?: number;
+  lastScanAt?: string;
 }
 
 export interface CreateTableRequest {
@@ -105,6 +107,8 @@ export const tablesApi = apiSlice.injectEndpoints({
             reservedBy: table.reservedBy,
             createdAt: table.createdAt || new Date().toISOString(),
             updatedAt: table.updatedAt || new Date().toISOString(),
+            scanCount: table.scanCount || 0,
+            lastScanAt: table.lastScanAt,
           })) as Table[],
           total: data.total || items.length,
         };
@@ -134,6 +138,8 @@ export const tablesApi = apiSlice.injectEndpoints({
           reservedBy: table.reservedBy,
           createdAt: table.createdAt || new Date().toISOString(),
           updatedAt: table.updatedAt || new Date().toISOString(),
+          scanCount: table.scanCount || 0,
+          lastScanAt: table.lastScanAt,
         } as Table;
       },
       providesTags: ['Table'],

@@ -984,10 +984,16 @@ export default function WorkPeriodsPage() {
                           {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.hotelRevenue || 0)}
                         </td>
                       </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-red-600 dark:text-red-400">Refund Total</td>
+                        <td className="px-4 py-2 text-right font-semibold text-red-600 dark:text-red-400">
+                          {isLoadingSalesSummary ? 'Loading...' : `-${formatCurrency(salesSummary?.refundTotal || 0)}`}
+                        </td>
+                      </tr>
                       <tr className="bg-gray-50 dark:bg-gray-800/50">
-                        <td className="px-4 py-2 font-bold text-gray-900 dark:text-white">Gross Sales (Total)</td>
+                        <td className="px-4 py-2 font-bold text-gray-900 dark:text-white">Net Sales</td>
                         <td className="px-4 py-2 text-right font-bold text-gray-900 dark:text-white">
-                          {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.grossSales || 0)}
+                          {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.netSales || 0)}
                         </td>
                       </tr>
                     </tbody>
@@ -1249,6 +1255,43 @@ export default function WorkPeriodsPage() {
                             </td>
                             <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
                               {order.createdAt ? formatDateTime(order.createdAt) : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Refunds During Period */}
+            {salesSummary && salesSummary.refundDetails && salesSummary.refundDetails.length > 0 && (
+              <div>
+                <h4 className="font-medium text-red-600 dark:text-red-400 mb-3">
+                  Refunds Processed ({salesSummary.refundDetails.length})
+                </h4>
+                <div className="border border-red-200 dark:border-red-900/30 rounded-lg overflow-hidden">
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-red-50 dark:bg-red-900/20">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-red-700 dark:text-red-300">Amount</th>
+                          <th className="px-4 py-2 text-left text-red-700 dark:text-red-300">Reason</th>
+                          <th className="px-4 py-2 text-left text-red-700 dark:text-red-300">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-red-100 dark:divide-red-900/20">
+                        {salesSummary.refundDetails.map((refund: any) => (
+                          <tr key={refund.id} className="hover:bg-red-50 dark:hover:bg-red-900/10">
+                            <td className="px-4 py-2 text-red-700 dark:text-red-300 font-bold">
+                              -{formatCurrency(refund.amount)}
+                            </td>
+                            <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                              {refund.reason}
+                            </td>
+                            <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
+                              {refund.createdAt ? formatDateTime(refund.createdAt) : 'N/A'}
                             </td>
                           </tr>
                         ))}

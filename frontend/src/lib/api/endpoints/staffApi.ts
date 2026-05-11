@@ -6,7 +6,7 @@ export interface Staff {
   lastName: string;
   email: string;
   phoneNumber: string;
-  role: 'owner' | 'manager' | 'chef' | 'waiter' | 'cashier';
+  role: 'owner' | 'manager' | 'chef' | 'cook' | 'waiter' | 'cashier';
   department?: string;
   employeeId: string;
   hireDate: string;
@@ -44,7 +44,7 @@ export interface CreateStaffRequest {
   lastName: string;
   email: string;
   phoneNumber?: string;
-  role: 'owner' | 'manager' | 'chef' | 'waiter' | 'cashier';
+  role: 'owner' | 'manager' | 'chef' | 'cook' | 'waiter' | 'cashier';
   password?: string;
   pin?: string;
   department?: string;

@@ -98,6 +98,8 @@ export default function TablesPage() {
       reservedBy: table.reservedBy,
       createdAt: table.createdAt || new Date().toISOString(),
       updatedAt: table.updatedAt || new Date().toISOString(),
+      scanCount: table.scanCount || 0,
+      lastScanAt: table.lastScanAt,
     }));
     return transformed;
   }, [tablesResponse]);
@@ -890,6 +892,31 @@ export default function TablesPage() {
                     {selectedTable.reservedBy.name} ({selectedTable.reservedBy.partySize} guests)
                   </p>
                   <Badge variant="warning">Reserved</Badge>
+                </div>
+              )}
+              {selectedTable.qrCode && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Scan Count
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <EyeIcon className="w-5 h-5 text-gray-400" />
+                      <span className="text-gray-900 dark:text-white font-semibold">
+                        {selectedTable.scanCount || 0} scans
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Last Scan
+                    </label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {selectedTable.lastScanAt 
+                        ? format(parseISO(selectedTable.lastScanAt), 'MMM d, h:mm a')
+                        : 'Never scanned'}
+                    </p>
+                  </div>
                 </div>
               )}
               {selectedTable.qrCode && (

@@ -3871,9 +3871,10 @@ export default function POSPage() {
       onClose={() => setIsQueueModalOpen(false)}
       title="Global Orders Queue"
       size="2xl"
+      className="z-[999]"
     >
       <div className="flex flex-col h-[75vh] bg-gray-50 dark:bg-slate-950 rounded-b-3xl overflow-hidden">
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900 px-8 py-5 bg-white dark:bg-slate-950 z-10">
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900 px-8 py-3 bg-white dark:bg-slate-950 z-10">
           <div className="flex items-center gap-6">
             {(['active', 'history'] as const).map((tab) => {
               const isActive = queueTab === tab;
@@ -3903,7 +3904,7 @@ export default function POSPage() {
           </Button>
         </div>
 
-        <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-white/50 dark:bg-slate-950/50 border-b border-gray-200 dark:border-slate-900/50 backdrop-blur-md">
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-white/50 dark:bg-slate-950/50 border-b border-gray-200 dark:border-slate-900/50 backdrop-blur-md">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-1">Channel Filter</label>
             <select

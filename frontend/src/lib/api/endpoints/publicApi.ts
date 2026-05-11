@@ -126,10 +126,11 @@ export const publicApi = apiSlice.injectEndpoints({
       };
       categories: PublicCategory[];
       menuItems: PublicMenuItem[];
-    }, { branchId: string; menuType?: string }>({
-      query: ({ branchId, menuType }) => {
+    }, { branchId: string; menuType?: string; table?: string }>({
+      query: ({ branchId, menuType, table }) => {
         const params = new URLSearchParams();
         if (menuType) params.append('type', menuType);
+        if (table) params.append('table', table);
         return `/public/branches/${branchId}/menu${params.toString() ? `?${params.toString()}` : ''}`;
       },
       transformResponse: (response: any) => {
@@ -149,11 +150,14 @@ export const publicApi = apiSlice.injectEndpoints({
       };
       categories: PublicCategory[];
       menuItems: PublicMenuItem[];
-    }, { companySlug: string; branchSlug: string; menuType?: string }>({
-      query: ({ companySlug, branchSlug, menuType }) => {
+    }, { companySlug: string; branchSlug: string; menuType?: string; table?: string }>({
+      query: ({ companySlug, branchSlug, menuType, table }) => {
         const params = new URLSearchParams();
         if (menuType && menuType !== 'full') {
           params.append('type', menuType);
+        }
+        if (table) {
+          params.append('table', table);
         }
         return `/public/companies/${companySlug}/branches/${branchSlug}/menu${params.toString() ? `?${params.toString()}` : ''}`;
       },

@@ -83,9 +83,9 @@ export default function KitchenPage() {
   const lastRefetchTimeRef = useRef<number>(0);
   const REFETCH_DEBOUNCE_MS = 1000; // Minimum 1 second between refetches
 
-  // Fetch only chefs for assignment (not cooks)
+  // Fetch both chefs and cooks for assignment
   const { data: chefsData } = useGetStaffQuery(
-    { role: 'chef', branchId, isActive: true },
+    { role: 'chef,cook', branchId, isActive: true },
     { skip: !branchId }
   );
   const chefs = useMemo(() => {
@@ -488,6 +488,80 @@ export default function KitchenPage() {
     }
   };
 
+  const handlePrintTicket = (order: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Could not open print window. Please check your popup blocker.');
+      return;
+    }
+
+    const itemsHtml = (order.items || []).map((item: any) => `
+      <div style="margin-bottom: 8px; border-bottom: 1px dotted #ccc; padding-bottom: 4px;">
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em;">
+          <span>${item.quantity}x ${item.name || item.menuItemId?.name || 'Item'}</span>
+        </div>
+        ${item.selectedVariant ? `<div style="font-size: 0.85em; color: #444; margin-left: 10px;">- ${item.selectedVariant.name}</div>` : ''}
+        ${item.selectedAddons?.length ? `<div style="font-size: 0.85em; color: #444; margin-left: 10px;">+ ${item.selectedAddons.map((a: any) => a.name).join(', ')}</div>` : ''}
+        ${item.specialInstructions ? `<div style="margin-top: 4px; color: #000; font-weight: bold; background: #eee; padding: 2px 4px; font-size: 0.9em;">⚠️ ${item.specialInstructions}</div>` : ''}
+      </div>
+    `).join('');
+
+    const ticketHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ticket #${order.orderNumber}</title>
+          <style>
+            @page { margin: 0; }
+            body { 
+              font-family: 'Courier New', Courier, monospace; 
+              width: 80mm; 
+              margin: 0; 
+              padding: 8mm;
+              font-size: 13px;
+              line-height: 1.3;
+              color: #000;
+            }
+            .header { text-align: center; margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 8px; }
+            .order-info { margin-bottom: 12px; font-size: 0.95em; }
+            .order-info div { display: flex; justify-content: space-between; margin-bottom: 2px; }
+            .items { margin-bottom: 12px; }
+            .footer { text-align: center; font-size: 0.75em; margin-top: 15px; border-top: 1px solid #000; padding-top: 4px; }
+            .urgent { border: 3px solid #000; padding: 4px; text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 10px; }
+          </style>
+        </head>
+        <body>
+          ${order.priority === 'urgent' || order.isUrgent ? '<div class="urgent">*** URGENT ***</div>' : ''}
+          <div class="header">
+            <h2 style="margin: 0; font-size: 1.3em;">KITCHEN TICKET</h2>
+            <div style="font-size: 1.6em; font-weight: bold; margin-top: 4px;">#${order.orderNumber}</div>
+          </div>
+          <div class="order-info">
+            <div><span>TYPE:</span> <strong>${(order.orderType || 'N/A').toUpperCase()}</strong></div>
+            <div><span>TABLE:</span> <strong>${order.tableNumber || 'N/A'}</strong></div>
+            <div><span>TIME:</span> <span>${new Date(order.receivedAt || order.createdAt).toLocaleTimeString()}</span></div>
+            ${order.customerName ? `<div><span>CUSTOMER:</span> <span>${order.customerName.toUpperCase()}</span></div>` : ''}
+          </div>
+          <div class="items">
+            ${itemsHtml}
+          </div>
+          <div class="footer">
+            <p>Printed: ${new Date().toLocaleString()}</p>
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(ticketHtml);
+    printWindow.document.close();
+  };
+
   const getPriorityBadge = (priority: 'urgent' | 'high' | 'normal' | 'low' | undefined) => {
     const variants = {
       urgent: 'danger',
@@ -882,7 +956,7 @@ export default function KitchenPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.print()}
+                          onClick={() => handlePrintTicket(order)}
                           className="text-gray-500 hover:text-gray-700 text-xs sm:text-sm"
                           title="Print Ticket"
                         >
