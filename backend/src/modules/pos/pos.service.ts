@@ -230,6 +230,9 @@ export class POSService {
           quantity: item.quantity,
           price: item.price || (menuItem?.price || 0), // Use menu price if not in preorder
           notes: item.notes,
+          variantSelections: item.variantSelections,
+          addonSelections: item.addonSelections,
+          selectionChoices: item.selectionChoices,
         };
       })
     );
@@ -310,25 +313,25 @@ export class POSService {
         !Array.isArray(menuItem.ingredients) ||
         menuItem.ingredients.length === 0
       ) {
+        console.log(`[POS] Skipping inventory for ${menuItem?.name || menuItemId} - tracking disabled or no ingredients`);
         continue;
       }
+      console.log(`[POS] Processing inventory for ${menuItem.name} (${item.quantity} units)`);
       for (const ingredient of menuItem.ingredients) {
         const rawIngredient = ingredient?.ingredientId as any;
-        const ingredientObjectId: Types.ObjectId | undefined =
-          rawIngredient?.id
-            ? new Types.ObjectId(rawIngredient.id)
-            : rawIngredient?._id
-            ? new Types.ObjectId(rawIngredient._id)
-            : rawIngredient instanceof Types.ObjectId
-            ? rawIngredient
-            : undefined;
-        const ingredientId = ingredientObjectId
-          ? ingredientObjectId.toString()
-          : rawIngredient
-          ? String(rawIngredient)
-          : null;
+        let ingredientId: string | null = null;
+        
+        if (rawIngredient instanceof Types.ObjectId) {
+          ingredientId = rawIngredient.toString();
+        } else if (typeof rawIngredient === 'string') {
+          ingredientId = rawIngredient;
+        } else if (rawIngredient && typeof rawIngredient === 'object') {
+          ingredientId = rawIngredient._id?.toString() || rawIngredient.id?.toString();
+        }
+
         const baseQuantity = Number(ingredient?.quantity ?? 0);
         if (!ingredientId || Number.isNaN(baseQuantity) || baseQuantity <= 0) {
+          console.warn(`[POS] Invalid ingredient entry for ${menuItem.name}:`, ingredient);
           continue;
         }
         const totalUsage = baseQuantity * item.quantity;
@@ -378,6 +381,7 @@ export class POSService {
         const savedOrder = await order.save();
         try {
           for (const [ingredientId, usage] of ingredientUsage.entries()) {
+            console.log(`[POS] Deducting ${usage.quantity} ${usage.unit || 'units'} of ${usage.name || ingredientId}`);
             await this.ingredientsService.removeStock(
               ingredientId,
               usage.quantity,

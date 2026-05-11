@@ -10,6 +10,9 @@ export interface POSOrderItem {
   price: number; // Actual price used in order (may include modifications)
   basePrice?: number; // Original menu item base price at time of order (for historical accuracy)
   notes?: string;
+  variantSelections?: any[]; // Selected variants (e.g. Size: Large)
+  addonSelections?: any[]; // Selected addons (e.g. Extra Cheese)
+  selectionChoices?: any[]; // Selected choices (e.g. Spicy Level: Hot)
 }
 
 export interface CustomerInfo {

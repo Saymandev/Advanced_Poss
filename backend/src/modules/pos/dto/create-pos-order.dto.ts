@@ -30,6 +30,18 @@ export class POSOrderItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  variantSelections?: any[];
+
+  @IsOptional()
+  @IsArray()
+  addonSelections?: any[];
+
+  @IsOptional()
+  @IsArray()
+  selectionChoices?: any[];
 }
 
 export class CustomerInfoDto {
