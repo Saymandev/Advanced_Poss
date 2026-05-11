@@ -31,9 +31,12 @@ export function Modal({
 }: ModalProps) {
   if (!isOpen) return null;
 
-  // Extract z-index from className if provided, otherwise use default z-100
+  // Extract z-index from className if provided, otherwise use default z-[9999]
   const zIndexMatch = className?.match(/z-\[?(\d+)\]?/);
-  const zIndexValue = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 100;
+  const zIndexValue = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 9999;
+
+  // Strip z-index related classes from the className before applying to inner div
+  const cleanedClassName = className?.replace(/z-\[\d+\]/g, '').replace(/z-\d+/g, '').trim();
 
   return (
     <div className="fixed inset-0 overflow-y-auto animate-fade-in" style={{ zIndex: zIndexValue }}>
@@ -46,7 +49,7 @@ export function Modal({
           'relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full transform transition-all duration-300 animate-scale-in text-left my-8',
           'border border-gray-200 dark:border-gray-700',
           sizeClasses[size],
-          className
+          cleanedClassName
         )}>
           {/* Top gradient border */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500 rounded-t-2xl" />
