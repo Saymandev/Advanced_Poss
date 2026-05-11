@@ -150,14 +150,14 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 const ORDER_STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-500/10 text-amber-200 border border-amber-500/30',
-  confirmed: 'bg-sky-500/10 text-sky-200 border border-sky-500/30',
-  preparing: 'bg-blue-500/10 text-blue-200 border border-blue-500/30',
-  ready: 'bg-purple-500/10 text-purple-200 border border-purple-500/30',
-  served: 'bg-indigo-500/10 text-indigo-200 border border-indigo-500/30',
-  paid: 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30',
-  completed: 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30',
-  cancelled: 'bg-rose-500/10 text-rose-200 border border-rose-500/30',
+  pending: 'bg-amber-500/10 text-amber-600 dark:text-amber-200 border border-amber-500/30',
+  confirmed: 'bg-sky-500/10 text-sky-600 dark:text-sky-200 border border-sky-500/30',
+  preparing: 'bg-blue-500/10 text-blue-600 dark:text-blue-200 border border-blue-500/30',
+  ready: 'bg-purple-500/10 text-purple-600 dark:text-purple-200 border border-purple-500/30',
+  served: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-200 border border-indigo-500/30',
+  paid: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-200 border border-emerald-500/30',
+  completed: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-200 border border-emerald-500/30',
+  cancelled: 'bg-rose-500/10 text-rose-600 dark:text-rose-200 border border-rose-500/30',
 };
 const ORDER_STATUS_FILTERS = [
   { value: 'all', label: 'All Statuses' },
@@ -2724,7 +2724,7 @@ export default function POSPage() {
                             {table.orderDetails.orderStatus && table.orderDetails.orderStatus === 'pending' && (
                               <div className="flex items-center justify-between">
                                 <span className="text-slate-400">Order Status:</span>
-                                <Badge className="bg-amber-500/10 text-amber-200 border border-amber-500/30 text-xs">
+                                <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-200 border border-amber-500/30 text-xs">
                                   Pending Payment
                                 </Badge>
                               </div>
@@ -2881,7 +2881,7 @@ export default function POSPage() {
           onClick={() => setHasStartedOrder(true)}
           className="w-full max-w-sm rounded-3xl border-2 border-sky-500/40 bg-gray-50 dark:bg-slate-950/60 p-10 text-center transition hover:border-sky-400 hover:bg-gray-100 dark:hover:bg-slate-900/70 shadow-xl shadow-sky-950/20 space-y-6"
         >
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/15 text-sky-200">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-200">
             <IconComponent className="h-8 w-8" />
           </div>
           <div className="space-y-2">
@@ -3991,8 +3991,8 @@ export default function POSPage() {
                     </div>
 
                     <div className="flex gap-3 pt-5 border-t border-gray-100 dark:border-slate-800/50">
-                      <Button size="sm" variant="secondary" onClick={() => handleQueueViewDetails(orderId)} className="flex-1 h-11 rounded-2xl bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:bg-gray-100 dark:hover:bg-slate-800 text-[10px] font-black uppercase tracking-widest transition-all">Full Details</Button>
-                      <Button size="sm" variant="secondary" onClick={() => handlePrintReceipt(orderId, false)} className="h-11 w-11 p-0 rounded-2xl bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:bg-sky-500 hover:text-white transition-all"><PrinterIcon className="h-5 w-5" /></Button>
+                      <Button size="sm" variant="secondary" onClick={() => handleQueueViewDetails(orderId)} className="flex-1 h-11 rounded-2xl bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:bg-gray-100 dark:hover:bg-slate-800 text-[10px] font-black uppercase tracking-widest transition-all text-gray-700 dark:text-slate-300">Full Details</Button>
+                      <Button size="sm" variant="secondary" onClick={() => handlePrintReceipt(orderId, false)} className="h-11 w-11 p-0 rounded-2xl bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:bg-sky-500 hover:text-white transition-all text-gray-600 dark:text-slate-400"><PrinterIcon className="h-5 w-5" /></Button>
                       {order.status === 'pending' && (
                         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 h-11 rounded-2xl flex-[0.8] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all text-white border-none" onClick={() => updateOrder({ id: orderId, data: { status: 'paid' }}).then(refetchQueue)}>Settle Payment</Button>
                       )}
@@ -4892,7 +4892,7 @@ export default function POSPage() {
                                 toast.error(error?.data?.message || 'Failed to update order status');
                               }
                             }}
-                            className="rounded-lg bg-sky-500/15 text-sky-200 hover:bg-sky-500/25"
+                            className="rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-200 hover:bg-sky-500/25"
                           >
                             Confirm Order
                           </Button>
@@ -4901,7 +4901,7 @@ export default function POSPage() {
                           variant="secondary"
                           onClick={() => canActOnOrder && handleQueueCancel(detailId)}
                           disabled={!canActOnOrder || queueActionOrderId === detailId}
-                          className="rounded-lg bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
+                          className="rounded-lg bg-rose-500/15 text-rose-600 dark:text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
                         >
                           {queueActionOrderId === detailId ? 'Cancelling…' : 'Cancel Order'}
                         </Button>
@@ -4913,7 +4913,7 @@ export default function POSPage() {
                           variant="secondary"
                           onClick={() => canActOnOrder && handleOpenRefundModal(detailId, queueDetail.totalAmount || queueDetail.total)}
                           disabled={!canActOnOrder}
-                          className="rounded-lg bg-orange-500/15 text-orange-200 hover:bg-orange-500/25"
+                          className="rounded-lg bg-orange-500/15 text-orange-600 dark:text-orange-200 hover:bg-orange-500/25"
                         >
                           Refund
                         </Button>
@@ -4934,7 +4934,7 @@ export default function POSPage() {
                             }
                           }}
                           disabled={!canActOnOrder}
-                          className="rounded-lg bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"
+                          className="rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-200 hover:bg-amber-500/25"
                         >
                           Mark Pending
                         </Button>
@@ -5286,12 +5286,12 @@ export default function POSPage() {
                         : orderStatus === 'cancelled' ? 'Cancelled'
                         : orderStatus || 'Unknown';
                       const badgeClass = orderStatus === 'paid' 
-                        ? 'bg-emerald-500/10 text-emerald-200 border border-emerald-500/30'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-200 border border-emerald-500/30'
                         : orderStatus === 'pending'
-                        ? 'bg-amber-500/10 text-amber-200 border border-amber-500/30'
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-200 border border-amber-500/30'
                         : orderStatus === 'cancelled'
-                        ? 'bg-rose-500/10 text-rose-200 border border-rose-500/30'
-                        : 'bg-slate-500/10 text-slate-200 border border-slate-500/30';
+                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-200 border border-rose-500/30'
+                        : 'bg-slate-500/10 text-slate-600 dark:text-slate-200 border border-slate-500/30';
                       return (
                         <Badge className={badgeClass}>
                           {statusLabel}
