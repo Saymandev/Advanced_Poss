@@ -60,19 +60,19 @@ export function Modal({
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500 rounded-t-2xl" />
 
           {title && (
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 {title}
               </h3>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg p-1.5 transition-all hover:rotate-90"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg p-1 transition-all hover:rotate-90"
               >
-                <XMarkIcon className="w-6 h-6" />
+                <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
           )}
-          <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary-500/50 scrollbar-track-transparent hover:scrollbar-thumb-primary-600/70">
+          <div className="p-4 max-h-[85vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary-500/50 scrollbar-track-transparent hover:scrollbar-thumb-primary-600/70">
             {children}
           </div>
         </div>

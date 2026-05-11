@@ -3873,9 +3873,9 @@ export default function POSPage() {
       size="2xl"
       className="z-[999]"
     >
-      <div className="flex flex-col h-[75vh] bg-gray-50 dark:bg-slate-950 rounded-b-3xl overflow-hidden">
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900 px-8 py-3 bg-white dark:bg-slate-950 z-10">
-          <div className="flex items-center gap-6">
+      <div className="flex flex-col h-[80vh] bg-gray-50 dark:bg-slate-950 rounded-b-3xl overflow-hidden -mt-3">
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900 px-4 py-1.5 bg-white dark:bg-slate-950 z-10">
+          <div className="flex items-center gap-4">
             {(['active', 'history'] as const).map((tab) => {
               const isActive = queueTab === tab;
               return (
@@ -3883,12 +3883,12 @@ export default function POSPage() {
                   key={tab}
                   onClick={() => setQueueTab(tab)}
                   className={cn(
-                    "relative py-2 text-sm font-black uppercase tracking-widest transition-all",
+                    "relative py-1 text-xs font-black uppercase tracking-widest transition-all",
                     isActive ? "text-sky-500" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                   )}
                 >
                   {tab === 'active' ? 'Active' : 'History'}
-                  {isActive && <div className="absolute -bottom-1 left-0 right-0 h-1 bg-sky-500 rounded-full shadow-lg shadow-sky-500/40" />}
+                  {isActive && <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-sky-500 rounded-full shadow-lg shadow-sky-500/40" />}
                 </button>
               );
             })}
@@ -3898,45 +3898,45 @@ export default function POSPage() {
             variant="ghost"
             onClick={handleQueueRefresh}
             disabled={queueLoading}
-            className="h-11 w-11 p-0 rounded-2xl bg-gray-100 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all shadow-sm"
+            className="h-8 w-8 p-0 rounded-xl bg-gray-100 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all shadow-sm"
           >
-            <ArrowPathIcon className={cn("h-5 w-5 text-gray-700 dark:text-slate-300", queueLoading && "animate-spin")} />
+            <ArrowPathIcon className={cn("h-4 w-4 text-gray-700 dark:text-slate-300", queueLoading && "animate-spin")} />
           </Button>
         </div>
 
-        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-white/50 dark:bg-slate-950/50 border-b border-gray-200 dark:border-slate-900/50 backdrop-blur-md">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-1">Channel Filter</label>
+        <div className="px-4 py-2 flex flex-wrap items-end gap-3 bg-white/50 dark:bg-slate-950/50 border-b border-gray-200 dark:border-slate-900/50 backdrop-blur-md">
+          <div className="flex-1 min-w-[140px]">
+            <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-0.5 block">Channel</label>
             <select
               value={queueOrderTypeFilter}
               onChange={(e) => setQueueOrderTypeFilter(e.target.value as any)}
-              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-xs font-bold focus:ring-4 focus:ring-sky-500/10 transition-all outline-none"
+              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold focus:ring-2 focus:ring-sky-500/10 transition-all outline-none"
             >
               <option value="all">All Channels</option>
               {ORDER_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           {queueTab === 'history' && (
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-1">Status Overview</label>
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-0.5 block">Status</label>
               <select
                 value={queueStatusFilter}
                 onChange={(e) => setQueueStatusFilter(e.target.value as any)}
-                className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-xs font-bold focus:ring-4 focus:ring-sky-500/10 transition-all outline-none"
+                className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold focus:ring-2 focus:ring-sky-500/10 transition-all outline-none"
               >
                 {ORDER_STATUS_FILTERS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           )}
-          <div className="space-y-2 relative">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-1">Quick Search</label>
+          <div className="flex-1 min-w-[180px] relative">
+            <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-0.5 block">Search</label>
             <div className="relative">
-              <MagnifyingGlassIcon className="h-4 w-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <MagnifyingGlassIcon className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <Input
                 value={queueSearchInput}
                 onChange={(e) => setQueueSearchInput(e.target.value)}
                 placeholder="Order ID, Customer..."
-                className="pl-11 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-xs font-bold"
+                className="pl-9 h-8 rounded-lg bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-xs font-bold"
               />
             </div>
           </div>
