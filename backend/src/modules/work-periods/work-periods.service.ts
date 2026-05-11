@@ -329,12 +329,12 @@ export class WorkPeriodsService {
     const refundDetails = payments
       .filter(p => p.amount < 0)
       .map(p => ({
-        id: p._id || p.id,
+        id: (p as any)._id || (p as any).id,
         amount: Math.abs(p.amount),
         method: p.method,
         reason: (p as any).paymentDetails?.refundReason || 'No reason',
         orderId: (p as any).paymentDetails?.originalOrderId,
-        createdAt: p.createdAt
+        createdAt: (p as any).createdAt
       }));
 
     // Get Hotel Transactions for this work period
