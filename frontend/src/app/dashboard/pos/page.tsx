@@ -150,14 +150,14 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 const ORDER_STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-500/10 text-amber-600 dark:text-amber-200 border border-amber-500/30',
-  confirmed: 'bg-sky-500/10 text-sky-600 dark:text-sky-200 border border-sky-500/30',
-  preparing: 'bg-blue-500/10 text-blue-600 dark:text-blue-200 border border-blue-500/30',
-  ready: 'bg-purple-500/10 text-purple-600 dark:text-purple-200 border border-purple-500/30',
-  served: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-200 border border-indigo-500/30',
-  paid: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-200 border border-emerald-500/30',
-  completed: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-200 border border-emerald-500/30',
-  cancelled: 'bg-rose-500/10 text-rose-600 dark:text-rose-200 border border-rose-500/30',
+  pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-200 border border-amber-500/30',
+  confirmed: 'bg-sky-500/10 text-sky-700 dark:text-sky-200 border border-sky-500/30',
+  preparing: 'bg-blue-500/10 text-blue-700 dark:text-blue-200 border border-blue-500/30',
+  ready: 'bg-purple-500/10 text-purple-700 dark:text-purple-200 border border-purple-500/30',
+  served: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-200 border border-indigo-500/30',
+  paid: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-200 border border-emerald-500/30',
+  completed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-200 border border-emerald-500/30',
+  cancelled: 'bg-rose-500/10 text-rose-700 dark:text-rose-200 border border-rose-500/30',
 };
 const ORDER_STATUS_FILTERS = [
   { value: 'all', label: 'All Statuses' },
@@ -3870,7 +3870,7 @@ export default function POSPage() {
       isOpen={isQueueModalOpen}
       onClose={() => setIsQueueModalOpen(false)}
       title="Global Orders Queue"
-      size="xl"
+      size="2xl"
     >
       <div className="flex flex-col h-[75vh] bg-gray-50 dark:bg-slate-950 rounded-b-3xl overflow-hidden">
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-900 px-8 py-5 bg-white dark:bg-slate-950 z-10">
@@ -3959,7 +3959,7 @@ export default function POSPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {queueOrders.map((order: any) => {
                 const orderId = resolveOrderId(order);
                 const canAct = Boolean(orderId);
@@ -3991,8 +3991,8 @@ export default function POSPage() {
                     </div>
 
                     <div className="flex gap-3 pt-5 border-t border-gray-100 dark:border-slate-800/50">
-                      <Button size="sm" variant="secondary" onClick={() => handleQueueViewDetails(orderId)} className="flex-1 h-11 rounded-2xl bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:bg-gray-100 dark:hover:bg-slate-800 text-[10px] font-black uppercase tracking-widest transition-all text-gray-700 dark:text-slate-300">Full Details</Button>
-                      <Button size="sm" variant="secondary" onClick={() => handlePrintReceipt(orderId, false)} className="h-11 w-11 p-0 rounded-2xl bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:bg-sky-500 hover:text-white transition-all text-gray-600 dark:text-slate-400"><PrinterIcon className="h-5 w-5" /></Button>
+                      <Button size="sm" variant="primary" onClick={() => handleQueueViewDetails(orderId)} className="flex-1 h-11 rounded-2xl bg-sky-600 hover:bg-sky-500 border-none text-[10px] font-black uppercase tracking-widest transition-all text-white shadow-lg shadow-sky-500/20">Full Details</Button>
+                      <Button size="sm" variant="secondary" onClick={() => handlePrintReceipt(orderId, false)} className="h-11 w-11 p-0 rounded-2xl bg-slate-100 dark:bg-slate-800 border-none hover:bg-sky-500 hover:text-white transition-all text-slate-600 dark:text-slate-400"><PrinterIcon className="h-5 w-5" /></Button>
                       {order.status === 'pending' && (
                         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 h-11 rounded-2xl flex-[0.8] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all text-white border-none" onClick={() => updateOrder({ id: orderId, data: { status: 'paid' }}).then(refetchQueue)}>Settle Payment</Button>
                       )}
