@@ -209,7 +209,8 @@ export default function BranchShopPage() {
   };
 
   const calculateItemPrice = (item: any, variants: Record<string, string>, selections: Record<string, string | string[]>) => {
-    let price = item.price;
+    if (!item) return 0;
+    let price = item.price || 0;
     // Variants
     Object.entries(variants).forEach(([vName, oName]) => {
       const variant = item.variants?.find((v: any) => v.name === vName);
@@ -657,11 +658,12 @@ export default function BranchShopPage() {
       <Modal 
         isOpen={!!customizingItem} 
         onClose={() => setCustomizingItem(null)}
-        title={`Customize ${customizingItem?.name}`}
+        title={`Customize ${customizingItem?.name || ''}`}
         size="md"
       >
-        <div className="space-y-6 py-2">
-          {/* Variants */}
+        {customizingItem && (
+          <div className="space-y-6 py-2">
+            {/* Variants */}
             {customizingItem?.variants?.map((variant: any) => (
               <div key={variant.name}>
                 <Label className="text-base font-bold mb-3 block">{variant.name}</Label>
@@ -771,6 +773,7 @@ export default function BranchShopPage() {
               Add to Cart
             </Button>
           </div>
+        )}
       </Modal>
     </div>
   );
