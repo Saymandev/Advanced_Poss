@@ -274,6 +274,14 @@ export const inventoryApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Ingredient'],
     }),
+    updatePricing: builder.mutation<InventoryItem, { id: string; unitCost: number }>({
+      query: ({ id, unitCost }) => ({
+        url: `/ingredients/${id}/update-pricing`,
+        method: 'POST',
+        body: { unitCost },
+      }),
+      invalidatesTags: ['Ingredient'],
+    }),
     getLowStockItems: builder.query<InventoryItem[], { companyId?: string; branchId?: string }>({
       query: ({ companyId, branchId }) => ({
         url: `/ingredients/company/${companyId}/low-stock`,
@@ -349,6 +357,7 @@ export const {
   useAdjustStockMutation,
   useAddStockMutation,
   useRemoveStockMutation,
+  useUpdatePricingMutation,
   useGetLowStockItemsQuery,
   useGetExpiringItemsQuery,
   useGetSuppliersQuery,

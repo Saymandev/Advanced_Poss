@@ -8,7 +8,7 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { InventoryItem, useAddStockMutation, useFixAllStockStatusesMutation, useGetInventoryItemByIdQuery, useGetInventoryItemsQuery, useGetLowStockItemsQuery, useRemoveStockMutation } from '@/lib/api/endpoints/inventoryApi';
+import { InventoryItem, useAdjustStockMutation, useFixAllStockStatusesMutation, useGetInventoryItemByIdQuery, useGetInventoryItemsQuery, useGetLowStockItemsQuery, useUpdatePricingMutation } from '@/lib/api/endpoints/inventoryApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -34,7 +34,8 @@ export default function StocksPage() {
   const [isAdjustStockModalOpen, setIsAdjustStockModalOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<InventoryItem | null>(null);
   const [adjustmentQuantity, setAdjustmentQuantity] = useState<number>(0);
-  const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add');
+  const [adjustmentUnitCost, setAdjustmentUnitCost] = useState<number>(0);
+  const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove' | 'set' | 'wastage'>('add');
   const [adjustmentReason, setAdjustmentReason] = useState<string>('');
 
   const companyId = (user as any)?.companyId || 
@@ -59,8 +60,8 @@ export default function StocksPage() {
     skip: !selectedIngredient?.id 
   });
 
-  const [addStock, { isLoading: isAddingStock }] = useAddStockMutation();
-  const [removeStock, { isLoading: isRemovingStock }] = useRemoveStockMutation();
+  const [adjustStock, { isLoading: isAdjustingStock }] = useAdjustStockMutation();
+  const [updatePricing, { isLoading: isUpdatingPricing }] = useUpdatePricingMutation();
   const [fixStatuses, { isLoading: isFixingStatuses }] = useFixAllStockStatusesMutation();
 
   // Extract ingredients from API response
@@ -134,10 +135,11 @@ export default function StocksPage() {
     setIsDetailsModalOpen(true);
   };
 
-  const openAdjustStockModal = (ingredient: InventoryItem, type: 'add' | 'remove') => {
+  const openAdjustStockModal = (ingredient: InventoryItem, type: 'add' | 'remove' | 'set' | 'wastage' = 'add') => {
     setSelectedIngredient(ingredient);
     setAdjustmentType(type);
     setAdjustmentQuantity(0);
+    setAdjustmentUnitCost(ingredient.unitCost || 0);
     setAdjustmentReason('');
     setIsAdjustStockModalOpen(true);
   };
@@ -150,27 +152,33 @@ export default function StocksPage() {
       return;
     }
 
-    if (adjustmentType === 'remove' && adjustmentQuantity > (selectedIngredient.currentStock || 0)) {
+    if ((adjustmentType === 'remove' || adjustmentType === 'wastage') && adjustmentQuantity > (selectedIngredient.currentStock || 0)) {
       toast.error('Cannot remove more stock than available');
       return;
     }
 
     try {
-      if (adjustmentType === 'add') {
-        await addStock({ 
-          id: selectedIngredient.id, 
-          quantity: adjustmentQuantity 
+      // If it's a purchase (add), we might want to update the unit cost
+      if (adjustmentType === 'add' && adjustmentUnitCost > 0 && adjustmentUnitCost !== (selectedIngredient.unitCost || 0)) {
+        await updatePricing({
+          id: selectedIngredient.id,
+          unitCost: adjustmentUnitCost
         }).unwrap();
-        toast.success(`Added ${adjustmentQuantity} ${selectedIngredient.unit} successfully`);
-      } else {
-        await removeStock({ 
-          id: selectedIngredient.id, 
-          quantity: adjustmentQuantity 
-        }).unwrap();
-        toast.success(`Removed ${adjustmentQuantity} ${selectedIngredient.unit} successfully`);
       }
+
+      await adjustStock({
+        id: selectedIngredient.id,
+        data: {
+          type: adjustmentType,
+          quantity: adjustmentQuantity,
+          reason: adjustmentReason || undefined,
+        }
+      }).unwrap();
+      
+      toast.success(`Stock adjusted successfully`);
       setIsAdjustStockModalOpen(false);
       setAdjustmentQuantity(0);
+      setAdjustmentUnitCost(0);
       setAdjustmentReason('');
       refetch();
       if (isDetailsModalOpen) {
@@ -291,7 +299,7 @@ export default function StocksPage() {
             variant="ghost"
             size="sm"
             onClick={() => openAdjustStockModal(row, 'add')}
-            title="Add Stock"
+            title="New Purchase (+)"
             className="text-green-600 hover:text-green-700"
           >
             <PlusIcon className="w-4 h-4" />
@@ -299,12 +307,11 @@ export default function StocksPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => openAdjustStockModal(row, 'remove')}
-            title="Remove Stock"
-            className="text-red-600 hover:text-red-700"
-            disabled={!row.currentStock || row.currentStock <= 0}
+            onClick={() => openAdjustStockModal(row, 'add')}
+            title="Adjust Stock"
+            className="text-blue-600 hover:text-blue-700"
           >
-            <MinusIcon className="w-4 h-4" />
+            <ArrowsUpDownIcon className="w-4 h-4" />
           </Button>
         </div>
       ),
@@ -381,9 +388,9 @@ export default function StocksPage() {
                 }
 
                 if (type === 'add' || type === 'increase') {
-                  await addStock({ 
+                  await adjustStock({ 
                     id: ingredient.id, 
-                    quantity 
+                    data: { type: 'add', quantity }
                   }).unwrap();
                   successCount++;
                 } else if (type === 'remove' || type === 'decrease' || type === 'subtract') {
@@ -391,9 +398,9 @@ export default function StocksPage() {
                     errorCount++;
                     continue;
                   }
-                  await removeStock({ 
+                  await adjustStock({ 
                     id: ingredient.id, 
-                    quantity 
+                    data: { type: 'remove', quantity }
                   }).unwrap();
                   successCount++;
                 } else {
@@ -802,7 +809,7 @@ export default function StocksPage() {
           setAdjustmentQuantity(0);
           setAdjustmentReason('');
         }}
-        title={adjustmentType === 'add' ? 'Add Stock' : 'Remove Stock'}
+        title="Adjust Stock"
         className="max-w-md"
       >
         {selectedIngredient && (
@@ -822,7 +829,23 @@ export default function StocksPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Quantity ({selectedIngredient.unit})
+                Adjustment Type
+              </label>
+              <Select
+                options={[
+                  { value: 'add', label: 'New Purchase (+)' },
+                  { value: 'wastage', label: 'Wastage / Spoilage (-)' },
+                  { value: 'set', label: 'Physical Count (Set exact)' },
+                  { value: 'remove', label: 'Other Remove (-)' }
+                ]}
+                value={adjustmentType}
+                onChange={(v) => setAdjustmentType(v as any)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {adjustmentType === 'set' ? `Actual Stock Count (${selectedIngredient.unit})` : `Quantity (${selectedIngredient.unit})`}
               </label>
               <Input
                 type="number"
@@ -833,7 +856,25 @@ export default function StocksPage() {
                 placeholder="Enter quantity"
                 required
               />
-              {adjustmentType === 'remove' && adjustmentQuantity > (selectedIngredient.currentStock || 0) && (
+              {adjustmentType === 'add' && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Unit Cost / Purchase Price ({formatCurrency(0).charAt(0)})
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={adjustmentUnitCost || ''}
+                    onChange={(e) => setAdjustmentUnitCost(parseFloat(e.target.value) || 0)}
+                    placeholder="Enter purchase price per unit"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Total Purchase Value: {formatCurrency(adjustmentQuantity * adjustmentUnitCost)}
+                  </p>
+                </div>
+              )}
+              {(adjustmentType === 'remove' || adjustmentType === 'wastage') && adjustmentQuantity > (selectedIngredient.currentStock || 0) && (
                 <p className="text-red-600 text-sm mt-1">
                   Cannot remove more than {selectedIngredient.currentStock} {selectedIngredient.unit}
                 </p>
@@ -843,27 +884,32 @@ export default function StocksPage() {
                   New stock will be: {((selectedIngredient.currentStock || 0) + adjustmentQuantity).toFixed(2)} {selectedIngredient.unit}
                 </p>
               )}
-              {adjustmentType === 'remove' && (
+              {(adjustmentType === 'remove' || adjustmentType === 'wastage') && (
                 <p className="text-gray-500 text-sm mt-1">
                   New stock will be: {Math.max(0, (selectedIngredient.currentStock || 0) - adjustmentQuantity).toFixed(2)} {selectedIngredient.unit}
+                </p>
+              )}
+              {adjustmentType === 'set' && (
+                <p className="text-gray-500 text-sm mt-1">
+                  Stock will be overridden to: {adjustmentQuantity || 0} {selectedIngredient.unit}
                 </p>
               )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Reason (Optional)
+                Reason / Notes (Optional)
               </label>
               <textarea
                 rows={3}
                 value={adjustmentReason}
                 onChange={(e) => setAdjustmentReason(e.target.value)}
                 className="input w-full"
-                placeholder={`Reason for ${adjustmentType === 'add' ? 'adding' : 'removing'} stock...`}
+                placeholder="Details about this adjustment..."
               />
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -877,10 +923,10 @@ export default function StocksPage() {
               </Button>
               <Button
                 onClick={handleAdjustStock}
-                disabled={adjustmentQuantity <= 0 || isAddingStock || isRemovingStock || (adjustmentType === 'remove' && adjustmentQuantity > (selectedIngredient.currentStock || 0))}
-                className={`w-full sm:w-auto text-sm sm:text-base ${adjustmentType === 'add' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                disabled={adjustmentQuantity <= 0 || isAdjustingStock || ((adjustmentType === 'remove' || adjustmentType === 'wastage') && adjustmentQuantity > (selectedIngredient.currentStock || 0))}
+                className="w-full sm:w-auto text-sm sm:text-base bg-primary-600 hover:bg-primary-700"
               >
-                {isAddingStock || isRemovingStock ? 'Processing...' : adjustmentType === 'add' ? 'Add Stock' : 'Remove Stock'}
+                {isAdjustingStock ? 'Processing...' : 'Confirm Adjustment'}
               </Button>
             </div>
           </div>
