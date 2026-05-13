@@ -716,6 +716,10 @@ export default function MenuItemsPage() {
       } else {
         payload.selections = []; // Clear selections if empty
       }
+
+      console.log('--- UPDATE MENU ITEM DEBUG ---');
+      console.log('Payload:', JSON.stringify(payload, null, 2));
+
       await updateMenuItem(payload).unwrap();
       toast.success('Menu item updated successfully');
       setIsEditModalOpen(false);
@@ -723,6 +727,9 @@ export default function MenuItemsPage() {
       setFormErrors({});
       refetch();
     } catch (error: any) {
+      console.error('--- UPDATE MENU ITEM ERROR ---');
+      console.error('Payload:', JSON.stringify(payload, null, 2));
+      console.error('Error:', error);
       const errorMessage = error?.data?.message || error?.message || 'Failed to update menu item';
       toast.error(errorMessage);
       // Set form-level error if it's a validation error
