@@ -20,7 +20,7 @@ import {
       { name: Ingredient.name, schema: IngredientSchema },
     ]),
     forwardRef(() => ExpensesModule),
-    SubscriptionsModule,
+    forwardRef(() => SubscriptionsModule),
     forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [PurchaseOrdersController],
