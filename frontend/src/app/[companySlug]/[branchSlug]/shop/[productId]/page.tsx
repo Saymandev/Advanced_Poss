@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { useGetProductQuery } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
+import { Label } from '@/components/ui/Label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Badge } from '@/components/ui/Badge';
 import { ArrowLeftIcon, ExclamationTriangleIcon, MinusIcon, PlusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -31,6 +35,66 @@ export default function ProductDetailPage() {
   
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [selectedSelections, setSelectedSelections] = useState<Record<string, string | string[]>>({});
+  const [totalPrice, setTotalPrice] = useState(0);
+
+  // Initialize selected options when product loads
+  useEffect(() => {
+    if (product) {
+      // Default variants
+      const initialVariants: Record<string, string> = {};
+      product.variants?.forEach(v => {
+        if (v.options.length > 0) {
+          initialVariants[v.name] = v.options[0].name;
+        }
+      });
+      setSelectedVariants(initialVariants);
+
+      // Default selections (only for 'single' type)
+      const initialSelections: Record<string, string | string[]> = {};
+      product.selections?.forEach(s => {
+        if (s.type === 'single' && s.options.length > 0) {
+          initialSelections[s.name] = s.options[0].name;
+        } else if (s.type === 'multi') {
+          initialSelections[s.name] = [];
+        }
+      });
+      setSelectedSelections(initialSelections);
+    }
+  }, [product]);
+
+  // Update total price when selections change
+  useEffect(() => {
+    if (!product) return;
+
+    let basePrice = product.price;
+
+    // Add variant modifiers
+    Object.entries(selectedVariants).forEach(([variantName, optionName]) => {
+      const variant = product.variants?.find(v => v.name === variantName);
+      const option = variant?.options.find(o => o.name === optionName);
+      if (option?.priceModifier) {
+        basePrice += option.priceModifier;
+      }
+    });
+
+    // Add selection prices
+    Object.entries(selectedSelections).forEach(([selectionName, value]) => {
+      const selection = product.selections?.find(s => s.name === selectionName);
+      if (Array.isArray(value)) {
+        value.forEach(optionName => {
+          const option = selection?.options.find(o => o.name === optionName);
+          if (option?.price) basePrice += option.price;
+        });
+      } else {
+        const option = selection?.options.find(o => o.name === value);
+        if (option?.price) basePrice += option.price;
+      }
+    });
+
+    setTotalPrice(basePrice * quantity);
+  }, [product, selectedVariants, selectedSelections, quantity]);
 
   useEffect(() => {
     if (isError) {
@@ -55,17 +119,30 @@ export default function ProductDetailPage() {
       const existingCart = localStorage.getItem(cartKey);
       const cart = existingCart ? JSON.parse(existingCart) : [];
 
-      const existingItem = cart.find((item: any) => item.id === product.id);
+      const uniqueId = `${product.id}-${JSON.stringify(selectedVariants)}-${JSON.stringify(selectedSelections)}`;
+
+      const existingItem = cart.find((item: any) => 
+        item.id === product.id && 
+        JSON.stringify(item.selectedVariants) === JSON.stringify(selectedVariants) &&
+        JSON.stringify(item.selectedSelections) === JSON.stringify(selectedSelections)
+      );
       
       if (existingItem) {
         existingItem.quantity += quantity;
       } else {
         cart.push({
           id: product.id,
+          uniqueId, // Important for differentiating same item with different options
           name: product.name,
-          price: product.price,
+          price: totalPrice / quantity, // Base price per item with modifiers
           quantity,
           image: product.images?.[0],
+          selectedVariants,
+          selectedSelections,
+          variantDisplay: Object.entries(selectedVariants).map(([k, v]) => `${k}: ${v}`).join(', '),
+          selectionDisplay: Object.entries(selectedSelections)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+            .join(', '),
         });
       }
 
@@ -203,6 +280,103 @@ export default function ProductDetailPage() {
               )}
             </div>
 
+            {/* Variants */}
+            {product.variants && product.variants.length > 0 && (
+              <div className="space-y-6 mb-8">
+                {product.variants.map((variant) => (
+                  <div key={variant.name}>
+                    <Label className="text-base font-bold mb-3 block">{variant.name}</Label>
+                    <RadioGroup
+                      value={selectedVariants[variant.name]}
+                      onValueChange={(val: string) => setSelectedVariants(prev => ({ ...prev, [variant.name]: val }))}
+                      className="flex flex-wrap gap-3"
+                    >
+                      {variant.options.map((option) => (
+                        <div key={option.name} className="flex items-center">
+                          <RadioGroupItem
+                            value={option.name}
+                            id={`variant-${variant.name}-${option.name}`}
+                            className="peer sr-only"
+                          />
+                          <Label
+                            htmlFor={`variant-${variant.name}-${option.name}`}
+                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 peer-data-[state=checked]:bg-primary-600 peer-data-[state=checked]:text-white peer-data-[state=checked]:border-primary-600 transition-all text-sm font-medium"
+                          >
+                            {option.name}
+                            {option.priceModifier !== 0 && (
+                              <span className="ml-1 text-xs opacity-80">
+                                ({option.priceModifier > 0 ? '+' : ''}{formatCurrency(option.priceModifier)})
+                              </span>
+                            )}
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Selections */}
+            {product.selections && product.selections.length > 0 && (
+              <div className="space-y-8 mb-8">
+                {product.selections.map((selection) => (
+                  <div key={selection.name}>
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-base font-bold">{selection.name}</Label>
+                      {selection.type === 'multi' && (
+                        <Badge variant="secondary" className="text-[10px] uppercase">Multi-select</Badge>
+                      )}
+                    </div>
+                    
+                    {selection.type === 'single' ? (
+                      <RadioGroup
+                        value={selectedSelections[selection.name] as string}
+                        onValueChange={(val: string) => setSelectedSelections(prev => ({ ...prev, [selection.name]: val }))}
+                        className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+                      >
+                        {selection.options.map((option) => (
+                          <div key={option.name} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <RadioGroupItem value={option.name} id={`selection-${selection.name}-${option.name}`} />
+                              <Label htmlFor={`selection-${selection.name}-${option.name}`} className="cursor-pointer">{option.name}</Label>
+                            </div>
+                            {option.price > 0 && <span className="text-sm font-medium">+{formatCurrency(option.price)}</span>}
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selection.options.map((option) => (
+                          <div key={option.name} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <Checkbox
+                                id={`selection-${selection.name}-${option.name}`}
+                                checked={(selectedSelections[selection.name] as string[])?.includes(option.name)}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setSelectedSelections(prev => {
+                                    const current = (prev[selection.name] as string[]) || [];
+                                    if (checked) {
+                                      return { ...prev, [selection.name]: [...current, option.name] };
+                                    } else {
+                                      return { ...prev, [selection.name]: current.filter(o => o !== option.name) };
+                                    }
+                                  });
+                                }}
+                              />
+                              <Label htmlFor={`selection-${selection.name}-${option.name}`} className="cursor-pointer">{option.name}</Label>
+                            </div>
+                            {option.price > 0 && <span className="text-sm font-medium">+{formatCurrency(option.price)}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Quantity Selector */}
             <div className="mb-6 md:mb-8">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -231,7 +405,7 @@ export default function ProductDetailPage() {
                 </div>
                 <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                   Total: <span className="font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(product.price * quantity)}
+                    {formatCurrency(totalPrice)}
                   </span>
                 </span>
               </div>

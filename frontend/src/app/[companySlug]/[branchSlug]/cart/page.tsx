@@ -13,10 +13,13 @@ import toast from 'react-hot-toast';
 
 interface CartItem {
   id: string;
+  uniqueId: string;
   name: string;
   price: number;
   quantity: number;
   image?: string;
+  variantDisplay?: string;
+  selectionDisplay?: string;
 }
 
 export default function CartPage() {
@@ -46,7 +49,7 @@ export default function CartPage() {
   const updateQuantity = (itemId: string, delta: number) => {
     setCart((prevCart) => {
       const updated = prevCart.map((item) => {
-        if (item.id === itemId) {
+        if (item.uniqueId === itemId || item.id === itemId) { // Fallback for old cart items
           const newQuantity = item.quantity + delta;
           if (newQuantity <= 0) return null;
           return { ...item, quantity: newQuantity };
@@ -66,9 +69,9 @@ export default function CartPage() {
   };
 
   const removeItem = (itemId: string) => {
-    const item = cart.find(c => c.id === itemId);
+    const item = cart.find(c => (c.uniqueId === itemId || c.id === itemId));
     setCart((prevCart) => {
-      const updated = prevCart.filter((item) => item.id !== itemId);
+      const updated = prevCart.filter((item) => (item.uniqueId !== itemId && item.id !== itemId));
       try {
         localStorage.setItem(`cart_${companySlug}_${branchSlug}`, JSON.stringify(updated));
         toast.success(`${item?.name || 'Item'} removed from cart`);
@@ -143,7 +146,7 @@ export default function CartPage() {
                 <div className="space-y-3 md:space-y-4">
                   {cart.map((item) => (
                     <div 
-                      key={item.id} 
+                      key={item.uniqueId || item.id} 
                       className="flex flex-col sm:flex-row items-start sm:items-center gap-3 md:gap-4 p-3 md:p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow"
                     >
                       <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -165,17 +168,27 @@ export default function CartPage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 truncate">
+                        <h3 className="font-semibold text-gray-900 dark:text-white mb-0.5 truncate">
                           {item.name}
                         </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {item.variantDisplay && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+                            {item.variantDisplay}
+                          </p>
+                        )}
+                        {item.selectionDisplay && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            {item.selectionDisplay}
+                          </p>
+                        )}
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                           {formatCurrency(item.price)} each
                         </p>
                       </div>
                       <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
                         <div className="flex items-center gap-2 border border-gray-300 dark:border-gray-600 rounded-lg">
                           <button
-                            onClick={() => updateQuantity(item.id, -1)}
+                            onClick={() => updateQuantity(item.uniqueId || item.id, -1)}
                             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                             aria-label="Decrease quantity"
                           >
@@ -185,7 +198,7 @@ export default function CartPage() {
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => updateQuantity(item.id, 1)}
+                            onClick={() => updateQuantity(item.uniqueId || item.id, 1)}
                             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                             aria-label="Increase quantity"
                           >
@@ -197,7 +210,7 @@ export default function CartPage() {
                             {formatCurrency(item.price * item.quantity)}
                           </p>
                           <button
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(item.uniqueId || item.id)}
                             className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-500 text-xs sm:text-sm mt-1 flex items-center gap-1"
                           >
                             <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4" />

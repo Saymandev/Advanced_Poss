@@ -35,6 +35,21 @@ export interface PublicMenuItem {
   category?: any;
   isAvailable: boolean;
   preparationTime?: number;
+  variants?: Array<{
+    name: string;
+    options: Array<{
+      name: string;
+      priceModifier: number;
+    }>;
+  }>;
+  selections?: Array<{
+    name: string;
+    type: 'single' | 'multi' | 'optional';
+    options: Array<{
+      name: string;
+      price: number;
+    }>;
+  }>;
 }
 export interface PublicCategory {
   id: string;
