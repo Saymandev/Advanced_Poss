@@ -281,7 +281,7 @@ export default function ProductDetailPage() {
 
               {/* Prep Time and Allergens */}
               <div className="flex flex-wrap gap-3 mb-6">
-                {product.preparationTime > 0 && (
+                {(product.preparationTime ?? 0) > 0 && (
                   <Badge variant="secondary" className="flex items-center gap-1.5 py-1.5 px-3">
                     <ClockIcon className="w-3.5 h-3.5" />
                     {product.preparationTime} mins
@@ -292,34 +292,34 @@ export default function ProductDetailPage() {
                     <ExclamationTriangleIcon className="w-3.5 h-3.5" />
                     {allergen}
                   </Badge>
-                )}
+                ))}
               </div>
             </div>
 
             {/* Nutritional Info */}
-            {product.nutritionalInfo && (product.nutritionalInfo.calories > 0 || product.nutritionalInfo.protein > 0) && (
+            {product.nutritionalInfo && ((product.nutritionalInfo.calories ?? 0) > 0 || (product.nutritionalInfo.protein ?? 0) > 0) && (
               <div className="mb-8 p-4 bg-gray-100 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-3">Nutritional Info</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {product.nutritionalInfo.calories > 0 && (
+                  {(product.nutritionalInfo.calories ?? 0) > 0 && (
                     <div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">Calories</p>
                       <p className="font-bold text-gray-900 dark:text-white">{product.nutritionalInfo.calories} kcal</p>
                     </div>
                   )}
-                  {product.nutritionalInfo.protein > 0 && (
+                  {(product.nutritionalInfo.protein ?? 0) > 0 && (
                     <div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">Protein</p>
                       <p className="font-bold text-gray-900 dark:text-white">{product.nutritionalInfo.protein}g</p>
                     </div>
                   )}
-                  {product.nutritionalInfo.carbs > 0 && (
+                  {(product.nutritionalInfo.carbs ?? 0) > 0 && (
                     <div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">Carbs</p>
                       <p className="font-bold text-gray-900 dark:text-white">{product.nutritionalInfo.carbs}g</p>
                     </div>
                   )}
-                  {product.nutritionalInfo.fat > 0 && (
+                  {(product.nutritionalInfo.fat ?? 0) > 0 && (
                     <div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">Fat</p>
                       <p className="font-bold text-gray-900 dark:text-white">{product.nutritionalInfo.fat}g</p>

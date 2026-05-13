@@ -35,6 +35,14 @@ export interface PublicMenuItem {
   category?: any;
   isAvailable: boolean;
   preparationTime?: number;
+  allergens?: string[];
+  ingredients?: any[];
+  nutritionalInfo?: {
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+  };
   variants?: Array<{
     name: string;
     options: Array<{
@@ -150,10 +158,15 @@ export const publicApi = apiSlice.injectEndpoints({
       },
       transformResponse: (response: any) => {
         const data = response.data || response;
+        const menuItems = Array.isArray(data.menuItems) ? data.menuItems : (data.menuItems?.menuItems || []);
+        
         return {
           branch: data.branch,
           categories: data.categories || [],
-          menuItems: Array.isArray(data.menuItems) ? data.menuItems : (data.menuItems?.menuItems || []),
+          menuItems: menuItems.map((item: any) => ({
+            ...item,
+            nutritionalInfo: item.nutrition || item.nutritionalInfo,
+          })),
         };
       },
     }),
@@ -197,7 +210,10 @@ export const publicApi = apiSlice.injectEndpoints({
         return {
           branch: data.branch,
           categories,
-          menuItems,
+          menuItems: menuItems.map((item: any) => ({
+            ...item,
+            nutritionalInfo: item.nutrition || item.nutritionalInfo,
+          })),
         };
       },
     }),
@@ -209,7 +225,11 @@ export const publicApi = apiSlice.injectEndpoints({
       query: ({ companySlug, branchSlug, productId }) =>
         `/public/companies/${companySlug}/branches/${branchSlug}/products/${productId}`,
       transformResponse: (response: any) => {
-        return response.data || response;
+        const data = response.data || response;
+        return {
+          ...data,
+          nutritionalInfo: data.nutrition || data.nutritionalInfo,
+        };
       },
     }),
     createPublicOrder: builder.mutation<any, {
