@@ -138,6 +138,7 @@ export class MenuItemsService {
       .sort(sortOptions)
       .skip(skip)
       .limit(limit)
+      .lean()
       .exec();
     // Debug: Log the names of found items to verify new items are included
     if (menuItems.length > 0) {

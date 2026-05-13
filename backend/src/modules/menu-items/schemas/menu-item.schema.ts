@@ -3,6 +3,45 @@ import { Document, Types } from 'mongoose';
 
 export type MenuItemDocument = MenuItem & Document;
 
+@Schema({ _id: false })
+class VariantOption {
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ type: Number, default: 0 })
+  priceModifier: number;
+}
+
+@Schema({ _id: true })
+class Variant {
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ type: [VariantOption], default: [] })
+  options: VariantOption[];
+}
+
+@Schema({ _id: false })
+class SelectionOption {
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ type: Number, default: 0 })
+  price: number;
+}
+
+@Schema({ _id: true })
+class Selection {
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ type: String, enum: ['single', 'multi', 'optional'], default: 'single' })
+  type: string;
+
+  @Prop({ type: [SelectionOption], default: [] })
+  options: SelectionOption[];
+}
+
 @Schema({ timestamps: true })
 export class MenuItem {
   @Prop({ type: Types.ObjectId, ref: 'Company', required: true })
@@ -34,27 +73,8 @@ export class MenuItem {
   margin?: number;
 
   // Variants & Modifiers
-  @Prop({
-    type: [
-      {
-        name: String,
-        options: [
-          {
-            name: String,
-            priceModifier: Number,
-          },
-        ],
-      },
-    ],
-    default: [],
-  })
-  variants: Array<{
-    name: string;
-    options: Array<{
-      name: string;
-      priceModifier: number;
-    }>;
-  }>;
+  @Prop({ type: [Variant], default: [] })
+  variants: Variant[];
 
   @Prop({
     type: [
@@ -73,29 +93,8 @@ export class MenuItem {
   }>;
 
   // Selections (for customization options)
-  @Prop({
-    type: [
-      {
-        name: String,
-        type: { type: String, enum: ['single', 'multi', 'optional'] },
-        options: [
-          {
-            name: String,
-            price: Number,
-          },
-        ],
-      },
-    ],
-    default: [],
-  })
-  selections: Array<{
-    name: string;
-    type: 'single' | 'multi' | 'optional';
-    options: Array<{
-      name: string;
-      price: number;
-    }>;
-  }>;
+  @Prop({ type: [Selection], default: [] })
+  selections: Selection[];
 
   // Inventory
   @Prop({ default: false })
@@ -197,7 +196,19 @@ MenuItemSchema.pre('save', function (next) {
 MenuItemSchema.set('toJSON', {
   virtuals: true,
   transform: function (doc, ret) {
-    // @ts-ignore - Mongoose transform`n    // @ts-ignore - Mongoose transform`n    ret.id = ret._id;
+    // @ts-ignore - Mongoose transform
+    ret.id = ret._id?.toString() || ret.id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});
+
+MenuItemSchema.set('toObject', {
+  virtuals: true,
+  transform: function (doc, ret) {
+    // @ts-ignore - Mongoose transform
+    ret.id = ret._id?.toString() || ret.id;
     delete ret._id;
     delete ret.__v;
     return ret;
