@@ -112,9 +112,10 @@ export default function BranchShopPage() {
     let filtered = menuItems.filter((item: any) => item.isAvailable !== false);
     // Filter by category
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter((item: any) => 
-        item.category?.id === selectedCategory || item.categoryId === selectedCategory
-      );
+      filtered = filtered.filter((item: any) => {
+        const itemCatId = item.category?.id || item.category?._id || item.categoryId;
+        return itemCatId === selectedCategory;
+      });
     }
     // Filter by search query (searches in name, description, and category name)
     if (searchQuery.trim()) {
@@ -122,9 +123,10 @@ export default function BranchShopPage() {
       filtered = filtered.filter((item: any) => {
         const nameMatch = item.name?.toLowerCase().includes(query);
         const descriptionMatch = item.description?.toLowerCase().includes(query);
-        const categoryName = typeof item.category === 'object' 
-          ? item.category?.name?.toLowerCase()
-          : categories.find((cat: any) => cat.id === item.categoryId)?.name?.toLowerCase();
+        const itemCatId = item.category?.id || item.category?._id || item.categoryId;
+        const categoryName = typeof item.category === 'object' && item.category?.name
+          ? item.category.name.toLowerCase()
+          : categories.find((cat: any) => (cat.id || cat._id) === itemCatId)?.name?.toLowerCase();
         const categoryMatch = categoryName?.includes(query);
         return nameMatch || descriptionMatch || categoryMatch;
       });
