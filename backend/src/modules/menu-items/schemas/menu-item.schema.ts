@@ -11,15 +11,17 @@ class VariantOption {
   @Prop({ type: Number, default: 0 })
   priceModifier: number;
 }
+const VariantOptionSchema = SchemaFactory.createForClass(VariantOption);
 
 @Schema({ _id: true })
 class Variant {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ type: [VariantOption], default: [] })
+  @Prop({ type: [VariantOptionSchema], default: [] })
   options: VariantOption[];
 }
+const VariantSchema = SchemaFactory.createForClass(Variant);
 
 @Schema({ _id: false })
 class SelectionOption {
@@ -29,6 +31,7 @@ class SelectionOption {
   @Prop({ type: Number, default: 0 })
   price: number;
 }
+const SelectionOptionSchema = SchemaFactory.createForClass(SelectionOption);
 
 @Schema({ _id: true })
 class Selection {
@@ -38,9 +41,11 @@ class Selection {
   @Prop({ type: String, enum: ['single', 'multi', 'optional'], default: 'single' })
   type: string;
 
-  @Prop({ type: [SelectionOption], default: [] })
+  @Prop({ type: [SelectionOptionSchema], default: [] })
   options: SelectionOption[];
 }
+const SelectionSchema = SchemaFactory.createForClass(Selection);
+
 
 @Schema({ timestamps: true })
 export class MenuItem {
@@ -73,7 +78,7 @@ export class MenuItem {
   margin?: number;
 
   // Variants & Modifiers
-  @Prop({ type: [Variant], default: [] })
+  @Prop({ type: [VariantSchema], default: [] })
   variants: Variant[];
 
   @Prop({
@@ -93,7 +98,7 @@ export class MenuItem {
   }>;
 
   // Selections (for customization options)
-  @Prop({ type: [Selection], default: [] })
+  @Prop({ type: [SelectionSchema], default: [] })
   selections: Selection[];
 
   // Inventory

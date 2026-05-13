@@ -240,13 +240,16 @@ export class MenuItemsService {
         updateData.trackInventory = updateData.ingredients.length > 0;
       }
     }
-    const menuItem = await this.menuItemModel
-      .findByIdAndUpdate(id, updateData, { new: true })
-      .populate('categoryId', 'name type');
+    const menuItem = await this.menuItemModel.findById(id);
     if (!menuItem) {
       throw new NotFoundException('Menu item not found');
     }
-    return menuItem;
+
+    // Apply updates
+    Object.assign(menuItem, updateData);
+
+    const savedItem = await menuItem.save();
+    return savedItem.populate('categoryId', 'name type');
   }
   async toggleAvailability(id: string): Promise<MenuItem> {
     if (!Types.ObjectId.isValid(id)) {
