@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useGetBranchMenuQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
-import { ChevronLeftIcon, ChevronRightIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Modal } from '@/components/ui/Modal';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
 import { Checkbox } from '@/components/ui/Checkbox';
@@ -521,10 +521,27 @@ export default function BranchShopPage() {
                       </h3>
                     </Link>
                     {item.description && (
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 flex-1">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
                         {item.description}
                       </p>
                     )}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {item.preparationTime > 0 && (
+                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5 flex items-center gap-1">
+                          <ClockIcon className="w-3 h-3" />
+                          {item.preparationTime}m
+                        </Badge>
+                      )}
+                      {item.allergens?.slice(0, 2).map((allergen: string) => (
+                        <Badge key={allergen} variant="danger" className="text-[10px] py-0 px-1.5 bg-red-50 text-red-600 border-red-100 flex items-center gap-1">
+                          <ExclamationTriangleIcon className="w-3 h-3" />
+                          {allergen}
+                        </Badge>
+                      ))}
+                      {item.allergens?.length > 2 && (
+                        <span className="text-[10px] text-gray-400">+{item.allergens.length - 2} more</span>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between mt-auto pt-2">
                       <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">
                         {formatCurrency(item.price)}
@@ -663,6 +680,22 @@ export default function BranchShopPage() {
       >
         {customizingItem && (
           <div className="space-y-6 py-2">
+            {/* Info Badges */}
+            <div className="flex flex-wrap gap-2">
+              {customizingItem.preparationTime > 0 && (
+                <Badge variant="secondary" className="flex items-center gap-1 py-1 px-2 text-[10px]">
+                  <ClockIcon className="w-3 h-3" />
+                  {customizingItem.preparationTime} mins
+                </Badge>
+              )}
+              {customizingItem.allergens?.map((allergen: string) => (
+                <Badge key={allergen} variant="danger" className="flex items-center gap-1 py-1 px-2 text-[10px] bg-red-50 text-red-700 border-red-100">
+                  <ExclamationTriangleIcon className="w-3 h-3" />
+                  {allergen}
+                </Badge>
+              ))}
+            </div>
+
             {/* Variants */}
             {customizingItem?.variants?.map((variant: any) => (
               <div key={variant.name}>

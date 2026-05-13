@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/Label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Badge } from '@/components/ui/Badge';
-import { ArrowLeftIcon, ExclamationTriangleIcon, MinusIcon, PlusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ClockIcon, ExclamationTriangleIcon, MinusIcon, PlusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -278,7 +278,74 @@ export default function ProductDetailPage() {
                   {product.description}
                 </p>
               )}
+
+              {/* Prep Time and Allergens */}
+              <div className="flex flex-wrap gap-3 mb-6">
+                {product.preparationTime > 0 && (
+                  <Badge variant="secondary" className="flex items-center gap-1.5 py-1.5 px-3">
+                    <ClockIcon className="w-3.5 h-3.5" />
+                    {product.preparationTime} mins
+                  </Badge>
+                )}
+                {product.allergens?.map((allergen: string) => (
+                  <Badge key={allergen} variant="danger" className="flex items-center gap-1.5 py-1.5 px-3 bg-red-50 text-red-700 border-red-100">
+                    <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+                    {allergen}
+                  </Badge>
+                )}
+              </div>
             </div>
+
+            {/* Nutritional Info */}
+            {product.nutritionalInfo && (product.nutritionalInfo.calories > 0 || product.nutritionalInfo.protein > 0) && (
+              <div className="mb-8 p-4 bg-gray-100 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-3">Nutritional Info</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {product.nutritionalInfo.calories > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Calories</p>
+                      <p className="font-bold text-gray-900 dark:text-white">{product.nutritionalInfo.calories} kcal</p>
+                    </div>
+                  )}
+                  {product.nutritionalInfo.protein > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Protein</p>
+                      <p className="font-bold text-gray-900 dark:text-white">{product.nutritionalInfo.protein}g</p>
+                    </div>
+                  )}
+                  {product.nutritionalInfo.carbs > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Carbs</p>
+                      <p className="font-bold text-gray-900 dark:text-white">{product.nutritionalInfo.carbs}g</p>
+                    </div>
+                  )}
+                  {product.nutritionalInfo.fat > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Fat</p>
+                      <p className="font-bold text-gray-900 dark:text-white">{product.nutritionalInfo.fat}g</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Ingredients */}
+            {product.ingredients && product.ingredients.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-3">Main Ingredients</h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.ingredients.map((ing: any, idx: number) => {
+                    const name = typeof ing === 'string' ? ing : (ing.ingredientId?.name || ing.name);
+                    if (!name) return null;
+                    return (
+                      <span key={idx} className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+                        {name}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Variants */}
             {product.variants && product.variants.length > 0 && (
