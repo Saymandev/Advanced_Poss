@@ -572,6 +572,12 @@ export default function MenuItemsPage() {
       if (formData.selections.length > 0) {
         payload.selections = formData.selections.filter(s => s.name && s.options.length > 0);
       }
+
+      console.log('--- CREATE MENU ITEM DEBUG ---');
+      console.log('Form Data Variants:', JSON.stringify(formData.variants, null, 2));
+      console.log('Form Data Selections:', JSON.stringify(formData.selections, null, 2));
+      console.log('Final Payload:', JSON.stringify(payload, null, 2));
+
       await createMenuItem(payload).unwrap();
       toast.success('Menu item created successfully');
       // Reset form to default state
@@ -601,6 +607,9 @@ export default function MenuItemsPage() {
       // Refetch menu items to show the new item
       await refetch();
     } catch (error: any) {
+      console.error('--- CREATE MENU ITEM ERROR ---');
+      console.error('Error payload:', JSON.stringify(payload, null, 2));
+      console.error('Error detail:', error);
       const errorMessage = error?.data?.message || error?.message || 'Failed to create menu item';
       toast.error(errorMessage);
       // Set form-level error if it's a validation error
@@ -622,9 +631,10 @@ export default function MenuItemsPage() {
       toast.error('Please fix the errors in the form');
       return;
     }
+    let payload: any = {};
     try {
       // Map form data to backend DTO structure
-      const payload: any = {
+      payload = {
         id: selectedMenuItem.id,
         categoryId: formData.categoryId,
         name: formData.name,
