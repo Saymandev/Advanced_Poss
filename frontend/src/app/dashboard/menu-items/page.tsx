@@ -599,7 +599,7 @@ export default function MenuItemsPage() {
       }
       // Add selections if provided
       if (formData.selections.length > 0) {
-        payload.selections = formData.selections.filter(s => s.name && s.options.length > 0);
+        payload.selections = formData.selections.filter(s => s.name);
       }
 
       console.log('--- CREATE MENU ITEM DEBUG ---');
@@ -712,7 +712,7 @@ export default function MenuItemsPage() {
       }
       // Add selections if provided
       if (formData.selections.length > 0) {
-        payload.selections = formData.selections.filter(s => s.name && s.options.length > 0);
+        payload.selections = formData.selections.filter(s => s.name);
       } else {
         payload.selections = []; // Clear selections if empty
       }
@@ -2000,16 +2000,10 @@ export default function MenuItemsPage() {
                         placeholder="Type"
                       />
                     </div>
-                    <div className="col-span-4 flex items-center gap-2">
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selection.type === 'optional'}
-                          onChange={(e) => updateSelection(selectionIndex, 'type', e.target.checked ? 'optional' : 'single')}
-                          className="h-4 w-4"
-                        />
-                        <span>Optional</span>
-                      </label>
+                    <div className="col-span-7">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Select 'Optional' if the customer doesn't have to choose anything.
+                      </p>
                     </div>
                     <div className="col-span-1">
                       <Button
