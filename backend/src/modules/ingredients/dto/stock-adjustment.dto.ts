@@ -18,5 +18,21 @@ export class StockAdjustmentDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @ApiPropertyOptional({ example: '60f1a2b3c4d5e6f7a8b9c0d1' })
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
+
+  @ApiPropertyOptional({ example: 100 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitPrice?: number;
+
+  @ApiPropertyOptional({ example: 'cash' })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }
 

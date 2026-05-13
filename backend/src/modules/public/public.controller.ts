@@ -293,7 +293,10 @@ export class PublicController {
     }
     // For public menu, we show all items that are marked as available
     // (Stock-based hiding is disabled for now to ensure newly created items show up)
-    const menuItems = rawMenuItems;
+    const menuItems = rawMenuItems.map(item => ({
+      ...item.toObject?.() || item,
+      id: item._id?.toString() || item.id,
+    }));
     return {
       success: true,
       data: {

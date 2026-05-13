@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PurchaseOrdersModule } from '../purchase-orders/purchase-orders.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
@@ -17,6 +18,7 @@ import { Ingredient, IngredientSchema } from './schemas/ingredient.schema';
     forwardRef(() => NotificationsModule),
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
+    forwardRef(() => PurchaseOrdersModule),
   ],
   controllers: [IngredientsController],
   providers: [IngredientsService],

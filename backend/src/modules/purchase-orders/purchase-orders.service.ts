@@ -468,4 +468,90 @@ export class PurchaseOrdersService {
     await order.save();
     return this.findOne(id);
   }
+
+  async quickPurchase(data: {
+    companyId: string;
+    branchId?: string;
+    supplierId: string;
+    ingredientId: string;
+    quantity: number;
+    unitPrice: number;
+    paymentMethod?: string;
+    notes?: string;
+    createdBy?: string;
+  }) {
+    const supplier = await this.supplierModel.findById(data.supplierId).lean();
+    if (!supplier) throw new BadRequestException('Supplier not found');
+
+    const ingredient = await this.ingredientModel.findById(data.ingredientId).lean();
+    if (!ingredient) throw new BadRequestException('Ingredient not found');
+
+    // 1. Create the Purchase Order with status RECEIVED
+    const purchaseOrder = new this.purchaseOrderModel({
+      orderNumber: this.generateOrderNumber(),
+      companyId: new Types.ObjectId(data.companyId),
+      branchId: data.branchId ? new Types.ObjectId(data.branchId) : undefined,
+      supplierId: new Types.ObjectId(data.supplierId),
+      supplierSnapshot: supplier,
+      status: PurchaseOrderStatus.RECEIVED,
+      orderDate: new Date(),
+      actualDeliveryDate: new Date(),
+      expectedDeliveryDate: new Date(),
+      notes: data.notes || 'Quick purchase from stock page',
+      totalAmount: data.quantity * data.unitPrice,
+      taxAmount: 0,
+      discountAmount: 0,
+      paymentMethod: data.paymentMethod || 'cash',
+      items: [{
+        ingredientId: new Types.ObjectId(data.ingredientId),
+        ingredientName: ingredient.name,
+        unit: ingredient.unit,
+        quantity: data.quantity,
+        unitPrice: data.unitPrice,
+        totalPrice: data.quantity * data.unitPrice,
+        receivedQuantity: data.quantity,
+      }],
+      workPeriodId: (await this.workPeriodsService.findActive(data.companyId, data.branchId))?._id || undefined,
+      createdBy: data.createdBy ? new Types.ObjectId(data.createdBy) : undefined,
+    });
+
+    const savedOrder = await purchaseOrder.save();
+
+    // 2. Update Ingredient Stock
+    await this.ingredientModel.findByIdAndUpdate(data.ingredientId, {
+      $inc: {
+        currentStock: data.quantity,
+        totalPurchased: data.quantity,
+      },
+      lastPurchasePrice: data.unitPrice,
+      lastRestockedDate: new Date(),
+    });
+
+    // 3. Create Expense (which triggers Ledger)
+    try {
+      const expenseData = {
+        companyId: data.companyId,
+        branchId: data.branchId || data.companyId,
+        title: `Purchase Receipt: ${savedOrder.orderNumber}`,
+        description: `Quick purchase of ${ingredient.name} (${data.quantity} ${ingredient.unit}) from ${supplier.name}`,
+        amount: data.quantity * data.unitPrice,
+        category: 'ingredient',
+        date: new Date().toISOString().split('T')[0],
+        vendorName: supplier.name,
+        invoiceNumber: savedOrder.orderNumber,
+        supplierId: data.supplierId,
+        paymentMethod: data.paymentMethod || 'cash',
+        status: 'paid',
+        notes: `Auto-created from quick purchase.`,
+        purchaseOrderId: savedOrder._id.toString(),
+        createdBy: data.createdBy || data.companyId,
+      };
+
+      await this.expensesService.create(expenseData);
+    } catch (error) {
+      console.error('Failed to create expense for quick purchase:', error);
+    }
+
+    return this.populateOrder(savedOrder);
+  }
 }

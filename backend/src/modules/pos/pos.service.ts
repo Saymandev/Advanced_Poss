@@ -2196,11 +2196,12 @@ export class POSService {
 
       // Transform to POS format
       return result.menuItems.map((item: any) => {
-        const category = item.categoryId;
+        const itemObj = typeof item.toObject === 'function' ? item.toObject() : item;
+        const category = itemObj.categoryId;
         const categoryId = category?._id?.toString() || category?.toString() || '';
         const categoryName = category?.name || 'Uncategorized';
-        const firstImage = Array.isArray(item.images) && item.images.length > 0 
-          ? item.images[0] 
+        const firstImage = Array.isArray(itemObj.images) && itemObj.images.length > 0 
+          ? itemObj.images[0] 
           : undefined;
 
         // Calculate stock and low-stock flags from ingredient data
@@ -2208,8 +2209,8 @@ export class POSService {
         let isLowStock = false;
         let isOutOfStock = false;
 
-        if (item.trackInventory === true && Array.isArray(item.ingredients) && item.ingredients.length > 0) {
-          for (const ing of item.ingredients) {
+        if (itemObj.trackInventory === true && Array.isArray(itemObj.ingredients) && itemObj.ingredients.length > 0) {
+          for (const ing of itemObj.ingredients) {
             const ingredient: any = ing?.ingredientId;
             if (!ingredient) continue;
 
@@ -2239,29 +2240,29 @@ export class POSService {
         }
 
         // If item is manually marked unavailable, treat as out of stock
-        if (item.isAvailable === false) {
+        if (itemObj.isAvailable === false) {
           stock = 0;
           isOutOfStock = true;
         }
 
         return {
-          id: (item._id || item.id).toString(),
-          name: item.name,
-          description: item.description,
-          price: item.price,
+          id: (itemObj._id || itemObj.id).toString(),
+          name: itemObj.name,
+          description: itemObj.description,
+          price: itemObj.price,
           category: {
             id: categoryId,
             name: categoryName,
           },
-          isAvailable: item.isAvailable !== false && !isOutOfStock,
+          isAvailable: itemObj.isAvailable !== false && !isOutOfStock,
           image: firstImage,
           stock: stock,
           stockStatus: isOutOfStock ? 'out' : isLowStock ? 'low' : 'ok',
           isLowStock,
           isOutOfStock,
-          variants: item.variants || [],
-          selections: item.selections || [],
-          addons: item.addons || [],
+          variants: itemObj.variants || [],
+          selections: itemObj.selections || [],
+          addons: itemObj.addons || [],
         };
       });
     } catch (error) {

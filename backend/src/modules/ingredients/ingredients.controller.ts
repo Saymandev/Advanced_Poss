@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { IngredientFilterDto } from '../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -129,12 +130,13 @@ export class IngredientsController {
   }
 
   @Post(':id/adjust-stock')
-  @ApiOperation({ summary: 'Adjust ingredient stock' })
+  @ApiOperation({ summary: 'Adjust stock (add/remove/set/wastage)' })
   adjustStock(
     @Param('id') id: string,
     @Body() adjustmentDto: StockAdjustmentDto,
+    @CurrentUser('id') userId: string,
   ) {
-    return this.ingredientsService.adjustStock(id, adjustmentDto);
+    return this.ingredientsService.adjustStock(id, adjustmentDto, userId);
   }
 
   @Post(':id/add-stock')

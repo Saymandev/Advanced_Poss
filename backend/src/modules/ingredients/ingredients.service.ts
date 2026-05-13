@@ -1,12 +1,15 @@
 import {
     BadRequestException,
+    Inject,
     Injectable,
     NotFoundException,
+    forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { IngredientFilterDto } from '../../common/dto/pagination.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PurchaseOrdersService } from '../purchase-orders/purchase-orders.service';
 import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
@@ -20,6 +23,8 @@ export class IngredientsService {
     private ingredientModel: Model<IngredientDocument>,
     private websocketsGateway: WebsocketsGateway,
     private notificationsService: NotificationsService,
+    @Inject(forwardRef(() => PurchaseOrdersService))
+    private purchaseOrdersService: PurchaseOrdersService,
   ) {}
 
   async create(createIngredientDto: CreateIngredientDto): Promise<Ingredient> {
@@ -233,6 +238,7 @@ export class IngredientsService {
   async adjustStock(
     id: string,
     adjustmentDto: StockAdjustmentDto,
+    userId?: string,
   ): Promise<Ingredient> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid ingredient ID');
@@ -244,13 +250,32 @@ export class IngredientsService {
       throw new NotFoundException('Ingredient not found');
     }
 
-    const { type, quantity, reason } = adjustmentDto;
+    const { type, quantity, reason, supplierId, unitPrice, paymentMethod } = adjustmentDto;
 
     switch (type) {
       case 'add':
-        ingredient.currentStock += quantity;
-        ingredient.totalPurchased += quantity;
-        ingredient.lastRestockedDate = new Date();
+        if (supplierId && unitPrice !== undefined) {
+          // If supplier and price are provided, treat as a "Purchase"
+          await this.purchaseOrdersService.quickPurchase({
+            companyId: ingredient.companyId.toString(),
+            branchId: ingredient.branchId?.toString(),
+            supplierId,
+            ingredientId: ingredient._id.toString(),
+            quantity,
+            unitPrice,
+            paymentMethod,
+            notes: reason,
+            createdBy: userId,
+          });
+          // Note: quickPurchase already updates currentStock and totalPurchased
+          // so we don't need to do it again here.
+          return this.ingredientModel.findById(id);
+        } else {
+          // Legacy behavior for simple stock adjustment
+          ingredient.currentStock += quantity;
+          ingredient.totalPurchased += quantity;
+          ingredient.lastRestockedDate = new Date();
+        }
         break;
 
       case 'remove':
