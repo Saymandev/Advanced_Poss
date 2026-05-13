@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useGetBranchMenuQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
-import { ExclamationTriangleIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -43,6 +43,8 @@ export default function BranchShopPage() {
   );
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -89,19 +91,33 @@ export default function BranchShopPage() {
   }, [cart, companySlug, branchSlug]);
   const categories = useMemo(() => {
     const cats = menuData?.categories;
-    return Array.isArray(cats) ? cats : [];
+    if (!Array.isArray(cats)) return [];
+    return cats.map((cat: any) => ({
+      ...cat,
+      id: cat.id || cat._id
+    }));
   }, [menuData?.categories]);
   const menuItems = useMemo(() => {
-    const items = menuData?.menuItems;
-    // Ensure we always have an array
-    if (Array.isArray(items)) {
-      return items;
+    let items = menuData?.menuItems;
+    // Extract items if they are nested
+    if (items && typeof items === 'object' && !Array.isArray(items) && Array.isArray((items as any).menuItems)) {
+      items = (items as any).menuItems;
     }
-    // If it's an object with menuItems property, extract it
-    if (items && typeof items === 'object' && Array.isArray((items as any).menuItems)) {
-      return (items as any).menuItems;
-    }
-    return [];
+    if (!Array.isArray(items)) return [];
+    
+    // Normalize items: ensure they have 'id' and clean up category refs
+    return items.map((item: any) => ({
+      ...item,
+      id: item.id || item._id,
+      categoryIdString: (
+        item.categoryId?._id || 
+        item.categoryId?.id || 
+        (typeof item.categoryId === 'string' ? item.categoryId : null) ||
+        item.category?._id || 
+        item.category?.id || 
+        (typeof item.category === 'string' ? item.category : null)
+      )?.toString()
+    }));
   }, [menuData?.menuItems]);
   // Combined filtering: category + search + availability
   const filteredItems = useMemo(() => {
@@ -112,10 +128,7 @@ export default function BranchShopPage() {
     let filtered = menuItems.filter((item: any) => item.isAvailable !== false);
     // Filter by category
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter((item: any) => {
-        const itemCatId = item.category?.id || item.category?._id || item.categoryId;
-        return itemCatId === selectedCategory;
-      });
+      filtered = filtered.filter((item: any) => item.categoryIdString === selectedCategory);
     }
     // Filter by search query (searches in name, description, and category name)
     if (searchQuery.trim()) {
@@ -123,16 +136,27 @@ export default function BranchShopPage() {
       filtered = filtered.filter((item: any) => {
         const nameMatch = item.name?.toLowerCase().includes(query);
         const descriptionMatch = item.description?.toLowerCase().includes(query);
-        const itemCatId = item.category?.id || item.category?._id || item.categoryId;
         const categoryName = typeof item.category === 'object' && item.category?.name
           ? item.category.name.toLowerCase()
-          : categories.find((cat: any) => (cat.id || cat._id) === itemCatId)?.name?.toLowerCase();
+          : categories.find((cat: any) => cat.id === item.categoryIdString)?.name?.toLowerCase();
         const categoryMatch = categoryName?.includes(query);
         return nameMatch || descriptionMatch || categoryMatch;
       });
     }
     return filtered;
   }, [menuItems, selectedCategory, searchQuery, categories]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, searchQuery]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredItems.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredItems, currentPage, itemsPerPage]);
   const addToCart = (item: any) => {
     if (!item.isAvailable) {
       toast.error('This item is currently unavailable');
@@ -301,6 +325,7 @@ export default function BranchShopPage() {
                 onClick={() => {
                   setSelectedCategory('all');
                   setSearchQuery('');
+                  setCurrentPage(1);
                 }}
                 className={`px-3 md:px-4 py-2 rounded-full whitespace-nowrap text-sm md:text-base transition-colors ${
                   selectedCategory === 'all'
@@ -313,7 +338,10 @@ export default function BranchShopPage() {
               {categories.map((category: any, index: number) => (
                 <button
                   key={category.id || category._id || `category-${index}`}
-                  onClick={() => setSelectedCategory(category.id || category._id)}
+                  onClick={() => {
+                    setSelectedCategory(category.id || category._id);
+                    setCurrentPage(1);
+                  }}
                   className={`px-3 md:px-4 py-2 rounded-full whitespace-nowrap text-sm md:text-base transition-colors ${
                     selectedCategory === (category.id || category._id)
                       ? 'bg-gray-900 dark:bg-gray-700 text-white'
@@ -346,6 +374,7 @@ export default function BranchShopPage() {
                     onClick={() => {
                       setSearchQuery('');
                       setSelectedCategory('all');
+                      setCurrentPage(1);
                     }}
                   >
                     Clear Filters
@@ -362,7 +391,7 @@ export default function BranchShopPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-            {filteredItems.map((item: any) => {
+            {paginatedItems.map((item: any) => {
               const cartItem = cart.find(c => c.id === item.id);
               return (
                 <Card 
@@ -448,6 +477,68 @@ export default function BranchShopPage() {
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="h-10 w-10 p-0 rounded-full"
+              >
+                <ChevronLeftIcon className="w-5 h-5" />
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  // Show current page, and up to 1 page around it, and first/last pages
+                  if (
+                    page === 1 || 
+                    page === totalPages || 
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`h-10 w-10 rounded-full text-sm font-medium transition-all ${
+                          currentPage === page
+                            ? 'bg-gray-900 dark:bg-gray-700 text-white shadow-md'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (
+                    (page === 2 && currentPage > 3) || 
+                    (page === totalPages - 1 && currentPage < totalPages - 2)
+                  ) {
+                    return <span key={page} className="px-1 text-gray-400">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="h-10 w-10 p-0 rounded-full"
+              >
+                <ChevronRightIcon className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredItems.length)} of {filteredItems.length} items
+            </p>
           </div>
         )}
       </main>
