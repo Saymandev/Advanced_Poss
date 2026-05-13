@@ -2,10 +2,12 @@ export default () => ({
   port: parseInt(process.env.PORT, 10) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
   apiVersion: process.env.API_VERSION || 'v1',
-// 12-09-2025
+  // 12-09-2025
   database: {
     uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/restaurant_pos',
-    testUri: process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/restaurant_pos_test',
+    testUri:
+      process.env.MONGODB_TEST_URI ||
+      'mongodb://localhost:27017/restaurant_pos_test',
   },
 
   redis: {
@@ -37,10 +39,12 @@ export default () => ({
     port: parseInt(process.env.EMAIL_PORT, 10) || 587,
     user: process.env.EMAIL_USER,
     password: process.env.EMAIL_PASSWORD,
-    from: process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_FROM || 'noreply@rahapossolution.com',
+    from:
+      process.env.EMAIL_FROM_ADDRESS ||
+      process.env.EMAIL_FROM ||
+      'noreply@rahapossolution.com',
     fromName: process.env.EMAIL_FROM_NAME || 'Raha POS Solution',
   },
-
 
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME,
@@ -76,4 +80,3 @@ export default () => ({
     lastName: process.env.SUPER_ADMIN_LAST_NAME || 'Admin',
   },
 });
-

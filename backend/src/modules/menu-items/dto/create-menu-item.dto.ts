@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
     IsArray,
     IsBoolean,
@@ -7,7 +8,78 @@ import {
     IsOptional,
     IsString,
     Min,
+    ValidateNested,
 } from 'class-validator';
+
+export class VariantOptionDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsNumber()
+  priceModifier: number;
+}
+
+export class VariantDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => VariantOptionDto)
+  options: VariantOptionDto[];
+}
+
+export class SelectionOptionDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsNumber()
+  @Min(0)
+  price: number;
+}
+
+export class SelectionDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  type: 'single' | 'multi' | 'optional';
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SelectionOptionDto)
+  options: SelectionOptionDto[];
+}
+
+export class IngredientItemDto {
+  @IsString()
+  @IsNotEmpty()
+  ingredientId: string;
+
+  @IsNumber()
+  @Min(0)
+  quantity: number;
+
+  @IsString()
+  unit: string;
+}
+
+export class AddonDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsNumber()
+  @Min(0)
+  price: number;
+
+  @IsBoolean()
+  isAvailable: boolean;
+}
 
 export class CreateMenuItemDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
@@ -51,78 +123,38 @@ export class CreateMenuItemDto {
   @Min(0)
   cost?: number;
 
-  @ApiPropertyOptional({
-    example: [
-      {
-        name: 'Size',
-        options: [
-          { name: 'Regular', priceModifier: 0 },
-          { name: 'Large', priceModifier: 5.00 },
-        ],
-      },
-    ],
-  })
+  @ApiPropertyOptional({ type: () => [VariantDto] })
   @IsOptional()
   @IsArray()
-  variants?: Array<{
-    name: string;
-    options: Array<{
-      name: string;
-      priceModifier: number;
-    }>;
-  }>;
+  @ValidateNested({ each: true })
+  @Type(() => VariantDto)
+  variants?: VariantDto[];
 
-  @ApiPropertyOptional({
-    example: [{ name: 'Extra Sauce', price: 2.00, isAvailable: true }],
-  })
+  @ApiPropertyOptional({ type: () => [AddonDto] })
   @IsOptional()
   @IsArray()
-  addons?: Array<{
-    name: string;
-    price: number;
-    isAvailable: boolean;
-  }>;
+  @ValidateNested({ each: true })
+  @Type(() => AddonDto)
+  addons?: AddonDto[];
 
-  @ApiPropertyOptional({
-    example: [
-      {
-        name: 'Toppings',
-        type: 'multi',
-        options: [
-          { name: 'Extra Cheese', price: 2.00 },
-          { name: 'Bacon', price: 3.00 },
-        ],
-      },
-    ],
-  })
+  @ApiPropertyOptional({ type: () => [SelectionDto] })
   @IsOptional()
   @IsArray()
-  selections?: Array<{
-    name: string;
-    type: 'single' | 'multi' | 'optional';
-    options: Array<{
-      name: string;
-      price: number;
-    }>;
-  }>;
+  @ValidateNested({ each: true })
+  @Type(() => SelectionDto)
+  selections?: SelectionDto[];
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @IsBoolean()
   trackInventory?: boolean;
 
-  @ApiPropertyOptional({
-    example: [
-      { ingredientId: '507f1f77bcf86cd799439014', quantity: 0.25, unit: 'kg' },
-    ],
-  })
+  @ApiPropertyOptional({ type: () => [IngredientItemDto] })
   @IsOptional()
   @IsArray()
-  ingredients?: Array<{
-    ingredientId: string;
-    quantity: number;
-    unit: string;
-  }>;
+  @ValidateNested({ each: true })
+  @Type(() => IngredientItemDto)
+  ingredients?: IngredientItemDto[];
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
@@ -154,15 +186,7 @@ export class CreateMenuItemDto {
   @IsNumber()
   preparationTime?: number;
 
-  @ApiPropertyOptional({
-    example: {
-      calories: 450,
-      protein: 35,
-      carbs: 20,
-      fat: 25,
-      allergens: ['fish'],
-    },
-  })
+  @ApiPropertyOptional()
   @IsOptional()
   nutrition?: {
     calories?: number;
@@ -172,4 +196,3 @@ export class CreateMenuItemDto {
     allergens?: string[];
   };
 }
-
