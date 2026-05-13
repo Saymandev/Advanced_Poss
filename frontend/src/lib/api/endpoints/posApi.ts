@@ -361,6 +361,9 @@ export const posApi = apiSlice.injectEndpoints({
       stockStatus?: 'ok' | 'low' | 'out';
       isLowStock?: boolean;
       isOutOfStock?: boolean;
+      variants?: any[];
+      selections?: any[];
+      addons?: any[];
     }>, {
       branchId?: string;
       categoryId?: string;
@@ -388,6 +391,9 @@ export const posApi = apiSlice.injectEndpoints({
           stockStatus: item.stockStatus || (item.isOutOfStock ? 'out' : item.isLowStock ? 'low' : 'ok'),
           isLowStock: item.isLowStock || item.stockStatus === 'low',
           isOutOfStock: item.isOutOfStock || item.stockStatus === 'out',
+          variants: item.variants || [],
+          selections: item.selections || [],
+          addons: item.addons || [],
         });
 
         if (Array.isArray(data)) {
