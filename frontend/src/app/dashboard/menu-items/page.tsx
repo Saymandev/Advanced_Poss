@@ -48,9 +48,25 @@ interface MenuItem {
   };
   tags?: string[];
   popularity?: number; // 1-5 stars based on orders
+  variants?: Array<{
+    name: string;
+    options: Array<{
+      name: string;
+      priceModifier: number;
+    }>;
+  }>;
+  selections?: Array<{
+    name: string;
+    type: 'single' | 'multi' | 'optional';
+    options: Array<{
+      name: string;
+      price: number;
+    }>;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
+
 export default function MenuItemsPage() {
   const { companyContext, user } = useAppSelector((state) => state.auth);
   // Redirect if user doesn't have menu-management feature (auto-redirects to role-specific dashboard)
@@ -310,6 +326,14 @@ export default function MenuItemsPage() {
       };
     });
   }, [menuItemsResponse]);
+
+  useEffect(() => {
+    if (menuItems.length > 0) {
+      console.log('--- MENU ITEMS DATA DEBUG ---');
+      console.log('Sample Item Variants:', JSON.stringify(menuItems[0].variants, null, 2));
+      console.log('Sample Item Selections:', JSON.stringify(menuItems[0].selections, null, 2));
+    }
+  }, [menuItems]);
   // Fetch ratings for menu items (including stats items)
   useEffect(() => {
     const statsItems = (statsResponse as any)?.menuItems || [];
@@ -416,6 +440,10 @@ export default function MenuItemsPage() {
         variants: itemData.variants || [],
         selections: itemData.selections || [],
       });
+
+      console.log('--- EDIT FORM POPULATION DEBUG ---');
+      console.log('Original Item Variants:', JSON.stringify(itemData.variants, null, 2));
+      console.log('Original Item Selections:', JSON.stringify(itemData.selections, null, 2));
     }
   }, [isEditModalOpen, selectedMenuItem, categories]);
   // Reset form when modal closes
@@ -517,10 +545,11 @@ export default function MenuItemsPage() {
       toast.error('Branch ID is missing');
       return;
     }
+    let payload: any = {};
     try {
       const companyId = (companyContext as any)?.companyId || (user as any)?.companyId;
       // Map form data to backend DTO structure
-      const payload: any = {
+      payload = {
         companyId,
         branchId,
         categoryId: formData.categoryId,
