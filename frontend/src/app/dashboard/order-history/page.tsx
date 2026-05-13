@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useRefundOrderMutation } from '@/lib/api/endpoints/posApi';
+import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useRefundOrderMutation, useUpdatePOSOrderMutation } from '@/lib/api/endpoints/posApi';
 import { useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -263,6 +263,7 @@ export default function OrdersPage() {
     branchId: branchId || undefined,
   }, { skip: !branchId });
   
+  const [updatePOSOrder, { isLoading: isUpdating }] = useUpdatePOSOrderMutation();
   const [cancelPOSOrder, { isLoading: isCancelling }] = useCancelPOSOrderMutation();
   const [refundOrder, { isLoading: isRefunding }] = useRefundOrderMutation();
 
@@ -277,6 +278,19 @@ export default function OrdersPage() {
       setCommittedSearch(urlSearch);
     }
   }, [urlSearch, committedSearch]);
+
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    try {
+      await updatePOSOrder({ 
+        id: orderId, 
+        data: { status: newStatus as any } 
+      }).unwrap();
+      toast.success(`Order status updated to ${newStatus}`);
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to update order status');
+    }
+  };
 
   const handleQuickRange = (range: QuickRange) => {
     setActiveQuickRange(range);
@@ -1103,6 +1117,18 @@ export default function OrdersPage() {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                {selectedOrder?.status === 'pending' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleStatusUpdate(selectedOrder.id, 'confirmed')}
+                    disabled={isUpdating}
+                    className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
+                  >
+                    <ArrowPathIcon className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} />
+                    <span className="text-sm">{isUpdating ? 'Confirming...' : 'Confirm Order'}</span>
+                  </Button>
+                )}
                 {selectedOrder?.status === 'paid' && selectedOrder?.paymentStatus === 'paid' && (
                   <Button
                     variant="secondary"
