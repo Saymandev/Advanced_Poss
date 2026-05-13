@@ -129,7 +129,8 @@ export class PublicController {
     const categories = await this.categoriesService.findAll({ branchId } as any);
     const menuItemsResult = await this.menuItemsService.findAll({ 
       branchId,
-      isAvailable: true 
+      isAvailable: true,
+      limit: 1000 
     } as any);
     // Extract menuItems array from result (it might be wrapped in an object)
     let menuItems = Array.isArray(menuItemsResult) 
@@ -241,6 +242,7 @@ export class PublicController {
       companyId, // CRITICAL: Use companyId from company slug (unique identifier)
       branchId, // Use branch ID (corrected if needed)
       isAvailable: true,
+      limit: 1000,
     } as any);
     // Extract menuItems array from the result object
     // menuItemsService.findAll returns { menuItems: [], total, page, limit }
@@ -289,19 +291,9 @@ export class PublicController {
         });
       }
     }
-    // For public menu, hide items whose tracked ingredients are low or out of stock
-    const menuItems = (rawMenuItems as any[]).filter((item) => {
-      // If inventory is not tracked or no ingredients, keep item visible
-      if (!item.trackInventory || !Array.isArray(item.ingredients) || item.ingredients.length === 0) {
-        return true;
-      }
-      // If any ingredient is low stock or out of stock, hide from public menu
-      return item.ingredients.every((ing: any) => {
-        const ingredient: any = ing?.ingredientId;
-        if (!ingredient) return true;
-        return !ingredient.isLowStock && !ingredient.isOutOfStock;
-      });
-    });
+    // For public menu, we show all items that are marked as available
+    // (Stock-based hiding is disabled for now to ensure newly created items show up)
+    const menuItems = rawMenuItems;
     return {
       success: true,
       data: {
