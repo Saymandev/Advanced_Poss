@@ -104,6 +104,23 @@ export class MenuItemsService {
       if (companyIdObjectId) delete query.companyId;
     }
 
+    // Handle range filters
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      query.price = {};
+      if (query.minPrice !== undefined) query.price.$gte = query.minPrice;
+      if (query.maxPrice !== undefined) query.price.$lte = query.maxPrice;
+      delete query.minPrice;
+      delete query.maxPrice;
+    }
+
+    if (query.minPrepTime !== undefined || query.maxPrepTime !== undefined) {
+      query.preparationTime = {};
+      if (query.minPrepTime !== undefined) query.preparationTime.$gte = query.minPrepTime;
+      if (query.maxPrepTime !== undefined) query.preparationTime.$lte = query.maxPrepTime;
+      delete query.minPrepTime;
+      delete query.maxPrepTime;
+    }
+
     // Build search conditions if provided
     if (search) {
       const searchConditions = {
