@@ -79,31 +79,31 @@ export class MenuItemsService {
       query.companyId = companyIdObjectId;
     }
     // Handle branchId: when provided, include both branch-specific AND company-wide items (branchId: null)
-    // IMPORTANT: This ensures each branch sees:
-    // 1. Items created specifically for that branch (branchId matches)
-    // 2. Company-wide items (branchId: null) - available to all branches
-    // 3. Items from OTHER branches are NOT shown (they have different branchId)
-    // This matches the findByBranch logic to ensure consistency
     if (query.branchId) {
       const branchIdObjectId = typeof query.branchId === 'string' 
         ? new Types.ObjectId(query.branchId) 
         : query.branchId;
-      // Remove branchId from query (we'll add it back in $or)
-      delete query.branchId;
       
       // Build branch filter: include items for this branch OR company-wide items
-      if (companyIdObjectId) {
-        query.$or = [
-          { branchId: branchIdObjectId, companyId: companyIdObjectId },
-          { branchId: null, companyId: companyIdObjectId },
-        ];
-        delete query.companyId; // Remove companyId from top level since it's now in $or conditions
-      } else {
-        // If companyId is completely missing, DO NOT apply the `{ branchId: null }` fallback.
-        // Doing so would return company-wide items from ALL companies, causing cross-tenant leaks.
-        query.branchId = branchIdObjectId;
-      }
+      const branchConditions = companyIdObjectId 
+        ? [
+            { branchId: branchIdObjectId, companyId: companyIdObjectId },
+            { branchId: null, companyId: companyIdObjectId }
+          ]
+        : [
+            { branchId: branchIdObjectId },
+            { branchId: null }
+          ];
+
+      // Use $and to combine branch conditions with existing filters
+      if (!query.$and) query.$and = [];
+      query.$and.push({ $or: branchConditions });
+      
+      // Remove top-level branchId and companyId to avoid conflicts with $or
+      delete query.branchId;
+      if (companyIdObjectId) delete query.companyId;
     }
+
     // Build search conditions if provided
     if (search) {
       const searchConditions = {
@@ -111,20 +111,16 @@ export class MenuItemsService {
           { name: { $regex: search, $options: 'i' } },
           { description: { $regex: search, $options: 'i' } },
           { tags: { $regex: search, $options: 'i' } },
-          { 'category.name': { $regex: search, $options: 'i' } },
         ],
       };
-      // If we already have $or (from branchId), combine with $and
-      if (query.$or) {
-        query.$and = [
-          { $or: query.$or },
-          searchConditions,
-        ];
-        delete query.$or;
-      } else {
-        Object.assign(query, searchConditions);
-      }
+      
+      if (!query.$and) query.$and = [];
+      query.$and.push(searchConditions);
     }
+
+    console.log('--- MENU ITEMS QUERY DEBUG ---');
+    console.log('Final Query:', JSON.stringify(query, null, 2));
+
     const sortOptions: any = {};
     sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
     const menuItems = await this.menuItemModel
