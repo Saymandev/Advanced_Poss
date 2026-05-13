@@ -294,8 +294,8 @@ export class PublicController {
     // For public menu, we show all items that are marked as available
     // (Stock-based hiding is disabled for now to ensure newly created items show up)
     const menuItems = rawMenuItems.map(item => ({
-      ...item.toObject?.() || item,
-      id: item._id?.toString() || item.id,
+      ...((item as any).toObject ? (item as any).toObject() : item),
+      id: (item as any)._id?.toString() || (item as any).id,
     }));
     return {
       success: true,
@@ -323,14 +323,21 @@ export class PublicController {
     const branch = await this.branchesService.findBySlug(companyId, branchSlug);
     const branchId = (branch as any)._id?.toString() || (branch as any).id;
     const product = await this.menuItemsService.findOne(productId);
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+    
     // Verify product belongs to this branch
     const productBranchId = (product as any).branchId?.toString() || (product as any).branchId;
-    if (productBranchId !== branchId) {
+    if (productBranchId && branchId && productBranchId !== branchId) {
       throw new NotFoundException('Product not found in this branch');
     }
+
+    const productObj = (product as any).toObject ? (product as any).toObject() : product;
+    
     return {
       success: true,
-      data: product,
+      data: productObj,
     };
   }
   @Public()
