@@ -81,16 +81,35 @@ export default function MenuItemsPage() {
   const [committedSearch, setCommittedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [availabilityFilter, setAvailabilityFilter] = useState('all');
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [minPrepTime, setMinPrepTime] = useState<string>('');
+  const [maxPrepTime, setMaxPrepTime] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-  // Debounce search query
+  // Debounce search query and range filters
+  const [debouncedRanges, setDebouncedRanges] = useState({
+    minPrice: '',
+    maxPrice: '',
+    minPrepTime: '',
+    maxPrepTime: '',
+  });
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setCommittedSearch(searchQuery);
-      setCurrentPage(1); // Reset to first page on search
+      setDebouncedRanges({
+        minPrice,
+        maxPrice,
+        minPrepTime,
+        maxPrepTime,
+      });
+      setCurrentPage(1); // Reset to first page on search/filter
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, minPrice, maxPrice, minPrepTime, maxPrepTime]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -136,6 +155,8 @@ export default function MenuItemsPage() {
       branchId,
       page: currentPage,
       limit: itemsPerPage,
+      sortBy,
+      sortOrder,
     };
     // Always include companyId to ensure proper filtering
     if (companyId) {
@@ -153,8 +174,14 @@ export default function MenuItemsPage() {
     if (availabilityFilter !== 'all') {
       params.isAvailable = availabilityFilter === 'available';
     }
+    // Add range filters
+    if (debouncedRanges.minPrice) params.minPrice = parseFloat(debouncedRanges.minPrice);
+    if (debouncedRanges.maxPrice) params.maxPrice = parseFloat(debouncedRanges.maxPrice);
+    if (debouncedRanges.minPrepTime) params.minPrepTime = parseInt(debouncedRanges.minPrepTime);
+    if (debouncedRanges.maxPrepTime) params.maxPrepTime = parseInt(debouncedRanges.maxPrepTime);
+
     return params;
-  }, [branchId, companyId, currentPage, itemsPerPage, committedSearch, categoryFilter, availabilityFilter]);
+  }, [branchId, companyId, currentPage, itemsPerPage, committedSearch, categoryFilter, availabilityFilter, sortBy, sortOrder, debouncedRanges]);
   const { data: menuItemsResponse, isLoading, error, refetch } = useGetMenuItemsQuery(
     queryParams,
     { skip: !branchId }
@@ -1029,6 +1056,7 @@ export default function MenuItemsPage() {
     {
       key: 'price',
       title: 'Price',
+      sortable: true,
       align: 'right' as const,
       render: (value: number) => (
         <div className="text-right">
@@ -1041,6 +1069,7 @@ export default function MenuItemsPage() {
     {
       key: 'preparationTime',
       title: 'Prep Time',
+      sortable: true,
       align: 'center' as const,
       render: (value: number) => (
         <div className="text-center">
@@ -1324,42 +1353,100 @@ export default function MenuItemsPage() {
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search menu items..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setCommittedSearch(searchQuery);
-                    setCurrentPage(1);
-                  }
-                }}
-              />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search menu items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setCommittedSearch(searchQuery);
+                      setCurrentPage(1);
+                    }
+                  }}
+                />
+              </div>
+              <div className="w-full sm:w-48">
+                <Select
+                  options={[
+                    { value: 'all', label: 'All Categories' },
+                    ...categories.map((cat: any) => ({ value: cat.id, label: cat.name })),
+                  ]}
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                  placeholder="Filter by category"
+                />
+              </div>
+              <div className="w-full sm:w-48">
+                <Select
+                  options={[
+                    { value: 'all', label: 'All Items' },
+                    { value: 'available', label: 'Available' },
+                    { value: 'unavailable', label: 'Unavailable' },
+                  ]}
+                  value={availabilityFilter}
+                  onChange={setAvailabilityFilter}
+                  placeholder="Filter by availability"
+                />
+              </div>
             </div>
-            <div className="w-full sm:w-48">
-              <Select
-                options={[
-                  { value: 'all', label: 'All Categories' },
-                  ...categories.map((cat: any) => ({ value: cat.id, label: cat.name })),
-                ]}
-                value={categoryFilter}
-                onChange={setCategoryFilter}
-                placeholder="Filter by category"
-              />
-            </div>
-            <div className="w-full sm:w-48">
-              <Select
-                options={[
-                  { value: 'all', label: 'All Items' },
-                  { value: 'available', label: 'Available' },
-                  { value: 'unavailable', label: 'Unavailable' },
-                ]}
-                value={availabilityFilter}
-                onChange={setAvailabilityFilter}
-                placeholder="Filter by availability"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 shrink-0">Price:</span>
+                <Input
+                  type="number"
+                  placeholder="Min"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <span className="text-gray-400">-</span>
+                <Input
+                  type="number"
+                  placeholder="Max"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 shrink-0">Prep:</span>
+                <Input
+                  type="number"
+                  placeholder="Min min"
+                  value={minPrepTime}
+                  onChange={(e) => setMinPrepTime(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <span className="text-gray-400">-</span>
+                <Input
+                  type="number"
+                  placeholder="Max min"
+                  value={maxPrepTime}
+                  onChange={(e) => setMaxPrepTime(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="lg:col-span-2 flex justify-end items-center">
+                {(minPrice || maxPrice || minPrepTime || maxPrepTime) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => {
+                      setMinPrice('');
+                      setMaxPrice('');
+                      setMinPrepTime('');
+                      setMaxPrepTime('');
+                    }}
+                  >
+                    <XMarkIcon className="w-3.5 h-3.5 mr-1" />
+                    Clear Ranges
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -1371,6 +1458,12 @@ export default function MenuItemsPage() {
         loading={isLoading}
         searchable={false}
         selectable={true}
+        onSort={(key, direction) => {
+          setSortBy(key);
+          setSortOrder(direction);
+          setCurrentPage(1);
+        }}
+        sortable={true}
         pagination={{
           currentPage,
           totalPages: Math.ceil(totalItems / itemsPerPage),
