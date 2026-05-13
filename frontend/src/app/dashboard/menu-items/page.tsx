@@ -534,9 +534,8 @@ export default function MenuItemsPage() {
         // Empty ingredients array - clear existing ingredients
         payload.ingredients = [];
       }
-      // Use the trackInventory value from form (user can enable/disable manually)
-      // If trackInventory is enabled but no ingredients, it will be ignored by backend
-      payload.trackInventory = formData.trackInventory && validIngredients.length > 0;
+      // Automatically track inventory if there are ingredients
+      payload.trackInventory = validIngredients.length > 0;
       // Add nutrition object if any nutritional info is provided
       if (formData.nutritionalInfo && (
         formData.nutritionalInfo.calories > 0 ||
@@ -656,9 +655,8 @@ export default function MenuItemsPage() {
         // Empty ingredients array - clear existing ingredients
         payload.ingredients = [];
       }
-      // Use the trackInventory value from form (user can enable/disable manually)
-      // If trackInventory is enabled but no ingredients, it will be ignored by backend
-      payload.trackInventory = formData.trackInventory && validIngredients.length > 0;
+      // Automatically track inventory if there are ingredients
+      payload.trackInventory = validIngredients.length > 0;
       // Add variants if provided
       if (formData.variants.length > 0) {
         payload.variants = formData.variants.filter(v => v.name && v.options.length > 0);
