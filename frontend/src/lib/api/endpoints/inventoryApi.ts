@@ -75,6 +75,9 @@ export interface CreateStockAdjustmentRequest {
   type: 'add' | 'remove' | 'set' | 'wastage';
   quantity: number;
   reason?: string;
+  supplierId?: string;
+  unitPrice?: number;
+  paymentMethod?: string;
 }
 export interface Supplier {
   id: string;

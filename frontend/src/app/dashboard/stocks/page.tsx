@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { InventoryItem, useAdjustStockMutation, useFixAllStockStatusesMutation, useGetInventoryItemByIdQuery, useGetInventoryItemsQuery, useGetLowStockItemsQuery, useUpdatePricingMutation } from '@/lib/api/endpoints/inventoryApi';
+import { useGetSuppliersQuery } from '@/lib/api/endpoints/suppliersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -37,6 +38,8 @@ export default function StocksPage() {
   const [adjustmentUnitCost, setAdjustmentUnitCost] = useState<number>(0);
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove' | 'set' | 'wastage'>('add');
   const [adjustmentReason, setAdjustmentReason] = useState<string>('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
+  const [adjustmentPaymentMethod, setAdjustmentPaymentMethod] = useState<string>('cash');
 
   const companyId = (user as any)?.companyId || 
                     (companyContext as any)?.companyId;
@@ -55,6 +58,9 @@ export default function StocksPage() {
   }, { skip: !branchId });
 
   const { data: lowStockData } = useGetLowStockItemsQuery({ companyId }, { skip: !companyId });
+  
+  const { data: suppliersData } = useGetSuppliersQuery({ companyId }, { skip: !companyId });
+  const suppliers = suppliersData?.suppliers || [];
 
   const { data: selectedIngredientData } = useGetInventoryItemByIdQuery(selectedIngredient?.id || '', { 
     skip: !selectedIngredient?.id 
@@ -141,6 +147,8 @@ export default function StocksPage() {
     setAdjustmentQuantity(0);
     setAdjustmentUnitCost(ingredient.unitCost || 0);
     setAdjustmentReason('');
+    setSelectedSupplierId(ingredient.preferredSupplierId || '');
+    setAdjustmentPaymentMethod('cash');
     setIsAdjustStockModalOpen(true);
   };
 
@@ -172,6 +180,9 @@ export default function StocksPage() {
           type: adjustmentType,
           quantity: adjustmentQuantity,
           reason: adjustmentReason || undefined,
+          supplierId: adjustmentType === 'add' ? selectedSupplierId : undefined,
+          unitPrice: adjustmentType === 'add' ? adjustmentUnitCost : undefined,
+          paymentMethod: adjustmentType === 'add' ? adjustmentPaymentMethod : undefined,
         }
       }).unwrap();
       
@@ -874,6 +885,46 @@ export default function StocksPage() {
                   </p>
                 </div>
               )}
+
+              {adjustmentType === 'add' && (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Supplier
+                    </label>
+                    <Select
+                      options={[
+                        { value: '', label: 'Select Supplier' },
+                        ...suppliers.map(s => ({ value: s.id, label: s.name }))
+                      ]}
+                      value={selectedSupplierId}
+                      onChange={(v) => setSelectedSupplierId(v)}
+                    />
+                    {!selectedSupplierId && (
+                      <p className="text-amber-600 text-xs mt-1 italic">
+                        Select a supplier to record this as a Purchase Order and Ledger entry.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Payment Method
+                    </label>
+                    <Select
+                      options={[
+                        { value: 'cash', label: 'Cash' },
+                        { value: 'bank', label: 'Bank Transfer' },
+                        { value: 'card', label: 'Card' },
+                        { value: 'mobile_banking', label: 'Mobile Banking' },
+                      ]}
+                      value={adjustmentPaymentMethod}
+                      onChange={(v) => setAdjustmentPaymentMethod(v)}
+                    />
+                  </div>
+                </div>
+              )}
+
               {(adjustmentType === 'remove' || adjustmentType === 'wastage') && adjustmentQuantity > (selectedIngredient.currentStock || 0) && (
                 <p className="text-red-600 text-sm mt-1">
                   Cannot remove more than {selectedIngredient.currentStock} {selectedIngredient.unit}

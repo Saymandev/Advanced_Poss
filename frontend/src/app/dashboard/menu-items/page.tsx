@@ -16,6 +16,7 @@ import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
   ClockIcon,
+  ExclamationTriangleIcon,
   EyeIcon,
   PencilIcon,
   PhotoIcon,
@@ -482,17 +483,21 @@ export default function MenuItemsPage() {
       errors.nutritionalInfo_fat = 'Fat cannot be negative';
     }
     // Validate ingredients
-    formData.ingredients.forEach((ing, index) => {
-      if (!ing.ingredientId) {
-        errors[`ingredient_${index}_ingredientId`] = 'Please select an ingredient';
-      }
-      if (ing.quantity <= 0) {
-        errors[`ingredient_${index}_quantity`] = 'Quantity must be greater than 0';
-      }
-      if (!ing.unit || ing.unit.trim() === '') {
-        errors[`ingredient_${index}_unit`] = 'Unit is required';
-      }
-    });
+    if (formData.ingredients.length === 0) {
+      errors.ingredients = 'At least one ingredient is required to create a menu item';
+    } else {
+      formData.ingredients.forEach((ing, index) => {
+        if (!ing.ingredientId) {
+          errors[`ingredient_${index}_ingredientId`] = 'Please select an ingredient';
+        }
+        if (ing.quantity <= 0) {
+          errors[`ingredient_${index}_quantity`] = 'Quantity must be greater than 0';
+        }
+        if (!ing.unit || ing.unit.trim() === '') {
+          errors[`ingredient_${index}_unit`] = 'Unit is required';
+        }
+      });
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -1529,6 +1534,25 @@ export default function MenuItemsPage() {
         className="max-w-3xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
+          {/* Global Error Banner */}
+          {Object.keys(formErrors).length > 0 && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 animate-in fade-in slide-in-from-top-1">
+              <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                <ExclamationTriangleIcon className="w-5 h-5" />
+                <p className="text-sm font-medium">Please fix the following errors:</p>
+              </div>
+              <ul className="mt-2 space-y-1 ml-7">
+                {formErrors.name && <li className="text-xs text-red-600 dark:text-red-400">• {formErrors.name}</li>}
+                {formErrors.categoryId && <li className="text-xs text-red-600 dark:text-red-400">• {formErrors.categoryId}</li>}
+                {formErrors.price && <li className="text-xs text-red-600 dark:text-red-400">• {formErrors.price}</li>}
+                {formErrors.ingredients && <li className="text-xs text-red-600 dark:text-red-400 font-bold">• {formErrors.ingredients}</li>}
+                {Object.keys(formErrors).some(k => k.startsWith('ingredient_')) && (
+                  <li className="text-xs text-red-600 dark:text-red-400">• Check individual ingredient quantities and units</li>
+                )}
+              </ul>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -2143,4 +2167,4 @@ export default function MenuItemsPage() {
       </Modal>
     </div>
   );
-}
+}

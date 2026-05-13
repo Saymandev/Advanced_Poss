@@ -391,9 +391,26 @@ export const posApi = apiSlice.injectEndpoints({
           stockStatus: item.stockStatus || (item.isOutOfStock ? 'out' : item.isLowStock ? 'low' : 'ok'),
           isLowStock: item.isLowStock || item.stockStatus === 'low',
           isOutOfStock: item.isOutOfStock || item.stockStatus === 'out',
-          variants: item.variants || [],
-          selections: item.selections || [],
-          addons: item.addons || [],
+          variants: (item.variants || []).map((v: any) => ({
+            name: v.name,
+            options: (v.options || []).map((o: any) => ({
+              name: o.name,
+              priceModifier: Number(o.priceModifier || 0)
+            }))
+          })),
+          selections: (item.selections || []).map((s: any) => ({
+            name: s.name,
+            type: s.type || 'single',
+            options: (s.options || []).map((o: any) => ({
+              name: o.name,
+              price: Number(o.price || 0)
+            }))
+          })),
+          addons: (item.addons || []).map((a: any) => ({
+            name: a.name,
+            price: Number(a.price || 0),
+            isAvailable: a.isAvailable !== false
+          })),
         });
 
         if (Array.isArray(data)) {
