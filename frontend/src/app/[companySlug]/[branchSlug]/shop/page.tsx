@@ -6,16 +6,27 @@ import { Input } from '@/components/ui/Input';
 import { useGetBranchMenuQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
 import { ChevronLeftIcon, ChevronRightIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Modal } from '@/components/ui/Modal';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Label } from '@/components/ui/Label';
+import { Badge } from '@/components/ui/Badge';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+
 interface CartItem {
   id: string;
+  uniqueId: string;
   name: string;
   price: number;
   quantity: number;
   image?: string;
+  selectedVariants?: Record<string, string>;
+  selectedSelections?: Record<string, string | string[]>;
+  variantDisplay?: string;
+  selectionDisplay?: string;
 }
 export default function BranchShopPage() {
   const params = useParams();
@@ -24,6 +35,13 @@ export default function BranchShopPage() {
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
   const menuType = searchParams.get('type') || 'full';
+
+  // Modal State
+  const [customizingItem, setCustomizingItem] = useState<any>(null);
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [selectedSelections, setSelectedSelections] = useState<Record<string, string | string[]>>({});
+  const [modalQuantity, setModalQuantity] = useState(1);
+
   const { 
     data: company, 
     isLoading: companyLoading,
@@ -49,7 +67,12 @@ export default function BranchShopPage() {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem(`cart_${companySlug}_${branchSlug}`);
-        return saved ? JSON.parse(saved) : [];
+        const parsed = saved ? JSON.parse(saved) : [];
+        // Ensure items have uniqueId
+        return parsed.map((item: any) => ({
+          ...item,
+          uniqueId: item.uniqueId || item.id
+        }));
       } catch (error) {
         console.error('Failed to load cart from localStorage:', error);
         return [];
@@ -157,36 +180,99 @@ export default function BranchShopPage() {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredItems.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredItems, currentPage, itemsPerPage]);
-  const addToCart = (item: any) => {
+
+  const hasModifiers = (item: any) => {
+    return (item.variants?.length > 0) || (item.selections?.length > 0);
+  };
+
+  const handleQuickCustomize = (item: any) => {
+    setCustomizingItem(item);
+    setModalQuantity(1);
+    
+    // Initial variants
+    const initialVariants: Record<string, string> = {};
+    item.variants?.forEach((v: any) => {
+      if (v.options?.length > 0) initialVariants[v.name] = v.options[0].name;
+    });
+    setSelectedVariants(initialVariants);
+
+    // Initial selections
+    const initialSelections: Record<string, string | string[]> = {};
+    item.selections?.forEach((s: any) => {
+      if (s.type === 'single' && s.options?.length > 0) {
+        initialSelections[s.name] = s.options[0].name;
+      } else if (s.type === 'multi') {
+        initialSelections[s.name] = [];
+      }
+    });
+    setSelectedSelections(initialSelections);
+  };
+
+  const calculateItemPrice = (item: any, variants: Record<string, string>, selections: Record<string, string | string[]>) => {
+    let price = item.price;
+    // Variants
+    Object.entries(variants).forEach(([vName, oName]) => {
+      const variant = item.variants?.find((v: any) => v.name === vName);
+      const option = variant?.options.find((o: any) => o.name === oName);
+      if (option?.priceModifier) price += option.priceModifier;
+    });
+    // Selections
+    Object.entries(selections).forEach(([sName, value]) => {
+      const selection = item.selections?.find((s: any) => s.name === sName);
+      if (Array.isArray(value)) {
+        value.forEach(oName => {
+          const option = selection?.options.find((o: any) => o.name === oName);
+          if (option?.price) price += option.price;
+        });
+      } else {
+        const option = selection?.options.find((o: any) => o.name === value);
+        if (option?.price) price += option.price;
+      }
+    });
+    return price;
+  };
+
+  const addToCart = (item: any, variants?: Record<string, string>, selections?: Record<string, string | string[]>, quantity: number = 1) => {
     if (!item.isAvailable) {
       toast.error('This item is currently unavailable');
       return;
     }
-    if (!item.id || !item.name || !item.price) {
-      toast.error('Invalid item data');
-      return;
-    }
-    const existingItem = cart.find(c => c.id === item.id);
-    if (existingItem) {
-      setCart(cart.map(c => 
-        c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-      ));
-      toast.success(`${item.name} added to cart`);
-    } else {
-      setCart([...cart, {
+
+    const currentVariants = variants || {};
+    const currentSelections = selections || {};
+    const pricePerItem = calculateItemPrice(item, currentVariants, currentSelections);
+    
+    const uniqueId = `${item.id}-${JSON.stringify(currentVariants)}-${JSON.stringify(currentSelections)}`;
+
+    setCart(prev => {
+      const existing = prev.find(c => c.uniqueId === uniqueId);
+      if (existing) {
+        return prev.map(c => c.uniqueId === uniqueId ? { ...c, quantity: c.quantity + quantity } : c);
+      }
+      return [...prev, {
         id: item.id,
+        uniqueId,
         name: item.name,
-        price: item.price,
-        quantity: 1,
+        price: pricePerItem,
+        quantity,
         image: item.images?.[0],
-      }]);
-      toast.success(`${item.name} added to cart`);
-    }
+        selectedVariants: currentVariants,
+        selectedSelections: currentSelections,
+        variantDisplay: Object.entries(currentVariants).map(([k, v]) => `${k}: ${v}`).join(', '),
+        selectionDisplay: Object.entries(currentSelections)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+          .join(', '),
+      }];
+    });
+    
+    toast.success(`${item.name} added to cart`);
+    setCustomizingItem(null);
   };
-  const updateQuantity = (itemId: string, delta: number) => {
+
+  const updateQuantity = (uniqueId: string, delta: number) => {
     setCart(prevCart => {
       const updated = prevCart.map(c => {
-        if (c.id === itemId) {
+        if (c.uniqueId === uniqueId) {
           const newQuantity = c.quantity + delta;
           if (newQuantity <= 0) return null;
           return { ...c, quantity: newQuantity };
@@ -196,6 +282,7 @@ export default function BranchShopPage() {
       return updated;
     });
   };
+
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   // Get company name from menu data if company query fails
@@ -441,36 +528,49 @@ export default function BranchShopPage() {
                       <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">
                         {formatCurrency(item.price)}
                       </span>
-                      {cartItem ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => updateQuantity(item.id, -1)}
-                            className="p-1.5 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                            aria-label="Decrease quantity"
-                          >
-                            <MinusIcon className="w-4 h-4" />
-                          </button>
-                          <span className="font-semibold w-6 sm:w-8 text-center text-sm sm:text-base">
-                            {cartItem.quantity}
-                          </span>
-                          <button
-                            onClick={() => updateQuantity(item.id, 1)}
-                            className="p-1.5 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                            aria-label="Increase quantity"
-                          >
-                            <PlusIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
+                      {hasModifiers(item) ? (
                         <Button
                           size="sm"
-                          onClick={() => addToCart(item)}
+                          onClick={() => handleQuickCustomize(item)}
                           disabled={!item.isAvailable}
-                          className="text-xs sm:text-sm"
+                          className="text-xs sm:text-sm bg-primary-600 hover:bg-primary-700"
                         >
-                          <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                          Add
+                          Customize
                         </Button>
+                      ) : (
+                        <>
+                          {cartItem ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => updateQuantity(cartItem.uniqueId, -1)}
+                                className="p-1.5 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                aria-label="Decrease quantity"
+                              >
+                                <MinusIcon className="w-4 h-4" />
+                              </button>
+                              <span className="font-semibold w-6 sm:w-8 text-center text-sm sm:text-base">
+                                {cart.filter(c => c.id === item.id).reduce((sum, c) => sum + c.quantity, 0)}
+                              </span>
+                              <button
+                                onClick={() => updateQuantity(cartItem.uniqueId, 1)}
+                                className="p-1.5 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                aria-label="Increase quantity"
+                              >
+                                <PlusIcon className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => addToCart(item)}
+                              disabled={!item.isAvailable}
+                              className="text-xs sm:text-sm"
+                            >
+                              <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                              Add
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </CardContent>
@@ -553,6 +653,125 @@ export default function BranchShopPage() {
           </div>
         </Link>
       )}
+      {/* Quick Customize Modal */}
+      <Modal 
+        isOpen={!!customizingItem} 
+        onClose={() => setCustomizingItem(null)}
+        title={`Customize ${customizingItem?.name}`}
+        size="md"
+      >
+        <div className="space-y-6 py-2">
+          {/* Variants */}
+            {customizingItem?.variants?.map((variant: any) => (
+              <div key={variant.name}>
+                <Label className="text-base font-bold mb-3 block">{variant.name}</Label>
+                <RadioGroup
+                  value={selectedVariants[variant.name]}
+                  onValueChange={(val: string) => setSelectedVariants(prev => ({ ...prev, [variant.name]: val }))}
+                  className="flex flex-wrap gap-2"
+                >
+                  {variant.options.map((option: any) => (
+                    <div key={option.name} className="flex items-center">
+                      <RadioGroupItem
+                        value={option.name}
+                        id={`modal-variant-${variant.name}-${option.name}`}
+                        className="peer sr-only"
+                      />
+                      <Label
+                        htmlFor={`modal-variant-${variant.name}-${option.name}`}
+                        className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 peer-data-[state=checked]:bg-primary-600 peer-data-[state=checked]:text-white peer-data-[state=checked]:border-primary-600 transition-all text-sm font-medium"
+                      >
+                        {option.name}
+                        {option.priceModifier > 0 && <span className="ml-1 text-xs opacity-80">(+{formatCurrency(option.priceModifier)})</span>}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            ))}
+
+            {/* Selections */}
+            {customizingItem?.selections?.map((selection: any) => (
+              <div key={selection.name}>
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="text-base font-bold">{selection.name}</Label>
+                  {selection.type === 'multi' && <Badge variant="secondary" className="text-[10px] uppercase">Multi</Badge>}
+                </div>
+                
+                <div className="grid grid-cols-1 gap-2">
+                  {selection.options.map((option: any) => (
+                    <div key={option.name} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <div className="flex items-center gap-3">
+                        {selection.type === 'multi' ? (
+                          <Checkbox 
+                            id={`modal-selection-${selection.name}-${option.name}`}
+                            checked={(selectedSelections[selection.name] as string[] || []).includes(option.name)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const current = (selectedSelections[selection.name] as string[] || []);
+                              if (checked) {
+                                setSelectedSelections(prev => ({ ...prev, [selection.name]: [...current, option.name] }));
+                              } else {
+                                setSelectedSelections(prev => ({ ...prev, [selection.name]: current.filter(n => n !== option.name) }));
+                              }
+                            }}
+                          />
+                        ) : (
+                          <RadioGroup
+                            value={selectedSelections[selection.name] as string}
+                            onValueChange={(val: string) => setSelectedSelections(prev => ({ ...prev, [selection.name]: val }))}
+                          >
+                            <div className="flex items-center gap-3">
+                              <RadioGroupItem value={option.name} id={`modal-selection-${selection.name}-${option.name}`} />
+                            </div>
+                          </RadioGroup>
+                        )}
+                        <Label htmlFor={`modal-selection-${selection.name}-${option.name}`} className="cursor-pointer">{option.name}</Label>
+                      </div>
+                      {option.price > 0 && <span className="text-sm font-medium">+{formatCurrency(option.price)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Quantity */}
+            <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={() => setModalQuantity(Math.max(1, modalQuantity - 1))}
+                  disabled={modalQuantity <= 1}
+                >
+                  <MinusIcon className="w-4 h-4" />
+                </Button>
+                <span className="font-bold text-lg w-8 text-center">{modalQuantity}</span>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={() => setModalQuantity(modalQuantity + 1)}
+                >
+                  <PlusIcon className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Total Price</p>
+                <p className="text-xl font-bold text-primary-600 dark:text-primary-400">
+                  {formatCurrency(calculateItemPrice(customizingItem, selectedVariants, selectedSelections) * modalQuantity)}
+                </p>
+              </div>
+            </div>
+
+            <Button 
+              className="w-full" 
+              size="lg"
+              onClick={() => addToCart(customizingItem, selectedVariants, selectedSelections, modalQuantity)}
+            >
+              Add to Cart
+            </Button>
+          </div>
+      </Modal>
     </div>
   );
 }
