@@ -836,36 +836,52 @@ export default function MenuItemsPage() {
     });
   };
   const updateSelection = (index: number, field: 'name' | 'type', value: string) => {
-    const newSelections = [...formData.selections];
-    newSelections[index] = {
-      ...newSelections[index],
-      [field]: value,
-    };
-    setFormData({ ...formData, selections: newSelections });
-  };
-  const removeSelection = (index: number) => {
-    setFormData({
-      ...formData,
-      selections: formData.selections.filter((_, i) => i !== index),
+    setFormData((prev) => {
+      const newSelections = [...prev.selections];
+      newSelections[index] = {
+        ...newSelections[index],
+        [field]: value,
+      };
+      return { ...prev, selections: newSelections };
     });
   };
+  const removeSelection = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      selections: prev.selections.filter((_, i) => i !== index),
+    }));
+  };
   const addSelectionOption = (selectionIndex: number) => {
-    const newSelections = [...formData.selections];
-    newSelections[selectionIndex].options.push({ name: '', price: 0 });
-    setFormData({ ...formData, selections: newSelections });
+    setFormData((prev) => {
+      const newSelections = [...prev.selections];
+      const selection = { ...newSelections[selectionIndex] };
+      selection.options = [...selection.options, { name: '', price: 0 }];
+      newSelections[selectionIndex] = selection;
+      return { ...prev, selections: newSelections };
+    });
   };
   const updateSelectionOption = (selectionIndex: number, optionIndex: number, field: 'name' | 'price', value: string | number) => {
-    const newSelections = [...formData.selections];
-    newSelections[selectionIndex].options[optionIndex] = {
-      ...newSelections[selectionIndex].options[optionIndex],
-      [field]: field === 'price' ? Number(value) : value,
-    };
-    setFormData({ ...formData, selections: newSelections });
+    setFormData((prev) => {
+      const newSelections = [...prev.selections];
+      const selection = { ...newSelections[selectionIndex] };
+      const newOptions = [...selection.options];
+      newOptions[optionIndex] = {
+        ...newOptions[optionIndex],
+        [field]: field === 'price' ? Number(value) : value,
+      };
+      selection.options = newOptions;
+      newSelections[selectionIndex] = selection;
+      return { ...prev, selections: newSelections };
+    });
   };
   const removeSelectionOption = (selectionIndex: number, optionIndex: number) => {
-    const newSelections = [...formData.selections];
-    newSelections[selectionIndex].options = newSelections[selectionIndex].options.filter((_, i) => i !== optionIndex);
-    setFormData({ ...formData, selections: newSelections });
+    setFormData((prev) => {
+      const newSelections = [...prev.selections];
+      const selection = { ...newSelections[selectionIndex] };
+      selection.options = selection.options.filter((_, i) => i !== optionIndex);
+      newSelections[selectionIndex] = selection;
+      return { ...prev, selections: newSelections };
+    });
   };
   // Variants handlers (for size variants like Small, Medium, Large)
   const addVariant = () => {
@@ -878,36 +894,52 @@ export default function MenuItemsPage() {
     });
   };
   const updateVariant = (index: number, field: 'name', value: string) => {
-    const newVariants = [...formData.variants];
-    newVariants[index] = {
-      ...newVariants[index],
-      [field]: value,
-    };
-    setFormData({ ...formData, variants: newVariants });
-  };
-  const removeVariant = (index: number) => {
-    setFormData({
-      ...formData,
-      variants: formData.variants.filter((_, i) => i !== index),
+    setFormData((prev) => {
+      const newVariants = [...prev.variants];
+      newVariants[index] = {
+        ...newVariants[index],
+        [field]: value,
+      };
+      return { ...prev, variants: newVariants };
     });
   };
+  const removeVariant = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      variants: prev.variants.filter((_, i) => i !== index),
+    }));
+  };
   const addVariantOption = (variantIndex: number) => {
-    const newVariants = [...formData.variants];
-    newVariants[variantIndex].options.push({ name: '', priceModifier: 0 });
-    setFormData({ ...formData, variants: newVariants });
+    setFormData((prev) => {
+      const newVariants = [...prev.variants];
+      const variant = { ...newVariants[variantIndex] };
+      variant.options = [...variant.options, { name: '', priceModifier: 0 }];
+      newVariants[variantIndex] = variant;
+      return { ...prev, variants: newVariants };
+    });
   };
   const updateVariantOption = (variantIndex: number, optionIndex: number, field: 'name' | 'priceModifier', value: string | number) => {
-    const newVariants = [...formData.variants];
-    newVariants[variantIndex].options[optionIndex] = {
-      ...newVariants[variantIndex].options[optionIndex],
-      [field]: field === 'priceModifier' ? Number(value) : value,
-    };
-    setFormData({ ...formData, variants: newVariants });
+    setFormData((prev) => {
+      const newVariants = [...prev.variants];
+      const variant = { ...newVariants[variantIndex] };
+      const newOptions = [...variant.options];
+      newOptions[optionIndex] = {
+        ...newOptions[optionIndex],
+        [field]: field === 'priceModifier' ? Number(value) : value,
+      };
+      variant.options = newOptions;
+      newVariants[variantIndex] = variant;
+      return { ...prev, variants: newVariants };
+    });
   };
   const removeVariantOption = (variantIndex: number, optionIndex: number) => {
-    const newVariants = [...formData.variants];
-    newVariants[variantIndex].options = newVariants[variantIndex].options.filter((_, i) => i !== optionIndex);
-    setFormData({ ...formData, variants: newVariants });
+    setFormData((prev) => {
+      const newVariants = [...prev.variants];
+      const variant = { ...newVariants[variantIndex] };
+      variant.options = variant.options.filter((_, i) => i !== optionIndex);
+      newVariants[variantIndex] = variant;
+      return { ...prev, variants: newVariants };
+    });
   };
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
