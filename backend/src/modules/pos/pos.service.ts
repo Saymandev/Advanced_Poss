@@ -2259,6 +2259,9 @@ export class POSService {
           stockStatus: isOutOfStock ? 'out' : isLowStock ? 'low' : 'ok',
           isLowStock,
           isOutOfStock,
+          variants: item.variants || [],
+          selections: item.selections || [],
+          addons: item.addons || [],
         };
       });
     } catch (error) {
