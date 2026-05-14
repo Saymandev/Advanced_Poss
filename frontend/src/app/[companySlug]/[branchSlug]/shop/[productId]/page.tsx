@@ -37,6 +37,7 @@ export default function ProductDetailPage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [selectedSelections, setSelectedSelections] = useState<Record<string, string | string[]>>({});
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
 
   // Initialize selected options when product loads
@@ -93,6 +94,12 @@ export default function ProductDetailPage() {
       }
     });
 
+    // Add addon prices
+    selectedAddons.forEach(addonName => {
+      const addon = product.addons?.find(a => a.name === addonName);
+      if (addon?.price) basePrice += addon.price;
+    });
+
     setTotalPrice(basePrice * quantity);
   }, [product, selectedVariants, selectedSelections, quantity]);
 
@@ -139,10 +146,12 @@ export default function ProductDetailPage() {
           image: product.images?.[0],
           selectedVariants,
           selectedSelections,
+          selectedAddons,
           variantDisplay: Object.entries(selectedVariants).map(([k, v]) => `${k}: ${v}`).join(', '),
-          selectionDisplay: Object.entries(selectedSelections)
-            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-            .join(', '),
+          selectionDisplay: [
+            ...Object.entries(selectedSelections).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`),
+            ...(selectedAddons.length > 0 ? [`Add-ons: ${selectedAddons.join(', ')}`] : [])
+          ].join(', '),
         });
       }
 
@@ -271,6 +280,21 @@ export default function ProductDetailPage() {
                   <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-sm font-medium">
                     Unavailable
                   </span>
+                )}
+                {product.isNew && (
+                  <Badge variant="info" className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    NEW
+                  </Badge>
+                )}
+                {product.isPopular && (
+                  <Badge variant="warning" className="px-3 py-1 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                    POPULAR
+                  </Badge>
+                )}
+                {product.isFeatured && (
+                  <Badge variant="success" className="px-3 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    FEATURED
+                  </Badge>
                 )}
               </div>
               {product.description && (
@@ -441,6 +465,45 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Add-ons */}
+            {product.addons && product.addons.length > 0 && (
+              <div className="mb-8">
+                <Label className="text-base font-bold mb-3 block">Extra Add-ons</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {product.addons.map((addon) => (
+                    <div 
+                      key={addon.name} 
+                      className={`flex items-center justify-between p-3 border rounded-lg transition-colors cursor-pointer ${
+                        !addon.isAvailable ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                      } ${selectedAddons.includes(addon.name) ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/10' : 'border-gray-200 dark:border-gray-700'}`}
+                      onClick={() => {
+                        if (!addon.isAvailable) return;
+                        setSelectedAddons(prev => 
+                          prev.includes(addon.name) 
+                            ? prev.filter(a => a !== addon.name)
+                            : [...prev, addon.name]
+                        );
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id={`addon-${addon.name}`}
+                          checked={selectedAddons.includes(addon.name)}
+                          disabled={!addon.isAvailable}
+                          onChange={() => {}} // Handled by parent div for better UX
+                        />
+                        <Label htmlFor={`addon-${addon.name}`} className="cursor-pointer">{addon.name}</Label>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        {addon.price > 0 && <span className="text-sm font-medium">+{formatCurrency(addon.price)}</span>}
+                        {!addon.isAvailable && <span className="text-[10px] text-red-500 font-bold">OUT OF STOCK</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

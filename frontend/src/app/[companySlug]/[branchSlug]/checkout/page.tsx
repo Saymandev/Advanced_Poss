@@ -155,9 +155,6 @@ export default function CheckoutPage() {
       errors.firstName = 'First name is required';
     }
 
-    if (!formData.lastName.trim()) {
-      errors.lastName = 'Last name is required';
-    }
 
     if (!formData.phone.trim()) {
       errors.phone = 'Phone number is required';
@@ -383,7 +380,7 @@ export default function CheckoutPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Last Name *
+                        Last Name
                       </label>
                       <Input
                         value={formData.lastName}
@@ -392,7 +389,7 @@ export default function CheckoutPage() {
                           if (formErrors.lastName) setFormErrors({ ...formErrors, lastName: '' });
                         }}
                         className={formErrors.lastName ? 'border-red-500' : ''}
-                        required
+                        placeholder="Optional"
                       />
                       {formErrors.lastName && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.lastName}</p>

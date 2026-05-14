@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
+import { useGetCompanyBySlugQuery, useTrackOrderQuery } from '@/lib/api/endpoints/publicApi';
 import { CheckCircleIcon, ExclamationTriangleIcon, HomeIcon, PhoneIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -47,6 +47,15 @@ export default function OrderConfirmationPage() {
     skip: !companySlug,
   });
 
+  const { 
+    data: orderData,
+    isLoading: isOrderLoading,
+  } = useTrackOrderQuery(orderId, {
+    skip: !orderId || orderId === 'pending',
+  });
+
+  const order = orderData?.data || orderData;
+
   useEffect(() => {
     if (isError) {
       const errorMessage = (error as any)?.data?.message || 'Failed to load company information';
@@ -54,12 +63,12 @@ export default function OrderConfirmationPage() {
     }
   }, [isError, error]);
 
-  if (isLoading) {
+  if (isLoading || (isOrderLoading && orderId !== 'pending')) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading order details...</p>
         </div>
       </div>
     );
@@ -119,6 +128,13 @@ export default function OrderConfirmationPage() {
     );
   }
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD', // You might want to get this from company settings
+    }).format(amount);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8">
       <Card className="max-w-2xl w-full">
@@ -131,17 +147,41 @@ export default function OrderConfirmationPage() {
             Order Received! 🛎️
           </h1>
           <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 mb-4 md:mb-6">
-            Thank you for your order. We have sent it to the restaurant for confirmation.
+            Thank you, <span className="font-semibold text-gray-900 dark:text-white">{order?.customerInfo?.name || 'Customer'}</span>! We&apos;ve received your order.
           </p>
 
           {orderId && orderId !== 'pending' && (
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 md:p-6 mb-4 md:mb-6">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Order Number</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3 md:mb-4">
-                {orderNumber || orderId}
+                {order?.orderNumber || orderNumber || orderId}
               </p>
+              
+              {/* Order Summary */}
+              {order?.items && (
+                <div className="border-t border-gray-200 dark:border-gray-700 mt-4 pt-4 text-left">
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Order Summary</h3>
+                  <div className="space-y-2 mb-4">
+                    {order.items.map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {item.quantity}x {item.name}
+                        </span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(item.price * item.quantity)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-dashed border-gray-200 dark:border-gray-700 pt-2 flex justify-between font-bold">
+                    <span>Total Amount</span>
+                    <span>{formatCurrency(order.totalAmount || order.total || 0)}</span>
+                  </div>
+                </div>
+              )}
+
               {/* Use tracking URL from sessionStorage if available, otherwise build from slugs */}
-              <Link href={trackingUrl || `/${companySlug}/${branchSlug}/track/${orderId}`}>
+              <Link href={trackingUrl || `/${companySlug}/${branchSlug}/track/${orderId}`} className="block mt-6">
                 <Button variant="secondary" className="w-full">
                   Track Your Order
                 </Button>

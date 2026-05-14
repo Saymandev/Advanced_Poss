@@ -182,7 +182,7 @@ export default function BranchShopPage() {
   }, [filteredItems, currentPage, itemsPerPage]);
 
   const hasModifiers = (item: any) => {
-    return (item.variants?.length > 0) || (item.selections?.length > 0);
+    return (item.variants?.length > 0) || (item.selections?.length > 0) || (item.addons?.length > 0);
   };
 
   const handleQuickCustomize = (item: any) => {
@@ -206,9 +206,12 @@ export default function BranchShopPage() {
       }
     });
     setSelectedSelections(initialSelections);
+    setSelectedAddons([]); // Initialize empty addons for modal
   };
 
-  const calculateItemPrice = (item: any, variants: Record<string, string>, selections: Record<string, string | string[]>) => {
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+
+  const calculateItemPrice = (item: any, variants: Record<string, string>, selections: Record<string, string | string[]>, addons: string[] = []) => {
     if (!item) return 0;
     let price = item.price || 0;
     // Variants
@@ -230,10 +233,15 @@ export default function BranchShopPage() {
         if (option?.price) price += option.price;
       }
     });
+    // Addons
+    addons.forEach(addonName => {
+      const addon = item.addons?.find((a: any) => a.name === addonName);
+      if (addon?.price) price += addon.price;
+    });
     return price;
   };
 
-  const addToCart = (item: any, variants?: Record<string, string>, selections?: Record<string, string | string[]>, quantity: number = 1) => {
+  const addToCart = (item: any, variants?: Record<string, string>, selections?: Record<string, string | string[]>, quantity: number = 1, addons: string[] = []) => {
     if (!item.isAvailable) {
       toast.error('This item is currently unavailable');
       return;
@@ -241,9 +249,10 @@ export default function BranchShopPage() {
 
     const currentVariants = variants || {};
     const currentSelections = selections || {};
-    const pricePerItem = calculateItemPrice(item, currentVariants, currentSelections);
+    const currentAddons = addons || [];
+    const pricePerItem = calculateItemPrice(item, currentVariants, currentSelections, currentAddons);
     
-    const uniqueId = `${item.id}-${JSON.stringify(currentVariants)}-${JSON.stringify(currentSelections)}`;
+    const uniqueId = `${item.id}-${JSON.stringify(currentVariants)}-${JSON.stringify(currentSelections)}-${JSON.stringify(currentAddons)}`;
 
     setCart(prev => {
       const existing = prev.find(c => c.uniqueId === uniqueId);
@@ -259,10 +268,12 @@ export default function BranchShopPage() {
         image: item.images?.[0],
         selectedVariants: currentVariants,
         selectedSelections: currentSelections,
+        selectedAddons: currentAddons,
         variantDisplay: Object.entries(currentVariants).map(([k, v]) => `${k}: ${v}`).join(', '),
-        selectionDisplay: Object.entries(currentSelections)
-          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-          .join(', '),
+        selectionDisplay: [
+          ...Object.entries(currentSelections).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`),
+          ...(currentAddons.length > 0 ? [`Add-ons: ${currentAddons.join(', ')}`] : [])
+        ].join(', '),
       }];
     });
     
@@ -512,6 +523,24 @@ export default function BranchShopPage() {
                           <span className="text-white font-semibold text-sm md:text-base">Unavailable</span>
                         </div>
                       )}
+                      {/* Promotional Badges */}
+                      <div className="absolute top-2 left-2 flex flex-col gap-1">
+                        {item.isNew && (
+                          <Badge variant="info" className="text-[10px] py-0.5 px-2 bg-blue-600 text-white border-none shadow-sm">
+                            NEW
+                          </Badge>
+                        )}
+                        {item.isPopular && (
+                          <Badge variant="warning" className="text-[10px] py-0.5 px-2 bg-orange-600 text-white border-none shadow-sm">
+                            HOT
+                          </Badge>
+                        )}
+                        {item.isFeatured && (
+                          <Badge variant="success" className="text-[10px] py-0.5 px-2 bg-purple-600 text-white border-none shadow-sm">
+                            BEST
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </Link>
                   <CardContent className="p-3 md:p-4 flex-1 flex flex-col">
@@ -793,7 +822,7 @@ export default function BranchShopPage() {
               <div className="text-right">
                 <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Total Price</p>
                 <p className="text-xl font-bold text-primary-600 dark:text-primary-400">
-                  {formatCurrency(calculateItemPrice(customizingItem, selectedVariants, selectedSelections) * modalQuantity)}
+                  {formatCurrency(calculateItemPrice(customizingItem, selectedVariants, selectedSelections, selectedAddons) * modalQuantity)}
                 </p>
               </div>
             </div>
@@ -801,7 +830,7 @@ export default function BranchShopPage() {
             <Button 
               className="w-full" 
               size="lg"
-              onClick={() => addToCart(customizingItem, selectedVariants, selectedSelections, modalQuantity)}
+              onClick={() => addToCart(customizingItem, selectedVariants, selectedSelections, modalQuantity, selectedAddons)}
             >
               Add to Cart
             </Button>

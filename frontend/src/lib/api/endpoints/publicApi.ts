@@ -58,6 +58,15 @@ export interface PublicMenuItem {
       price: number;
     }>;
   }>;
+  addons?: Array<{
+    name: string;
+    price: number;
+    isAvailable: boolean;
+  }>;
+  tags?: string[];
+  isPopular?: boolean;
+  isFeatured?: boolean;
+  isNew?: boolean;
 }
 export interface PublicCategory {
   id: string;

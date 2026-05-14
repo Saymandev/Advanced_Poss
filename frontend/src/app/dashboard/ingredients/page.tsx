@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/Select';
 import {
   InventoryItem,
   useAddStockMutation,
+  useAdjustStockMutation,
   useCreateInventoryItemMutation,
   useDeleteInventoryItemMutation,
   useGetInventoryItemsQuery,
@@ -89,6 +90,7 @@ export default function IngredientsPage() {
   const [createIngredient, { isLoading: isCreating }] = useCreateInventoryItemMutation();
   const [updateIngredient, { isLoading: isUpdating }] = useUpdateInventoryItemMutation();
   const [deleteIngredient] = useDeleteInventoryItemMutation();
+  const [adjustStock] = useAdjustStockMutation();
   const [addStock] = useAddStockMutation();
   const [removeStock] = useRemoveStockMutation();
 
@@ -166,7 +168,8 @@ export default function IngredientsPage() {
   });
 
   const [stockAdjustment, setStockAdjustment] = useState({
-    change: 0,
+    quantity: 0,
+    type: 'add' as 'add' | 'remove' | 'wastage' | 'set',
     reason: '',
   });
 
@@ -202,7 +205,8 @@ export default function IngredientsPage() {
 
   const resetStockAdjustment = () => {
     setStockAdjustment({
-      change: 0,
+      quantity: 0,
+      type: 'add',
       reason: '',
     });
   };
@@ -296,26 +300,20 @@ export default function IngredientsPage() {
 
   const handleAdjustStock = async () => {
     if (!selectedIngredient) return;
-    if (!stockAdjustment.change || stockAdjustment.change === 0) {
+    if (!stockAdjustment.quantity || stockAdjustment.quantity <= 0) {
       toast.error('Please enter a valid quantity');
       return;
     }
 
     try {
-      const adjustmentType = stockAdjustment.change >= 0 ? 'add' : 'remove';
-      const quantity = Math.abs(stockAdjustment.change);
-      
-      if (adjustmentType === 'add') {
-        await addStock({
-          id: selectedIngredient.id,
-          quantity,
-        }).unwrap();
-      } else {
-        await removeStock({
-          id: selectedIngredient.id,
-          quantity,
-        }).unwrap();
-      }
+      await adjustStock({
+        id: selectedIngredient.id,
+        data: {
+          type: stockAdjustment.type,
+          quantity: stockAdjustment.quantity,
+          reason: stockAdjustment.reason,
+        },
+      }).unwrap();
 
       toast.success('Stock adjusted successfully');
       setIsAdjustStockModalOpen(false);
@@ -1252,22 +1250,36 @@ export default function IngredientsPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Stock Change
+                Adjustment Type
               </label>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
-                  variant={stockAdjustment.change > 0 ? 'primary' : 'secondary'}
-                  onClick={() => setStockAdjustment({ ...stockAdjustment, change: Math.abs(stockAdjustment.change) })}
-                  className="flex-1"
+                  variant={stockAdjustment.type === 'add' ? 'primary' : 'secondary'}
+                  onClick={() => setStockAdjustment({ ...stockAdjustment, type: 'add' })}
+                  className="text-xs py-2 h-auto"
                 >
                   + Add Stock
                 </Button>
                 <Button
-                  variant={stockAdjustment.change < 0 ? 'primary' : 'secondary'}
-                  onClick={() => setStockAdjustment({ ...stockAdjustment, change: -Math.abs(stockAdjustment.change) })}
-                  className="flex-1"
+                  variant={stockAdjustment.type === 'remove' ? 'primary' : 'secondary'}
+                  onClick={() => setStockAdjustment({ ...stockAdjustment, type: 'remove' })}
+                  className="text-xs py-2 h-auto"
                 >
                   - Remove Stock
+                </Button>
+                <Button
+                  variant={stockAdjustment.type === 'wastage' ? 'primary' : 'secondary'}
+                  onClick={() => setStockAdjustment({ ...stockAdjustment, type: 'wastage' })}
+                  className="text-xs py-2 h-auto"
+                >
+                  🗑️ Damage/Wastage
+                </Button>
+                <Button
+                  variant={stockAdjustment.type === 'set' ? 'primary' : 'secondary'}
+                  onClick={() => setStockAdjustment({ ...stockAdjustment, type: 'set' })}
+                  className="text-xs py-2 h-auto"
+                >
+                  🎯 Set Fixed Qty
                 </Button>
               </div>
             </div>
@@ -1278,12 +1290,12 @@ export default function IngredientsPage() {
               </label>
               <Input
                 type="number"
-                value={Math.abs(stockAdjustment.change)}
+                value={stockAdjustment.quantity}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value) || 0;
                   setStockAdjustment({
                     ...stockAdjustment,
-                    change: stockAdjustment.change < 0 ? -value : value,
+                    quantity: value,
                   });
                 }}
                 placeholder="Enter quantity"
@@ -1299,13 +1311,27 @@ export default function IngredientsPage() {
                 value={stockAdjustment.reason}
                 onChange={(e) => setStockAdjustment({ ...stockAdjustment, reason: e.target.value })}
                 className="input w-full"
-                placeholder="Enter reason for stock adjustment..."
+                placeholder={stockAdjustment.type === 'wastage' ? 'e.g., Expired, Damaged, Spilled...' : 'Enter reason for stock adjustment...'}
               />
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-              <p className="text-sm text-blue-800 dark:text-blue-400 text-center">
-                New stock level will be: {Math.max(0, selectedIngredient.currentStock + stockAdjustment.change)} {selectedIngredient.unit}
+            <div className={`rounded-lg p-4 ${
+              stockAdjustment.type === 'wastage' ? 'bg-red-50 dark:bg-red-900/20' : 
+              stockAdjustment.type === 'add' ? 'bg-green-50 dark:bg-green-900/20' : 
+              'bg-blue-50 dark:bg-blue-900/20'
+            }`}>
+              <p className={`text-sm text-center ${
+                stockAdjustment.type === 'wastage' ? 'text-red-800 dark:text-red-400' : 
+                stockAdjustment.type === 'add' ? 'text-green-800 dark:text-green-400' : 
+                'text-blue-800 dark:text-blue-400'
+              }`}>
+                {stockAdjustment.type === 'set' ? (
+                  <>New stock level will be: <strong>{stockAdjustment.quantity} {selectedIngredient.unit}</strong></>
+                ) : stockAdjustment.type === 'add' ? (
+                  <>New stock level will be: <strong>{selectedIngredient.currentStock + stockAdjustment.quantity} {selectedIngredient.unit}</strong></>
+                ) : (
+                  <>New stock level will be: <strong>{Math.max(0, selectedIngredient.currentStock - stockAdjustment.quantity)} {selectedIngredient.unit}</strong></>
+                )}
               </p>
             </div>
 
