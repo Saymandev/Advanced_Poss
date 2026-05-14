@@ -117,6 +117,13 @@ export class POSOrder {
   @Prop({ required: true, enum: ['pending', 'paid', 'cancelled'] })
   status: string;
 
+  @Prop({
+    type: String,
+    enum: ['pending', 'partial', 'paid', 'refunded'],
+    default: 'pending',
+  })
+  paymentStatus: string;
+
   @Prop({ default: 'cash' })
   paymentMethod?: string;
 

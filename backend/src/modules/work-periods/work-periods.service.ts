@@ -310,10 +310,11 @@ export class WorkPeriodsService {
 
     // Net revenue calculation from payments (More accurate for cash drawer)
     payments.forEach((payment) => {
-      if (payment.amount < 0) {
-        refundTotal += Math.abs(payment.amount);
+      const amount = Number(payment.amount);
+      if (amount < 0) {
+        refundTotal += Math.abs(amount);
       } else {
-        grossSales += payment.amount;
+        grossSales += amount;
       }
 
       // Payment method breakdown from actual transactions
@@ -322,8 +323,8 @@ export class WorkPeriodsService {
         paymentMethods[method] = { count: 0, amount: 0 };
       }
       paymentMethods[method].count += 1;
-      paymentMethods[method].amount += payment.amount;
-      totalByPaymentMethod[method] = (totalByPaymentMethod[method] || 0) + payment.amount;
+      paymentMethods[method].amount += amount;
+      totalByPaymentMethod[method] = (totalByPaymentMethod[method] || 0) + amount;
     });
 
     const refundDetails = payments

@@ -117,11 +117,21 @@ export class TransactionsService {
     }
 
     const amount = Number(createTransactionDto.amount);
-    let currentBalance = Number(paymentMethod.currentBalance) || 0;
-    const balanceAfter = createTransactionDto.type === TransactionType.IN ? currentBalance + amount : currentBalance - amount;
+    const currentBalance = Number(paymentMethod.currentBalance) || 0;
 
-    paymentMethod.currentBalance = balanceAfter;
-    await paymentMethod.save();
+    // 4. Update balance atomically to prevent race conditions
+    const updatedPaymentMethod = await this.paymentMethodModel.findByIdAndUpdate(
+      paymentMethod._id,
+      { $inc: { currentBalance: createTransactionDto.type === TransactionType.IN ? amount : -amount } },
+      { new: true }
+    );
+
+    if (!updatedPaymentMethod) {
+      throw new NotFoundException('Failed to update payment method balance');
+    }
+
+    const balanceAfter = updatedPaymentMethod.currentBalance;
+    fs.appendFileSync(logPath, `[TXN] ${createTransactionDto.type} for ${paymentMethod.code}: Bal ${currentBalance} -> ${balanceAfter} (Amt: ${amount})\n`);
 
     const transactionNumber = await this.generateTransactionNumber(companyId);
     const newTransaction = new this.transactionModel({
@@ -139,7 +149,7 @@ export class TransactionsService {
 
     try {
       const saved = await newTransaction.save();
-      fs.appendFileSync(logPath, `[TXN] Success: ${saved._id}\n`);
+      fs.appendFileSync(logPath, `[TXN] Success: ${saved._id} | Bal: ${balanceAfter}\n`);
       return saved;
     } catch (err) {
       fs.appendFileSync(logPath, `[TXN] Save Error: ${err.message}\n`);

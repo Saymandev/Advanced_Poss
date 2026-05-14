@@ -749,9 +749,12 @@ export class AiService {
     };
   }
   // Get menu optimization suggestions
-  async getMenuOptimization(branchId: string, category?: string): Promise<any[]> {
+  async getMenuOptimization(branchId: string, companyId: string, category?: string): Promise<any[]> {
     if (!Types.ObjectId.isValid(branchId)) {
       throw new BadRequestException('Invalid branch ID');
+    }
+    if (!Types.ObjectId.isValid(companyId)) {
+      throw new BadRequestException('Invalid company ID');
     }
     const endDate = new Date();
     const startDate = new Date();
@@ -759,11 +762,12 @@ export class AiService {
     // Build menu items query - match menu-items service logic
     // Include both branch-specific items and company-wide items (branchId: null)
     const branchIdObj = new Types.ObjectId(branchId);
+    const companyIdObj = new Types.ObjectId(companyId);
 
     let menuItems = await this.menuItemModel.find({
+      companyId: companyIdObj,
       $or: [
         { branchId: branchIdObj },
-        { branchId: branchId }, // Try string format too
         { branchId: null }, // Include company-wide items
       ],
     })

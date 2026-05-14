@@ -862,6 +862,7 @@ export class POSService {
           orderType: obj.type || 'dine-in',
           totalAmount: obj.total,
           status: posStatus,
+          paymentStatus: obj.paymentStatus || 'pending',
           customerInfo: obj.deliveryInfo || {
             name: obj.guestName || 'Customer',
             phone: obj.guestPhone || '',
@@ -966,6 +967,8 @@ export class POSService {
         try {
           // Update order with payment info (amountReceived, changeDue)
           await this.posOrderModel.findByIdAndUpdate(id, {
+            status: 'paid',
+            paymentStatus: 'paid',
             amountReceived: updatedPOSOrder.totalAmount,
             changeDue: 0,
           }).exec();
@@ -1235,6 +1238,7 @@ export class POSService {
     } else {
       updatedOrder = await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
         status: 'paid',
+        paymentStatus: 'paid',
         paymentId: savedPayment._id,
         completedAt: new Date(),
         amountReceived: processPaymentDto.amountReceived,
@@ -1864,9 +1868,15 @@ export class POSService {
     if (amount === order.totalAmount) {
       await this.posOrderModel.findByIdAndUpdate(orderId, {
         status: 'cancelled',
+        paymentStatus: 'refunded',
         cancelledAt: new Date(),
         cancelledBy: new Types.ObjectId(userId),
         cancellationReason: `Full refund: ${reason}`,
+      }).exec();
+    } else {
+      // For partial refunds, still update paymentStatus to 'refunded' (or could use 'partial')
+      await this.posOrderModel.findByIdAndUpdate(orderId, {
+        paymentStatus: 'refunded',
       }).exec();
     }
     // Record transaction for the refund

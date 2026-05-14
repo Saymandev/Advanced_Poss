@@ -168,6 +168,7 @@ export class AiController {
     }
     const suggestions = await this.aiService.getMenuOptimization(
       branchId,
+      user.companyId?.toString(),
       category,
     );
     return {
