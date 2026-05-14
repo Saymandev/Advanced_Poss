@@ -257,52 +257,46 @@ export class WebsocketsGateway
     const sockets = this.server.sockets.sockets;
     let notificationCount = 0;
     
-    // Iterate over sockets - handle both Map and object formats
-    if (sockets instanceof Map) {
-      for (const socket of sockets.values()) {
-        const sockUser = this.socketToUser.get(socket.id);
-        const sockBranch = this.socketToBranch.get(socket.id);
-        const sockCompany = this.socketToCompany.get(socket.id);
-        const sockRole = this.socketToRole.get(socket.id);
-        const sockFeatures = this.socketToFeatures.get(socket.id);
-        // Company / branch scoping
-        if (companyId && sockCompany !== companyId) continue;
-        if (branchId && sockBranch !== branchId) continue;
-        // Role scoping
-        if (roleSet.size > 0 && (!sockRole || !roleSet.has(sockRole))) continue;
-        // User targeting
-        if (userIdSet.size > 0 && (!sockUser || !userIdSet.has(sockUser))) continue;
-        // Feature scoping
-        if (featureSet.size > 0) {
-          if (!sockFeatures) continue;
-          const hasFeature = [...featureSet].some((f) => sockFeatures.has(f));
-          if (!hasFeature) continue;
+    // Convert sockets to an iterable array
+    const socketInstances = sockets instanceof Map 
+      ? Array.from(sockets.values()) 
+      : Object.values(sockets) as Socket[];
+
+    for (const socket of socketInstances) {
+      const sockUser = this.socketToUser.get(socket.id);
+      const sockBranch = this.socketToBranch.get(socket.id);
+      const sockCompany = this.socketToCompany.get(socket.id);
+      const sockRole = this.socketToRole.get(socket.id);
+      const sockFeatures = this.socketToFeatures.get(socket.id);
+
+      // 1. Mandatory Scoping: Company and Branch (if provided)
+      if (companyId && sockCompany !== companyId) continue;
+      if (branchId && sockBranch !== branchId) continue;
+
+      // 2. Targeting Logic: (Role OR User OR Feature)
+      // If no targeting criteria provided, it passes to everyone in the branch/company
+      let isTargeted = false;
+      const hasTargetingCriteria = roleSet.size > 0 || userIdSet.size > 0 || featureSet.size > 0;
+
+      if (!hasTargetingCriteria) {
+        isTargeted = true;
+      } else {
+        // Match by Role
+        if (roleSet.size > 0 && sockRole && roleSet.has(sockRole)) {
+          isTargeted = true;
         }
-        socket.emit('notification', payload);
-        notificationCount++;
+        // Match by User ID
+        if (!isTargeted && userIdSet.size > 0 && sockUser && userIdSet.has(sockUser)) {
+          isTargeted = true;
+        }
+        // Match by Feature
+        if (!isTargeted && featureSet.size > 0 && sockFeatures) {
+          const hasFeature = [...featureSet].some((f) => sockFeatures.has(f));
+          if (hasFeature) isTargeted = true;
+        }
       }
-    } else {
-      // Handle object/dictionary format
-      const socketValues = Object.values(sockets) as Socket[];
-      for (const socket of socketValues) {
-        const sockUser = this.socketToUser.get(socket.id);
-        const sockBranch = this.socketToBranch.get(socket.id);
-        const sockCompany = this.socketToCompany.get(socket.id);
-        const sockRole = this.socketToRole.get(socket.id);
-        const sockFeatures = this.socketToFeatures.get(socket.id);
-        // Company / branch scoping
-        if (companyId && sockCompany !== companyId) continue;
-        if (branchId && sockBranch !== branchId) continue;
-        // Role scoping
-        if (roleSet.size > 0 && (!sockRole || !roleSet.has(sockRole))) continue;
-        // User targeting
-        if (userIdSet.size > 0 && (!sockUser || !userIdSet.has(sockUser))) continue;
-        // Feature scoping
-        if (featureSet.size > 0) {
-          if (!sockFeatures) continue;
-          const hasFeature = [...featureSet].some((f) => sockFeatures.has(f));
-          if (!hasFeature) continue;
-        }
+
+      if (isTargeted) {
         socket.emit('notification', payload);
         notificationCount++;
       }
@@ -424,9 +418,14 @@ export class WebsocketsGateway
     }
     
     // Notification for Bell
+    const notificationRoles = ['manager', 'cashier'];
+    if (!order.waiterId) {
+      notificationRoles.push('waiter');
+    }
+
     this.emitScopedNotification({
       branchId,
-      roles: ['manager', 'cashier', 'waiter'],
+      roles: notificationRoles,
       payload: {
         type: 'order',
         title: 'New Order',
@@ -479,6 +478,11 @@ export class WebsocketsGateway
 
     if (order.tableId) {
       this.emitToTable(order.tableId, 'table:order-status-changed', { orderId, status: order.status });
+    }
+
+    // Skip general status notification if it's 'paid' (already handled by notifyPaymentReceived)
+    if (order.status === 'paid' || order.status === 'completed') {
+      return;
     }
 
     // Public tracking room

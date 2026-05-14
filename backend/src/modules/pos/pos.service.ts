@@ -1851,6 +1851,7 @@ export class POSService {
       processedBy: new Types.ObjectId(userId),
       processedAt: new Date(),
       branchId: new Types.ObjectId(branchId),
+      workPeriodId: (await this.workPeriodsService.findActive(companyId || '', branchId))?._id || undefined,
       paymentDetails: {
         refundReason: reason,
         originalOrderId: orderId,
