@@ -153,6 +153,14 @@ export interface SystemSettings {
     requireEmailVerification: boolean;
     enableTwoFactor: boolean;
   };
+  ai: {
+    openaiApiKey: string;
+    openaiModel: string;
+    deepseekApiKey: string;
+    deepseekModel: string;
+    deepseekBaseUrl: string;
+    enabled: boolean;
+  };
   createdAt?: string;
   updatedAt?: string;
 }

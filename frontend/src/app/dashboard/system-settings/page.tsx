@@ -20,6 +20,7 @@ import {
   ExclamationTriangleIcon,
   LockClosedIcon,
   ShieldCheckIcon,
+  CpuChipIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -57,7 +58,7 @@ export default function SystemSettingsPage() {
   }, [user, router]);
 
   const [activeTab, setActiveTab] = useState<
-    'maintenance' | 'defaults' | 'security' | 'email' | 'sms' | 'backup' | 'features'
+    'maintenance' | 'defaults' | 'security' | 'email' | 'sms' | 'backup' | 'features' | 'ai'
   >('maintenance');
 
   const { data: systemSettings, isLoading, refetch } = useGetSystemSettingsQuery(undefined, {
@@ -169,6 +170,7 @@ export default function SystemSettingsPage() {
     { id: 'sms', label: 'SMS', icon: DevicePhoneMobileIcon },
     { id: 'backup', label: 'Backup', icon: CloudArrowDownIcon },
     { id: 'features', label: 'Features', icon: CheckCircleIcon },
+    { id: 'ai', label: 'AI Settings', icon: CpuChipIcon },
   ];
 
   return (
@@ -735,6 +737,98 @@ export default function SystemSettingsPage() {
               </label>
             </CardContent>
           </Card>
+        )}
+
+        {/* AI Tab */}
+        {activeTab === 'ai' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Global AI Configuration</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Enable AI Features
+                    </label>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Turn off all AI-powered features (Menu Optimization, Predictions, etc.)
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.ai?.enabled !== false}
+                      onChange={(e) => updateField('ai.enabled', e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center">
+                    <span className="text-blue-600 font-bold text-xs">DS</span>
+                  </div>
+                  DeepSeek Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input
+                  label="DeepSeek API Key"
+                  type="password"
+                  value={formData.ai?.deepseekApiKey || ''}
+                  onChange={(e) => updateField('ai.deepseekApiKey', e.target.value)}
+                  placeholder="sk-..."
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="DeepSeek Model"
+                    value={formData.ai?.deepseekModel || 'deepseek-chat'}
+                    onChange={(e) => updateField('ai.deepseekModel', e.target.value)}
+                    placeholder="deepseek-chat"
+                  />
+                  <Input
+                    label="Base URL"
+                    value={formData.ai?.deepseekBaseUrl || 'https://api.deepseek.com'}
+                    onChange={(e) => updateField('ai.deepseekBaseUrl', e.target.value)}
+                    placeholder="https://api.deepseek.com"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded bg-emerald-100 flex items-center justify-center">
+                    <span className="text-emerald-600 font-bold text-xs">AI</span>
+                  </div>
+                  OpenAI Settings (Fallback)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input
+                  label="OpenAI API Key"
+                  type="password"
+                  value={formData.ai?.openaiApiKey || ''}
+                  onChange={(e) => updateField('ai.openaiApiKey', e.target.value)}
+                  placeholder="sk-..."
+                />
+                <Input
+                  label="OpenAI Model"
+                  value={formData.ai?.openaiModel || 'gpt-4o-mini'}
+                  onChange={(e) => updateField('ai.openaiModel', e.target.value)}
+                  placeholder="gpt-4o-mini"
+                />
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Save Button */}
