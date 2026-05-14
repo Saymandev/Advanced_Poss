@@ -64,6 +64,12 @@ export default () => ({
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   },
 
+  deepseek: {
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+    baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+  },
+
   frontend: {
     url: process.env.APP_URL || 'http://localhost:3000',
   },

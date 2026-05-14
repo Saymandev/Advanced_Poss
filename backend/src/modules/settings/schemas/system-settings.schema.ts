@@ -196,6 +196,33 @@ export class SystemSettings {
     requireEmailVerification: boolean;
     enableTwoFactor: boolean;
   };
+
+  @Prop({
+    type: {
+      openaiApiKey: { type: String, default: '' },
+      openaiModel: { type: String, default: 'gpt-4o-mini' },
+      deepseekApiKey: { type: String, default: '' },
+      deepseekModel: { type: String, default: 'deepseek-chat' },
+      deepseekBaseUrl: { type: String, default: 'https://api.deepseek.com' },
+      enabled: { type: Boolean, default: true },
+    },
+    default: {
+      openaiApiKey: '',
+      openaiModel: 'gpt-4o-mini',
+      deepseekApiKey: '',
+      deepseekModel: 'deepseek-chat',
+      deepseekBaseUrl: 'https://api.deepseek.com',
+      enabled: true,
+    },
+  })
+  ai: {
+    openaiApiKey: string;
+    openaiModel: string;
+    deepseekApiKey: string;
+    deepseekModel: string;
+    deepseekBaseUrl: string;
+    enabled: boolean;
+  };
 }
 
 export const SystemSettingsSchema = SchemaFactory.createForClass(SystemSettings);

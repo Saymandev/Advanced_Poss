@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OpenAIService } from '../../common/services/openai.service';
+import { DeepSeekService } from '../../common/services/deepseek.service';
 import { CategoriesModule } from '../categories/categories.module';
 import { Customer, CustomerSchema } from '../customers/schemas/customer.schema';
 import { MenuItem, MenuItemSchema } from '../menu-items/schemas/menu-item.schema';
@@ -8,6 +9,7 @@ import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { SettingsModule } from '../settings/settings.module';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 
@@ -22,9 +24,10 @@ import { AiService } from './ai.service';
     CategoriesModule,
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
+    SettingsModule,
   ],
   controllers: [AiController],
-  providers: [AiService, OpenAIService],
+  providers: [AiService, OpenAIService, DeepSeekService],
   exports: [AiService],
 })
 export class AiModule {}

@@ -98,5 +98,17 @@ export class UpdateSystemSettingsDto {
     requireEmailVerification?: boolean;
     enableTwoFactor?: boolean;
   };
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  ai?: {
+    openaiApiKey?: string;
+    openaiModel?: string;
+    deepseekApiKey?: string;
+    deepseekModel?: string;
+    deepseekBaseUrl?: string;
+    enabled?: boolean;
+  };
 }
 
