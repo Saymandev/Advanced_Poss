@@ -902,7 +902,7 @@ export default function WorkPeriodsPage() {
                     {isLoadingSalesSummary ? (
                       <span>Loading...</span>
                     ) : (
-                      formatCurrency((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0))
+                      formatCurrency((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.netSales || 0))
                     )}
                   </p>
                 </div>
@@ -920,14 +920,14 @@ export default function WorkPeriodsPage() {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">Difference:</span>
-                  <p className={`font-semibold ${(selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0)) >= 0
+                  <p className={`font-semibold ${(selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.netSales || 0)) >= 0
                     ? 'text-green-600'
                     : 'text-red-600'
                     }`}>
                     {isLoadingSalesSummary ? (
                       <span>Loading...</span>
                     ) : (
-                      formatCurrency((selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.grossSales || 0)))
+                      formatCurrency((selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.netSales || 0)))
                     )}
                   </p>
                 </div>

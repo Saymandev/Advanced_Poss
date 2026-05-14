@@ -162,6 +162,8 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
           grossSales: data?.grossSales || 0,
           posSales: data?.posSales || 0,
           hotelRevenue: data?.hotelRevenue || 0,
+          refundTotal: data?.refundTotal || 0,
+          netSales: data?.netSales || 0,
           subtotal: data?.subtotal || 0,
           vatTotal: data?.vatTotal || 0,
           serviceCharge: data?.serviceCharge || 0,

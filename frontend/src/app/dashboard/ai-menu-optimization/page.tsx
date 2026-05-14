@@ -84,24 +84,35 @@ export default function AIMenuOptimizationPage() {
   };
   const handleApplySuggestion = async () => {
     if (!selectedSuggestion) return;
-    if (!confirm(`Are you sure you want to update the price from ${formatCurrency(selectedSuggestion.currentPrice)} to ${formatCurrency(selectedSuggestion.suggestedPrice)}?`)) {
+    
+    const confirmMessage = `Are you sure you want to update the price of "${selectedSuggestion.itemName}" from ${formatCurrency(selectedSuggestion.currentPrice)} to ${formatCurrency(selectedSuggestion.suggestedPrice)}?`;
+    
+    if (!confirm(confirmMessage)) {
       return;
     }
-    try {
+
+    const applyPromise = async () => {
       await updateMenuItem({
         id: selectedSuggestion.itemId,
         price: selectedSuggestion.suggestedPrice,
       }).unwrap();
-      toast.success(`Price updated successfully to ${formatCurrency(selectedSuggestion.suggestedPrice)}`);
-      setIsDetailsModalOpen(false);
-      setSelectedSuggestion(null);
+      
       // Refetch both optimization and menu items to get updated data
-      refetchOptimization();
-    } catch (error: any) {
-      const errorMessage = error?.data?.message || error?.message || 'Failed to apply suggestion';
-      toast.error(errorMessage);
-      console.error('Failed to apply suggestion:', error);
-    }
+      await refetchOptimization();
+    };
+
+    toast.promise(applyPromise(), {
+      loading: 'Applying suggestion...',
+      success: (data) => {
+        setIsDetailsModalOpen(false);
+        setSelectedSuggestion(null);
+        return `Successfully updated price to ${formatCurrency(selectedSuggestion.suggestedPrice)}`;
+      },
+      error: (err) => {
+        console.error('Failed to apply suggestion:', err);
+        return err?.data?.message || err?.message || 'Failed to apply suggestion';
+      }
+    });
   };
   const getRecommendationBadge = (recommendation: MenuOptimizationSuggestion['recommendation']) => {
     const configs = {

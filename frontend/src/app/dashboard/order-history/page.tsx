@@ -739,7 +739,7 @@ export default function OrdersPage() {
         taxRate: orderData.taxRate ?? posSettings?.taxRate ?? 0,
         serviceChargeRate: orderData.serviceChargeRate ?? posSettings?.serviceCharge ?? 0,
         paymentMethod: orderData.paymentMethod,
-        paymentStatus: orderData.status === 'paid' ? 'paid' : 'pending',
+        paymentStatus: orderData.paymentStatus || (orderData.status === 'paid' ? 'paid' : 'pending'),
         createdAt: orderData.createdAt || new Date().toISOString(),
         updatedAt: orderData.updatedAt || new Date().toISOString(),
         servedAt: orderData.servedAt,
@@ -778,7 +778,15 @@ export default function OrdersPage() {
       cancelled: 'danger',
     };
 
-    const label = status === 'pending' || status === 'unpaid' ? 'Unpaid' : status === 'paid' ? 'Paid' : status;
+    const labelMap: Record<string, string> = {
+      pending: 'Unpaid',
+      unpaid: 'Unpaid',
+      paid: 'Paid',
+      refunded: 'Refunded',
+      cancelled: 'Cancelled',
+    };
+
+    const label = labelMap[status as string] || (typeof status === 'string' ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown');
     const variant = variants[status as string] || 'secondary';
     return <Badge variant={variant}>{label}</Badge>;
   };
@@ -1204,7 +1212,7 @@ export default function OrdersPage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Payment Status:</span>
-                    {getPaymentStatusBadge(selectedOrder?.paymentStatus === 'paid' ? 'paid' : 'unpaid')}
+                    {getPaymentStatusBadge(selectedOrder?.paymentStatus)}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Payment At:</span>
