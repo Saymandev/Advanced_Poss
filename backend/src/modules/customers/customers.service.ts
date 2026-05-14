@@ -141,19 +141,28 @@ export class CustomersService {
   }
   async findOrCreate(customerData: any): Promise<Customer> {
     // Try to find existing customer by email or phone
-    const existingCustomer = await this.customerModel.findOne({
-      companyId: new Types.ObjectId(customerData.companyId),
-      $or: [
-        { email: customerData.email },
-        { phone: customerData.phone },
-      ],
-    });
-    if (existingCustomer) {
-      return existingCustomer;
+    const searchConditions: any[] = [];
+    if (customerData.email && customerData.email.trim()) {
+      searchConditions.push({ email: customerData.email.toLowerCase().trim() });
     }
+    if (customerData.phone && customerData.phone.trim()) {
+      searchConditions.push({ phone: customerData.phone.trim() });
+    }
+
+    if (searchConditions.length > 0) {
+      const existingCustomer = await this.customerModel.findOne({
+        companyId: new Types.ObjectId(customerData.companyId),
+        $or: searchConditions,
+      });
+
+      if (existingCustomer) {
+        return existingCustomer;
+      }
+    }
+    
     // Create new customer
-    const [firstName, ...lastNameParts] = (customerData.name || customerData.firstName || 'Customer').split(' ');
-    const lastName = lastNameParts.join(' ') || customerData.lastName || '';
+    const firstName = customerData.firstName || customerData.name?.split(' ')[0] || 'Customer';
+    const lastName = customerData.lastName || customerData.name?.split(' ').slice(1).join(' ') || '';
     return this.create({
       companyId: customerData.companyId,
       firstName,

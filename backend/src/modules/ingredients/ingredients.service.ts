@@ -15,12 +15,15 @@ import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 import { Ingredient, IngredientDocument } from './schemas/ingredient.schema';
+import { Wastage, WastageDocument, WastageReason } from '../wastage/schemas/wastage.schema';
 
 @Injectable()
 export class IngredientsService {
   constructor(
     @InjectModel(Ingredient.name)
     private ingredientModel: Model<IngredientDocument>,
+    @InjectModel(Wastage.name)
+    private wastageModel: Model<WastageDocument>,
     private websocketsGateway: WebsocketsGateway,
     private notificationsService: NotificationsService,
     @Inject(forwardRef(() => PurchaseOrdersService))
@@ -297,6 +300,30 @@ export class IngredientsService {
         }
         ingredient.currentStock -= quantity;
         ingredient.totalWastage += quantity;
+
+        // Record wastage document for reports
+        try {
+          const wastageRecord = new this.wastageModel({
+            companyId: ingredient.companyId,
+            branchId: ingredient.branchId,
+            ingredientId: ingredient._id,
+            quantity: quantity,
+            unit: ingredient.unit,
+            reason: reason?.toLowerCase().includes('damage') ? WastageReason.DAMAGED : WastageReason.OTHER,
+            unitCost: ingredient.unitCost || 0,
+            totalCost: quantity * (ingredient.unitCost || 0),
+            wastageDate: new Date(),
+            reportedBy: new Types.ObjectId(userId), // Optional but good to have
+            notes: reason || 'Manual stock adjustment (wastage)',
+            status: 'approved',
+            approvedBy: new Types.ObjectId(userId),
+            approvedAt: new Date(),
+          });
+          await wastageRecord.save();
+        } catch (wastageError) {
+          console.error('Failed to create wastage record during stock adjustment:', wastageError);
+          // We don't throw here to avoid failing the stock adjustment if only the log fails
+        }
         break;
 
       default:

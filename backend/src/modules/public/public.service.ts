@@ -212,24 +212,44 @@ export class PublicService {
         companyId: new Types.ObjectId(orderData.companyId),
         branchId: new Types.ObjectId(orderData.branchId),
         orderNumber,
-        type: orderType,
+        orderType, // Use the mapped orderType (dine-in, takeaway, delivery)
         tableId: tableId ? new Types.ObjectId(tableId) : undefined,
         tableNumber: orderData.tableNumber, // Store raw table number for reference
         customerId: customerId ? new Types.ObjectId(customerId) : undefined,
+        customerInfo: {
+          name: `${orderData.customer.firstName} ${orderData.customer.lastName}`.trim(),
+          email: orderData.customer.email,
+          phone: orderData.customer.phone,
+        },
+        deliveryDetails: orderType === 'delivery' ? {
+          contactName: `${orderData.customer.firstName} ${orderData.customer.lastName}`.trim(),
+          contactPhone: orderData.customer.phone,
+          addressLine1: orderData.deliveryAddress?.street,
+          city: orderData.deliveryAddress?.city,
+          state: orderData.deliveryAddress?.state,
+          postalCode: orderData.deliveryAddress?.zipCode,
+          instructions: orderData.specialInstructions,
+          zoneId: deliveryZoneId,
+        } : undefined,
+        takeawayDetails: orderType === 'takeaway' ? {
+          contactName: `${orderData.customer.firstName} ${orderData.customer.lastName}`.trim(),
+          contactPhone: orderData.customer.phone,
+          instructions: orderData.specialInstructions,
+        } : undefined,
         waiterId: new Types.ObjectId(waiterId),
+        userId: new Types.ObjectId(waiterId), // Also set userId to the waiter/owner
         items,
         subtotal,
         taxRate,
         taxAmount,
         deliveryFee,
-        deliveryZoneId: deliveryZoneId ? new Types.ObjectId(deliveryZoneId) : undefined,
-        total: finalTotal,
+        totalAmount: finalTotal, // Map 'total' to 'totalAmount' in POSOrder schema
         remainingAmount: finalTotal,
         status: 'pending',
         paymentStatus: 'pending',
         paymentMethod: orderData.paymentMethod || 'cash',
-        specialInstructions: orderData.specialInstructions,
         notes: orderData.specialInstructions,
+        orderSource: 'customer_app', // Identify as coming from public portal
       });
 
       const savedOrder = await order.save();

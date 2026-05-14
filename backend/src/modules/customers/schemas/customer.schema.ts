@@ -14,11 +14,11 @@ export class Customer {
   @Prop({ required: true, trim: true })
   firstName: string;
 
-  @Prop({ required: true, trim: true })
-  lastName: string;
+  @Prop({ trim: true })
+  lastName?: string;
 
-  @Prop({ required: true })
-  email: string;
+  @Prop()
+  email?: string;
 
   @Prop()
   phone?: string;
