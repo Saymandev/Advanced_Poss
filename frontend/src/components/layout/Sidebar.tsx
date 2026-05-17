@@ -228,7 +228,7 @@ const navigation: NavigationItem[] = [
     name: 'Financial',
     href: '/dashboard/expenses',
     icon: CurrencyDollarIcon,
-    requiredFeature: ['expenses', 'work-periods', 'accounting'], // Show if user has ANY
+    requiredFeature: ['expenses', 'income', 'work-periods', 'accounting'], // Show if user has ANY
     children: [
       {
         name: 'Ledger & Accounting',
@@ -242,6 +242,12 @@ const navigation: NavigationItem[] = [
         href: '/dashboard/expenses',
         icon: CurrencyDollarIcon,
         requiredFeature: 'expenses',
+      },
+      {
+        name: 'Income',
+        href: '/dashboard/incomes',
+        icon: CurrencyDollarIcon,
+        requiredFeature: 'income',
       },
       {
         name: 'Work Periods',

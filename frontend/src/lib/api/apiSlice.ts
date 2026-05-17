@@ -350,6 +350,7 @@ export const apiSlice = createApi({
     'Ingredient',
     'Supplier',
     'Expense',
+    'Income',
     'Report',
     'Wastage',
     'Subscription',
