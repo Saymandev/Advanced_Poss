@@ -57,6 +57,7 @@ export const FEATURES = {
 
   // Financial Management
   EXPENSES: 'expenses',
+  INCOME: 'income',
   ACCOUNTING: 'accounting',
   WORK_PERIODS: 'work-periods',
 
@@ -96,7 +97,7 @@ export const FEATURE_CATEGORIES = {
   CUSTOMERS: ['customer-management', 'loyalty-program', 'marketing'],
   AI_FEATURES: ['ai-menu-optimization', 'ai-customer-loyalty'],
   INVENTORY: ['inventory', 'suppliers', 'purchase-orders', 'wastage-management'],
-  FINANCIAL: ['expenses', 'accounting', 'work-periods'],
+  FINANCIAL: ['expenses', 'income', 'accounting', 'work-periods'],
   SYSTEM: ['settings', 'branches', 'notifications'],
   HOTEL: ['room-management', 'booking-management'],
 } as const;
@@ -133,6 +134,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.PURCHASE_ORDERS,
     FEATURES.WASTAGE_MANAGEMENT,
     FEATURES.EXPENSES,
+    FEATURES.INCOME,
     FEATURES.ACCOUNTING,
     FEATURES.WORK_PERIODS,
     FEATURES.SETTINGS,
@@ -164,6 +166,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.SUPPLIERS,
     FEATURES.WASTAGE_MANAGEMENT,
     FEATURES.EXPENSES,
+    FEATURES.INCOME,
     FEATURES.WORK_PERIODS,
     FEATURES.NOTIFICATIONS,
     FEATURES.ROOM_MANAGEMENT,
@@ -197,6 +200,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.DIGITAL_RECEIPTS,
     FEATURES.CUSTOMER_MANAGEMENT,
     FEATURES.EXPENSES,
+    FEATURES.INCOME,
     FEATURES.WORK_PERIODS,
     FEATURES.NOTIFICATIONS,
   ],

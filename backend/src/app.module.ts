@@ -27,6 +27,7 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { DeliveryZonesModule } from './modules/delivery-zones/delivery-zones.module';
 import { DigitalReceiptsModule } from './modules/digital-receipts/digital-receipts.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
+import { IncomesModule } from './modules/incomes/incomes.module';
 import { GalleryModule } from './modules/gallery/gallery.module';
 import { IngredientsModule } from './modules/ingredients/ingredients.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
@@ -158,6 +159,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
     IngredientsModule,
     SuppliersModule,
     ExpensesModule,
+    IncomesModule,
     GalleryModule,
     AttendanceModule,
     SubscriptionsModule,

@@ -338,6 +338,46 @@ export class WorkPeriodsService {
         createdAt: (p as any).createdAt
       }));
 
+    // Fetch manual income transactions for this work period
+    const manualIncomes = await this.transactionModel.find({
+      workPeriodId: new Types.ObjectId(workPeriodId),
+      category: TransactionCategory.INCOME,
+    }).populate('paymentMethodId', 'name code').lean();
+
+    const manualExpenses = await this.transactionModel.find({
+      workPeriodId: new Types.ObjectId(workPeriodId),
+      category: TransactionCategory.EXPENSE,
+    }).populate('paymentMethodId', 'name code').lean();
+
+    const manualIncomeTotal = manualIncomes.reduce((sum, trx) => sum + (trx.amount || 0), 0);
+    const manualExpenseTotal = manualExpenses.reduce((sum, trx) => sum + (trx.amount || 0), 0);
+
+    // Add manual incomes to payment method balances
+    manualIncomes.forEach((txn) => {
+      const amount = Number(txn.amount);
+      const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
+      
+      if (!paymentMethods[pmCode]) {
+        paymentMethods[pmCode] = { count: 0, amount: 0 };
+      }
+      paymentMethods[pmCode].count += 1;
+      paymentMethods[pmCode].amount += amount;
+      totalByPaymentMethod[pmCode] = (totalByPaymentMethod[pmCode] || 0) + amount;
+    });
+
+    // Subtract manual expenses from payment method balances
+    manualExpenses.forEach((txn) => {
+      const amount = Number(txn.amount);
+      const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
+      
+      if (!paymentMethods[pmCode]) {
+        paymentMethods[pmCode] = { count: 0, amount: 0 };
+      }
+      paymentMethods[pmCode].count += 1;
+      paymentMethods[pmCode].amount -= amount;
+      totalByPaymentMethod[pmCode] = (totalByPaymentMethod[pmCode] || 0) - amount;
+    });
+
     // Get Hotel Transactions for this work period
     const hotelTransactions = await this.transactionModel.find({
       workPeriodId: new Types.ObjectId(workPeriodId),
@@ -346,9 +386,11 @@ export class WorkPeriodsService {
 
     const hotelRevenue = hotelTransactions.reduce((sum, trx) => sum + (trx.amount || 0), 0);
 
+    const totalIncomePool = grossSales + hotelRevenue + manualIncomeTotal;
+
     // Calculate payment method percentages and commissions
     const paymentMethodsArray = Object.entries(paymentMethods).map(([method, data]) => {
-      const percentage = (grossSales + hotelRevenue) > 0 ? (data.amount / (grossSales + hotelRevenue)) * 100 : 0;
+      const percentage = totalIncomePool > 0 ? (data.amount / totalIncomePool) * 100 : 0;
       // Commission calculation (example: 2% for cash, 3.5% for card)
       const commissionRate = method === 'cash' ? 0.02 : method === 'card' ? 0.035 : 0;
       const commission = data.amount * commissionRate;
@@ -368,7 +410,9 @@ export class WorkPeriodsService {
       posSales: grossSales,
       hotelRevenue,
       refundTotal,
-      netSales: (grossSales + hotelRevenue) - refundTotal,
+      manualIncomeTotal,
+      manualExpenseTotal,
+      netSales: (grossSales + hotelRevenue + manualIncomeTotal) - (refundTotal + manualExpenseTotal),
       subtotal,
       vatTotal,
       serviceCharge,

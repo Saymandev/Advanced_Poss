@@ -11,6 +11,7 @@ export enum TransactionType {
 export enum TransactionCategory {
   SALE = 'SALE', // Money in from orders
   EXPENSE = 'EXPENSE', // Money out for rent, utilities, vendor payments
+  INCOME = 'INCOME', // Manual income entries (events, catering, etc.)
   PURCHASE = 'PURCHASE', // Money out for buying ingredients
   REFUND = 'REFUND', // Money out to refund a customer
   PROFIT_WITHDRAWAL = 'PROFIT_WITHDRAWAL', // Money out to the owner

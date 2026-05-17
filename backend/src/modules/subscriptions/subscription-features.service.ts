@@ -342,6 +342,16 @@ export class SubscriptionFeaturesService {
         sortOrder: 4,
       },
       {
+        key: 'income',
+        name: 'Income Management',
+        description: 'Track and manage manual income sources (catering, events, event booking)',
+        category: 'Financial',
+        basePriceMonthly: 150,
+        basePriceYearly: 1500,
+        defaultLimits: {},
+        sortOrder: 9,
+      },
+      {
         key: 'ai-insights',
         name: 'AI Insights',
         description: 'AI-powered analytics and recommendations',

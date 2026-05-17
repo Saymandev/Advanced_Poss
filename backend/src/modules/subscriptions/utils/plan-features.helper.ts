@@ -32,6 +32,7 @@ export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
     FEATURES.ACCOUNTING,
     FEATURES.REPORTS,
     FEATURES.EXPENSES,
+    FEATURES.INCOME,
     FEATURES.WORK_PERIODS,
   ],
   aiInsights: [
@@ -171,6 +172,7 @@ export function getFeaturesByCategory() {
     Financial: [
       { key: FEATURES.ACCOUNTING, name: 'Advanced Accounting' },
       { key: FEATURES.EXPENSES, name: 'Expense Management' },
+      { key: FEATURES.INCOME, name: 'Income Management' },
       { key: FEATURES.REPORTS, name: 'Sales & Analytics Reports' },
       { key: FEATURES.WORK_PERIODS, name: 'Work Period Management' },
     ],
