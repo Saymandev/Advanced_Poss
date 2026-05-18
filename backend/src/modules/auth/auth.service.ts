@@ -1108,20 +1108,35 @@ export class AuthService {
         const branchIdStr = branch._id.toString();
         const branchUsers = await this.usersService.findByBranch(branchIdStr);
         this.logger.log(`📍 Branch: ${branch.name} (ID: ${branchIdStr}) - Found ${branchUsers.length} user(s)`);
-        branchUsers.forEach(user => {
+        
+        // Also include company-wide owners since owners can log into any branch
+        const companyUsers = await this.usersService.findByCompany(targetCompanyId.toString());
+        const owners = companyUsers.filter((u: any) => u.role?.toLowerCase() === 'owner' && u.isActive !== false);
+        
+        // Merge without duplicates
+        const branchUserIds = new Set(branchUsers.map((u: any) => (u._id || u.id).toString()));
+        const mergedUsers = [...branchUsers];
+        for (const owner of owners) {
+          const ownerId = (owner as any)._id?.toString() || (owner as any).id?.toString();
+          if (ownerId && !branchUserIds.has(ownerId)) {
+            mergedUsers.push(owner);
+          }
+        }
+
+        mergedUsers.forEach(user => {
           this.logger.log(`  👤 User: ${user.firstName} ${user.lastName} - Role: ${user.role} - Active: ${(user as any).isActive} - BranchId: ${(user as any).branchId}`);
         });
-        const availableRoles = [...new Set(branchUsers.map(user => user.role))];
-        this.logger.log(`📍 Branch: ${branch.name} - Users: ${branchUsers.length}, Roles: ${availableRoles.join(', ')}`);
+        const availableRoles = [...new Set(mergedUsers.map(user => user.role))];
+        this.logger.log(`📍 Branch: ${branch.name} - Users: ${mergedUsers.length}, Roles: ${availableRoles.join(', ')}`);
 
         // Group users by role for selection
         const usersByRole = {};
-        branchUsers.forEach(user => {
+        mergedUsers.forEach(user => {
           if (!usersByRole[user.role]) {
             usersByRole[user.role] = [];
           }
           usersByRole[user.role].push({
-            id: (user as any)._id.toString(),
+            id: (user as any)._id?.toString() || (user as any).id?.toString(),
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,

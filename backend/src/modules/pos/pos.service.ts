@@ -2274,6 +2274,7 @@ export class POSService {
           variants: itemObj.variants || [],
           selections: itemObj.selections || [],
           addons: itemObj.addons || [],
+          requiresKitchen: itemObj.requiresKitchen !== false,
         };
       });
     } catch (error) {
@@ -2357,6 +2358,11 @@ export class POSService {
         }
       }
 
+      // Skip items that do not require kitchen preparation (e.g. bottled water, soda cans)
+      if (menuItem && menuItem.requiresKitchen === false) {
+        continue;
+      }
+
       const itemName = menuItem?.name || `Item ${index + 1}`;
       kitchenItems.push({
         itemId: `${posOrder.orderNumber}-${index}`,
@@ -2367,6 +2373,11 @@ export class POSService {
         status: 'pending',
         priority: 0,
       });
+    }
+
+    // If no items require kitchen preparation, skip creating a kitchen order entirely
+    if (kitchenItems.length === 0) {
+      return;
     }
 
     // Transform POS order to kitchen order format

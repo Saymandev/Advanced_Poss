@@ -178,6 +178,10 @@ export class MenuItem {
   // Preparation
   @Prop()
   preparationTime?: number;
+
+  // Kitchen routing
+  @Prop({ default: true })
+  requiresKitchen: boolean;
 }
 
 export const MenuItemSchema = SchemaFactory.createForClass(MenuItem);

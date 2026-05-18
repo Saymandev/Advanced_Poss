@@ -186,6 +186,11 @@ export class CreateMenuItemDto {
   @IsNumber()
   preparationTime?: number;
 
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  requiresKitchen?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   nutrition?: {

@@ -24,7 +24,7 @@ export class KitchenOrder {
 
   @Prop({
     type: String,
-    enum: ['dine-in', 'takeaway', 'delivery'],
+    enum: ['dine-in', 'takeaway', 'delivery', 'room_service'],
     required: true,
   })
   orderType: string;
