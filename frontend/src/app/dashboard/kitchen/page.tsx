@@ -54,7 +54,7 @@ export default function KitchenPage() {
   const [selectedOrder, setSelectedOrder] = useState<KitchenOrder | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterOrderType, setFilterOrderType] = useState<'all' | 'dine-in' | 'takeaway' | 'delivery'>('all');
+  const [filterOrderType, setFilterOrderType] = useState<'all' | 'dine-in' | 'takeaway' | 'delivery' | 'room_service'>('all');
   const [sortBy, setSortBy] = useState<'time' | 'priority' | 'table'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -715,6 +715,7 @@ export default function KitchenPage() {
                   { value: 'dine-in', label: 'Dine-In' },
                   { value: 'takeaway', label: 'Takeaway' },
                   { value: 'delivery', label: 'Delivery' },
+                  { value: 'room_service', label: 'Room Service' },
                 ]}
                 value={filterOrderType}
                 onChange={(value) => setFilterOrderType(value as any)}
@@ -782,7 +783,9 @@ export default function KitchenPage() {
                           ? 'border-indigo-300 dark:border-indigo-700 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/40 dark:to-gray-800'
                           : order.orderType === 'takeaway'
                             ? 'border-teal-300 dark:border-teal-700 bg-gradient-to-br from-teal-50 to-white dark:from-teal-900/40 dark:to-gray-800'
-                            : 'border-yellow-200 dark:border-yellow-800 bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/20 dark:to-gray-800'
+                            : order.orderType === 'room_service'
+                              ? 'border-purple-300 dark:border-purple-700 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/20 dark:to-gray-800'
+                              : 'border-yellow-200 dark:border-yellow-800 bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/20 dark:to-gray-800'
                     }`}
                   >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
@@ -798,7 +801,8 @@ export default function KitchenPage() {
                   <div className="text-left sm:text-right">
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       {order.orderType === 'dine-in' ? `Table ${order.tableNumber || 'N/A'}` : 
-                       order.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'}
+                       order.orderType === 'takeaway' ? 'Takeaway' : 
+                       order.orderType === 'room_service' ? 'Room Service' : 'Delivery'}
                     </p>
                     {order.customerName && (
                       <p className="text-xs text-gray-500 dark:text-gray-500">

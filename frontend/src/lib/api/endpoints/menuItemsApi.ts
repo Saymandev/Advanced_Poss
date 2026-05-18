@@ -12,6 +12,7 @@ export interface MenuItem {
   allergens?: string[];
   preparationTime?: number;
   calories?: number;
+  requiresKitchen?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +28,7 @@ export interface CreateMenuItemRequest {
   allergens?: string[];
   preparationTime?: number;
   calories?: number;
+  requiresKitchen?: boolean;
 }
 
 export interface UpdateMenuItemRequest extends Partial<CreateMenuItemRequest> {
@@ -131,6 +133,7 @@ export const menuItemsApi = apiSlice.injectEndpoints({
               variants: item.variants || [],
               selections: item.selections || [],
               trackInventory: item.trackInventory !== undefined ? item.trackInventory : false,
+              requiresKitchen: item.requiresKitchen !== false,
               popularity: item.popularity || item.averageRating || 4.0,
               createdAt: item.createdAt || new Date().toISOString(),
               updatedAt: item.updatedAt || new Date().toISOString(),
@@ -176,6 +179,7 @@ export const menuItemsApi = apiSlice.injectEndpoints({
           allergens: item.allergens || [],
           preparationTime: item.preparationTime,
           calories: item.calories,
+          requiresKitchen: item.requiresKitchen !== false,
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt: item.updatedAt || new Date().toISOString(),
         } as MenuItem;

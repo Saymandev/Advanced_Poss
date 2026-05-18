@@ -38,6 +38,7 @@ interface MenuItem {
   imageUrl?: string;
   isAvailable: boolean;
   preparationTime?: number; // in minutes
+  requiresKitchen?: boolean; // Kitchen routing
   ingredients?: string[];
   allergens?: string[];
   nutritionalInfo?: {
@@ -117,6 +118,7 @@ export default function MenuItemsPage() {
     categoryId: '',
     preparationTime: 0,
     isAvailable: true,
+    requiresKitchen: true, // Kitchen routing
     trackInventory: false, // Enable inventory tracking if ingredients are added
     images: [] as string[],
     ingredients: [] as Array<{ ingredientId: string; quantity: number; unit: string }>,
@@ -334,6 +336,7 @@ export default function MenuItemsPage() {
         imageUrl: item.imageUrl,
         images: item.images || [],
         isAvailable: item.isAvailable !== false,
+        requiresKitchen: item.requiresKitchen !== false,
         preparationTime: item.preparationTime,
         ingredients: ingredientsArray,
         allergens: item.allergens || item.nutrition?.allergens || [],
@@ -453,6 +456,7 @@ export default function MenuItemsPage() {
         categoryId: categoryIdValue,
         preparationTime: itemData.preparationTime || 0,
         isAvailable: itemData.isAvailable !== false,
+        requiresKitchen: itemData.requiresKitchen !== false,
         trackInventory: itemData.trackInventory || (ingredientsArray.length > 0),
         images: itemData.images || (itemData.imageUrl ? [itemData.imageUrl] : []),
         ingredients: ingredientsArray,
@@ -483,6 +487,7 @@ export default function MenuItemsPage() {
         categoryId: categories[0]?.id || '',
         preparationTime: 0,
         isAvailable: true,
+        requiresKitchen: true,
         trackInventory: false,
         images: [],
         ingredients: [] as Array<{ ingredientId: string; quantity: number; unit: string }>,
@@ -585,6 +590,7 @@ export default function MenuItemsPage() {
         price: formData.price,
         preparationTime: formData.preparationTime || undefined,
         isAvailable: formData.isAvailable !== false,
+        requiresKitchen: formData.requiresKitchen !== false,
         trackInventory: false, // Will be set based on ingredients below
         images: formData.images.filter(Boolean).length > 0 ? formData.images.filter(Boolean) : undefined,
         tags: formData.tags.length > 0 ? formData.tags : undefined,
@@ -644,6 +650,7 @@ export default function MenuItemsPage() {
         categoryId: categories[0]?.id || '',
         preparationTime: 0,
         isAvailable: true,
+        requiresKitchen: true,
         trackInventory: false,
         images: [],
         ingredients: [],
@@ -698,6 +705,7 @@ export default function MenuItemsPage() {
         price: formData.price,
         preparationTime: formData.preparationTime || undefined,
         isAvailable: formData.isAvailable !== false,
+        requiresKitchen: formData.requiresKitchen !== false,
         images: formData.images.filter(Boolean).length > 0 ? formData.images.filter(Boolean) : undefined,
         tags: formData.tags.length > 0 ? formData.tags : undefined,
       };
@@ -1047,7 +1055,17 @@ export default function MenuItemsPage() {
             </div>
             <div>
               <p className="font-medium text-gray-900 dark:text-white">{value}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{row.category}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-xs text-gray-500 dark:text-gray-400">{row.category}</span>
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  row.requiresKitchen !== false 
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' 
+                    : 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400'
+                }`}>
+                  {row.requiresKitchen !== false ? 'KDS' : 'Direct'}
+                </span>
+              </div>
             </div>
           </div>
         );
@@ -1533,6 +1551,9 @@ export default function MenuItemsPage() {
                     <Badge variant={selectedMenuItem.isAvailable ? 'success' : 'danger'} className="mt-2">
                       {selectedMenuItem.isAvailable ? 'Available' : 'Unavailable'}
                     </Badge>
+                    <Badge variant={selectedMenuItem.requiresKitchen !== false ? 'info' : 'secondary'} className="mt-2 ml-2">
+                      {selectedMenuItem.requiresKitchen !== false ? 'Kitchen Item' : 'Direct Serve'}
+                    </Badge>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 mt-4">
@@ -1883,6 +1904,20 @@ export default function MenuItemsPage() {
                 />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Available</span>
               </label>
+            </div>
+            <div className="flex items-center pt-6">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.requiresKitchen}
+                  onChange={(e) => setFormData({ ...formData, requiresKitchen: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Send to Kitchen</span>
+              </label>
+              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                (Uncheck for drinks/bottled items that do not require prep)
+              </span>
             </div>
             <div className="flex items-center pt-4">
               <label className="flex items-center gap-2">
