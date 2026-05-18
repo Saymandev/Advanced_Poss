@@ -651,8 +651,11 @@ export class UsersService {
 
   // Query methods
   async findByCompany(companyId: string): Promise<User[]> {
+    const companyObjectId = Types.ObjectId.isValid(companyId)
+      ? new Types.ObjectId(companyId)
+      : companyId;
     return this.userModel
-      .find({ companyId: new Types.ObjectId(companyId) })
+      .find({ companyId: { $in: [companyObjectId, companyId] } })
       .select('-password -pin')
       .exec();
   }
@@ -673,9 +676,12 @@ export class UsersService {
   }
 
   async findByBranchAndRole(branchId: string, role: string): Promise<User[]> {
+    const branchObjectId = Types.ObjectId.isValid(branchId)
+      ? new Types.ObjectId(branchId)
+      : branchId;
     return this.userModel
       .find({ 
-        branchId: new Types.ObjectId(branchId), 
+        branchId: { $in: [branchObjectId, branchId] }, 
         role: role.toLowerCase(),
         isActive: true 
       })
@@ -689,8 +695,11 @@ export class UsersService {
   }
 
   async countByCompany(companyId: string): Promise<number> {
+    const companyObjectId = Types.ObjectId.isValid(companyId)
+      ? new Types.ObjectId(companyId)
+      : companyId;
     return this.userModel
-      .countDocuments({ companyId: new Types.ObjectId(companyId) })
+      .countDocuments({ companyId: { $in: [companyObjectId, companyId] } })
       .exec();
   }
 
