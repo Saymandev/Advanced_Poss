@@ -19,7 +19,7 @@ export function getRoleDashboardPath(role: string | undefined | null): string {
     // Managers should also use the main dashboard instead of a separate manager page
     [UserRole.MANAGER.toLowerCase()]: '/dashboard',
     [UserRole.CHEF.toLowerCase()]: '/dashboard/kitchen',
-    [UserRole.KITCHEN.toLowerCase()]: '/dashboard/kitchen', // Alias for kitchen staff
+    [UserRole.COOK.toLowerCase()]: '/dashboard/kitchen',
     [UserRole.WAITER.toLowerCase()]: '/dashboard/pos', // Waiters use POS for order taking
     [UserRole.CASHIER.toLowerCase()]: '/dashboard/pos', // Cashiers use POS for payments
   };

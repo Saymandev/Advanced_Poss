@@ -42,6 +42,7 @@ const ROLE_CATEGORY_MAP: Partial<Record<UserRole, string[] | 'all'>> = {
   [UserRole.OWNER]: 'all',
   [UserRole.MANAGER]: ['Overview', 'Staff', 'Menu', 'Orders', 'Customers', 'Inventory', 'Financial', 'Hotel'],
   [UserRole.CHEF]: ['Overview', 'Menu', 'Orders', 'Inventory'],
+  [UserRole.COOK]: ['Overview', 'Orders', 'Inventory'],
   [UserRole.WAITER]: ['Overview', 'Orders', 'Customers'],
   [UserRole.CASHIER]: ['Overview', 'Orders', 'Customers', 'Financial'],
   // Fallback roles map to no categories unless defined
@@ -136,6 +137,13 @@ export default function RoleAccessPage() {
         description: 'Kitchen operations access',
         color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
         features: buildFeaturesForRole(UserRole.CHEF),
+      },
+      {
+        role: UserRole.COOK,
+        name: 'Cook',
+        description: 'Food preparation and kitchen operations',
+        color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+        features: buildFeaturesForRole(UserRole.COOK),
       },
       {
         role: UserRole.WAITER,
@@ -281,7 +289,7 @@ export default function RoleAccessPage() {
     }
 
     // Security check: Only owners can assign owner role
-    if (newRole === 'owner' && user?.role !== 'owner') {
+    if (newRole === 'owner' && user?.role !== 'owner' && !user?.isSuperAdmin) {
       toast.error('Only owners can assign owner role');
       return;
     }
@@ -565,7 +573,7 @@ export default function RoleAccessPage() {
             <EyeIcon className="w-4 h-4" />
           </Button>
           {/* Only owners can manage users */}
-          {user?.role === 'owner' && (
+          {user?.role === 'owner' || user?.isSuperAdmin ? (
             <>
               <Button
                 variant="ghost"
@@ -631,7 +639,7 @@ export default function RoleAccessPage() {
                 <TrashIcon className="w-4 h-4" />
               </Button>
             </>
-          )}
+          ) : null}
         </div>
       ),
     },
@@ -705,7 +713,7 @@ export default function RoleAccessPage() {
               </div>
 
               {/* Edit Features Button - Owner Only */}
-              {user?.role === 'owner' && (
+              {(user?.role === 'owner' || user?.isSuperAdmin) && (
                 <Button
                   variant="secondary"
                   size="sm"

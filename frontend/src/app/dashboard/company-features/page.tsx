@@ -21,12 +21,13 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-type CompanyRole = 'owner' | 'manager' | 'chef' | 'waiter' | 'cashier';
+type CompanyRole = 'owner' | 'manager' | 'chef' | 'cook' | 'waiter' | 'cashier';
 
 const ROLE_OPTIONS: { value: CompanyRole; label: string }[] = [
   { value: 'owner', label: 'Owner' },
   { value: 'manager', label: 'Manager' },
   { value: 'chef', label: 'Chef' },
+  { value: 'cook', label: 'Cook' },
   { value: 'waiter', label: 'Waiter' },
   { value: 'cashier', label: 'Cashier' },
 ];

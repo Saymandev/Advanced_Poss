@@ -69,6 +69,14 @@ const authSlice = createSlice({
         };
         localStorage.setItem('user', JSON.stringify(minimalUser));
 
+        // Set a non-httpOnly cookie so middleware can read role/permissions before page load
+        const userInfo = JSON.stringify({
+          role: action.payload.user.role,
+          permissions: action.payload.user.permissions || [],
+          isSuperAdmin: action.payload.user.isSuperAdmin || false,
+        });
+        document.cookie = `user_info=${encodeURIComponent(userInfo)}; path=/; max-age=${60 * 60 * 24 * 7}; sameSite=lax`;
+
         // Clear old tokens from localStorage if they exist (migration cleanup)
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -99,6 +107,7 @@ const authSlice = createSlice({
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         localStorage.removeItem('companyContext');
+        document.cookie = 'user_info=; path=/; max-age=0';
       }
     },
     restoreAuth: (state) => {
@@ -131,6 +140,14 @@ const authSlice = createSlice({
             state.user = sanitizedUser;
             // Set authenticated if user exists (actual auth verified by backend via cookies)
             state.isAuthenticated = true;
+
+            // Restore user_info cookie so middleware can read it
+            const userInfo = JSON.stringify({
+              role: sanitizedUser.role,
+              permissions: sanitizedUser.permissions || [],
+              isSuperAdmin: sanitizedUser.isSuperAdmin || false,
+            });
+            document.cookie = `user_info=${encodeURIComponent(userInfo)}; path=/; max-age=${60 * 60 * 24 * 7}; sameSite=lax`;
           } catch {
             // Silent error - invalid JSON
           }

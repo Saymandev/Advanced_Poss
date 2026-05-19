@@ -3,7 +3,7 @@ import { apiSlice } from '../apiSlice';
 export interface RolePermission {
   id: string;
   companyId: string;
-  role: 'owner' | 'manager' | 'chef' | 'waiter' | 'cashier';
+  role: 'owner' | 'manager' | 'chef' | 'cook' | 'waiter' | 'cashier';
   features: string[];
   updatedBy?: string;
   createdAt?: string;
@@ -11,7 +11,7 @@ export interface RolePermission {
 }
 
 export interface UpdateRolePermissionRequest {
-  role: 'owner' | 'manager' | 'chef' | 'waiter' | 'cashier';
+  role: 'owner' | 'manager' | 'chef' | 'cook' | 'waiter' | 'cashier';
   features: string[];
 }
 

@@ -252,8 +252,8 @@ export default function POSPage() {
     syncNow,
   } = usePOSOfflinePrefetcher();
   const formatCurrency = useFormatCurrency(); // Use hook to get reactive currency formatting
-  const isOwnerOrManager =
-    user?.role === 'owner' || user?.role === 'super_admin' || user?.role === 'manager';
+  const isOwnerOrSuperAdmin =
+    user?.role === 'owner' || user?.role === 'super_admin';
   // Check if user has access to booking management feature (for room booking / room service)
   const { hasAccess: hasBookingAccess } = useFeatureAccess('booking-management');
   // Build order type options based on feature access
@@ -267,7 +267,7 @@ export default function POSPage() {
     data: activeWorkPeriod,
     isLoading: workPeriodLoading,
   } = useGetCurrentWorkPeriodQuery(undefined, {
-    skip: isOwnerOrManager,
+    skip: isOwnerOrSuperAdmin,
   });
   // Load from localStorage on mount
   const [orderType, setOrderType] = useState<OrderType>(() => {
@@ -838,7 +838,7 @@ export default function POSPage() {
       .filter((staffMember: any) => {
         // Broaden role check to include anyone who might serve tables
         const role = (staffMember.role || '').toLowerCase();
-        const potentialWaiterRoles = ['waiter', 'server', 'steward', 'staff', 'employee', 'captain', 'manager', 'cashier', 'owner'];
+        const potentialWaiterRoles = ['waiter'];
         const isPotentialWaiter = potentialWaiterRoles.includes(role);
         
         if (!isPotentialWaiter) {
@@ -4065,7 +4065,7 @@ export default function POSPage() {
   }, []);
 
   return (
-    !isOwnerOrManager && !workPeriodLoading && !activeWorkPeriod ? (
+    !isOwnerOrSuperAdmin && !workPeriodLoading && !activeWorkPeriod ? (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-8 text-center space-y-4">
