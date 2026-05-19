@@ -110,7 +110,7 @@ export class AuthController {
             name: 'Main Branch',
             address: '123 Main St, City',
             isActive: true,
-            availableRoles: ['owner', 'manager', 'waiter', 'chef', 'cashier']
+            availableRoles: ['owner', 'manager', 'waiter', 'chef', 'cook', 'cashier']
           }
         ],
         message: 'Please select a branch, role, and enter your PIN to continue'

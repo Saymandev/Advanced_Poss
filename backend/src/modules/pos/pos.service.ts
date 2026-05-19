@@ -88,9 +88,9 @@ export class POSService {
     return `POS-${branchCode}-${dateStr}-${sequence.toString().padStart(4, '0')}`;
   }
   // Create POS order
-  async createOrder(createOrderDto: CreatePOSOrderDto, userId: string, branchId: string, companyId?: string, userBranchId?: string): Promise<POSOrder> {
+  async createOrder(createOrderDto: CreatePOSOrderDto, creatorUserId: string, waiterId: string | null, branchId: string, companyId?: string, userBranchId?: string): Promise<POSOrder> {
     // Validate the user creating the order is assigned to the branch (owners can work across branches)
-    const creatingUser: any = await this.userModel.findById(userId).select('role branchId companyId');
+    const creatingUser: any = await this.userModel.findById(creatorUserId).select('role branchId companyId');
     if (!creatingUser) {
       throw new NotFoundException('User not found');
     }
@@ -112,9 +112,11 @@ export class POSService {
         );
       }
     }
-    // Validate waiter/employee assignment if waiterId is provided
-    if (createOrderDto.waiterId && createOrderDto.waiterId !== userId) {
-      const waiter = await this.userModel.findById(createOrderDto.waiterId).select('role branchId firstName lastName');
+    // Resolve effective waiterId: use specified waiter, otherwise default to creator
+    const effectiveWaiterId = waiterId || creatorUserId;
+    // Validate waiter/employee assignment if a different waiter is specified
+    if (waiterId && waiterId !== creatorUserId) {
+      const waiter = await this.userModel.findById(waiterId).select('role branchId firstName lastName');
       if (!waiter) {
         throw new NotFoundException('Selected waiter/employee not found');
       }
@@ -124,9 +126,8 @@ export class POSService {
           `${waiter.firstName} ${waiter.lastName} is not assigned to this branch. Please select an employee assigned to this branch.`
         );
       }
-      // Validate waiter role - only waiters can be assigned as waiters
       const waiterRole = waiter.role.toLowerCase();
-      if (waiterRole !== 'waiter' && waiterRole !== 'server') {
+      if (waiterRole !== 'waiter') {
         throw new BadRequestException(
           `Selected employee (${waiter.role}) cannot be assigned as waiter. Only employees with "waiter" role can be assigned.`
         );
@@ -200,7 +201,8 @@ export class POSService {
     const baseOrderData: any = {
       ...createOrderDto,
       branchId: new Types.ObjectId(branchId),
-      userId: new Types.ObjectId(userId),
+      userId: new Types.ObjectId(effectiveWaiterId),
+      waiterId: new Types.ObjectId(effectiveWaiterId),
       companyId: companyId ? new Types.ObjectId(companyId) : undefined,
       items: [], // Will be filled below with names
       customerId: effectiveCustomerId ? new Types.ObjectId(effectiveCustomerId) : undefined,
@@ -412,7 +414,7 @@ export class POSService {
               method: 'room_charge',
               status: 'completed',
               transactionId: `ROOM-CHARGE-${savedOrder.orderNumber}-${Date.now()}`,
-              processedBy: new Types.ObjectId(userId),
+              processedBy: new Types.ObjectId(creatorUserId),
               processedAt: new Date(),
               branchId: new Types.ObjectId(branchId),
               workPeriodId: activeWorkPeriod ? activeWorkPeriod._id : undefined,
@@ -444,7 +446,7 @@ export class POSService {
               {
                 status: 'occupied',
                 orderId: savedOrder._id.toString(),
-                occupiedBy: userId,
+                occupiedBy: creatorUserId,
               },
             );
           } catch (tableError) {
@@ -460,7 +462,7 @@ export class POSService {
               {
                 status: 'occupied',
                 orderId: savedOrder._id.toString(),
-                occupiedBy: userId,
+                occupiedBy: creatorUserId,
               },
             );
           } catch (tableError) {
@@ -477,7 +479,7 @@ export class POSService {
               method: createOrderDto.paymentMethod,
               status: 'completed',
               transactionId: `PAY-FIRST-${savedOrder.orderNumber}-${Date.now()}`,
-              processedBy: new Types.ObjectId(userId),
+              processedBy: new Types.ObjectId(creatorUserId),
               processedAt: new Date(),
               branchId: new Types.ObjectId(branchId),
               paymentDetails: {},
@@ -519,12 +521,12 @@ export class POSService {
                             date: new Date().toISOString(),
                             referenceId: savedOrder._id.toString(),
                             referenceModel: 'POSOrder',
-                            description: `Split payment (${subMethod}) for POS order ${savedOrder.orderNumber}`,
-                            notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
-                          },
-                          resolvedCompanyId,
-                          branchId,
-                          userId,
+                             description: `Split payment (${subMethod}) for POS order ${savedOrder.orderNumber}`,
+                             notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
+                           },
+                           resolvedCompanyId,
+                           branchId,
+                           creatorUserId,
                         );
                         recordedAny = true;
                       } catch (subTxnError) {
@@ -543,12 +545,12 @@ export class POSService {
                         date: new Date().toISOString(),
                         referenceId: savedOrder._id.toString(),
                         referenceModel: 'POSOrder',
-                        description: `Split payment for POS order ${savedOrder.orderNumber}`,
-                        notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
-                      },
-                      resolvedCompanyId,
-                      branchId,
-                      userId,
+                         description: `Split payment for POS order ${savedOrder.orderNumber}`,
+                         notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
+                       },
+                       resolvedCompanyId,
+                       branchId,
+                       creatorUserId,
                     );
                   }
                 } else {
@@ -562,12 +564,12 @@ export class POSService {
                       date: new Date().toISOString(),
                       referenceId: savedOrder._id.toString(),
                       referenceModel: 'POSOrder',
-                      description: `Split payment for POS order ${savedOrder.orderNumber}`,
-                      notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
-                    },
-                    resolvedCompanyId,
-                    branchId,
-                    userId,
+                       description: `Split payment for POS order ${savedOrder.orderNumber}`,
+                       notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
+                     },
+                     resolvedCompanyId,
+                     branchId,
+                     creatorUserId,
                   );
                 }
               } else {
@@ -583,12 +585,12 @@ export class POSService {
                     date: new Date().toISOString(),
                     referenceId: savedOrder._id.toString(),
                     referenceModel: 'POSOrder',
-                    description: `Payment for POS order ${savedOrder.orderNumber}`,
-                    notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
-                  },
-                  resolvedCompanyId,
-                  branchId,
-                  userId,
+                   description: `Payment for POS order ${savedOrder.orderNumber}`,
+                   notes: `Txn ID: PAY-FIRST-${savedOrder.orderNumber}`,
+                 },
+                 resolvedCompanyId,
+                 branchId,
+                 creatorUserId,
                 );
               }
             } catch (txnError) {
@@ -673,14 +675,6 @@ export class POSService {
         // Notify via WebSocket: new order created
         try {
           const orderData: any = savedOrder.toObject ? savedOrder.toObject() : savedOrder;
-          // Ensure waiterId is included in order data for notifications (convert to string)
-          // waiterId might not be in savedOrder because it's not in the schema, so use from DTO
-          if (createOrderDto.waiterId) {
-            const waiterIdValue: any = createOrderDto.waiterId;
-            orderData.waiterId = typeof waiterIdValue === 'string' 
-              ? waiterIdValue 
-              : String(waiterIdValue);
-            }
           // Fetch table number if tableId exists
           if (savedOrder.tableId) {
             try {
@@ -898,6 +892,7 @@ export class POSService {
       .findById(id)
       .populate('tableId', 'tableNumber number capacity')
       .populate('userId', 'firstName lastName name email')
+      .populate('waiterId', 'firstName lastName name email')
       .populate('items.menuItemId', 'name description price')
       .populate('paymentId')
       .exec();
@@ -1788,7 +1783,7 @@ export class POSService {
       notes: `Split from Order #${originalOrder.orderNumber}`,
       waiterId: originalOrder.userId?.toString(),
     };
-    const newOrder = await this.createOrder(splitOrderData, userId, branchId);
+    const newOrder = await this.createOrder(splitOrderData, userId, null, branchId);
     // Update original order with remaining items
     const updateData = {
       items: remainingItems.map(item => ({
@@ -2154,19 +2149,18 @@ export class POSService {
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    // Get all active orders for today grouped by userId (waiter)
+    // Get all active orders for today grouped by waiterId (fallback to userId for legacy orders)
     const activeOrders = await this.posOrderModel.aggregate([
       {
         $match: {
           branchId: new Types.ObjectId(branchId),
           createdAt: { $gte: today, $lt: tomorrow },
           status: { $in: ['pending', 'paid'] },
-          userId: { $exists: true, $ne: null },
         },
       },
       {
         $group: {
-          _id: '$userId',
+          _id: { $ifNull: ['$waiterId', '$userId'] },
           count: { $sum: 1 },
         },
       },
@@ -2654,6 +2648,7 @@ export class POSService {
     const newPOSOrder = await this.createOrder(
       createDto,
       userId,
+      null,
       publicOrder.branchId.toString(),
       publicOrder.companyId.toString(),
     );

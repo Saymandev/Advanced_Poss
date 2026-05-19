@@ -367,7 +367,7 @@ export class IngredientsService {
           await this.notificationsService.create({
             companyId: savedIngredient.companyId.toString(),
             branchId,
-            roles: ['owner', 'manager', 'chef'],
+            roles: ['owner', 'manager', 'chef', 'cook'],
             type: type as any,
             title,
             message,

@@ -44,10 +44,9 @@ export class POSController {
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async createOrder(@Body() createOrderDto: CreatePOSOrderDto, @Request() req) {
     const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
-    // Use selected waiterId if provided, otherwise use logged-in user
-    const userId = createOrderDto.waiterId || req.user.id;
-    // Pass user's branchId for validation
-    return this.posService.createOrder(createOrderDto, userId, req.user.branchId, companyId, req.user.branchId);
+    const creatorUserId = req.user.id;
+    const waiterId = createOrderDto.waiterId || null;
+    return this.posService.createOrder(createOrderDto, creatorUserId, waiterId, req.user.branchId, companyId, req.user.branchId);
   }
 
   @Get('orders')

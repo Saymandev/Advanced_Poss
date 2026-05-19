@@ -20,6 +20,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { RolePermissionsService } from '../role-permissions/role-permissions.service';
 import { AttendanceService } from './attendance.service';
 import { AttendanceCheckInDto } from './dto/attendance-check-in.dto';
@@ -27,7 +28,7 @@ import { AttendanceCheckOutDto } from './dto/attendance-check-out.dto';
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, WorkPeriodCheckGuard)
 @RequiresFeature(FEATURES.ATTENDANCE)
 @Controller('attendance')
 export class AttendanceController {

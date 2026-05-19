@@ -21,13 +21,14 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
+import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @ApiTags('Customers')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard, WorkPeriodCheckGuard)
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) { }

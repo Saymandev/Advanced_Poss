@@ -136,6 +136,9 @@ export class POSOrder {
   @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
   userId: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  waiterId?: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, ref: 'POSPayment' })
   paymentId?: Types.ObjectId;
 
@@ -199,3 +202,4 @@ POSOrderSchema.index({ branchId: 1, createdAt: -1 });
 POSOrderSchema.index({ workPeriodId: 1 });
 POSOrderSchema.index({ orderType: 1, deliveryStatus: 1 });
 POSOrderSchema.index({ assignedDriverId: 1, deliveryStatus: 1 });
+POSOrderSchema.index({ waiterId: 1 });

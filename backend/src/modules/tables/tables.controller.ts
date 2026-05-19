@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
+import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { CreateTableDto } from './dto/create-table.dto';
 import { ReserveTableDto } from './dto/reserve-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
@@ -25,7 +26,7 @@ import { TablesService } from './tables.service';
 
 @ApiTags('Tables')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard, WorkPeriodCheckGuard)
 @RequiresFeature(FEATURES.TABLE_MANAGEMENT)
 @Controller('tables')
 export class TablesController {

@@ -5,12 +5,13 @@ import { RequiresFeature } from '../../common/decorators/requires-feature.decora
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationsService } from './notifications.service';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, WorkPeriodCheckGuard)
 @RequiresFeature(FEATURES.NOTIFICATIONS)
 @Controller('notifications')
 export class NotificationsController {

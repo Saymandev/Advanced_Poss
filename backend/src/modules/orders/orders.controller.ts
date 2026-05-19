@@ -17,6 +17,7 @@ import { OrderFilterDto } from '../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -25,7 +26,7 @@ import { OrdersService } from './orders.service';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, WorkPeriodCheckGuard)
 @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
 @Controller('orders')
 export class OrdersController {

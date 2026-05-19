@@ -79,7 +79,7 @@ export class UsersService {
     let employeeId: string | undefined;
     if (
       createUserDto.branchId &&
-      ['waiter', 'chef', 'manager'].includes(createUserDto.role)
+      ['waiter', 'chef', 'cook', 'manager', 'cashier'].includes(createUserDto.role)
     ) {
       // Generate based on branch code (you'd fetch this from branch)
       employeeId = GeneratorUtil.generateEmployeeId('BRANCH');

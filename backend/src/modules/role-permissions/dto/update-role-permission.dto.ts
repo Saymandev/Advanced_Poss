@@ -5,10 +5,10 @@ import { UserRole } from '../../../common/enums/user-role.enum';
 export class UpdateRolePermissionDto {
   @ApiProperty({
     example: 'waiter',
-    enum: ['owner', 'manager', 'chef', 'waiter', 'cashier'],
+    enum: ['owner', 'manager', 'chef', 'cook', 'waiter', 'cashier'],
     description: 'Role to update permissions for',
   })
-  @IsEnum(['owner', 'manager', 'chef', 'waiter', 'cashier'])
+  @IsEnum(['owner', 'manager', 'chef', 'cook', 'waiter', 'cashier'])
   role: string;
 
   @ApiProperty({

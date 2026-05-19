@@ -14,13 +14,14 @@ import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { WorkPeriodCheckGuard } from '../../common/guards/work-period-check.guard';
 import { DeliveryZonesService } from './delivery-zones.service';
 import { CreateDeliveryZoneDto } from './dto/create-delivery-zone.dto';
 import { UpdateDeliveryZoneDto } from './dto/update-delivery-zone.dto';
 
 @ApiTags('Delivery Zones')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, WorkPeriodCheckGuard)
 @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
 @Controller('delivery-zones')
 export class DeliveryZonesController {

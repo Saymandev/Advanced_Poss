@@ -564,7 +564,7 @@ export class WebsocketsGateway
     // Notification for Bell
     this.emitScopedNotification({
       branchId,
-      roles: ['owner', 'manager', 'chef'],
+      roles: ['owner', 'manager', 'chef', 'cook'],
       payload: {
         type: 'system', // or promotion/system
         title: 'Low Stock Alert',
@@ -580,7 +580,7 @@ export class WebsocketsGateway
     // Notification for Bell
     this.emitScopedNotification({
       branchId,
-      roles: ['owner', 'manager', 'chef'],
+      roles: ['owner', 'manager', 'chef', 'cook'],
       payload: {
         type: 'system',
         title: 'Out of Stock!',
