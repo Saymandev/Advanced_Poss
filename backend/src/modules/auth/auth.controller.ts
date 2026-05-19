@@ -14,7 +14,7 @@ import { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { clearAuthCookies, getRefreshToken, setAuthCookies } from '../../common/utils/cookie.util';
+import { clearAuthCookies, clearUserInfoCookie, getRefreshToken, setAuthCookies, setUserInfoCookie } from '../../common/utils/cookie.util';
 import { AuthService } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangePinDto } from './dto/change-pin.dto';
@@ -214,6 +214,8 @@ export class AuthController {
       isProduction,
     );
 
+    setUserInfoCookie(res, result.data.user, isProduction);
+
     // Return user data without tokens (NestJS will handle response via interceptors)
     return {
       success: true,
@@ -272,6 +274,8 @@ export class AuthController {
       isProduction,
     );
 
+    setUserInfoCookie(res, result.user, isProduction);
+
     // Return user data without tokens (NestJS will handle response via interceptors)
     return {
       user: result.user,
@@ -315,6 +319,10 @@ export class AuthController {
       isProduction,
     );
 
+    if (result.user) {
+      setUserInfoCookie(res, result.user, isProduction);
+    }
+
     // Return success without tokens (NestJS will handle response via interceptors)
     return {
       success: true,
@@ -335,6 +343,7 @@ export class AuthController {
     // Clear httpOnly cookies
     const isProduction = process.env.NODE_ENV === 'production';
     clearAuthCookies(res, isProduction);
+    clearUserInfoCookie(res, isProduction);
     
     // Return message (NestJS will handle response via interceptors)
     return { message: 'Logged out successfully' };
@@ -515,6 +524,8 @@ export class AuthController {
       refreshExpiresIn,
       isProduction,
     );
+
+    setUserInfoCookie(res, result.user, isProduction);
 
     // Return user data without tokens (NestJS will handle response via interceptors)
     return {

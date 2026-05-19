@@ -6,6 +6,7 @@ import { Response } from 'express';
 
 const ACCESS_TOKEN_COOKIE = 'accessToken';
 const REFRESH_TOKEN_COOKIE = 'refreshToken';
+const USER_INFO_COOKIE = 'user_info';
 
 // Cookie options for production
 const getCookieOptions = (isProduction: boolean = false) => {
@@ -68,6 +69,45 @@ export function clearAuthCookies(res: Response, isProduction: boolean = false): 
 
   res.clearCookie(ACCESS_TOKEN_COOKIE, cookieOptions);
   res.clearCookie(REFRESH_TOKEN_COOKIE, cookieOptions);
+}
+
+/**
+ * Set a non-httpOnly cookie with minimal user info (role, permissions, isSuperAdmin)
+ * so that Next.js middleware can read it before page hydration.
+ */
+export function setUserInfoCookie(
+  res: Response,
+  user: { role: string; permissions?: string[]; isSuperAdmin?: boolean },
+  isProduction: boolean = false,
+): void {
+  const userInfo = JSON.stringify({
+    role: user.role,
+    permissions: user.permissions || [],
+    isSuperAdmin: user.isSuperAdmin || false,
+  });
+
+  const sameSite = (process.env.COOKIE_SAME_SITE as any) || (isProduction ? 'none' : 'lax');
+
+  res.cookie(USER_INFO_COOKIE, encodeURIComponent(userInfo), {
+    httpOnly: false,
+    secure: isProduction || sameSite === 'none',
+    sameSite: sameSite as 'lax' | 'strict' | 'none',
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+}
+
+/**
+ * Clear the user_info cookie
+ */
+export function clearUserInfoCookie(res: Response, isProduction: boolean = false): void {
+  const sameSite = (process.env.COOKIE_SAME_SITE as any) || (isProduction ? 'none' : 'lax');
+  res.clearCookie(USER_INFO_COOKIE, {
+    httpOnly: false,
+    secure: isProduction || sameSite === 'none',
+    sameSite: sameSite as 'lax' | 'strict' | 'none',
+    path: '/',
+  });
 }
 
 /**

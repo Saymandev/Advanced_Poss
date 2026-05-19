@@ -776,6 +776,7 @@ export class AuthService {
           companyId: user.companyId,
           branchId: user.branchId,
           permissions,
+          isSuperAdmin: user.role === 'super_admin',
         }
       };
     } catch (error) {
@@ -1465,6 +1466,10 @@ export class AuthService {
       sessionId,
     });
 
+    // Fetch permissions for this user
+    const permissions = await this.getUserPermissions(userWithPin);
+    const isSuperAdmin = userWithPin.role === 'super_admin';
+
     // Create login session
     await this.loginActivityService.createLoginSession({
       userId: validUserId,
@@ -1508,7 +1513,9 @@ export class AuthService {
             role: userWithPin.role,
             companyId: userWithPin.companyId,
             branchId: userWithPin.branchId,
-            avatar: userWithPin.avatar
+            avatar: userWithPin.avatar,
+            permissions,
+            isSuperAdmin,
           },
           sessionId
         },
@@ -1527,7 +1534,9 @@ export class AuthService {
           role: userWithPin.role,
           companyId: userWithPin.companyId,
           branchId: userWithPin.branchId,
-          avatar: userWithPin.avatar
+          avatar: userWithPin.avatar,
+          permissions,
+          isSuperAdmin,
         },
         accessToken,
         refreshToken,
@@ -1799,6 +1808,10 @@ export class AuthService {
     // Generate full access tokens
     const tokens = await this.generateTokens(user);
 
+    // Fetch permissions
+    const permissions = await this.getUserPermissions(user);
+    const isSuperAdmin = user.role === 'super_admin';
+
     // Save refresh token
     await this.usersService.updateRefreshToken(userId, tokens.refreshToken);
 
@@ -1811,6 +1824,8 @@ export class AuthService {
         role: user.role,
         companyId: user.companyId,
         branchId: user.branchId,
+        permissions,
+        isSuperAdmin,
       },
       tokens,
     };
