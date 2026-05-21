@@ -7,6 +7,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { UsersModule } from '../users/users.module';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceSchedulerService } from './attendance-scheduler.service';
 import { AttendanceService } from './attendance.service';
@@ -23,6 +24,7 @@ import { Attendance, AttendanceSchema } from './schemas/attendance.schema';
     RolePermissionsModule, // Import to use RolePermissionsService in RoleFeatureGuard
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
+    forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [AttendanceController],
   providers: [AttendanceService, AttendanceSchedulerService, RoleFeatureGuard],

@@ -8,6 +8,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { TablesModule } from '../tables/tables.module';
 import { TransactionsModule } from '../transactions/transactions.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { Order, OrderSchema } from './schemas/order.schema';
@@ -23,6 +24,7 @@ import { Order, OrderSchema } from './schemas/order.schema';
     forwardRef(() => TransactionsModule), // Used to record payments in accounting ledger
     forwardRef(() => NotificationsModule),
     forwardRef(() => WebsocketsModule),
+    forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

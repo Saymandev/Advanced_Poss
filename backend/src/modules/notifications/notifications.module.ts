@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { Notification, NotificationSchema } from './schemas/notification.schema';
@@ -13,6 +14,7 @@ import { Notification, NotificationSchema } from './schemas/notification.schema'
     forwardRef(() => WebsocketsModule),
     forwardRef(() => SubscriptionsModule),
     forwardRef(() => SubscriptionPlansModule),
+    forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService],

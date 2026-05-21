@@ -7,6 +7,7 @@ import { POSSettings, POSSettingsSchema } from '../pos/schemas/pos-settings.sche
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
+import { WorkPeriodsModule } from '../work-periods/work-periods.module';
 import { Table, TableSchema } from './schemas/table.schema';
 import { TablesController } from './tables.controller';
 import { TablesService } from './tables.service';
@@ -23,6 +24,7 @@ import { TablesService } from './tables.service';
     forwardRef(() => SubscriptionPlansModule),
     forwardRef(() => SubscriptionsModule),
     forwardRef(() => NotificationsModule),
+    forwardRef(() => WorkPeriodsModule),
   ],
   controllers: [TablesController],
   providers: [TablesService],
