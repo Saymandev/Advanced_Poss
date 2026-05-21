@@ -786,7 +786,7 @@ export class BookingsService {
     }
 
     const result = await this.findOne(bookingId);
-    this.websocketsGateway.server.emit('bookingUpdated', result);
+    this.websocketsGateway.server.emit('booking:updated', result);
     return result;
   }
 }

@@ -15,6 +15,7 @@ import { RequiresFeature } from '../../common/decorators/requires-feature.decora
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
+import { SubscriptionLimitGuard } from '../../common/guards/subscription-limit.guard';
 import { BookingsService } from './bookings.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
@@ -23,7 +24,7 @@ import { UpdateBookingDto } from './dto/update-booking.dto';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, SubscriptionLimitGuard)
 @RequiresFeature(FEATURES.BOOKING_MANAGEMENT)
 @Controller('bookings')
 export class BookingsController {

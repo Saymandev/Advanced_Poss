@@ -315,7 +315,6 @@ export class RoomsService {
     } else if (updateStatusDto.status === 'available') {
       updateData.checkedInAt = null;
       updateData.checkedOutAt = new Date();
-      updateData.currentBookingId = null;
     }
     const room = await this.roomModel
       .findByIdAndUpdate(id, updateData, { new: true })

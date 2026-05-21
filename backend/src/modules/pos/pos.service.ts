@@ -1245,21 +1245,8 @@ export class POSService {
         changeDue: processPaymentDto.changeDue,
       }, { new: true }).exec();
     }
-    // If this is a room_service order that was just paid, add the additional charge to the booking
-    if (updatedOrder.orderType === 'room_service' && updatedOrder.bookingId) {
-      try {
-        await this.bookingsService.applyAdditionalCharge(
-          updatedOrder.bookingId.toString(),
-          updatedOrder.totalAmount,
-          'room_service',
-          `Room service order ${updatedOrder.orderNumber}`,
-          true, // alreadyPaid = true since payment was just processed
-        );
-        } catch (chargeError) {
-        console.error(`❌ [processPayment] Failed to add additional charge to booking:`, chargeError);
-        // Don't fail the payment if charge addition fails - log and continue
-      }
-    }
+    // Room service charges are already applied to the booking during createOrder.
+    // Do not apply additional charge again in processPayment to avoid double-charging.
     // Note: We do NOT free the table after payment processing.
     // Tables remain occupied even after payment because customers may still be using them.
     // Tables are only freed when staff explicitly releases them or orders are cancelled.
