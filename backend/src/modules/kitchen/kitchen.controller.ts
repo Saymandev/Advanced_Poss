@@ -51,7 +51,7 @@ export class KitchenController {
 
   @Get('branch/:branchId/ready')
   @Get('branch/:branchId/ready')
-  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
+  @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get ready orders' })
   findReady(@Param('branchId') branchId: string) {
     return this.kitchenService.findReady(branchId);
@@ -138,8 +138,8 @@ export class KitchenController {
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Mark order as urgent' })
   markUrgent(@Param('id') id: string, @Body('isUrgent') isUrgent: boolean, @CurrentUser() user?: any) {
-    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER) {
-      throw new ForbiddenException('Only Managers and Owners can mark orders as urgent');
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.CHEF) {
+      throw new ForbiddenException('Only Managers, Owners, and Chefs can mark orders as urgent');
     }
     return this.kitchenService.markUrgent(id, isUrgent);
   }
@@ -161,8 +161,8 @@ export class KitchenController {
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Cancel kitchen order' })
   cancelOrder(@Param('id') id: string, @Body('reason') reason?: string, @CurrentUser() user?: any) {
-    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER) {
-      throw new ForbiddenException('Only Managers and Owners can cancel kitchen orders');
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.CHEF) {
+      throw new ForbiddenException('Only Managers, Owners, and Chefs can cancel kitchen orders');
     }
     return this.kitchenService.cancelOrder(id, reason);
   }

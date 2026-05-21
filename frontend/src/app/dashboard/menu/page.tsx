@@ -26,7 +26,7 @@ export default function MenuPage() {
   useFeatureRedirect('menu-management');
 
   const { user } = useAppSelector((state) => state.auth);
-  const { data, isLoading, refetch } = useGetMenuItemsQuery({ branchId: user?.branchId });
+  const { data, isLoading, refetch } = useGetMenuItemsQuery({ branchId: user?.branchId, companyId: (user as any)?.companyId });
 
   const [createMenuItem] = useCreateMenuItemMutation();
   const [updateMenuItem] = useUpdateMenuItemMutation();
@@ -98,7 +98,7 @@ export default function MenuPage() {
         price: parseFloat(formData.price),
         category: formData.category,
         preparationTime: formData.preparationTime ? parseInt(formData.preparationTime) : undefined,
-        calories: formData.calories ? parseInt(formData.calories) : undefined,
+        nutrition: formData.calories ? { calories: parseInt(formData.calories) } : undefined,
         isAvailable: formData.isAvailable,
       };
 

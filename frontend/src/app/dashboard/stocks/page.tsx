@@ -23,8 +23,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function StocksPage() {
+  useFeatureRedirect('inventory');
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');

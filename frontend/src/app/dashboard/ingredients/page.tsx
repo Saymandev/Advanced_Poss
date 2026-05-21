@@ -32,8 +32,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
 export default function IngredientsPage() {
+  useFeatureRedirect('inventory');
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
