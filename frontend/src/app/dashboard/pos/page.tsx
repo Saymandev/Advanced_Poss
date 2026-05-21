@@ -454,6 +454,7 @@ export default function POSPage() {
   const [fullPaymentReceived, setFullPaymentReceived] = useState<string>('0');
   const [multiPayments, setMultiPayments] = useState<SplitPaymentRow[]>([]);
   const [paymentSuccessOrder, setPaymentSuccessOrder] = useState<PaymentSuccessState | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [queueTab, setQueueTab] = useState<'active' | 'history'>('active');
   const [queueStatusFilter, setQueueStatusFilter] = useState<'all' | 'pending' | 'paid' | 'cancelled'>('pending');
   const [queueOrderTypeFilter, setQueueOrderTypeFilter] = useState<'all' | 'dine-in' | 'delivery' | 'takeaway'>('all');
@@ -1087,13 +1088,17 @@ export default function POSPage() {
   // Save delivery details to encrypted storage
   useEffect(() => {
     if (typeof window !== 'undefined' && orderType === 'delivery') {
-      const hasDeliveryDetails = Object.values(deliveryDetails).some(v => v.trim() !== '') || deliveryFee !== '0';
+      const hasDeliveryDetails = Object.values(deliveryDetails).some(v => v.trim() !== '');
       if (hasDeliveryDetails) {
-        // Encrypt delivery PII with 24-hour TTL
-        const DELIVERY_DATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
         setEncryptedItemWithTTL('pos_deliveryDetails', deliveryDetails, DELIVERY_DATA_TTL);
       } else {
         removeEncryptedItem('pos_deliveryDetails');
+      }
+      const parsedFee = parseFloat(deliveryFee);
+      if (!Number.isNaN(parsedFee) && parsedFee > 0) {
+        localStorage.setItem('pos_deliveryFee', deliveryFee);
+      } else {
+        localStorage.removeItem('pos_deliveryFee');
       }
     }
   }, [deliveryDetails, deliveryFee, orderType]);
@@ -1108,36 +1113,6 @@ export default function POSPage() {
       }
     }
   }, [takeawayDetails, orderType]);
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const hasDeliveryDetails = Object.values(deliveryDetails).some((value) => value.trim() !== '');
-    if (hasDeliveryDetails) {
-      // Encrypt delivery PII with 24-hour TTL
-      const DELIVERY_DATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
-      setEncryptedItemWithTTL('pos_deliveryDetails', deliveryDetails, DELIVERY_DATA_TTL);
-    } else {
-      removeEncryptedItem('pos_deliveryDetails');
-    }
-    const parsedFee = parseFloat(deliveryFee);
-    if (!Number.isNaN(parsedFee) && parsedFee > 0) {
-      localStorage.setItem('pos_deliveryFee', deliveryFee);
-    } else {
-      localStorage.removeItem('pos_deliveryFee');
-    }
-  }, [deliveryDetails, deliveryFee]);
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const hasTakeawayDetails = Object.values(takeawayDetails).some((value) => value.trim() !== '');
-    if (hasTakeawayDetails) {
-      localStorage.setItem('pos_takeawayDetails', JSON.stringify(takeawayDetails));
-    } else {
-      localStorage.removeItem('pos_takeawayDetails');
-    }
-  }, [takeawayDetails]);
   useEffect(() => {
     if (!isCustomerLookupOpen) {
       return;
@@ -1734,6 +1709,9 @@ export default function POSPage() {
             quantity: item.quantity || 1,
             category: typeof menuItem?.category === 'string' ? menuItem.category : (menuItem?.category?.name || ''),
             notes: item.notes || '',
+            variantSelections: item.variantSelections || [],
+            addonSelections: item.addonSelections || [],
+            selectionChoices: item.selectionChoices || [],
           });
         }
         setCart(cartItems);
@@ -1848,6 +1826,7 @@ export default function POSPage() {
   }, [reservedTableModal, menuItemsData, buildCartItemFromMenuItem]);
   // Order functions
   const handleCreateOrder = useCallback(async () => {
+    if (isProcessingPayment) return;
     // In pay-first mode, orders cannot be created without payment
     if (paymentMode === 'pay-first') {
       toast.error('Pay-first mode is enabled. Please use "Checkout" to process payment before creating the order.');
@@ -1877,6 +1856,7 @@ export default function POSPage() {
     const roomServiceBookingForOrder = isRoomService
       ? roomServiceBookings.find((b) => b.id === roomServiceBookingIdToUse) || roomServiceBookings[0]
       : null;
+    setIsProcessingPayment(true);
     try {
       const deliveryPayload = isDelivery
         ? (sanitizeDetails(deliveryDetails) as CreatePOSOrderRequest['deliveryDetails'])
@@ -1983,6 +1963,8 @@ export default function POSPage() {
 
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to create order');
+    } finally {
+      setIsProcessingPayment(false);
     }
   }, [
     orderType,
@@ -2018,6 +2000,7 @@ export default function POSPage() {
     roomServiceBookings,
   ]);
   const handlePayment = async () => {
+    if (isProcessingPayment) return;
     const requiresTable = orderType === 'dine-in';
     const isDelivery = orderType === 'delivery';
     const isTakeaway = orderType === 'takeaway';
@@ -2064,7 +2047,7 @@ export default function POSPage() {
         return;
       }
     }
-    if (!isRoomBooking && cart.length === 0) {
+    if (!isRoomBooking && !isRoomService && cart.length === 0) {
       toast.error('Cart is empty');
       return;
     }
@@ -2073,6 +2056,7 @@ export default function POSPage() {
       toast.error('Total due must be greater than zero before processing payment');
       return;
     }
+    setIsProcessingPayment(true);
     try {
       const deliveryPayload = isDelivery
         ? (sanitizeDetails(deliveryDetails) as CreatePOSOrderRequest['deliveryDetails'])
@@ -2086,7 +2070,11 @@ export default function POSPage() {
       let changeDue = 0;
       let paymentBreakdown: Array<{ method: string; amount: number }> = [];
       // For room service in pay-later mode, we don't take payment now.
+      // The charge will be applied to the room folio by the backend.
       const skipFullPaymentValidation = isRoomService && paymentMode === 'pay-later';
+      if (skipFullPaymentValidation) {
+        paymentMethodForBackend = 'room_charge';
+      }
       if (paymentTab === 'full' && !skipFullPaymentValidation) {
         const received = parseFloat(fullPaymentReceived || '0');
         if (!Number.isFinite(received) || received <= 0) {
@@ -2102,7 +2090,6 @@ export default function POSPage() {
         paymentMethodForBackend = fullPaymentMethod as any; // Pass the actual method code (bkash, nagad, cash, card, etc.)
         paymentBreakdown = [{ method: fullPaymentMethod, amount: totalDue }];
         const methodName = selectedMethod?.displayName || selectedMethod?.name || fullPaymentMethod;
-        const amountReceivedForBackend = received;
         if (allowsChange) {
           changeDue = Math.max(0, received - totalDue);
           paymentNotes.push(
@@ -2138,9 +2125,6 @@ export default function POSPage() {
         const cashPortion = activeRows
           .filter((row) => row.method === 'cash')
           .reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
-        
-        const totalReceived = activeRows.reduce((sum, row) => sum + (parseFloat(row.amount || '0') || 0), 0);
-        const amountReceivedForBackend = totalReceived;
         
         if (cashPortion > 0 && totalApplied > totalDue) {
           changeDue = totalApplied - totalDue;
@@ -2271,10 +2255,6 @@ export default function POSPage() {
           return;
         }
       }
-      // At this point, isRoomBooking is false (we returned early if true)
-      if (isRoomBooking) {
-        return;
-      }
       // Determine the actual payment method to store in order
       // For full payment, use the actual method code (bkash, nagad, etc.)
       // For split payment, use the primary method or 'split' with breakdown
@@ -2402,6 +2382,8 @@ export default function POSPage() {
     } catch (error: any) {
       console.error('Payment flow failed:', error);
       toast.error(error?.data?.message || 'Failed to process payment');
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
   const handlePrintReceipt = async (orderId: string, usePDF = false) => {
@@ -2991,7 +2973,7 @@ export default function POSPage() {
             <Button
               variant="primary"
               onClick={() => setIsPaymentModalOpen(true)}
-              disabled={checkoutBlocked || cart.length === 0}
+                disabled={checkoutBlocked || (orderType !== 'room-booking' && orderType !== 'room-service' && cart.length === 0)}
               className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black uppercase tracking-widest gap-2 shadow-lg shadow-emerald-600/10 transition-all active:scale-95 border-none"
             >
               <CreditCardIcon className="h-4 w-4" />
@@ -3850,7 +3832,7 @@ export default function POSPage() {
               <Button
                 variant="secondary"
                 onClick={handleCreateOrder}
-                disabled={checkoutBlocked || (orderType !== 'room-booking' && cart.length === 0)}
+                disabled={checkoutBlocked || (orderType !== 'room-booking' && orderType !== 'room-service' && cart.length === 0)}
                 className="flex-1 h-10 rounded-lg bg-gray-100 dark:bg-slate-900 hover:bg-gray-200 dark:hover:bg-slate-800 border-none transition-all"
               >
                   <ClockIcon className="h-4 w-4 text-slate-500" />
@@ -4025,10 +4007,6 @@ export default function POSPage() {
           event.preventDefault();
           setIsQueueModalOpen((prev) => !prev);
           break;
-        case 'F2':
-          event.preventDefault();
-          // setIsPaymentModalOpen(true); replaced by direct cart interaction or repurposed
-          break;
         case 'Escape':
           event.preventDefault();
           setIsPaymentModalOpen(false);
@@ -4046,7 +4024,7 @@ export default function POSPage() {
     };
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [cart.length, selectedTable, showKeyboardShortcuts, handleCreateOrder, requiresTable, checkoutBlocked, paymentMode, setIsPaymentModalOpen, clearCart]);
+  }, [cart.length, checkoutBlocked]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Listen for sidebar state changes
@@ -4676,7 +4654,7 @@ export default function POSPage() {
               <Button
                 onClick={handlePayment}
                 className="bg-emerald-600 hover:bg-emerald-500"
-                disabled={checkoutBlocked || cart.length === 0}
+              disabled={checkoutBlocked || (orderType !== 'room-booking' && orderType !== 'room-service' && cart.length === 0)}
               >
                 <CheckIcon className="h-4 w-4 mr-2" />
                 Complete Payment
@@ -4692,55 +4670,19 @@ export default function POSPage() {
         title="Keyboard Shortcuts"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Navigation</h3>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Toggle Orders Queue</span>
-                  <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">F1</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Payment Modal</span>
-                  <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">F2</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Clear Cart</span>
-                  <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">F3</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Show Shortcuts</span>
-                  <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">F4</kbd>
-                </div>
-              </div>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between py-1">
+              <span>Toggle Orders Queue</span>
+              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">F1</kbd>
             </div>
-            <div className="space-y-2">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Actions</h3>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Create Order</span>
-                  <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Enter</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Close Modals</span>
-                  <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Esc</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Search Menu</span>
-                  <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Ctrl+F</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Quick Add</span>
-                  <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Space</kbd>
-                </div>
-              </div>
+            <div className="flex justify-between py-1">
+              <span>Open Payment / Create Order</span>
+              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Enter</kbd>
             </div>
-          </div>
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              💡 <strong>Tip:</strong> Use keyboard shortcuts to speed up order processing. 
-              Focus on menu items and press Space to quickly add to cart.
-            </p>
+            <div className="flex justify-between py-1">
+              <span>Close Modals</span>
+              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Esc</kbd>
+            </div>
           </div>
         </div>
       </Modal>
