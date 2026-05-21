@@ -1090,6 +1090,7 @@ export default function POSPage() {
     if (typeof window !== 'undefined' && orderType === 'delivery') {
       const hasDeliveryDetails = Object.values(deliveryDetails).some(v => v.trim() !== '');
       if (hasDeliveryDetails) {
+        const DELIVERY_DATA_TTL = 24 * 60 * 60 * 1000;
         setEncryptedItemWithTTL('pos_deliveryDetails', deliveryDetails, DELIVERY_DATA_TTL);
       } else {
         removeEncryptedItem('pos_deliveryDetails');
