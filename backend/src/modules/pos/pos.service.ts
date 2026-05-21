@@ -308,71 +308,6 @@ export class POSService {
       if (!menuItemId) {
         continue;
       }
-      const menuItem = menuItemCache.get(menuItemId);
-      if (
-        !menuItem ||
-        menuItem.trackInventory !== true ||
-        !Array.isArray(menuItem.ingredients) ||
-        menuItem.ingredients.length === 0
-      ) {
-        console.log(`[POS] Skipping inventory for ${menuItem?.name || menuItemId} - tracking disabled or no ingredients`);
-        continue;
-      }
-      console.log(`[POS] Processing inventory for ${menuItem.name} (${item.quantity} units)`);
-      for (const ingredient of menuItem.ingredients) {
-        const rawIngredient = ingredient?.ingredientId as any;
-        let ingredientId: string | null = null;
-        
-        if (rawIngredient instanceof Types.ObjectId) {
-          ingredientId = rawIngredient.toString();
-        } else if (typeof rawIngredient === 'string') {
-          ingredientId = rawIngredient;
-        } else if (rawIngredient && typeof rawIngredient === 'object') {
-          ingredientId = rawIngredient._id?.toString() || rawIngredient.id?.toString();
-        }
-
-        const baseQuantity = Number(ingredient?.quantity ?? 0);
-        if (!ingredientId || Number.isNaN(baseQuantity) || baseQuantity <= 0) {
-          console.warn(`[POS] Invalid ingredient entry for ${menuItem.name}:`, ingredient);
-          continue;
-        }
-        const totalUsage = baseQuantity * item.quantity;
-        if (totalUsage <= 0) {
-          continue;
-        }
-        const existing = ingredientUsage.get(ingredientId) ?? {
-          quantity: 0,
-          name: rawIngredient?.name,
-          unit: ingredient?.unit,
-        };
-        existing.quantity += totalUsage;
-        if (!existing.name && rawIngredient?.name) {
-          existing.name = rawIngredient.name;
-        }
-        if (!existing.unit && ingredient?.unit) {
-          existing.unit = ingredient.unit;
-        }
-        ingredientUsage.set(ingredientId, existing);
-      }
-    }
-    for (const [ingredientId, usage] of ingredientUsage.entries()) {
-      const ingredient = await this.ingredientsService.findOne(ingredientId);
-      if (ingredient.currentStock < usage.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for ingredient ${
-            usage.name || ingredient.name
-          }. Required ${usage.quantity}${
-            ingredient.unit ? ` ${ingredient.unit}` : ''
-          }, available ${ingredient.currentStock}.`,
-        );
-      }
-      ingredientUsage.set(ingredientId, {
-        quantity: usage.quantity,
-        name: ingredient.name,
-        unit: ingredient.unit,
-      });
-    }
-    }
       // menuItemCache is already populated above, so just get from cache
       const menuItem = menuItemCache.get(menuItemId);
       if (
@@ -437,6 +372,7 @@ export class POSService {
         name: ingredient.name,
         unit: ingredient.unit,
       });
+    }
     }
     let lastError: any = null;
     for (let attempt = 0; attempt < 5; attempt++) {
