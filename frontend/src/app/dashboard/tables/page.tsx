@@ -306,6 +306,7 @@ export default function TablesPage() {
         status,
       }).unwrap();
       toast.success(`Table ${table.number} is now ${status}`);
+      refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Failed to update table status');
     }
@@ -329,8 +330,7 @@ export default function TablesPage() {
       available: 'success',
       occupied: 'danger',
       reserved: 'warning',
-      needs_cleaning: 'info',
-      maintenance: 'secondary',
+      cleaning: 'info',
     };
     return <Badge variant={variants[status] || 'secondary'}>{status.replace('_', ' ')}</Badge>;
   };
@@ -339,8 +339,7 @@ export default function TablesPage() {
       available: CheckCircleIcon,
       occupied: XCircleIcon,
       reserved: ClockIcon,
-      needs_cleaning: ClockIcon,
-      maintenance: ClockIcon,
+      cleaning: ClockIcon,
     };
     const Icon = icons[status] || CheckCircleIcon;
     return <Icon className="w-4 h-4" />;
@@ -450,14 +449,14 @@ export default function TablesPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleStatusChange(row, 'needs_cleaning' as any)}
+              onClick={() => handleStatusChange(row, 'cleaning' as any)}
               className="text-blue-600 hover:text-blue-700"
               title="Mark as Needs Cleaning"
             >
               <ClockIcon className="w-4 h-4" />
             </Button>
           )}
-          {(row.status === ('needs_cleaning' as any) || (row as any).status === 'needs_cleaning') && (
+          {row.status === 'cleaning' && (
             <Button
               variant="ghost"
               size="sm"
@@ -508,7 +507,7 @@ export default function TablesPage() {
       available: tables.filter(t => t.status === 'available').length,
       occupied: tables.filter(t => t.status === 'occupied').length,
       reserved: tables.filter(t => t.status === 'reserved').length,
-      cleaning: tables.filter(t => t.status === 'needs_cleaning').length,
+      cleaning: tables.filter(t => t.status === 'cleaning').length,
     };
   }, [tables, totalTables]);
   return (
@@ -737,7 +736,7 @@ export default function TablesPage() {
                   { value: 'available', label: 'Available' },
                   { value: 'occupied', label: 'Occupied' },
                   { value: 'reserved', label: 'Reserved' },
-                  { value: 'needs_cleaning', label: 'Needs Cleaning' },
+                  { value: 'cleaning', label: 'Needs Cleaning' },
                 ]}
                 value={statusFilter}
                 onChange={setStatusFilter}
@@ -1014,8 +1013,7 @@ export default function TablesPage() {
                   { value: 'available', label: 'Available' },
                   { value: 'occupied', label: 'Occupied' },
                   { value: 'reserved', label: 'Reserved' },
-                  { value: 'needs_cleaning', label: 'Needs Cleaning' },
-                  { value: 'maintenance', label: 'Maintenance' },
+                  { value: 'cleaning', label: 'Needs Cleaning' },
                 ]}
                 value={formData.status}
                 onChange={(value) => setFormData({ ...formData, status: value })}

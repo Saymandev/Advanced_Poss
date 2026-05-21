@@ -70,8 +70,8 @@ export class TablesService {
     return savedTable;
   }
 
-  async findAll(filter: any = {}): Promise<Table[]> {
-    const tables = await this.tableModel
+  async findAll(filter: any = {}, page?: number, limit?: number): Promise<Table[]> {
+    let query = this.tableModel
       .find(filter)
       .populate('branchId', 'name code')
       .populate({
@@ -84,8 +84,14 @@ export class TablesService {
       })
       .populate('occupiedBy', 'firstName lastName')
       .sort({ tableNumber: 1 })
-      .lean()
-      .exec();
+      .lean();
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      query = query.skip(skip).limit(limit);
+    }
+
+    const tables = await query.exec();
 
     // Calculate status dynamically based on pending orders (same logic as POS)
     // This ensures Table Management and POS show the same status
@@ -239,11 +245,27 @@ export class TablesService {
   }
 
   async findAvailable(branchId: string): Promise<Table[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const occupiedTableIds = await this.posOrderModel.distinct('tableId', {
+      branchId: new Types.ObjectId(branchId),
+      createdAt: { $gte: today, $lt: tomorrow },
+      status: { $in: ['pending', 'paid'] },
+      orderType: 'dine-in',
+      tableId: { $exists: true, $ne: null },
+    });
+
+    const occupiedIds = occupiedTableIds.map(id => id.toString());
+
     return this.tableModel
       .find({
         branchId: new Types.ObjectId(branchId),
         status: 'available',
         isActive: true,
+        _id: { $nin: occupiedIds.map(id => new Types.ObjectId(id)) },
       })
       .sort({ tableNumber: 1 })
       .exec();
@@ -597,15 +619,19 @@ export class TablesService {
   }
 
   async getStats(branchId: string): Promise<any> {
-    // Use findAll to get tables with dynamically calculated status
     const tables = await this.findAll({ branchId });
+
+    const cleaningCount = await this.tableModel.countDocuments({
+      branchId: new Types.ObjectId(branchId),
+      status: 'cleaning',
+    });
 
     const stats = {
       total: tables.length,
       available: tables.filter((t: any) => t.status === 'available').length,
       occupied: tables.filter((t: any) => t.status === 'occupied').length,
       reserved: tables.filter((t: any) => t.status === 'reserved').length,
-      cleaning: tables.filter((t: any) => t.status === 'cleaning').length,
+      cleaning: cleaningCount,
       totalCapacity: tables.reduce((sum: number, t: any) => sum + (t.capacity || 0), 0),
       occupancyRate: 0,
     };

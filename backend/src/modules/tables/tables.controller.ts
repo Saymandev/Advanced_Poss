@@ -52,11 +52,13 @@ export class TablesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all tables' })
-  findAll(@Query('branchId') branchId?: string, @Query('status') status?: string) {
+  findAll(@Query('branchId') branchId?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
     const filter: any = {};
     if (branchId) filter.branchId = branchId;
     if (status) filter.status = status;
-    return this.tablesService.findAll(filter);
+    const pageNum = page ? parseInt(page, 10) : undefined;
+    const limitNum = limit ? parseInt(limit, 10) : undefined;
+    return this.tablesService.findAll(filter, pageNum, limitNum);
   }
 
   @Get('branch/:branchId')

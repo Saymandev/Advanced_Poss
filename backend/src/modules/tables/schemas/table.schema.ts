@@ -88,7 +88,7 @@ TableSchema.index({ qrCode: 1 }, { unique: true });
 TableSchema.set('toJSON', {
   virtuals: true,
   transform: function (doc, ret) {
-    // @ts-ignore - Mongoose transform`n    // @ts-ignore - Mongoose transform`n    ret.id = ret._id;
+    (ret as any).id = ret._id?.toString();
     delete ret._id;
     delete ret.__v;
     return ret;
