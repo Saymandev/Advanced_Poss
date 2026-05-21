@@ -6,6 +6,7 @@ import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { TransactionsModule } from '../transactions/transactions.module';
 import { Wastage, WastageSchema } from './schemas/wastage.schema';
 import { WastageController } from './wastage.controller';
 import { WastageService } from './wastage.service';
@@ -18,6 +19,7 @@ import { WastageService } from './wastage.service';
     RolePermissionsModule, // Import to use RolePermissionsService in RoleFeatureGuard
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
+    TransactionsModule,
   ],
   controllers: [WastageController],
   providers: [WastageService, RoleFeatureGuard],

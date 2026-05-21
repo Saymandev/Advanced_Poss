@@ -416,9 +416,10 @@ export class OrdersService {
           if (!creatorId) {
             console.error(`Cannot record transaction for order ${order.orderNumber}: No user ID found`);
           } else {
+            const orderPaymentMethod = (order as any).payments?.[0]?.method || 'cash';
             await this.transactionsService.recordTransaction(
               {
-                paymentMethodId: 'cash',
+                paymentMethodId: orderPaymentMethod,
                 type: TransactionType.IN,
                 category: TransactionCategory.SALE,
                 amount: order.total,

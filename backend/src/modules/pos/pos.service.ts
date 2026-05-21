@@ -540,9 +540,9 @@ export class POSService {
                   }
                   if (!recordedAny) {
                     // Fallback: record full amount under cash if parsing failed
-                    await this.transactionsService.recordTransaction(
-                      {
-                        paymentMethodId: 'cash',
+           await this.transactionsService.recordTransaction(
+             {
+               paymentMethodId: 'cash',
                         type: TransactionType.IN,
                         category: TransactionCategory.SALE,
                         amount: savedOrder.totalAmount,
@@ -973,10 +973,11 @@ export class POSService {
           }).exec();
 
           // Create a payment record
+          const orderPaymentMethod = updatedPOSOrder.paymentMethod || 'cash';
           const paymentData = {
             orderId: updatedPOSOrder._id,
             amount: updatedPOSOrder.totalAmount,
-            method: 'cash', // Default to cash for status updates
+            method: orderPaymentMethod,
             status: 'completed',
             processedBy: new Types.ObjectId(userId),
             processedAt: new Date(),

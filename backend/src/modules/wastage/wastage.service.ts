@@ -8,6 +8,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
+import { TransactionsService } from '../transactions/transactions.service';
+import { TransactionCategory, TransactionType } from '../transactions/schemas/transaction.schema';
 import { CreateWastageDto } from './dto/create-wastage.dto';
 import { UpdateWastageDto } from './dto/update-wastage.dto';
 import { WastageQueryDto } from './dto/wastage-query.dto';
@@ -19,6 +21,7 @@ export class WastageService {
     @InjectModel(Wastage.name) private wastageModel: Model<WastageDocument>,
     private ingredientsService: IngredientsService,
     private menuItemsService: MenuItemsService,
+    private transactionsService: TransactionsService,
   ) {}
 
   async create(
@@ -69,6 +72,30 @@ export class WastageService {
     });
 
     const savedWastage = await wastage.save();
+
+    // Record ledger transaction for wastage financial loss
+    if (totalCost > 0) {
+      try {
+        await this.transactionsService.recordTransaction(
+          {
+            paymentMethodId: 'cash',
+            type: TransactionType.OUT,
+            category: TransactionCategory.EXPENSE,
+            amount: totalCost,
+            date: new Date(createWastageDto.wastageDate).toISOString(),
+            referenceId: savedWastage._id.toString(),
+            referenceModel: 'Wastage',
+            description: `Stock wastage: ${createWastageDto.reason}`,
+            notes: createWastageDto.notes || undefined,
+          },
+          companyId,
+          branchId,
+          userId,
+        );
+      } catch (txnError) {
+        console.error('Failed to record wastage transaction:', txnError);
+      }
+    }
 
     // Update ingredient stock and totalWastage
     if (createWastageDto.ingredientId) {
