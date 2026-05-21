@@ -19,7 +19,7 @@ import { WastageService } from './wastage.service';
     RolePermissionsModule, // Import to use RolePermissionsService in RoleFeatureGuard
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
-    TransactionsModule,
+    forwardRef(() => TransactionsModule),
   ],
   controllers: [WastageController],
   providers: [WastageService, RoleFeatureGuard],
