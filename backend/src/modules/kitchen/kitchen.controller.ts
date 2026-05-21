@@ -26,14 +26,12 @@ export class KitchenController {
   constructor(private readonly kitchenService: KitchenService) { }
 
   @Get('branch/:branchId')
-  @Get('branch/:branchId')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get all kitchen orders for branch' })
   findAll(@Param('branchId') branchId: string, @Query('status') status?: string) {
     return this.kitchenService.findAll(branchId, status);
   }
 
-  @Get('branch/:branchId/pending')
   @Get('branch/:branchId/pending')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get pending orders' })
@@ -42,14 +40,12 @@ export class KitchenController {
   }
 
   @Get('branch/:branchId/preparing')
-  @Get('branch/:branchId/preparing')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get orders being prepared' })
   findPreparing(@Param('branchId') branchId: string) {
     return this.kitchenService.findPreparing(branchId);
   }
 
-  @Get('branch/:branchId/ready')
   @Get('branch/:branchId/ready')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get ready orders' })
@@ -58,14 +54,12 @@ export class KitchenController {
   }
 
   @Get('branch/:branchId/delayed')
-  @Get('branch/:branchId/delayed')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get delayed orders (> 30 min)' })
   findDelayed(@Param('branchId') branchId: string) {
     return this.kitchenService.findDelayed(branchId);
   }
 
-  @Get('branch/:branchId/urgent')
   @Get('branch/:branchId/urgent')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get urgent orders' })
@@ -74,14 +68,12 @@ export class KitchenController {
   }
 
   @Get('branch/:branchId/stats')
-  @Get('branch/:branchId/stats')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get kitchen statistics' })
   getStats(@Param('branchId') branchId: string) {
     return this.kitchenService.getStats(branchId);
   }
 
-  @Get('order/:orderId')
   @Get('order/:orderId')
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Get kitchen order by order ID' })
@@ -90,7 +82,6 @@ export class KitchenController {
   }
 
   @Get(':id')
-  @Get(':id')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Get kitchen order by ID' })
   findOne(@Param('id') id: string) {
@@ -98,14 +89,12 @@ export class KitchenController {
   }
 
   @Post(':id/start')
-  @Post(':id/start')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Start preparing order' })
   startOrder(@Param('id') id: string, @Body('chefId') chefId: string) {
     return this.kitchenService.startOrder(id, chefId);
   }
 
-  @Post(':id/items/:itemId/start')
   @Post(':id/items/:itemId/start')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Start preparing specific item' })
@@ -118,7 +107,6 @@ export class KitchenController {
   }
 
   @Post(':id/items/:itemId/complete')
-  @Post(':id/items/:itemId/complete')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Mark item as ready' })
   completeItem(@Param('id') id: string, @Param('itemId') itemId: string) {
@@ -126,14 +114,12 @@ export class KitchenController {
   }
 
   @Post(':id/complete')
-  @Post(':id/complete')
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Mark entire order as served' })
   completeOrder(@Param('id') id: string) {
     return this.kitchenService.completeOrder(id);
   }
 
-  @Patch(':id/urgent')
   @Patch(':id/urgent')
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Mark order as urgent' })
@@ -145,7 +131,6 @@ export class KitchenController {
   }
 
   @Patch(':id/items/:itemId/priority')
-  @Patch(':id/items/:itemId/priority')
   @RequiresFeature(FEATURES.KITCHEN_DISPLAY)
   @ApiOperation({ summary: 'Set item priority' })
   setPriority(
@@ -156,7 +141,6 @@ export class KitchenController {
     return this.kitchenService.setPriority(id, itemId, priority);
   }
 
-  @Post(':id/cancel')
   @Post(':id/cancel')
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   @ApiOperation({ summary: 'Cancel kitchen order' })

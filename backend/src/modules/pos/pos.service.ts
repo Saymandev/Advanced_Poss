@@ -88,7 +88,7 @@ export class POSService {
     return `POS-${branchCode}-${dateStr}-${sequence.toString().padStart(4, '0')}`;
   }
   // Create POS order
-  async createOrder(createOrderDto: CreatePOSOrderDto, creatorUserId: string, waiterId: string | null, branchId: string, companyId?: string, userBranchId?: string): Promise<POSOrder> {
+  async createOrder(createOrderDto: CreatePOSOrderDto, creatorUserId: string, waiterId: string | null, branchId: string, companyId?: string, userBranchId?: string, skipStockManagement: boolean = false): Promise<POSOrder> {
     // Validate the user creating the order is assigned to the branch (owners can work across branches)
     const creatingUser: any = await this.userModel.findById(creatorUserId).select('role branchId companyId');
     if (!creatingUser) {
@@ -302,11 +302,77 @@ export class POSService {
       string,
       { quantity: number; name?: string; unit?: string }
     >();
+    if (!skipStockManagement) {
     for (const item of createOrderDto.items) {
       const menuItemId = item.menuItemId;
       if (!menuItemId) {
         continue;
       }
+      const menuItem = menuItemCache.get(menuItemId);
+      if (
+        !menuItem ||
+        menuItem.trackInventory !== true ||
+        !Array.isArray(menuItem.ingredients) ||
+        menuItem.ingredients.length === 0
+      ) {
+        console.log(`[POS] Skipping inventory for ${menuItem?.name || menuItemId} - tracking disabled or no ingredients`);
+        continue;
+      }
+      console.log(`[POS] Processing inventory for ${menuItem.name} (${item.quantity} units)`);
+      for (const ingredient of menuItem.ingredients) {
+        const rawIngredient = ingredient?.ingredientId as any;
+        let ingredientId: string | null = null;
+        
+        if (rawIngredient instanceof Types.ObjectId) {
+          ingredientId = rawIngredient.toString();
+        } else if (typeof rawIngredient === 'string') {
+          ingredientId = rawIngredient;
+        } else if (rawIngredient && typeof rawIngredient === 'object') {
+          ingredientId = rawIngredient._id?.toString() || rawIngredient.id?.toString();
+        }
+
+        const baseQuantity = Number(ingredient?.quantity ?? 0);
+        if (!ingredientId || Number.isNaN(baseQuantity) || baseQuantity <= 0) {
+          console.warn(`[POS] Invalid ingredient entry for ${menuItem.name}:`, ingredient);
+          continue;
+        }
+        const totalUsage = baseQuantity * item.quantity;
+        if (totalUsage <= 0) {
+          continue;
+        }
+        const existing = ingredientUsage.get(ingredientId) ?? {
+          quantity: 0,
+          name: rawIngredient?.name,
+          unit: ingredient?.unit,
+        };
+        existing.quantity += totalUsage;
+        if (!existing.name && rawIngredient?.name) {
+          existing.name = rawIngredient.name;
+        }
+        if (!existing.unit && ingredient?.unit) {
+          existing.unit = ingredient.unit;
+        }
+        ingredientUsage.set(ingredientId, existing);
+      }
+    }
+    for (const [ingredientId, usage] of ingredientUsage.entries()) {
+      const ingredient = await this.ingredientsService.findOne(ingredientId);
+      if (ingredient.currentStock < usage.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for ingredient ${
+            usage.name || ingredient.name
+          }. Required ${usage.quantity}${
+            ingredient.unit ? ` ${ingredient.unit}` : ''
+          }, available ${ingredient.currentStock}.`,
+        );
+      }
+      ingredientUsage.set(ingredientId, {
+        quantity: usage.quantity,
+        name: ingredient.name,
+        unit: ingredient.unit,
+      });
+    }
+    }
       // menuItemCache is already populated above, so just get from cache
       const menuItem = menuItemCache.get(menuItemId);
       if (
@@ -381,6 +447,7 @@ export class POSService {
       });
       try {
         const savedOrder = await order.save();
+        if (!skipStockManagement) {
         try {
           for (const [ingredientId, usage] of ingredientUsage.entries()) {
             console.log(`[POS] Deducting ${usage.quantity} ${usage.unit || 'units'} of ${usage.name || ingredientId}`);
@@ -392,6 +459,7 @@ export class POSService {
         } catch (inventoryError) {
           await this.posOrderModel.deleteOne({ _id: savedOrder._id });
           throw inventoryError;
+        }
         }
         // If this is a room_service order, a bookingId is required so that the charge hits the folio.
         if (createOrderDto.orderType === 'room_service') {
@@ -1783,7 +1851,7 @@ export class POSService {
       notes: `Split from Order #${originalOrder.orderNumber}`,
       waiterId: originalOrder.userId?.toString(),
     };
-    const newOrder = await this.createOrder(splitOrderData, userId, null, branchId);
+    const newOrder = await this.createOrder(splitOrderData, userId, null, branchId, undefined, undefined, true);
     // Update original order with remaining items
     const updateData = {
       items: remainingItems.map(item => ({

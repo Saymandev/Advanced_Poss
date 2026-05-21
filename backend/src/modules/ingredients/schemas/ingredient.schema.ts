@@ -156,7 +156,7 @@ IngredientSchema.pre('save', function (next) {
 IngredientSchema.set('toJSON', {
   virtuals: true,
   transform: function (doc, ret) {
-    // @ts-ignore - Mongoose transform`n    // @ts-ignore - Mongoose transform`n    ret.id = ret._id;
+    ret.id = ret._id?.toString();
     delete ret._id;
     delete ret.__v;
     return ret;

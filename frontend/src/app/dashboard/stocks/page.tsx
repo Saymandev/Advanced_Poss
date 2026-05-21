@@ -352,7 +352,7 @@ export default function StocksPage() {
           </p>
         </div>
         <div className="w-full sm:w-auto flex items-center gap-2">
-          {user?.role === 'owner' && (
+          {(user?.role === 'owner' || user?.isSuperAdmin) && (
             <Button
               variant="ghost"
               size="sm"
