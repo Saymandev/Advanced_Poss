@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { DemandPrediction, MenuOptimizationSuggestion, useGetDemandPredictionsQuery, useGetMenuOptimizationQuery } from '@/lib/api/endpoints/aiApi';
 import { useGetMenuItemsQuery, useUpdateMenuItemMutation } from '@/lib/api/endpoints/menuItemsApi';
 import { useAppSelector } from '@/lib/store';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { formatCurrency } from '@/lib/utils';
 import {
     ArrowTrendingDownIcon,
@@ -31,6 +32,8 @@ import {
     YAxis
 } from 'recharts';
 export default function AIMenuOptimizationPage() {
+  useFeatureRedirect('ai-menu-optimization');
+
   const { user } = useAppSelector((state) => state.auth);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);

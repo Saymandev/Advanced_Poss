@@ -187,13 +187,7 @@ export const aiApi = apiSlice.injectEndpoints({
     }),
 
     // Customer Loyalty AI
-    getCustomerLoyaltyInsights: builder.query<CustomerLoyaltyInsight[], { branchId?: string; customerIds?: string[] }>({
-      query: (params) => ({
-        url: '/ai/customer-loyalty-insights',
-        params,
-      }),
-      providesTags: ['AI'],
-    }),
+    // Note: customer-loyalty-insights is computed client-side from customers API
     getPersonalizedOffers: builder.mutation<{ offers: Array<CustomerLoyaltyInsight['personalizedOffers'][0]> }, { customerId: string; branchId: string }>({
       query: ({ customerId, branchId }) => ({
         url: '/ai/personalized-offers',
@@ -201,22 +195,6 @@ export const aiApi = apiSlice.injectEndpoints({
         body: { customerId, branchId },
       }),
       invalidatesTags: ['AI'],
-    }),
-
-    // Predictive Analytics
-    getSalesForecast: builder.query<SalesForecast[], { branchId?: string; startDate?: string; endDate?: string }>({
-      query: (params) => ({
-        url: '/ai/sales-forecast',
-        params,
-      }),
-      providesTags: ['AI'],
-    }),
-    getStaffingOptimization: builder.query<{ recommendations: SalesForecast['recommendedStaffing']; reasoning: string[] }, { branchId: string; date: string }>({
-      query: ({ branchId, date }) => ({
-        url: '/ai/staffing-optimization',
-        params: { branchId, date },
-      }),
-      providesTags: ['AI'],
     }),
 
     // QR Code Menus
@@ -427,10 +405,7 @@ export const aiApi = apiSlice.injectEndpoints({
 export const {
   useGetMenuOptimizationQuery,
   useGetDemandPredictionsQuery,
-  useGetCustomerLoyaltyInsightsQuery,
   useGetPersonalizedOffersMutation,
-  useGetSalesForecastQuery,
-  useGetStaffingOptimizationQuery,
   useGetQRCodesQuery,
   useGenerateQRCodeMutation,
   useUpdateQRCodeMutation,

@@ -2,45 +2,56 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { ChartBarIcon, ExclamationTriangleIcon, LightBulbIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
+import { useGetMenuOptimizationQuery } from '@/lib/api/endpoints/aiApi';
+import { useGetPOSStatsQuery } from '@/lib/api/endpoints/posApi';
+import { useAppSelector } from '@/lib/store';
+import { formatCurrency } from '@/lib/utils';
+import {
+  ChartBarIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  LightBulbIcon,
+  ShoppingBagIcon,
+  SparklesIcon,
+} from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { useMemo } from 'react';
 
 export default function AIPage() {
-  const insights = [
-    {
-      type: 'recommendation',
-      title: 'Optimize Menu Pricing',
-      description: 'Based on sales data, consider increasing price of "Grilled Salmon" by 8% to maximize profit without affecting demand.',
-      impact: 'high',
-      icon: LightBulbIcon,
-    },
-    {
-      type: 'prediction',
-      title: 'Demand Forecast',
-      description: 'Weekend traffic expected to increase by 35% this Saturday. Recommend scheduling 2 additional staff members.',
-      impact: 'medium',
-      icon: ChartBarIcon,
-    },
-    {
-      type: 'alert',
-      title: 'Inventory Alert',
-      description: 'Chicken stock predicted to run out in 2 days based on current consumption rate. Restock immediately.',
-      impact: 'critical',
-      icon: ExclamationTriangleIcon,
-    },
-  ];
+  useFeatureRedirect('ai-insights');
+  const { user } = useAppSelector((state) => state.auth);
+  const branchId = user?.branchId;
+  const today = new Date().toISOString().split('T')[0];
 
-  const getImpactColor = (impact: string) => {
-    switch (impact) {
-      case 'critical':
-        return 'border-red-300 bg-red-50 dark:bg-red-900/20';
-      case 'high':
-        return 'border-orange-300 bg-orange-50 dark:bg-orange-900/20';
-      case 'medium':
-        return 'border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20';
-      default:
-        return 'border-blue-300 bg-blue-50 dark:bg-blue-900/20';
-    }
-  };
+  const { data: statsData } = useGetPOSStatsQuery(
+    { branchId: branchId || undefined, date: today },
+    { skip: !branchId }
+  );
+
+  const { data: optimizationData, isLoading: optLoading } = useGetMenuOptimizationQuery(
+    { branchId: branchId || undefined },
+    { skip: !branchId }
+  );
+
+  const stats = useMemo(() => {
+    const d = (statsData as any) || {};
+    return {
+      ordersToday: d.ordersToday || d.totalOrders || 0,
+      revenueToday: d.revenueToday || d.totalRevenue || 0,
+      avgValue: d.averageOrderValue || d.avgOrderValue || 0,
+    };
+  }, [statsData]);
+
+  const suggestions = useMemo(() => {
+    if (!optimizationData) return [];
+    const d = (optimizationData as any);
+    if (Array.isArray(d)) return d;
+    if (d.data) return Array.isArray(d.data) ? d.data : [];
+    if (d.suggestions) return d.suggestions;
+    if (d.recommendations) return d.recommendations;
+    return [];
+  }, [optimizationData]);
 
   return (
     <div className="space-y-6">
@@ -50,73 +61,101 @@ export default function AIPage() {
             <SparklesIcon className="w-8 h-8 text-purple-600 dark:text-purple-400" />
             AI Insights & Recommendations
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Powered by artificial intelligence</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Data-driven insights powered by analytics
+          </p>
         </div>
-        <Button>
-          <SparklesIcon className="w-5 h-5 mr-2" />
-          Generate New Insights
-        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardContent className="p-6 text-center">
-            <div className="text-4xl font-bold text-purple-600 dark:text-purple-400">87%</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Prediction Accuracy</div>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <CurrencyDollarIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Revenue Today</p>
+              <p className="text-lg font-bold">{formatCurrency(stats.revenueToday)}</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6 text-center">
-            <div className="text-4xl font-bold text-green-600 dark:text-green-400">+18%</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Revenue Improvement</div>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <ShoppingBagIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Orders Today</p>
+              <p className="text-lg font-bold">{stats.ordersToday}</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6 text-center">
-            <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">24</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Active Insights</div>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <CurrencyDollarIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Avg Order Value</p>
+              <p className="text-lg font-bold">{formatCurrency(stats.avgValue)}</p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="space-y-4">
-        {insights.map((insight, idx) => {
-          const Icon = insight.icon;
-          return (
-            <Card key={idx} className={`border-2 ${getImpactColor(insight.impact)}`}>
-              <CardHeader>
+      {optLoading ? (
+        <Card>
+          <CardContent className="p-8">
+            <div className="animate-pulse space-y-3">
+              <div className="h-4 bg-gray-200 dark:bg-slate-800 rounded w-3/4" />
+              <div className="h-4 bg-gray-200 dark:bg-slate-800 rounded w-1/2" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : suggestions.length > 0 ? (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <LightBulbIcon className="w-5 h-5 text-yellow-500" />
+            Menu Optimization Recommendations
+          </h2>
+          {suggestions.slice(0, 5).map((s: any, idx: number) => (
+            <Card key={idx} className="border-l-4 border-l-purple-500">
+              <CardContent className="p-4">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-                      <Icon className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{insight.title}</CardTitle>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{insight.description}</p>
-                    </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {s.itemName || s.name || s.title || `Suggestion #${idx + 1}`}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      {s.reasoning || s.description || s.recommendation || ''}
+                    </p>
+                    {s.currentPrice && s.suggestedPrice && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        {formatCurrency(s.currentPrice)} → {formatCurrency(s.suggestedPrice)}
+                        <span className="ml-2 text-green-600">
+                          ({s.priceChange > 0 ? '+' : ''}{s.priceChange || 0}%)
+                        </span>
+                      </p>
+                    )}
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-                    insight.impact === 'critical'
-                      ? 'bg-red-500 text-white'
-                      : insight.impact === 'high'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-yellow-500 text-white'
-                  }`}>
-                    {insight.impact}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-3">
-                  <Button size="sm">Apply Recommendation</Button>
-                  <Button size="sm" variant="secondary">View Details</Button>
-                  <Button size="sm" variant="ghost">Dismiss</Button>
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <LightBulbIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600 dark:text-gray-400">
+              Navigate to Menu Optimization for AI-powered pricing and demand insights.
+            </p>
+            <Link href="/dashboard/ai-menu-optimization">
+              <Button className="mt-4">Open Menu Optimization</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -124,26 +163,33 @@ export default function AIPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button variant="secondary" className="h-24 flex-col">
-              <ChartBarIcon className="w-8 h-8 mb-2" />
-              <div className="font-semibold">Sales Analysis</div>
-            </Button>
-            <Button variant="secondary" className="h-24 flex-col">
-              <SparklesIcon className="w-8 h-8 mb-2" />
-              <div className="font-semibold">Demand Prediction</div>
-            </Button>
-            <Button variant="secondary" className="h-24 flex-col">
-              <LightBulbIcon className="w-8 h-8 mb-2" />
-              <div className="font-semibold">Menu Optimization</div>
-            </Button>
-            <Button variant="secondary" className="h-24 flex-col">
-              <ChartBarIcon className="w-8 h-8 mb-2" />
-              <div className="font-semibold">Customer Insights</div>
-            </Button>
+            <Link href="/dashboard/ai-menu-optimization">
+              <Button variant="secondary" className="h-24 w-full flex-col">
+                <ChartBarIcon className="w-8 h-8 mb-2" />
+                <div className="font-semibold">Menu Optimization</div>
+              </Button>
+            </Link>
+            <Link href="/dashboard/customer-loyalty-ai">
+              <Button variant="secondary" className="h-24 w-full flex-col">
+                <SparklesIcon className="w-8 h-8 mb-2" />
+                <div className="font-semibold">Customer Insights</div>
+              </Button>
+            </Link>
+            <Link href="/dashboard/reports">
+              <Button variant="secondary" className="h-24 w-full flex-col">
+                <ChartBarIcon className="w-8 h-8 mb-2" />
+                <div className="font-semibold">Reports</div>
+              </Button>
+            </Link>
+            <Link href="/dashboard/work-periods">
+              <Button variant="secondary" className="h-24 w-full flex-col">
+                <ClockIcon className="w-8 h-8 mb-2" />
+                <div className="font-semibold">Work Periods</div>
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>
     </div>
   );
 }
-
