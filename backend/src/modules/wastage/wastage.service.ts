@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Inject,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -21,7 +23,7 @@ export class WastageService {
     @InjectModel(Wastage.name) private wastageModel: Model<WastageDocument>,
     private ingredientsService: IngredientsService,
     private menuItemsService: MenuItemsService,
-    private transactionsService: TransactionsService,
+    @Optional() private transactionsService?: TransactionsService,
   ) {}
 
   async create(
@@ -74,7 +76,7 @@ export class WastageService {
     const savedWastage = await wastage.save();
 
     // Record ledger transaction for wastage financial loss
-    if (totalCost > 0) {
+    if (totalCost > 0 && this.transactionsService) {
       try {
         await this.transactionsService.recordTransaction(
           {
