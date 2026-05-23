@@ -61,6 +61,7 @@ import {
   InformationCircleIcon,
   LockClosedIcon,
   MagnifyingGlassIcon,
+  MapPinIcon,
   MinusIcon,
   PencilSquareIcon,
   PlusIcon,
@@ -78,6 +79,9 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+const AddressMap = dynamic(() => import('@/components/map/AddressMap'), { ssr: false });
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 interface ModifierSelection {
@@ -455,6 +459,7 @@ export default function POSPage() {
   const [multiPayments, setMultiPayments] = useState<SplitPaymentRow[]>([]);
   const [paymentSuccessOrder, setPaymentSuccessOrder] = useState<PaymentSuccessState | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showDeliveryMap, setShowDeliveryMap] = useState(false);
   const [queueTab, setQueueTab] = useState<'active' | 'history'>('active');
   const [queueStatusFilter, setQueueStatusFilter] = useState<'all' | 'pending' | 'paid' | 'cancelled'>('pending');
   const [queueOrderTypeFilter, setQueueOrderTypeFilter] = useState<'all' | 'dine-in' | 'delivery' | 'takeaway'>('all');
@@ -3347,8 +3352,35 @@ export default function POSPage() {
             </p>
           </div>
         )}
-      </div>
-    </div>
+                      </div>
+                      <button
+                        onClick={() => setShowDeliveryMap(!showDeliveryMap)}
+                        className="w-full flex items-center justify-center gap-2 py-2 text-[10px] font-bold text-sky-600 hover:text-sky-500 uppercase tracking-wider border border-dashed border-sky-300 dark:border-sky-800 rounded-xl transition-colors"
+                      >
+                        <MapPinIcon className="h-3.5 w-3.5" />
+                        {showDeliveryMap ? 'Hide Map' : 'Locate on Map'}
+                      </button>
+                      {showDeliveryMap && (
+                        <div className="space-y-2">
+                          <AddressMap
+                            height="200px"
+                            onChange={(data) => {
+                              const parts = data.address.split(',');
+                              const road = parts[0]?.trim() || '';
+                              const cityPart = parts[1]?.trim() || parts[2]?.trim() || '';
+                              const postalPart = parts.find((p: string) => /\d{4,}/.test(p))?.trim() || '';
+                              setDeliveryDetails({
+                                ...deliveryDetails,
+                                addressLine1: road || deliveryDetails.addressLine1,
+                                city: cityPart || deliveryDetails.city,
+                                postalCode: postalPart || deliveryDetails.postalCode,
+                                state: parts.find((p: string) => !/\d/.test(p?.trim()) && p?.trim() !== road && p?.trim() !== cityPart)?.trim() || '',
+                              });
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
   );
 
   const renderCartSidebar = () => {
