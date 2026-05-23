@@ -248,7 +248,8 @@ export class PublicService {
         taxRate,
         taxAmount,
         deliveryFee,
-        totalAmount: finalTotal, // Map 'total' to 'totalAmount' in POSOrder schema
+        totalAmount: finalTotal,
+        total: finalTotal,
         remainingAmount: finalTotal,
         status: 'pending',
         paymentStatus: 'pending',
