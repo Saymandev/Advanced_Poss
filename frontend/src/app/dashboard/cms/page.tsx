@@ -17,7 +17,8 @@ import {
   useDeleteContentPageMutation,
   useGetAllContentPagesQuery,
   useUpdateContentPageMutation,
-  useUploadCmsImageMutation
+  useUploadCmsImageMutation,
+  useHardDeleteContentPageMutation,
 } from '@/lib/api/endpoints/cmsApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
@@ -56,6 +57,7 @@ export default function CmsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<ContentPageType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<ContentPageStatus | 'all'>('all');
+  const [showArchived, setShowArchived] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadImage, { isLoading: isUploadingImage }] = useUploadCmsImageMutation();
@@ -92,12 +94,13 @@ export default function CmsPage() {
     type: tabToType !== 'all' ? tabToType : (typeFilter !== 'all' ? typeFilter : undefined),
     status: statusFilter !== 'all' ? statusFilter : undefined,
     search: debouncedSearch || undefined,
-    isActive: true,
+    isActive: showArchived ? undefined : true,
   });
 
   const [createPage, { isLoading: isCreating }] = useCreateContentPageMutation();
   const [updatePage, { isLoading: isUpdating }] = useUpdateContentPageMutation();
   const [deletePage, { isLoading: isDeleting }] = useDeleteContentPageMutation();
+  const [hardDeletePage] = useHardDeleteContentPageMutation();
 
   const pages = useMemo(() => {
     if (!pagesData) return [];
@@ -182,6 +185,30 @@ export default function CmsPage() {
       refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to delete content page');
+    }
+  };
+
+  const handleRestore = async (page: ContentPage) => {
+    try {
+      await updatePage({
+        id: page._id,
+        data: { isActive: true, status: ContentPageStatus.DRAFT },
+      } as any).unwrap();
+      toast.success('Page restored');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to restore page');
+    }
+  };
+
+  const handleHardDelete = async (id: string) => {
+    if (!confirm('This will permanently delete the page. This cannot be undone. Continue?')) return;
+    try {
+      await hardDeletePage(id).unwrap();
+      toast.success('Page permanently deleted');
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to permanently delete page');
     }
   };
 
@@ -301,8 +328,30 @@ export default function CmsPage() {
             title="Delete"
             disabled={isDeleting}
           >
-            <TrashIcon className="w-5 h-5" />
+            {isDeleting ? (
+              <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <TrashIcon className="w-5 h-5" />
+            )}
           </button>
+          {row.isActive === false && (
+            <>
+              <button
+                onClick={() => handleRestore(row)}
+                className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                title="Restore"
+              >
+                <CheckCircleIcon className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => handleHardDelete(row.id || row._id)}
+                className="p-2 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                title="Permanently Delete"
+              >
+                <TrashIcon className="w-5 h-5" />
+              </button>
+            </>
+          )}
         </div>
       ),
     },
@@ -402,6 +451,17 @@ export default function CmsPage() {
                 { value: ContentPageStatus.ARCHIVED, label: 'Archived' },
               ]}
             />
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+                className="w-4 h-4 text-primary-600 rounded"
+              />
+              Show archived/deleted items
+            </label>
           </div>
         </CardContent>
       </Card>
@@ -602,6 +662,23 @@ export default function CmsPage() {
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Type
+              </label>
+              <Select
+                value={formData.type}
+                onChange={(value) => setFormData({ ...formData, type: value as ContentPageType })}
+                options={[
+                  { value: ContentPageType.PAGE, label: 'Page' },
+                  { value: ContentPageType.BLOG, label: 'Blog' },
+                  { value: ContentPageType.CAREER, label: 'Career' },
+                  { value: ContentPageType.LANDING_SECTION, label: 'Landing Section' },
+                ]}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Status
