@@ -268,8 +268,8 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || [];
       },
     }),
-    trackOrder: builder.query<any, string>({
-      query: (orderId) => `/public/orders/${orderId}/track`,
+    trackOrder: builder.query<any, { orderId: string; companySlug: string; branchSlug: string }>({
+      query: ({ orderId, companySlug, branchSlug }) => `/public/companies/${companySlug}/branches/${branchSlug}/orders/${orderId}/track`,
       transformResponse: (response: any) => {
         return response.data || response;
       },

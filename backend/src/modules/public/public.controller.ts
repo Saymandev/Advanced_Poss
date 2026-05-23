@@ -383,10 +383,18 @@ export class PublicController {
     return this.publicService.getGallery(companyId);
   }
   @Public()
-  @Get('orders/:orderId/track')
-  @ApiOperation({ summary: 'Track order by ID (public)' })
-  async trackOrder(@Param('orderId') orderId: string) {
-    return this.publicService.getOrderById(orderId);
+  @Get('companies/:companySlug/branches/:branchSlug/orders/:orderId/track')
+  @ApiOperation({ summary: 'Track order by ID (public, scoped to branch)' })
+  async trackOrder(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Param('orderId') orderId: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    return this.publicService.getOrderById(orderId, companyId, branchId);
   }
   @Public()
   @Get('companies/:companySlug/branches/:branchSlug/delivery-zones')

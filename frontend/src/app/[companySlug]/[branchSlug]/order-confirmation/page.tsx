@@ -50,7 +50,7 @@ export default function OrderConfirmationPage() {
   const { 
     data: orderData,
     isLoading: isOrderLoading,
-  } = useTrackOrderQuery(orderId, {
+  } = useTrackOrderQuery({ orderId, companySlug, branchSlug }, {
     skip: !orderId || orderId === 'pending',
   });
 

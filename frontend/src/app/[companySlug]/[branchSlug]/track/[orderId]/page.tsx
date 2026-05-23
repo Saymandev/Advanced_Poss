@@ -34,7 +34,7 @@ export default function OrderTrackingPage() {
     isError: orderError,
     error: orderErrorData,
     refetch: refetchOrder
-  } = useTrackOrderQuery(orderId, {
+  } = useTrackOrderQuery({ orderId, companySlug, branchSlug }, {
     skip: !orderId,
     // WebSocket handles real-time updates, API call is for initial load and fallback
   });

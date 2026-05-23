@@ -97,7 +97,12 @@ export class PublicService {
         orderData.items.map(async (item: any) => {
           const menuItem = await this.menuItemsService.findOne(item.menuItemId);
           
-          let unitPrice = item.price || menuItem.price;
+          if (!menuItem.isAvailable) {
+            throw new BadRequestException(`${menuItem.name} is currently unavailable`);
+          }
+
+          // Always use server-side price. Client-supplied price is ignored for security.
+          const unitPrice = menuItem.price;
           const totalPrice = unitPrice * item.quantity;
 
           return {
@@ -367,15 +372,16 @@ export class PublicService {
     }
   }
 
-  async getOrderById(orderIdOrNumber: string) {
+  async getOrderById(orderIdOrNumber: string, companyId?: string, branchId?: string) {
     try {
-      // Try to find by MongoDB _id first
       let order = null;
+      const scopeFilter: any = {};
+      if (companyId) scopeFilter.companyId = companyId;
+      if (branchId) scopeFilter.branchId = branchId;
       
-      // Check if it's a valid MongoDB ObjectId format
       if (Types.ObjectId.isValid(orderIdOrNumber) && orderIdOrNumber.length === 24) {
         order = await this.orderModel
-          .findById(orderIdOrNumber)
+          .findOne({ _id: orderIdOrNumber, ...scopeFilter })
           .populate('companyId', 'name phone email slug')
           .populate('branchId', 'name address phone slug')
           .populate('customerId', 'firstName lastName phone email')
@@ -385,7 +391,7 @@ export class PublicService {
       // If not found by ID, try searching by orderNumber
       if (!order) {
         order = await this.orderModel
-          .findOne({ orderNumber: orderIdOrNumber })
+          .findOne({ orderNumber: orderIdOrNumber, ...scopeFilter })
           .populate('companyId', 'name phone email slug')
           .populate('branchId', 'name address phone slug')
           .populate('customerId', 'firstName lastName phone email')

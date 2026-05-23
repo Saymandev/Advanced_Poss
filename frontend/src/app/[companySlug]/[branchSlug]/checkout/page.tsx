@@ -278,8 +278,6 @@ export default function CheckoutPage() {
     if (selectedZone.freeDeliveryAbove && subtotal >= selectedZone.freeDeliveryAbove) {
       deliveryFee = 0;
     }
-    // Fallback fee if no zone detected (only if zones have finished loading)
-    deliveryFee = 50;
   } else if (formData.deliveryType === 'dining') {
     deliveryFee = 0;
   }
