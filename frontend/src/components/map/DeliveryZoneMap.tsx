@@ -1,7 +1,9 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import type { LatLng, Map as LeafletMap } from 'leaflet';
+import { searchAddress, GeocodingResult } from './geocoding';
+import { useMap } from 'react-leaflet';
+import L from 'leaflet';
 
 const MapComponent = dynamic(() => import('./MapComponent'), { ssr: false });
 const PolygonEditor = dynamic(() => import('./PolygonEditor'), { ssr: false });
@@ -31,6 +33,9 @@ export default function DeliveryZoneMap({
   const [coordinates, setCoordinates] = useState<number[][]>(initialCoordinates || []);
   const [center, setCenter] = useState<[number, number]>(initialCenter || [23.8103, 90.4125]);
   const [radius, setRadius] = useState<number>(initialRadius || 1000);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<GeocodingResult[]>([]);
+  const mapRef = useRef<L.Map | null>(null);
 
   const handleCoordinatesChange = useCallback((coords: number[][]) => {
     setCoordinates(coords);

@@ -555,7 +555,7 @@ export default function DeliveriesPage() {
           setZoneCoverage({});
         }}
         title={editingZone ? "Edit Delivery Zone" : "Create Delivery Zone"}
-        size="md"
+        size="lg"
       >
         <div className="space-y-4">
           <div>
