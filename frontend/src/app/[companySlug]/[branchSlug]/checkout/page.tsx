@@ -68,6 +68,8 @@ export default function CheckoutPage() {
     paymentMethod: 'cash', // cash or card
     specialInstructions: '',
     tableNumber: '',
+    lat: undefined as number | undefined,
+    lng: undefined as number | undefined,
   });
 
   const [qrTableNumber, setQrTableNumber] = useState<string | null>(null);
@@ -222,6 +224,8 @@ export default function CheckoutPage() {
           street: formData.address.trim(),
           city: formData.city.trim() || undefined,
           zipCode: formData.zipCode.trim() || undefined,
+          lat: formData.lat,
+          lng: formData.lng,
         } : undefined,
         deliveryType: formData.deliveryType,
         tableNumber: formData.tableNumber || undefined,
@@ -574,6 +578,8 @@ export default function CheckoutPage() {
                               address: parts[0]?.trim() || formData.address,
                               city: parts[1]?.trim() || parts[2]?.trim() || formData.city,
                               zipCode: parts.find((p: string) => /\d{4,}/.test(p))?.trim() || formData.zipCode,
+                              lat: data.lat,
+                              lng: data.lng,
                             });
                           }}
                         />

@@ -70,17 +70,45 @@ export class DeliveryZonesService {
       zipCode?: string;
       city?: string;
       street?: string;
+      lat?: number;
+      lng?: number;
     },
   ): Promise<DeliveryZone | null> {
-    // First, try to find by zip code
+    const branchFilter = branchId ? { branchId: new Types.ObjectId(branchId) } : {};
+
+    // If coordinates are provided, check polygon/radius coverage first
+    if (address.lat !== undefined && address.lng !== undefined) {
+      const zones = await this.zoneModel.find({
+        companyId: new Types.ObjectId(companyId),
+        ...branchFilter,
+        isActive: true,
+        'coverageArea.coordinates': { $exists: true, $ne: [] },
+      });
+
+      for (const zone of zones) {
+        const coverage = zone.coverageArea;
+        if (coverage?.type === 'polygon' && coverage.coordinates) {
+          if (isPointInPolygon(address.lat, address.lng, coverage.coordinates)) {
+            return zone;
+          }
+        } else if (coverage?.type === 'radius' && coverage.coordinates?.length) {
+          const center = coverage.coordinates[0];
+          const dist = getDistance(address.lat, address.lng, center[0], center[1]);
+          if (dist <= (coverage.radius || 1000)) {
+            return zone;
+          }
+        }
+      }
+    }
+
+    // Try to find by zip code
     if (address.zipCode) {
       const zone = await this.zoneModel.findOne({
         companyId: new Types.ObjectId(companyId),
-        branchId: branchId ? new Types.ObjectId(branchId) : { $exists: true },
+        ...branchFilter,
         isActive: true,
         'deliveryAreas.zipCodes': address.zipCode,
       });
-
       if (zone) return zone;
     }
 
@@ -88,14 +116,13 @@ export class DeliveryZonesService {
     if (address.city) {
       const zone = await this.zoneModel.findOne({
         companyId: new Types.ObjectId(companyId),
-        branchId: branchId ? new Types.ObjectId(branchId) : { $exists: true },
+        ...branchFilter,
         isActive: true,
         $or: [
           { 'deliveryAreas.neighborhoods': { $in: [address.city] } },
           { areas: { $in: [address.city] } },
         ],
       });
-
       if (zone) return zone;
     }
 
@@ -103,7 +130,7 @@ export class DeliveryZonesService {
     const defaultZone = await this.zoneModel
       .findOne({
         companyId: new Types.ObjectId(companyId),
-        branchId: branchId ? new Types.ObjectId(branchId) : { $exists: true },
+        ...branchFilter,
         isActive: true,
       })
       .sort({ deliveryCharge: 1, sortOrder: 1 })
@@ -145,5 +172,28 @@ export class DeliveryZonesService {
       throw new NotFoundException('Delivery zone not found');
     }
   }
+}
+
+function isPointInPolygon(lat: number, lng: number, polygon: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][1], yi = polygon[i][0];
+    const xj = polygon[j][1], yj = polygon[j][0];
+    const intersect = ((yi > lng) !== (yj > lng)) &&
+      (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
