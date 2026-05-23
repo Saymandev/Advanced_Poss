@@ -15,7 +15,7 @@ export interface Notification {
 export interface UseNotificationsReturn {
   notifications: Notification[];
   unreadCount: number;
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'> & { id?: string }) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearNotification: (id: string) => void;
@@ -86,10 +86,26 @@ export const useNotifications = (): UseNotificationsReturn => {
     };
   }, []);
 
-  const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+  const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'> & { id?: string }) => {
+    const incomingId = notification.id || (notification as any)._id;
+    if (incomingId) {
+      const exists = globalNotifications.find(n => n.id === incomingId);
+      if (exists) return;
+    }
+
+    // Deduplicate by content within last 5 seconds
+    const now = Date.now();
+    const duplicate = globalNotifications.find(n =>
+      n.title === notification.title &&
+      n.message === notification.message &&
+      n.type === notification.type &&
+      (now - n.timestamp.getTime()) < 5000
+    );
+    if (duplicate) return;
+
     const newNotification: Notification = {
       ...notification,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: incomingId || Date.now().toString() + Math.random().toString(36).substr(2, 9),
       timestamp: new Date(),
       read: false,
     };

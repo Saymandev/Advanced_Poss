@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { WebsocketsGateway } from '../websockets/websockets.gateway';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { Notification, NotificationDocument } from './schemas/notification.schema';
 
@@ -12,7 +11,6 @@ export class NotificationsService {
   constructor(
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<NotificationDocument>,
-    private readonly websocketsGateway: WebsocketsGateway,
   ) {}
 
   private normalizeRoles(roles?: string[]) {
@@ -29,21 +27,6 @@ export class NotificationsService {
       createdBy: dto.createdBy ? new Types.ObjectId(dto.createdBy) : undefined,
     });
     const saved = await doc.save();
-
-    // Broadcast via WebSocket
-    try {
-      this.websocketsGateway.emitScopedNotification({
-        companyId: dto.companyId,
-        branchId: dto.branchId,
-        roles: this.normalizeRoles(dto.roles),
-        features: dto.features || [],
-        userIds: dto.userIds || [],
-        payload: saved.toJSON(),
-      });
-    } catch (err) {
-      this.logger.warn(`Failed to emit notification: ${err?.message || err}`);
-    }
-
     return saved;
   }
 
