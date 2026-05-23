@@ -628,9 +628,10 @@ export class POSService {
               const customerForStats = customer || await this.customersService.findOne(createOrderDto.customerId);
               if (customerForStats) {
                 await this.customersService.updateOrderStats(customerForStats._id.toString(), savedOrder.totalAmount);
-                }
+                await this.customersService.addLoyaltyPoints(customerForStats._id.toString(), Math.floor(savedOrder.totalAmount));
+              }
             } catch (customerError) {
-              console.error('❌ Failed to update customer statistics:', customerError);
+              console.error('Failed to update customer stats:', customerError);
             }
           } else if (createOrderDto.customerInfo?.email && companyId) {
             try {
@@ -1296,9 +1297,9 @@ export class POSService {
           }
         }
         // Update customer statistics and award points
-        // Award points based on the correct total field (total for public, totalAmount for POS)
         const totalToAccrue = isPublic ? (order.total || 0) : (order.totalAmount || 0);
         await this.customersService.updateOrderStats(customerId, totalToAccrue);
+        await this.customersService.addLoyaltyPoints(customerId, Math.floor(totalToAccrue));
         } catch (customerError) {
         console.error('❌ Failed to update customer statistics:', customerError);
       }
