@@ -53,6 +53,7 @@ export default function CmsPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedPage, setSelectedPage] = useState<ContentPage | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<ContentPageType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<ContentPageStatus | 'all'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,10 +83,16 @@ export default function CmsPage() {
     return 'all';
   }, [activeTab]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const { data: pagesData, isLoading, refetch } = useGetAllContentPagesQuery({
     type: tabToType !== 'all' ? tabToType : (typeFilter !== 'all' ? typeFilter : undefined),
     status: statusFilter !== 'all' ? statusFilter : undefined,
-    search: searchQuery || undefined,
+    search: debouncedSearch || undefined,
+    isActive: true,
   });
 
   const [createPage, { isLoading: isCreating }] = useCreateContentPageMutation();
@@ -148,6 +155,10 @@ export default function CmsPage() {
 
   const handleEdit = async () => {
     if (!selectedPage) return;
+    if (!formData.title || !formData.slug) {
+      toast.error('Please fill in required fields');
+      return;
+    }
     try {
       await updatePage({
         id: selectedPage._id,
@@ -285,7 +296,7 @@ export default function CmsPage() {
             <PencilIcon className="w-5 h-5" />
           </button>
           <button
-            onClick={() => handleDelete(row._id)}
+            onClick={() => handleDelete(row.id || row._id)}
             className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             title="Delete"
             disabled={isDeleting}
@@ -408,7 +419,7 @@ export default function CmsPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
           ) : (
-            <DataTable data={pages} columns={columns} />
+            <DataTable data={pages} columns={columns} searchable={false} />
           )}
         </CardContent>
       </Card>
