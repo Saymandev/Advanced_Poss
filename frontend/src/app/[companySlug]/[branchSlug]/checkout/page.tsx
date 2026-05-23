@@ -16,6 +16,9 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
+
+const AddressMap = dynamic(() => import('@/components/map/AddressMap'), { ssr: false });
 
 interface CartItem {
   id: string;
@@ -85,6 +88,7 @@ export default function CheckoutPage() {
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isLoadingCart, setIsLoadingCart] = useState(true);
+  const [showAddressMap, setShowAddressMap] = useState(false);
 
   useEffect(() => {
     if (companyError) {
@@ -547,7 +551,34 @@ export default function CheckoutPage() {
                           />
                         </div>
                       </div>
-                      
+
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressMap(!showAddressMap)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-primary-600 hover:text-primary-500 border border-dashed border-primary-300 dark:border-primary-800 rounded-lg transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {showAddressMap ? 'Hide Map' : 'Locate on Map'}
+                      </button>
+
+                      {showAddressMap && (
+                        <AddressMap
+                          height="250px"
+                          onChange={(data) => {
+                            const parts = data.address.split(',');
+                            setFormData({
+                              ...formData,
+                              address: parts[0]?.trim() || formData.address,
+                              city: parts[1]?.trim() || parts[2]?.trim() || formData.city,
+                              zipCode: parts.find((p: string) => /\d{4,}/.test(p))?.trim() || formData.zipCode,
+                            });
+                          }}
+                        />
+                      )}
+
                       {/* Zone Selection/Display */}
                       {zones && zones.length > 0 && (
                         <div>
