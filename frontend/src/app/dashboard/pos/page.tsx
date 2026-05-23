@@ -538,6 +538,18 @@ export default function POSPage() {
   const requiresRoomBooking = orderType === 'room-booking';
   const requiresRoomService = orderType === 'room-service';
   const orderTypeLabel = ORDER_TYPE_OPTIONS.find(option => option.value === orderType)?.label ?? 'Dine-In';
+
+  // Sync delivery details to customer info when delivery form is filled
+  useEffect(() => {
+    if (!requiresDeliveryDetails) return;
+    if ((!customerInfo.name || !customerInfo.phone) && (deliveryDetails.contactName || deliveryDetails.contactPhone)) {
+      setCustomerInfo(prev => ({
+        ...prev,
+        name: prev.name || deliveryDetails.contactName,
+        phone: prev.phone || deliveryDetails.contactPhone,
+      }));
+    }
+  }, [deliveryDetails.contactName, deliveryDetails.contactPhone, requiresDeliveryDetails]);
   const activeOrderTypeOption = useMemo(() => ORDER_TYPE_OPTIONS.find(option => option.value === orderType), [orderType, ORDER_TYPE_OPTIONS]);
   const ActiveOrderIcon = activeOrderTypeOption?.icon ?? HomeModernIcon;
   // Room booking queries
@@ -1381,6 +1393,12 @@ export default function POSPage() {
       email,
     });
     setSelectedCustomerId(customer.id || customer._id || '');
+    // Also sync to delivery details for delivery orders
+    setDeliveryDetails(prev => ({
+      ...prev,
+      contactName: prev.contactName || composedName,
+      contactPhone: prev.contactPhone || phone,
+    }));
     setIsCustomerLookupOpen(false);
     toast.success(`Linked customer ${composedName}`);
   }, []);
@@ -3353,33 +3371,6 @@ export default function POSPage() {
           </div>
         )}
                       </div>
-                      <button
-                        onClick={() => setShowDeliveryMap(!showDeliveryMap)}
-                        className="w-full flex items-center justify-center gap-2 py-2 text-[10px] font-bold text-sky-600 hover:text-sky-500 uppercase tracking-wider border border-dashed border-sky-300 dark:border-sky-800 rounded-xl transition-colors"
-                      >
-                        <MapPinIcon className="h-3.5 w-3.5" />
-                        {showDeliveryMap ? 'Hide Map' : 'Locate on Map'}
-                      </button>
-                      {showDeliveryMap && (
-                        <div className="space-y-2">
-                          <AddressMap
-                            height="200px"
-                            onChange={(data) => {
-                              const parts = data.address.split(',');
-                              const road = parts[0]?.trim() || '';
-                              const cityPart = parts[1]?.trim() || parts[2]?.trim() || '';
-                              const postalPart = parts.find((p: string) => /\d{4,}/.test(p))?.trim() || '';
-                              setDeliveryDetails({
-                                ...deliveryDetails,
-                                addressLine1: road || deliveryDetails.addressLine1,
-                                city: cityPart || deliveryDetails.city,
-                                postalCode: postalPart || deliveryDetails.postalCode,
-                                state: parts.find((p: string) => !/\d/.test(p?.trim()) && p?.trim() !== road && p?.trim() !== cityPart)?.trim() || '',
-                              });
-                            }}
-                          />
-                        </div>
-                      )}
                     </div>
   );
 
@@ -3722,6 +3713,34 @@ export default function POSPage() {
                           className="w-full h-16 rounded-xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 p-3 text-xs outline-none focus:border-sky-500/50 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500/10 transition-all resize-none"
                         />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDeliveryMap(!showDeliveryMap)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold text-sky-600 hover:text-sky-500 uppercase tracking-wider border border-dashed border-sky-300 dark:border-sky-800 rounded-xl transition-colors"
+                      >
+                        <MapPinIcon className="h-3.5 w-3.5" />
+                        {showDeliveryMap ? 'Hide Map' : 'Locate on Map'}
+                      </button>
+                      {showDeliveryMap && (
+                        <div className="space-y-2">
+                          <AddressMap
+                            height="200px"
+                            onChange={(data) => {
+                              const parts = data.address.split(',');
+                              const road = parts[0]?.trim() || '';
+                              const cityPart = parts[1]?.trim() || parts[2]?.trim() || '';
+                              const postalPart = parts.find((p: string) => /\d{4,}/.test(p))?.trim() || '';
+                              setDeliveryDetails({
+                                ...deliveryDetails,
+                                addressLine1: road || deliveryDetails.addressLine1,
+                                city: cityPart || deliveryDetails.city,
+                                postalCode: postalPart || deliveryDetails.postalCode,
+                                state: parts.find((p: string) => !/\d/.test(p?.trim()) && p?.trim() !== road && p?.trim() !== cityPart)?.trim() || '',
+                              });
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   ) : requiresTakeawayDetails ? (
                     <div className="space-y-4">
