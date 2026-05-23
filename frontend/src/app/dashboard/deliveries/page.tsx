@@ -21,6 +21,9 @@ import { formatDateTime } from '@/lib/utils';
 import { TruckIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
+
+const DeliveryZoneMap = dynamic(() => import('@/components/map/DeliveryZoneMap'), { ssr: false });
 
 const DELIVERY_STATUS_OPTIONS: { value: DeliveryStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
@@ -49,6 +52,12 @@ export default function DeliveriesPage() {
     minimumOrderAmount: '',
     freeDeliveryAbove: '',
   });
+  const [zoneCoverage, setZoneCoverage] = useState<{
+    coordinates?: number[][];
+    radius?: number;
+    center?: [number, number];
+    type?: 'polygon' | 'radius';
+  }>({});
 
   const { data: staffData } = useGetStaffQuery({ branchId: user?.branchId || '' }, { skip: !user?.branchId });
   const { data: deliveryOrders = [], isLoading, refetch } = useGetDeliveryOrdersQuery(
@@ -141,6 +150,9 @@ export default function DeliveriesPage() {
       toast.error('Delivery charge must be a positive number');
       return;
     }
+    const coverageData = zoneCoverage.coordinates?.length
+      ? { coverageArea: { type: zoneCoverage.type || 'polygon', coordinates: zoneCoverage.coordinates, radius: zoneCoverage.radius } as any }
+      : {};
 
     try {
       if (editingZone) {
@@ -156,6 +168,7 @@ export default function DeliveriesPage() {
             freeDeliveryAbove: zoneForm.freeDeliveryAbove
               ? parseFloat(zoneForm.freeDeliveryAbove)
               : undefined,
+            ...coverageData,
           },
         }).unwrap();
         toast.success('Delivery zone updated');
@@ -172,20 +185,16 @@ export default function DeliveriesPage() {
           freeDeliveryAbove: zoneForm.freeDeliveryAbove
             ? parseFloat(zoneForm.freeDeliveryAbove)
             : undefined,
-        }).unwrap();
+          ...coverageData,
+        } as any).unwrap();
         toast.success('Delivery zone created');
       }
 
       await refetchZones();
       setIsZoneModalOpen(false);
       setEditingZone(null);
-      setZoneForm({
-        name: '',
-        description: '',
-        deliveryCharge: '',
-        minimumOrderAmount: '',
-        freeDeliveryAbove: '',
-      });
+      setZoneForm({ name: '', description: '', deliveryCharge: '', minimumOrderAmount: '', freeDeliveryAbove: '' });
+      setZoneCoverage({});
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to save delivery zone');
     }
@@ -498,6 +507,12 @@ export default function DeliveriesPage() {
                           minimumOrderAmount: zone.minimumOrderAmount?.toString() || '',
                           freeDeliveryAbove: zone.freeDeliveryAbove?.toString() || '',
                         });
+                        setZoneCoverage(zone.coverageArea ? {
+                          coordinates: zone.coverageArea.coordinates,
+                          radius: zone.coverageArea.radius,
+                          center: zone.coverageArea.coordinates?.[0] ? [zone.coverageArea.coordinates[0][0], zone.coverageArea.coordinates[0][1]] as [number, number] : undefined,
+                          type: zone.coverageArea.type || 'polygon',
+                        } : {});
                         setIsZoneModalOpen(true);
                       }}
                       className="text-xs sm:text-sm"
@@ -536,13 +551,8 @@ export default function DeliveriesPage() {
         onClose={() => {
           setIsZoneModalOpen(false);
           setEditingZone(null);
-          setZoneForm({
-            name: '',
-            description: '',
-            deliveryCharge: '',
-            minimumOrderAmount: '',
-            freeDeliveryAbove: '',
-          });
+          setZoneForm({ name: '', description: '', deliveryCharge: '', minimumOrderAmount: '', freeDeliveryAbove: '' });
+          setZoneCoverage({});
         }}
         title={editingZone ? "Edit Delivery Zone" : "Create Delivery Zone"}
         size="md"
@@ -613,19 +623,28 @@ export default function DeliveriesPage() {
             </div>
           </div>
 
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Coverage Area (Map)
+            </label>
+            <DeliveryZoneMap
+              initialCoordinates={zoneCoverage.coordinates}
+              initialRadius={zoneCoverage.radius}
+              initialCenter={zoneCoverage.center}
+              mode={zoneCoverage.type || 'polygon'}
+              onChange={(data) => setZoneCoverage({ ...zoneCoverage, ...data, type: zoneCoverage.type || 'polygon' })}
+              height="350px"
+            />
+          </div>
+
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               variant="ghost"
               onClick={() => {
                 setIsZoneModalOpen(false);
                 setEditingZone(null);
-                setZoneForm({
-                  name: '',
-                  description: '',
-                  deliveryCharge: '',
-                  minimumOrderAmount: '',
-                  freeDeliveryAbove: '',
-                });
+                setZoneForm({ name: '', description: '', deliveryCharge: '', minimumOrderAmount: '', freeDeliveryAbove: '' });
+                setZoneCoverage({});
               }}
               className="w-full sm:w-auto text-sm sm:text-base"
             >

@@ -9,6 +9,11 @@ export interface DeliveryZone {
   freeDeliveryAbove?: number;
   areas?: string[];
   isActive: boolean;
+  coverageArea?: {
+    type: 'polygon' | 'radius';
+    coordinates?: number[][];
+    radius?: number;
+  };
 }
 
 export const deliveryZonesApi = apiSlice.injectEndpoints({
