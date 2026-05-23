@@ -11,6 +11,7 @@ import { FEATURES } from '../../../common/constants/features.constants';
 export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
   pos: [
     FEATURES.ORDER_MANAGEMENT,
+    FEATURES.DELIVERY_MANAGEMENT,
     FEATURES.TABLE_MANAGEMENT,
     FEATURES.KITCHEN_DISPLAY,
     FEATURES.CUSTOMER_DISPLAY,
@@ -22,6 +23,7 @@ export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
     FEATURES.INVENTORY,
     FEATURES.SUPPLIERS,
     FEATURES.PURCHASE_ORDERS,
+    FEATURES.WASTAGE_MANAGEMENT,
   ],
   crm: [
     FEATURES.CUSTOMER_MANAGEMENT,
@@ -47,6 +49,7 @@ export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
     FEATURES.STAFF_MANAGEMENT,
     FEATURES.ROLE_MANAGEMENT,
     FEATURES.ATTENDANCE,
+    FEATURES.SCHEDULE,
   ],
   hotel: [
     FEATURES.ROOM_MANAGEMENT,
@@ -195,6 +198,7 @@ export function getFeaturesByCategory() {
       { key: FEATURES.STAFF_MANAGEMENT, name: 'Staff Management' },
       { key: FEATURES.ATTENDANCE, name: 'Employee Attendance' },
       { key: FEATURES.ROLE_MANAGEMENT, name: 'Advanced Role Access' },
+      { key: FEATURES.SCHEDULE, name: 'Staff Scheduling' },
     ],
     System: [
       { key: FEATURES.DASHBOARD, name: 'Live Dashboard' },

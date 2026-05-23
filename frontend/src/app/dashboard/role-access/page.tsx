@@ -37,15 +37,15 @@ interface RoleAccess {
 }
 
 // Categories allowed per role (drives dynamic feature assignment)
+// MUST match backend getFeaturesByCategory() categories in plan-features.helper.ts
 const ROLE_CATEGORY_MAP: Partial<Record<UserRole, string[] | 'all'>> = {
   [UserRole.SUPER_ADMIN]: 'all',
   [UserRole.OWNER]: 'all',
-  [UserRole.MANAGER]: ['Overview', 'Staff', 'Menu', 'Orders', 'Customers', 'Inventory', 'Financial', 'Hotel'],
-  [UserRole.CHEF]: ['Overview', 'Menu', 'Orders', 'Inventory'],
-  [UserRole.COOK]: ['Overview', 'Orders', 'Inventory'],
-  [UserRole.WAITER]: ['Overview', 'Orders', 'Customers'],
-  [UserRole.CASHIER]: ['Overview', 'Orders', 'Customers', 'Financial'],
-  // Fallback roles map to no categories unless defined
+  [UserRole.MANAGER]: ['Sales & POS', 'Staffing', 'Kitchen & Menu', 'Customer & Marketing', 'Inventory', 'Financial', 'AI Features', 'System', 'Hospitality'],
+  [UserRole.CHEF]: ['Sales & POS', 'Kitchen & Menu', 'Inventory', 'System'],
+  [UserRole.COOK]: ['Sales & POS', 'Inventory', 'System'],
+  [UserRole.WAITER]: ['Sales & POS', 'Customer & Marketing', 'System'],
+  [UserRole.CASHIER]: ['Sales & POS', 'Customer & Marketing', 'Financial', 'System'],
 };
 
 export default function RoleAccessPage() {

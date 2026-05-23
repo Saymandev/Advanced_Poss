@@ -77,7 +77,7 @@ const ROUTE_FEATURE_MAP: Record<string, string[]> = {
   '/dashboard/incomes': ['income'],
   '/dashboard/accounting': ['accounting'],
   '/dashboard/role-access': ['role-management'],
-  '/dashboard/company-subscriptions': ['subscriptions'],
+  '/dashboard/company-subscriptions': ['settings'],
   '/dashboard/company-features': ['settings'],
   '/dashboard/subscription-features': ['settings'],
   '/dashboard/subscription-payment-methods': ['settings'],

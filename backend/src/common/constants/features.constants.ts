@@ -82,7 +82,7 @@ export const ALL_FEATURES = Object.values(FEATURES);
  */
 export const FEATURE_CATEGORIES = {
   OVERVIEW: ['dashboard', 'reports'],
-  STAFF: ['staff-management', 'role-management', 'attendance'],
+  STAFF: ['staff-management', 'role-management', 'attendance', 'schedule'],
   MENU: ['menu-management', 'categories', 'qr-menus'],
   ORDERS: [
     'order-management',
@@ -98,7 +98,7 @@ export const FEATURE_CATEGORIES = {
   AI_FEATURES: ['ai-menu-optimization', 'ai-customer-loyalty', 'ai-insights'],
   INVENTORY: ['inventory', 'suppliers', 'purchase-orders', 'wastage-management'],
   FINANCIAL: ['expenses', 'income', 'accounting', 'work-periods'],
-  SYSTEM: ['settings', 'branches', 'notifications'],
+  SYSTEM: ['settings', 'branches', 'notifications', 'cms'],
   HOTEL: ['room-management', 'booking-management'],
 } as const;
 
