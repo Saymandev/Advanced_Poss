@@ -4745,7 +4745,7 @@ export default function POSPage() {
       >
         <div className="space-y-3">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Click a shortcut to rebind — then press your desired key. Changes save automatically.
+            <span className="font-bold text-amber-600">How to rebind:</span> Click any key badge below → press your desired key on the keyboard.
           </p>
           {([
             { key: 'toggleQueue', label: 'Toggle Orders Queue', shortcut: shortcuts.toggleQueue },
@@ -4764,12 +4764,14 @@ export default function POSPage() {
                     document.removeEventListener('keydown', handler);
                   };
                   document.addEventListener('keydown', handler);
-                  toast.success(`Press a key for "${label}"...`, { duration: 2000 });
+                  toast.success(`Press any key for "${label}"`, { duration: 3000, icon: '⌨' });
                 }}
-                className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono font-bold hover:bg-blue-100 dark:hover:bg-blue-900/30 cursor-pointer min-w-[60px] text-center transition-colors"
-                title="Click to rebind"
+                className="group px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono font-bold hover:bg-amber-100 dark:hover:bg-amber-900/30 cursor-pointer min-w-[60px] text-center transition-colors border border-transparent hover:border-amber-400"
+                title="Click then press a key to rebind"
               >
-                {shortcuts[key as keyof typeof shortcuts]}
+                <span className="group-hover:hidden">{shortcuts[key as keyof typeof shortcuts]}</span>
+                <span className="hidden group-hover:inline text-amber-600 text-[10px]">✎ Set</span>
+              </button>
               </button>
             </div>
           ))}
