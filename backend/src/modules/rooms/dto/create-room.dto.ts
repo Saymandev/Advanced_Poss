@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
     IsArray,
     IsBoolean,
-    IsEnum,
     IsNotEmpty,
     IsNumber,
     IsOptional,
@@ -21,8 +20,8 @@ export class CreateRoomDto {
   @IsNotEmpty()
   roomNumber: string;
 
-  @ApiProperty({ example: 'double', enum: ['single', 'double', 'suite', 'deluxe', 'presidential'] })
-  @IsEnum(['single', 'double', 'suite', 'deluxe', 'presidential'])
+  @ApiProperty({ example: 'double' })
+  @IsString()
   @IsNotEmpty()
   roomType: string;
 
