@@ -8,7 +8,8 @@ import {
   useCreatePublicOrderMutation,
   useFindDeliveryZoneMutation,
   useGetBranchZonesQuery,
-  useGetCompanyBySlugQuery
+  useGetCompanyBySlugQuery,
+  useGetCompanySettingsQuery,
 } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeftIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
@@ -41,6 +42,13 @@ export default function CheckoutPage() {
   } = useGetCompanyBySlugQuery(companySlug, {
     skip: !companySlug,
   });
+
+  const { data: settings } = useGetCompanySettingsQuery(companySlug, {
+    skip: !companySlug,
+  });
+
+  const taxRate = (settings?.taxRate ?? 10) / 100;
+  const currency = settings?.currency || 'USD';
   
   const { 
     data: zones,
@@ -275,7 +283,7 @@ export default function CheckoutPage() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.1;
+  const tax = subtotal * taxRate;
   
   // Calculate delivery fee based on zone
   let deliveryFee = 0;

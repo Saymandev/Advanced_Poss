@@ -143,6 +143,12 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || response;
       },
     }),
+    getCompanySettings: builder.query<{ currency: string; taxRate: number; taxType: string }, string>({
+      query: (companySlug) => `/public/companies/${companySlug}/settings`,
+      transformResponse: (response: any) => {
+        return response.data || response || { currency: 'USD', taxRate: 10, taxType: 'percentage' };
+      },
+    }),
     getBranchBySlug: builder.query<PublicBranch, { companySlug: string; branchSlug: string }>({
       query: ({ companySlug, branchSlug }) => 
         `/public/companies/${companySlug}/branches/${branchSlug}`,
@@ -421,6 +427,7 @@ export const publicApi = apiSlice.injectEndpoints({
 });
 export const {
   useGetCompanyBySlugQuery,
+  useGetCompanySettingsQuery,
   useGetCompanyBranchesQuery,
   useGetBranchBySlugQuery,
   useGetBranchMenuByIdQuery,

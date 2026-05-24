@@ -12,6 +12,7 @@ import { MenuItemsService } from '../menu-items/menu-items.service';
 import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/schemas/order.schema';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { SettingsService } from '../settings/settings.service';
 import { SystemFeedbackService } from '../system-feedback/system-feedback.service';
 import { TablesService } from '../tables/tables.service';
 import { UsersService } from '../users/users.service';
@@ -38,6 +39,7 @@ export class PublicService {
     private companiesService: CompaniesService,
     private systemFeedbackService: SystemFeedbackService,
     private subscriptionsService: SubscriptionsService,
+    private settingsService: SettingsService,
     private branchesService: BranchesService,
     private tablesService: TablesService,
   ) {}
@@ -117,9 +119,19 @@ export class PublicService {
         }),
       );
 
-      // Calculate totals
       const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-      const taxRate = 10; // 10% tax
+
+      // Calculate totals - use company tax settings if available
+      let taxRate = 10;
+      try {
+        const companySettings = await this.settingsService.getCompanySettings(orderData.companyId);
+        if (companySettings) {
+          const taxSetting = (companySettings as any).taxSettings?.[0] || (companySettings as any).taxSetting;
+          if (taxSetting?.rate !== undefined) {
+            taxRate = taxSetting.type === 'fixed' ? 0 : taxSetting.rate;
+          }
+        }
+      } catch { /* use default 10% */ }
       const taxAmount = (subtotal * taxRate) / 100;
       
       // Calculate delivery fee based on zone
@@ -587,6 +599,16 @@ export class PublicService {
 
   async incrementTableScan(branchId: string, tableNumber: string): Promise<void> {
     await this.tablesService.incrementScanCount(branchId, tableNumber);
+  }
+
+  async getCompanySettings(companyId: string) {
+    const settings = await this.settingsService.getCompanySettings(companyId);
+    const taxSetting = (settings as any)?.taxSettings?.[0] || (settings as any)?.taxSetting;
+    return {
+      currency: (settings as any)?.currency || 'USD',
+      taxRate: taxSetting?.rate ?? 10,
+      taxType: taxSetting?.type || 'percentage',
+    };
   }
 }
 

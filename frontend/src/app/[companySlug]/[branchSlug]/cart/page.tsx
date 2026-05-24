@@ -4,6 +4,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { useGetCompanySettingsQuery } from '@/lib/api/endpoints/publicApi';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeftIcon, MinusIcon, PlusIcon, ShoppingCartIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
@@ -30,6 +31,9 @@ export default function CartPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { data: settings } = useGetCompanySettingsQuery(companySlug, { skip: !companySlug });
+  const taxRate = (settings?.taxRate ?? 10) / 100;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -84,7 +88,7 @@ export default function CartPage() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.1; // 10% tax (adjust as needed)
+  const tax = subtotal * taxRate;
   const deliveryFee = 50; // Fixed delivery fee (adjust as needed)
   const total = subtotal + tax + deliveryFee;
 

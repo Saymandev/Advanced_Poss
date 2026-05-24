@@ -382,6 +382,16 @@ export class PublicController {
     const companyId = (company as any)._id?.toString() || (company as any).id;
     return this.publicService.getGallery(companyId);
   }
+
+  @Public()
+  @Get('companies/:companySlug/settings')
+  @ApiOperation({ summary: 'Get company settings - tax rate, currency (public)' })
+  async getCompanySettings(@Param('companySlug') companySlug: string) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    return this.publicService.getCompanySettings(companyId);
+  }
+
   @Public()
   @Get('companies/:companySlug/branches/:branchSlug/orders/:orderId/track')
   @ApiOperation({ summary: 'Track order by ID (public, scoped to branch)' })
