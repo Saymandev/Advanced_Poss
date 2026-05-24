@@ -4232,10 +4232,11 @@ export default function POSPage() {
               size="sm"
               variant="ghost"
               onClick={() => setShowKeyboardShortcuts(true)}
-              className="h-9 w-9 p-0 rounded-lg bg-gray-50 dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800"
-              title={`Shortcuts (Ctrl+/)`}
+              className="h-9 w-auto px-3 gap-1.5 rounded-lg bg-gray-50 dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500"
+              title="Keyboard Shortcuts (Ctrl+/)"
             >
-              <span className="text-xs">⌨</span>
+              <span className="text-sm">⌨</span>
+              Shortcuts
             </Button>
 
             <Button
