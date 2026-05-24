@@ -75,9 +75,13 @@ export const usersApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ['User'],
-      transformResponse: (response: any) => {
-        return response?.data || response;
-      },
+    }),
+    savePreferences: builder.mutation<void, Record<string, any>>({
+      query: (preferences) => ({
+        url: '/users/me/preferences',
+        method: 'PATCH',
+        body: preferences,
+      }),
     }),
     changePassword: builder.mutation<{ message: string }, ChangePasswordRequest>({
       query: (data) => ({
@@ -157,6 +161,7 @@ export const usersApi = apiSlice.injectEndpoints({
 export const {
   useGetProfileQuery,
   useUpdateProfileMutation,
+  useSavePreferencesMutation,
   useChangePasswordMutation,
   useChangePinMutation,
   useAdminUpdatePinMutation,

@@ -100,6 +100,9 @@ export class User {
 
   @Prop({ select: false })
   refreshToken?: string;
+
+  @Prop({ type: Object, default: {} })
+  preferences?: Record<string, any>;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

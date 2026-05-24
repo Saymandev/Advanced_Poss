@@ -98,6 +98,15 @@ export class UsersController {
     return this.usersService.update(userId, updateUserDto);
   }
 
+  @Patch('me/preferences')
+  @ApiOperation({ summary: 'Save user preferences (keyboard shortcuts, etc)' })
+  savePreferences(
+    @CurrentUser('id') userId: string,
+    @Body() preferences: Record<string, any>,
+  ) {
+    return this.usersService.update(userId, { preferences } as any);
+  }
+
   @Patch(':id')
   @RequiresFeature(FEATURES.STAFF_MANAGEMENT)
   @ApiOperation({ summary: 'Update user by ID' })

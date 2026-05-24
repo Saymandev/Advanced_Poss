@@ -36,6 +36,7 @@ import {
 import { useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
 import { useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
+import { useSavePreferencesMutation } from '@/lib/api/endpoints/usersApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { useOfflineSyncManager } from '@/lib/hooks/useOfflineSyncManager';
 import { usePOSOfflinePrefetcher } from '@/lib/hooks/usePOSOfflinePrefetcher';
@@ -419,6 +420,7 @@ export default function POSPage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('pos_shortcuts', JSON.stringify(updated));
     }
+    savePreferences({ shortcuts: updated }).catch(() => {});
   };
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string>('');
@@ -1551,6 +1553,7 @@ export default function POSPage() {
   const [contextMenu, setContextMenu] = useState<{ tableId: string; x: number; y: number } | null>(null);
   const [notifiedTables, setNotifiedTables] = useState<Set<string>>(new Set()); // Track tables we've already notified
   const [updateTableStatus] = useUpdateTableStatusMutation();
+  const [savePreferences] = useSavePreferencesMutation();
   // Show notification for tables paid > 15 minutes using Socket.IO events
   // Instead of polling with setInterval, we listen for payment events and set timeouts
   useEffect(() => {
