@@ -603,17 +603,22 @@ export default function RoomsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Room Type *</label>
-              <Input
-                value={formData.roomType}
-                onChange={(e) => setFormData({ ...formData, roomType: e.target.value })}
-                placeholder="e.g. Single, Double, Suite, Executive, Family..."
-                list="room-type-suggestions"
-              />
-              <datalist id="room-type-suggestions">
-                {uniqueRoomTypes.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select
+                    value={formData.roomType}
+                    onChange={(value) => setFormData({ ...formData, roomType: value })}
+                    options={uniqueRoomTypes.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+                    className="w-full"
+                  />
+                </div>
+                <Input
+                  value={formData.roomType}
+                  onChange={(e) => setFormData({ ...formData, roomType: e.target.value })}
+                  placeholder="Or type new..."
+                  className="flex-1"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Floor</label>
@@ -841,17 +846,22 @@ export default function RoomsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Room Type *</label>
-              <Input
-                value={formData.roomType}
-                onChange={(e) => setFormData({ ...formData, roomType: e.target.value })}
-                placeholder="e.g. Single, Double, Suite, Executive, Family..."
-                list="room-type-suggestions-edit"
-              />
-              <datalist id="room-type-suggestions-edit">
-                {uniqueRoomTypes.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select
+                    value={formData.roomType}
+                    onChange={(value) => setFormData({ ...formData, roomType: value })}
+                    options={uniqueRoomTypes.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+                    className="w-full"
+                  />
+                </div>
+                <Input
+                  value={formData.roomType}
+                  onChange={(e) => setFormData({ ...formData, roomType: e.target.value })}
+                  placeholder="Or type new..."
+                  className="flex-1"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Floor</label>
