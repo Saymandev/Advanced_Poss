@@ -127,6 +127,11 @@ export default function RoomsPage() {
     });
   }, [rooms, searchQuery, statusFilter, roomTypeFilter]);
 
+  const uniqueRoomTypes = useMemo(() => {
+    const types = new Set(rooms.map((r: any) => r.roomType).filter(Boolean));
+    return Array.from(types).sort();
+  }, [rooms]);
+
   const [createRoom, { isLoading: isCreating }] = useCreateRoomMutation();
   const [updateRoom, { isLoading: isUpdating }] = useUpdateRoomMutation();
   const [deleteRoom] = useDeleteRoomMutation();
@@ -553,11 +558,7 @@ export default function RoomsPage() {
               onChange={(value) => setRoomTypeFilter(value)}
               options={[
                 { value: 'all', label: 'All Types' },
-                { value: 'single', label: 'Single' },
-                { value: 'double', label: 'Double' },
-                { value: 'suite', label: 'Suite' },
-                { value: 'deluxe', label: 'Deluxe' },
-                { value: 'presidential', label: 'Presidential' },
+                ...uniqueRoomTypes.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) })),
               ]}
               className="sm:min-w-[180px]"
             />
@@ -602,17 +603,17 @@ export default function RoomsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Room Type *</label>
-              <Select
+              <Input
                 value={formData.roomType}
-                onChange={(value) => setFormData({ ...formData, roomType: value })}
-                options={[
-                  { value: 'single', label: 'Single' },
-                  { value: 'double', label: 'Double' },
-                  { value: 'suite', label: 'Suite' },
-                  { value: 'deluxe', label: 'Deluxe' },
-                  { value: 'presidential', label: 'Presidential' },
-                ]}
+                onChange={(e) => setFormData({ ...formData, roomType: e.target.value })}
+                placeholder="e.g. Single, Double, Suite, Executive, Family..."
+                list="room-type-suggestions"
               />
+              <datalist id="room-type-suggestions">
+                {uniqueRoomTypes.map((t) => (
+                  <option key={t} value={t} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Floor</label>
@@ -840,17 +841,17 @@ export default function RoomsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Room Type *</label>
-              <Select
+              <Input
                 value={formData.roomType}
-                onChange={(value) => setFormData({ ...formData, roomType: value })}
-                options={[
-                  { value: 'single', label: 'Single' },
-                  { value: 'double', label: 'Double' },
-                  { value: 'suite', label: 'Suite' },
-                  { value: 'deluxe', label: 'Deluxe' },
-                  { value: 'presidential', label: 'Presidential' },
-                ]}
+                onChange={(e) => setFormData({ ...formData, roomType: e.target.value })}
+                placeholder="e.g. Single, Double, Suite, Executive, Family..."
+                list="room-type-suggestions-edit"
               />
+              <datalist id="room-type-suggestions-edit">
+                {uniqueRoomTypes.map((t) => (
+                  <option key={t} value={t} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Floor</label>
