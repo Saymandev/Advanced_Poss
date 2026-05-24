@@ -398,6 +398,28 @@ export default function POSPage() {
     return createDefaultTakeawayDetails();
   });
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+
+  const DEFAULT_SHORTCUTS = {
+    toggleQueue: 'F1',
+    openPayment: 'Enter',
+    closeAll: 'Escape',
+    showShortcuts: '?',
+  };
+
+  const [shortcuts, setShortcuts] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_SHORTCUTS;
+    try {
+      const saved = localStorage.getItem('pos_shortcuts');
+      return saved ? { ...DEFAULT_SHORTCUTS, ...JSON.parse(saved) } : DEFAULT_SHORTCUTS;
+    } catch { return DEFAULT_SHORTCUTS; }
+  });
+
+  const saveShortcuts = (updated: typeof shortcuts) => {
+    setShortcuts(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pos_shortcuts', JSON.stringify(updated));
+    }
+  };
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string>('');
   const [roomServiceBookingId, setRoomServiceBookingId] = useState<string>('');
@@ -4050,33 +4072,19 @@ export default function POSPage() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      // Only handle shortcuts when not typing in input fields
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-      switch (event.key) {
-        case 'F1':
-          event.preventDefault();
-          setIsQueueModalOpen((prev) => !prev);
-          break;
-        case 'Escape':
-          event.preventDefault();
-          setIsPaymentModalOpen(false);
-          setShowKeyboardShortcuts(false);
-          setIsCalculatorOpen(false);
-          setIsQueueModalOpen(false);
-          break;
-        case 'Enter':
-          event.preventDefault();
-          if (cart.length > 0 && !checkoutBlocked) {
-             setIsPaymentModalOpen(true);
-          }
-          break;
-      }
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      
+      const key = event.key;
+      
+      if ((event.ctrlKey || event.metaKey) && key === '/') { event.preventDefault(); setShowKeyboardShortcuts(prev => !prev); return; }
+      if (key === shortcuts.toggleQueue) { event.preventDefault(); setIsQueueModalOpen(prev => !prev); return; }
+      if (key === shortcuts.closeAll) { event.preventDefault(); setIsPaymentModalOpen(false); setShowKeyboardShortcuts(false); setIsCalculatorOpen(false); setIsQueueModalOpen(false); return; }
+      if (key === shortcuts.openPayment && cart.length > 0 && !checkoutBlocked) { event.preventDefault(); setIsPaymentModalOpen(true); return; }
+      if (key === shortcuts.showShortcuts) { event.preventDefault(); setShowKeyboardShortcuts(prev => !prev); return; }
     };
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [cart.length, checkoutBlocked]);
+  }, [cart.length, checkoutBlocked, shortcuts]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Listen for sidebar state changes
@@ -4214,7 +4222,17 @@ export default function POSPage() {
               className="h-9 gap-2 text-[10px] font-black uppercase tracking-widest px-4 rounded-lg border-none bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 whitespace-nowrap"
             >
               <ClipboardDocumentListIcon className="h-4 w-4" />
-              Orders (F1)
+              Orders ({shortcuts.toggleQueue})
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowKeyboardShortcuts(true)}
+              className="h-9 w-9 p-0 rounded-lg bg-gray-50 dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800"
+              title={`Shortcuts (Ctrl+/)`}
+            >
+              <span className="text-xs">⌨</span>
             </Button>
 
             <Button
@@ -4721,20 +4739,44 @@ export default function POSPage() {
         onClose={() => setShowKeyboardShortcuts(false)}
         title="Keyboard Shortcuts"
       >
-        <div className="space-y-4">
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between py-1">
-              <span>Toggle Orders Queue</span>
-              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">F1</kbd>
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Click a shortcut to rebind — then press your desired key. Changes save automatically.
+          </p>
+          {([
+            { key: 'toggleQueue', label: 'Toggle Orders Queue', shortcut: shortcuts.toggleQueue },
+            { key: 'openPayment', label: 'Open Payment / Create Order', shortcut: shortcuts.openPayment },
+            { key: 'closeAll', label: 'Close All Modals', shortcut: shortcuts.closeAll },
+            { key: 'showShortcuts', label: 'Show This Help', shortcut: shortcuts.showShortcuts },
+          ] as const).map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
+              <span className="text-sm text-gray-900 dark:text-white">{label}</span>
+              <button
+                onClick={() => {
+                  const handler = (e: KeyboardEvent) => {
+                    e.preventDefault();
+                    const k = e.key === ' ' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+                    saveShortcuts({ ...shortcuts, [key]: k });
+                    document.removeEventListener('keydown', handler);
+                  };
+                  document.addEventListener('keydown', handler);
+                  toast.success(`Press a key for "${label}"...`, { duration: 2000 });
+                }}
+                className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono font-bold hover:bg-blue-100 dark:hover:bg-blue-900/30 cursor-pointer min-w-[60px] text-center transition-colors"
+                title="Click to rebind"
+              >
+                {shortcuts[key as keyof typeof shortcuts]}
+              </button>
             </div>
-            <div className="flex justify-between py-1">
-              <span>Open Payment / Create Order</span>
-              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Enter</kbd>
-            </div>
-            <div className="flex justify-between py-1">
-              <span>Close Modals</span>
-              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Esc</kbd>
-            </div>
+          ))}
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => { saveShortcuts(DEFAULT_SHORTCUTS); toast.success('Shortcuts reset to defaults'); }}
+              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
+            >
+              Reset to defaults
+            </button>
+            <span className="text-xs text-gray-400 ml-4">Ctrl+/ to open this panel</span>
           </div>
         </div>
       </Modal>
