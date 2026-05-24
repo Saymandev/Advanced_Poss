@@ -82,6 +82,29 @@ export function DataTable<T extends Record<string, any>>({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Client-side sorting
+  const sortedData = useMemo(() => {
+    if (!sortKey || !sortDirection) return safeData;
+    return [...safeData].sort((a, b) => {
+      const aVal = sortKey.split('.').reduce((obj: any, k) => obj?.[k], a);
+      const bVal = sortKey.split('.').reduce((obj: any, k) => obj?.[k], b);
+
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [safeData, sortKey, sortDirection]);
+
   // Scroll detection
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -99,7 +122,7 @@ export function DataTable<T extends Record<string, any>>({
     checkScroll();
     window.addEventListener('resize', checkScroll);
     return () => window.removeEventListener('resize', checkScroll);
-  }, [safeData]);
+  }, [sortedData]);
 
   const handleSort = (key: string) => {
     if (!sortable) return;
@@ -130,8 +153,8 @@ export function DataTable<T extends Record<string, any>>({
     }
   };
 
-  const isAllSelected = selectable && selectedItems.length === safeData.length && safeData.length > 0;
-  const isIndeterminate = selectable && selectedItems.length > 0 && selectedItems.length < safeData.length;
+  const isAllSelected = selectable && selectedItems.length === sortedData.length && sortedData.length > 0;
+  const isIndeterminate = selectable && selectedItems.length > 0 && selectedItems.length < sortedData.length;
 
   const getValue = (row: T, key: string) => {
     return key.split('.').reduce((obj, k) => obj?.[k], row);
@@ -227,7 +250,7 @@ export function DataTable<T extends Record<string, any>>({
             <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               <span className="text-gray-500 dark:text-gray-400">Total:</span>
               <span className="font-semibold text-gray-900 dark:text-white">
-                {pagination?.totalItems ?? safeData.length}
+                {pagination?.totalItems ?? sortedData.length}
               </span>
             </div>
             {selectedItems.length > 0 && (
@@ -301,21 +324,23 @@ export function DataTable<T extends Record<string, any>>({
                     />
                   </th>
                 )}
-                {columns.map((column) => (
+                {columns.map((column) => {
+                  const isColumnSortable = sortable && column.sortable !== false;
+                  return (
                   <th
                     key={column.key as string}
                     className={cn(
                       'px-6 py-3 text-sm font-medium text-gray-900 dark:text-white',
                       column.align === 'center' && 'text-center',
                       column.align === 'right' && 'text-right',
-                      sortable && 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600',
+                      isColumnSortable && 'cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600',
                       column.width && `w-${column.width}`
                     )}
-                    onClick={() => sortable && handleSort(column.key as string)}
+                    onClick={() => isColumnSortable && handleSort(column.key as string)}
                   >
                     <div className="flex items-center gap-2">
                       <span>{column.title}</span>
-                      {sortable && sortKey === column.key && (
+                      {isColumnSortable && sortKey === column.key && (
                         sortDirection === 'asc' ? (
                           <ChevronUpIcon className="w-4 h-4" />
                         ) : (
@@ -324,11 +349,12 @@ export function DataTable<T extends Record<string, any>>({
                       )}
                     </div>
                   </th>
-                ))}
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {safeData.length === 0 ? (
+              {sortedData.length === 0 ? (
                 <tr>
                   <td
                     colSpan={columns.length + (selectable ? 1 : 0)}
@@ -348,7 +374,7 @@ export function DataTable<T extends Record<string, any>>({
                   </td>
                 </tr>
               ) : (
-                safeData.map((row, index) => (
+                sortedData.map((row, index) => (
                   <tr
                     key={index}
                     className={cn(
