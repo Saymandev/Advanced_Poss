@@ -4105,8 +4105,10 @@ export default function POSPage() {
     };
   }, []);
 
-  return (
-    !isOwnerOrSuperAdmin && !workPeriodLoading && !activeWorkPeriod ? (
+  const isLocked = !isOwnerOrSuperAdmin && !workPeriodLoading && !activeWorkPeriod;
+
+  if (isLocked) {
+    return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-8 text-center space-y-4">
@@ -4127,7 +4129,10 @@ export default function POSPage() {
           </CardContent>
         </Card>
       </div>
-    ) : (
+    );
+  }
+
+  return (
     <div className={cn(
       "fixed inset-0 top-16 z-0 flex flex-col bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden transition-all duration-300",
       sidebarCollapsed ? "left-0 lg:left-16" : "left-0 lg:left-64"
@@ -4771,7 +4776,6 @@ export default function POSPage() {
               >
                 <span className="group-hover:hidden">{shortcuts[key as keyof typeof shortcuts]}</span>
                 <span className="hidden group-hover:inline text-amber-600 text-[10px]">✎ Set</span>
-              </button>
               </button>
             </div>
           ))}
@@ -5790,6 +5794,5 @@ export default function POSPage() {
         onClose={() => setIsCalculatorOpen(false)}
       />
     </div>
-    )
   );
 }
