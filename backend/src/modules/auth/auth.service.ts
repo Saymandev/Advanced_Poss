@@ -833,12 +833,19 @@ export class AuthService {
       resetPasswordExpires: resetExpires,
     } as any);
 
-    // TODO: Send reset email
-    // await this.mailService.sendPasswordReset(user.email, resetToken);
+    // Send reset email
+    const resetUrl = `${process.env.FRONTEND_URL || ''}/auth/reset-password?token=${resetToken}`;
+    const html = `
+      <h2>Password Reset Request</h2>
+      <p>You requested a password reset. Click the link below to set a new password:</p>
+      <p><a href="${resetUrl}">${resetUrl}</a></p>
+      <p>This link expires in 1 hour.</p>
+      <p>If you did not request this, please ignore this email.</p>
+    `;
+    await this.emailService.sendEmail(user.email, 'Reset Your Password', html);
 
     return {
       message: 'If the email exists, a reset link has been sent',
-      resetToken, // For development only
     };
   }
 
