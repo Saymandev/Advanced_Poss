@@ -17,7 +17,6 @@ export class Room {
 
   @Prop({
     type: String,
-    enum: ['single', 'double', 'suite', 'deluxe', 'presidential'],
     required: true,
   })
   roomType: string;
