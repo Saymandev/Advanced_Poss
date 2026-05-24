@@ -36,6 +36,7 @@ function ClientOnlyToaster() {
         style: {
           background: '#333',
           color: '#fff',
+          zIndex: 99999,
         },
         success: {
           duration: 3000,

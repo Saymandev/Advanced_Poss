@@ -154,6 +154,14 @@ export default function RoomsPage() {
     images: [],
   });
 
+  const roomTypeOptions = useMemo(() => {
+    const types = uniqueRoomTypes.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }));
+    if (formData.roomType && !uniqueRoomTypes.includes(formData.roomType)) {
+      types.unshift({ value: formData.roomType, label: formData.roomType.charAt(0).toUpperCase() + formData.roomType.slice(1) + ' (new)' });
+    }
+    return types;
+  }, [uniqueRoomTypes, formData.roomType]);
+
   const resetForm = () => {
     setFormData({
       roomNumber: '',
@@ -608,7 +616,7 @@ export default function RoomsPage() {
                   <Select
                     value={formData.roomType}
                     onChange={(value) => setFormData({ ...formData, roomType: value })}
-                    options={uniqueRoomTypes.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+                    options={roomTypeOptions}
                     className="w-full"
                   />
                 </div>
@@ -851,7 +859,7 @@ export default function RoomsPage() {
                   <Select
                     value={formData.roomType}
                     onChange={(value) => setFormData({ ...formData, roomType: value })}
-                    options={uniqueRoomTypes.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+                    options={roomTypeOptions}
                     className="w-full"
                   />
                 </div>
