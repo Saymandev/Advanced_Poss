@@ -9,7 +9,7 @@ export interface POSOrderItem {
 }
 
 export interface CreatePOSOrderRequest {
-  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
+  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service' | 'counter_sale';
   tableId?: string;
   roomId?: string;
   bookingId?: string;

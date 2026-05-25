@@ -16,7 +16,7 @@ export class Order {
 
   @Prop({
     type: String,
-    enum: ['dine-in', 'takeaway', 'delivery'],
+    enum: ['dine-in', 'takeaway', 'delivery', 'counter_sale'],
     default: 'dine-in',
   })
   type: string;

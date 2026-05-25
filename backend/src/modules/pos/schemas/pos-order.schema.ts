@@ -29,8 +29,8 @@ export class POSOrder {
   @Prop({ type: Types.ObjectId, ref: 'Company', required: true })
   companyId: Types.ObjectId;
 
-  @Prop({ required: true, enum: ['dine-in', 'delivery', 'takeaway', 'room_service'] })
-  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
+  @Prop({ required: true, enum: ['dine-in', 'delivery', 'takeaway', 'room_service', 'counter_sale'] })
+  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service' | 'counter_sale';
 
   @Prop({ type: Types.ObjectId, ref: 'Table' })
   tableId?: Types.ObjectId;
