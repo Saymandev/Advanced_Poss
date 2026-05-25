@@ -77,6 +77,19 @@ export class MenuItem {
   @Prop()
   margin?: number;
 
+  // Grocery / Product fields
+  @Prop({ trim: true })
+  sku?: string;
+
+  @Prop({ trim: true })
+  barcode?: string;
+
+  @Prop({ default: false })
+  weightBasedPricing?: boolean;
+
+  @Prop({ trim: true })
+  unitType?: string; // 'kg', 'g', 'lb', 'oz', 'liter', 'piece'
+
   // Variants & Modifiers
   @Prop({ type: [VariantSchema], default: [] })
   variants: Variant[];

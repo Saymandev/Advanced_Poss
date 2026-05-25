@@ -32,6 +32,7 @@ const businessTypes = [
   { value: 'bakery', label: 'Bakery' },
   { value: 'bar', label: 'Bar' },
   { value: 'food_truck', label: 'Food Truck' },
+  { value: 'grocery', label: 'Grocery Store' },
   { value: 'other', label: 'Other' },
 ];
 

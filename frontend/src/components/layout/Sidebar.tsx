@@ -73,6 +73,12 @@ const navigation: NavigationItem[] = [
         requiredFeature: 'order-management',
       },
       {
+        name: 'Grocery POS',
+        href: '/dashboard/grocery-pos',
+        icon: ShoppingBagIcon,
+        requiredFeature: 'order-management',
+      },
+      {
         name: 'POS Settings',
         href: '/dashboard/pos-settings',
         icon: CogIcon,
