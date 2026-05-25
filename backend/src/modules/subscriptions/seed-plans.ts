@@ -7,9 +7,71 @@ export async function seedSubscriptionPlans(
   planModel: Model<SubscriptionPlanDocument>,
 ) {
   const existingPlans = await planModel.countDocuments();
-  if (existingPlans > 0) {
+  if (existingPlans === 0) {
+    // Fresh database — seed all plans
+    await seedAllPlans(planModel);
     return;
   }
+
+  // Existing database — seed only missing grocery plans
+  const groceryPlanNames = ['grocery_starter', 'grocery_pro'];
+  const plansToInsert = getGroceryPlans().filter(
+    (p: any) => !planModel.findOne({ name: p.name }),
+  );
+
+  if (plansToInsert.length > 0) {
+    await planModel.insertMany(plansToInsert);
+    console.log(`Seeded ${plansToInsert.length} new grocery plan(s)`);
+  }
+}
+
+function getGroceryPlans(): Partial<SubscriptionPlan>[] {
+  return [
+    {
+      name: 'grocery_starter',
+      displayName: 'Grocery Starter',
+      description: 'Perfect for small grocery and retail stores',
+      price: 2000,
+      currency: 'BDT',
+      billingCycle: 'monthly',
+      trialPeriod: 168,
+      features: {
+        pos: true, inventory: true, crm: true, accounting: false,
+        aiInsights: false, multiBranch: false, staff: false, hotel: false,
+        maxUsers: 3, maxBranches: 1,
+      },
+      limits: {
+        storageGB: 10, maxMenuItems: 1000, maxTables: 0,
+        publicOrderingEnabled: false, maxPublicBranches: 0, whitelabelEnabled: false,
+      },
+      featureList: ['Grocery POS with barcode scanning', 'Inventory & stock management', 'Customer CRM', 'Supplier & purchase orders', 'Single store'],
+      isActive: true, sortOrder: 5, isPopular: false,
+    },
+    {
+      name: 'grocery_pro',
+      displayName: 'Grocery Pro',
+      description: 'For growing grocery stores and retail chains',
+      price: 5000,
+      currency: 'BDT',
+      billingCycle: 'monthly',
+      trialPeriod: 168,
+      features: {
+        pos: true, inventory: true, crm: true, accounting: true,
+        aiInsights: false, multiBranch: true, staff: false, hotel: false,
+        maxUsers: -1, maxBranches: -1,
+      },
+      limits: {
+        storageGB: 50, maxMenuItems: -1, maxTables: 0,
+        publicOrderingEnabled: true, maxPublicBranches: 3,
+        whitelabelEnabled: true, customDomainEnabled: true,
+      },
+      featureList: ['Everything in Starter', 'Multi-store management', 'Accounting & reports', 'Public online ordering', 'Unlimited products & users'],
+      isActive: true, sortOrder: 6, isPopular: true,
+    },
+  ];
+}
+
+async function seedAllPlans(planModel: Model<SubscriptionPlanDocument>) {
   const priceFromEnv = (key: string, fallback: string) =>
     process.env[key] && process.env[key]?.trim() !== '' ? process.env[key] : fallback;
   const plans: Partial<SubscriptionPlan>[] = [
@@ -168,87 +230,7 @@ export async function seedSubscriptionPlans(
       isActive: true,
       sortOrder: 4,
     },
-    // Grocery Plans
-    {
-      name: 'grocery_starter',
-      displayName: 'Grocery Starter',
-      description: 'Perfect for small grocery and retail stores',
-      price: 2000,
-      currency: 'BDT',
-      billingCycle: 'monthly',
-      trialPeriod: 168, // 7 days
-      features: {
-        pos: true,
-        inventory: true,
-        crm: true,
-        accounting: false,
-        aiInsights: false,
-        multiBranch: false,
-        staff: false,
-        hotel: false,
-        maxUsers: 3,
-        maxBranches: 1,
-      },
-      limits: {
-        storageGB: 10,
-        maxMenuItems: 1000,
-        maxTables: 0,
-        publicOrderingEnabled: false,
-        maxPublicBranches: 0,
-        whitelabelEnabled: false,
-      },
-      featureList: [
-        'Grocery POS with barcode scanning',
-        'Inventory & stock management',
-        'Customer CRM',
-        'Supplier & purchase orders',
-        'Single store',
-      ],
-      stripePriceId: priceFromEnv('STRIPE_PRICE_GROCERY_STARTER_MONTHLY', 'price_grocery_starter_monthly'),
-      isActive: true,
-      sortOrder: 5,
-    },
-    {
-      name: 'grocery_pro',
-      displayName: 'Grocery Pro',
-      description: 'For growing grocery stores and retail chains',
-      price: 5000,
-      currency: 'BDT',
-      billingCycle: 'monthly',
-      trialPeriod: 168, // 7 days
-      features: {
-        pos: true,
-        inventory: true,
-        crm: true,
-        accounting: true,
-        aiInsights: false,
-        multiBranch: true,
-        staff: false,
-        hotel: false,
-        maxUsers: -1,
-        maxBranches: -1,
-      },
-      limits: {
-        storageGB: 50,
-        maxMenuItems: -1,
-        maxTables: 0,
-        publicOrderingEnabled: true,
-        maxPublicBranches: 3,
-        whitelabelEnabled: true,
-        customDomainEnabled: true,
-      },
-      featureList: [
-        'Everything in Starter',
-        'Multi-store management',
-        'Accounting & reports',
-        'Public online ordering',
-        'Unlimited products & users',
-      ],
-      stripePriceId: priceFromEnv('STRIPE_PRICE_GROCERY_PRO_MONTHLY', 'price_grocery_pro_monthly'),
-      isActive: true,
-      isPopular: true,
-      sortOrder: 6,
-    },
+    ...getGroceryPlans(),
   ];
   await planModel.insertMany(plans);
   }
