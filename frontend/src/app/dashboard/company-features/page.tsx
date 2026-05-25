@@ -33,7 +33,12 @@ const ROLE_OPTIONS: { value: CompanyRole; label: string }[] = [
 ];
 
 export default function CompanyFeaturesPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
+  const isGrocery = companyContext?.businessType === 'grocery';
+  const availableRoles = useMemo(() => {
+    if (!isGrocery) return ROLE_OPTIONS;
+    return ROLE_OPTIONS.filter(r => !['chef', 'cook', 'waiter'].includes(r.value));
+  }, [isGrocery]);
   const router = useRouter();
 
   useEffect(() => {
@@ -204,7 +209,7 @@ export default function CompanyFeaturesPage() {
                 onChange={(value) => {
                   setSelectedRole(value as CompanyRole);
                 }}
-                options={ROLE_OPTIONS}
+                options={availableRoles}
                 className="w-full max-w-md"
               />
             </CardContent>
@@ -313,7 +318,7 @@ export default function CompanyFeaturesPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {ROLE_OPTIONS.map((roleOption) => {
+                      {availableRoles.map((roleOption) => {
                         const perm = rolePermissionsData.find(
                           (p: RolePermission) => p.role === roleOption.value
                         );

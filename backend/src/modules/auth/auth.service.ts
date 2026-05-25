@@ -643,7 +643,8 @@ export class AuthService {
         id: (company as any)._id.toString(),
         name: company.name,
         email: company.email,
-        slug: (company as any).slug, // Include slug for public URL routing
+        slug: (company as any).slug,
+        businessType: (company as any).businessType || 'restaurant',
       },
       branch: {
         id: (branch as any)._id.toString(),
@@ -1215,6 +1216,7 @@ export class AuthService {
       companyId: targetCompanyId,
       companyName: company.name,
       companySlug: company.slug || company.name.toLowerCase().replace(/\s+/g, '-'),
+      businessType: (company as any).businessType || 'restaurant',
       logoUrl: logoUrl,
       branches: branchesWithRoles,
       message: 'Please select a branch, role, and enter your PIN to continue',

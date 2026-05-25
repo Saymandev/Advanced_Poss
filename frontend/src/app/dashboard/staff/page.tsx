@@ -38,6 +38,11 @@ const ROLE_OPTIONS = [
 
 export default function StaffPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  const isGrocery = companyContext?.businessType === 'grocery';
+  const availableRoles = useMemo(() => {
+    if (!isGrocery) return ROLE_OPTIONS;
+    return ROLE_OPTIONS.filter(r => !['chef', 'waiter'].includes(r.value));
+  }, [isGrocery]);
   
   // Redirect if user doesn't have staff-management feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('staff-management');
@@ -772,7 +777,7 @@ export default function StaffPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Roles' },
-                  ...ROLE_OPTIONS,
+                  ...availableRoles,
                 ]}
                 value={roleFilter}
                 onChange={setRoleFilter}
@@ -1113,7 +1118,7 @@ export default function StaffPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Role"
-              options={ROLE_OPTIONS}
+              options={availableRoles}
               value={formData.role || 'waiter'}
               onChange={(value) => setFormData({ ...formData, role: value as any })}
             />

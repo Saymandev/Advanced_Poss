@@ -28,6 +28,7 @@ export interface AuthState {
     companyName: string;
     companySlug: string;
     logoUrl?: string;
+    businessType?: string;
     branches: any[];
   };
 }

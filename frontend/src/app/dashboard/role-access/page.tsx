@@ -49,7 +49,8 @@ const ROLE_CATEGORY_MAP: Partial<Record<UserRole, string[] | 'all'>> = {
 };
 
 export default function RoleAccessPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
+  const isGrocery = companyContext?.businessType === 'grocery';
   
   // Redirect if user doesn't have role-management feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('role-management');
@@ -162,9 +163,15 @@ export default function RoleAccessPage() {
     ];
   }, [allFeatureKeys, featureCategoryMap]);
 
+  const filteredRoleAccess = useMemo(() => {
+    if (!isGrocery) return allRoleAccess;
+    const excludedRoles = [UserRole.CHEF, UserRole.COOK, UserRole.WAITER];
+    return allRoleAccess.filter(r => !excludedRoles.includes(r.role));
+  }, [allRoleAccess, isGrocery]);
+
   const companyRoleAccess = useMemo(
-    () => allRoleAccess.filter((role) => role.role !== UserRole.SUPER_ADMIN),
-    [allRoleAccess],
+    () => filteredRoleAccess.filter((role) => role.role !== UserRole.SUPER_ADMIN),
+    [filteredRoleAccess],
   );
 
   const [deleteStaff] = useDeleteStaffMutation();
