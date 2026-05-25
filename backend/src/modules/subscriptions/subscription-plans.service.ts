@@ -72,10 +72,20 @@ export class SubscriptionPlansService implements OnModuleInit {
     
     // Add feature names to each plan
     return plans.map((plan: any) => {
-      // .lean() returns plain objects, so no need for toObject()
       const planObj = { ...plan };
+      // Fallback: compute enabledFeatureKeys from legacy features if not set
+      if (!planObj.enabledFeatureKeys || planObj.enabledFeatureKeys.length === 0) {
+        if (planObj.features) {
+          planObj.enabledFeatureKeys = [
+            ...ensureCoreFeatures([]),
+            ...convertLegacyFeaturesToKeys(planObj.features),
+          ];
+        } else {
+          planObj.enabledFeatureKeys = [];
+        }
+      }
       // Map enabledFeatureKeys to feature names
-      if (planObj.enabledFeatureKeys && Array.isArray(planObj.enabledFeatureKeys)) {
+      if (planObj.enabledFeatureKeys.length > 0) {
         planObj.featureNames = planObj.enabledFeatureKeys.map((key: string) => 
           getFeatureDisplayName(key)
         );
