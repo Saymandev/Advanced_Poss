@@ -252,6 +252,9 @@ export default function LandingPage() {
 
   const restaurantPlans = useMemo(() => activePlans.filter((p: any) => !p.name?.includes('grocery')), [activePlans]);
   const groceryPlans = useMemo(() => activePlans.filter((p: any) => p.name?.includes('grocery')), [activePlans]);
+
+  const [planType, setPlanType] = useState<'restaurant' | 'grocery'>('restaurant');
+  const displayPlans = planType === 'grocery' ? groceryPlans : restaurantPlans;
   
   // Hardcoded features for the landing page marketing
   const features = useMemo(() => {
@@ -763,6 +766,30 @@ export default function LandingPage() {
             <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Choose the perfect plan for your business. Start free, upgrade anytime.
             </p>
+            {groceryPlans.length > 0 && (
+              <div className="mt-8 inline-flex bg-gray-200 dark:bg-gray-800 rounded-full p-1">
+                <button
+                  onClick={() => setPlanType('restaurant')}
+                  className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                    planType === 'restaurant'
+                      ? 'bg-white dark:bg-gray-700 text-primary-600 shadow'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  🍽️ Restaurant
+                </button>
+                <button
+                  onClick={() => setPlanType('grocery')}
+                  className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                    planType === 'grocery'
+                      ? 'bg-white dark:bg-gray-700 text-primary-600 shadow'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  🛒 Grocery
+                </button>
+              </div>
+            )}
           </div>
 
           {isLoadingPlans ? (
@@ -778,8 +805,8 @@ export default function LandingPage() {
               </p>
             </div>
           ) : (
-            <div className={`grid grid-cols-1 ${activePlans.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'} ${activePlans.length >= 2 ? 'lg:grid-cols-3' : ''} gap-6 max-w-7xl mx-auto items-start`}>
-              {activePlans.map((plan: any, index: number) => {
+            <div className={`grid grid-cols-1 ${displayPlans.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'} ${displayPlans.length >= 2 ? 'lg:grid-cols-3' : ''} gap-6 max-w-7xl mx-auto items-start`}>
+              {displayPlans.map((plan: any, index: number) => {
                 const isPopular = plan.isPopular || index === 1;
                 
                 // Use featureNames from backend (mapped from enabledFeatureKeys selected in super admin)
