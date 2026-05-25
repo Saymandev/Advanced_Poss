@@ -1139,7 +1139,13 @@ export class AuthService {
           this.logger.log(`  👤 User: ${user.firstName} ${user.lastName} - Role: ${user.role} - Active: ${(user as any).isActive} - BranchId: ${(user as any).branchId}`);
         });
         const availableRoles = [...new Set(mergedUsers.map(user => user.role))];
-        this.logger.log(`📍 Branch: ${branch.name} - Users: ${mergedUsers.length}, Roles: ${availableRoles.join(', ')}`);
+
+        // For grocery companies, filter out restaurant-only roles
+        const companyBusinessType = (company as any).businessType;
+        const filteredRoles = companyBusinessType === 'grocery'
+          ? availableRoles.filter(role => !['chef', 'cook', 'waiter'].includes(role.toLowerCase()))
+          : availableRoles;
+        this.logger.log(`📍 Branch: ${branch.name} - Users: ${mergedUsers.length}, Roles: ${filteredRoles.join(', ')}`);
 
         // Group users by role for selection
         const usersByRole = {};
@@ -1187,7 +1193,7 @@ export class AuthService {
           address: formattedAddress || 'Address not available', // Always return formatted string
           addressObject: branch.address, // Keep original object for detailed display
           isActive: branch.isActive,
-          availableRoles: availableRoles,
+          availableRoles: filteredRoles,
           usersByRole: usersByRole
         };
       })

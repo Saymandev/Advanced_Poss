@@ -116,6 +116,8 @@ export default function MenuItemsPage() {
     description: '',
     price: 0,
     categoryId: '',
+    barcode: '',
+    sku: '',
     preparationTime: 0,
     isAvailable: true,
     requiresKitchen: true, // Kitchen routing
