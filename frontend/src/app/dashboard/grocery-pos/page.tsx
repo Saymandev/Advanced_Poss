@@ -33,8 +33,9 @@ import {
   UserCircleIcon,
   XMarkIcon,
   QrCodeIcon,
+  CameraIcon,
 } from '@heroicons/react/24/outline';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 interface CartItem {
@@ -122,6 +123,46 @@ export default function GroceryPOSPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const scanIntervalRef = useRef<any>(null);
+
+  const startCameraScan = async () => {
+    if (!('BarcodeDetector' in window)) {
+      toast.error('Camera scanning not supported in this browser. Use a USB scanner instead.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setIsScanning(true);
+        const detector = new (window as any).BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e'] });
+        scanIntervalRef.current = setInterval(async () => {
+          if (!videoRef.current || !isScanning) return;
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              setBarcodeInput(code);
+              stopCameraScan();
+            }
+          } catch {}
+        }, 300);
+      }
+    } catch {
+      toast.error('Camera access denied. Use a USB scanner instead.');
+    }
+  };
+
+  const stopCameraScan = () => {
+    setIsScanning(false);
+    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   const filteredProducts = useMemo(() => {
@@ -303,6 +344,11 @@ export default function GroceryPOSPage() {
     }
   };
 
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => stopCameraScan();
+  }, []);
+
   // Work period lock
   if (!isOwner && !workPeriodLoading && !activeWorkPeriod) {
     return (
@@ -364,7 +410,7 @@ export default function GroceryPOSPage() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <div className="bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 px-4 py-2 flex items-center gap-3 z-20">
+        <div className="relative bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 px-4 py-2 flex items-center gap-3 z-20">
           <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 h-9 border border-amber-200 dark:border-amber-800">
             <QrCodeIcon className="h-4 w-4 text-amber-600" />
             <Input
@@ -372,8 +418,25 @@ export default function GroceryPOSPage() {
               onChange={(e) => setBarcodeInput(e.target.value)}
               placeholder="Scan barcode..."
               className="h-8 w-48 text-sm font-mono bg-transparent border-none focus:ring-0"
+              autoFocus
             />
+            <button
+              onClick={isScanning ? stopCameraScan : startCameraScan}
+              className={isScanning ? 'text-red-500' : 'text-gray-400 hover:text-amber-600'}
+              title={isScanning ? 'Stop camera' : 'Scan with camera'}
+            >
+              <CameraIcon className="h-4 w-4" />
+            </button>
+            {isScanning && (
+              <span className="flex items-center gap-1 text-[10px] text-amber-600 font-bold animate-pulse">
+                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                Scanning
+              </span>
+            )}
           </div>
+          {isScanning && (
+            <video ref={videoRef} autoPlay playsInline className="absolute top-12 left-0 w-64 h-48 rounded-xl border-2 border-amber-400 object-cover z-50 shadow-2xl" />
+          )}
 
           <div className="relative flex-1 max-w-md">
             <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
