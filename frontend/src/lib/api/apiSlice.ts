@@ -371,6 +371,7 @@ export const apiSlice = createApi({
     'DigitalReceipt',
     'DeliveryIntegration',
     'PurchaseOrder',
+    'PurchaseReturn',
     'Review',
     'RolePermission',
     'MyPermissions',

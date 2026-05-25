@@ -37,7 +37,7 @@ export default function PurchaseReturnsPage() {
   const { data: menuData } = useGetPOSMenuItemsQuery({ branchId: user?.branchId || undefined, isAvailable: true });
   const products = useMemo(() => Array.isArray(menuData) ? menuData : [], [menuData]);
 
-  const { data: suppliersData } = useGetSuppliersQuery({ branchId }, { skip: !branchId });
+  const { data: suppliersData } = useGetSuppliersQuery({ companyId }, { skip: !companyId });
   const suppliers = useMemo(() => (suppliersData as any)?.suppliers || [], [suppliersData]);
 
   const [createReturn] = useCreatePurchaseReturnMutation();
