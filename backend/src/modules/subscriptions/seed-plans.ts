@@ -3,6 +3,10 @@ import {
   SubscriptionPlan,
   SubscriptionPlanDocument,
 } from './schemas/subscription-plan.schema';
+import {
+  convertLegacyFeaturesToKeys,
+  ensureCoreFeatures,
+} from './utils/plan-features.helper';
 export async function seedSubscriptionPlans(
   planModel: Model<SubscriptionPlanDocument>,
 ) {
@@ -21,6 +25,12 @@ export async function seedSubscriptionPlans(
   }
 
   if (plansToInsert.length > 0) {
+    for (const plan of plansToInsert) {
+      plan.enabledFeatureKeys = [
+        ...ensureCoreFeatures([]),
+        ...convertLegacyFeaturesToKeys(plan.features),
+      ];
+    }
     await planModel.insertMany(plansToInsert);
     console.log(`Seeded ${plansToInsert.length} new grocery plan(s)`);
   }
