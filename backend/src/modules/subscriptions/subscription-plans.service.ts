@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateSubscriptionPlanDto, UpdateSubscriptionPlanDto } from './dto/subscription-plan.dto';
 import { SubscriptionPlan, SubscriptionPlanDocument } from './schemas/subscription-plan.schema';
+import { seedSubscriptionPlans } from './seed-plans';
 import {
   convertLegacyFeaturesToKeys,
   ensureCoreFeatures,
@@ -11,11 +12,15 @@ import {
 } from './utils/plan-features.helper';
 
 @Injectable()
-export class SubscriptionPlansService {
+export class SubscriptionPlansService implements OnModuleInit {
   constructor(
     @InjectModel(SubscriptionPlan.name)
     private subscriptionPlanModel: Model<SubscriptionPlanDocument>,
   ) {}
+
+  async onModuleInit() {
+    await seedSubscriptionPlans(this.subscriptionPlanModel);
+  }
 
   async create(createDto: CreateSubscriptionPlanDto): Promise<SubscriptionPlan> {
     const existingPlan = await this.subscriptionPlanModel.findOne({
