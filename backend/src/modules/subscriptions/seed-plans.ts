@@ -46,6 +46,7 @@ function getGroceryPlans(): Partial<SubscriptionPlan>[] {
         publicOrderingEnabled: false, maxPublicBranches: 0, whitelabelEnabled: false,
       },
       featureList: ['Grocery POS with barcode scanning', 'Inventory & stock management', 'Customer CRM', 'Supplier & purchase orders', 'Single store'],
+      stripePriceId: process.env['STRIPE_PRICE_GROCERY_STARTER_MONTHLY'] || 'price_grocery_starter_monthly',
       isActive: true, sortOrder: 5, isPopular: false,
     },
     {
@@ -67,6 +68,7 @@ function getGroceryPlans(): Partial<SubscriptionPlan>[] {
         whitelabelEnabled: true, customDomainEnabled: true,
       },
       featureList: ['Everything in Starter', 'Multi-store management', 'Accounting & reports', 'Public online ordering', 'Unlimited products & users'],
+      stripePriceId: process.env['STRIPE_PRICE_GROCERY_PRO_MONTHLY'] || 'price_grocery_pro_monthly',
       isActive: true, sortOrder: 6, isPopular: true,
     },
   ];
