@@ -249,6 +249,9 @@ export default function LandingPage() {
   const activePlans = useMemo(() => {
     return plans.filter((plan: any) => plan.isActive !== false).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }, [plans]);
+
+  const restaurantPlans = useMemo(() => activePlans.filter((p: any) => !p.name?.includes('grocery')), [activePlans]);
+  const groceryPlans = useMemo(() => activePlans.filter((p: any) => p.name?.includes('grocery')), [activePlans]);
   
   // Hardcoded features for the landing page marketing
   const features = useMemo(() => {
