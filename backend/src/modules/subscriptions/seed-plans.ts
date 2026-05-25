@@ -14,10 +14,11 @@ export async function seedSubscriptionPlans(
   }
 
   // Existing database — seed only missing grocery plans
-  const groceryPlanNames = ['grocery_starter', 'grocery_pro'];
-  const plansToInsert = getGroceryPlans().filter(
-    (p: any) => !planModel.findOne({ name: p.name }),
-  );
+  const plansToInsert: any[] = [];
+  for (const plan of getGroceryPlans()) {
+    const exists = await planModel.findOne({ name: plan.name });
+    if (!exists) plansToInsert.push(plan);
+  }
 
   if (plansToInsert.length > 0) {
     await planModel.insertMany(plansToInsert);
