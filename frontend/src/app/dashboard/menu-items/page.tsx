@@ -1856,6 +1856,28 @@ export default function MenuItemsPage() {
             </label>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload one or more images for this menu item</p>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Barcode
+              </label>
+              <Input
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                placeholder="Product barcode"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                SKU
+              </label>
+              <Input
+                value={formData.sku}
+                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                placeholder="Stock keeping unit"
+              />
+            </div>
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

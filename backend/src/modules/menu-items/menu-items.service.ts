@@ -202,6 +202,18 @@ export class MenuItemsService {
       .populate('categoryId', 'name type')
       .exec();
   }
+
+  async findByBarcode(barcode: string, companyId: string): Promise<MenuItem | null> {
+    return this.menuItemModel
+      .findOne({
+        companyId: new Types.ObjectId(companyId),
+        $or: [{ barcode }, { sku: barcode }],
+        isAvailable: true,
+      })
+      .populate('categoryId', 'name type')
+      .exec();
+  }
+
   async search(query: string, companyId: string): Promise<MenuItem[]> {
     return this.menuItemModel
       .find({

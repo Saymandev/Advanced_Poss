@@ -107,6 +107,16 @@ export class CreateMenuItemDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({ example: '8901234567890' })
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  @ApiPropertyOptional({ example: 'SKU-00123' })
+  @IsOptional()
+  @IsString()
+  sku?: string;
+
   @ApiPropertyOptional({ example: ['https://example.com/image1.jpg'] })
   @IsOptional()
   @IsArray()
