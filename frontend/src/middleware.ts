@@ -45,6 +45,7 @@ const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
 const ROUTE_FEATURE_MAP: Record<string, string[]> = {
   '/dashboard': ['dashboard'],
   '/dashboard/pos': ['order-management'],
+  '/dashboard/grocery-pos': ['order-management'],
   '/dashboard/order-history': ['order-management'],
   '/dashboard/orders': ['order-management'],
   '/dashboard/tables': ['table-management'],

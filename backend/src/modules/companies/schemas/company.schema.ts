@@ -60,6 +60,14 @@ export class Company {
   @Prop({ type: Types.ObjectId, ref: 'User' })
   ownerId?: Types.ObjectId;
 
+  // Business type - determines which features are enabled
+  @Prop({
+    type: String,
+    enum: ['restaurant', 'grocery'],
+    default: 'restaurant',
+  })
+  businessType: string;
+
   // Subscription
   @Prop({
     type: String,

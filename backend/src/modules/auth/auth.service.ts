@@ -474,12 +474,16 @@ export class AuthService {
       zipCodeAddress = '00000';
     }
 
+    // Map companyType to businessType (drives feature set)
+    const businessType = companyType === 'grocery' ? 'grocery' : 'restaurant';
+
     // Create company first (without ownerId initially)
     const company = await this.companiesService.create({
       name: companyName,
       email: companyEmail,
       phone: phoneNumber,
       subscriptionPlan: subscriptionPackage,
+      businessType,
       address: {
         street: streetAddress,
         city: cityAddress,

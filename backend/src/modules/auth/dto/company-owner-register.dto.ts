@@ -7,6 +7,7 @@ export enum CompanyType {
   BAKERY = 'bakery',
   BAR = 'bar',
   FOOD_TRUCK = 'food_truck',
+  GROCERY = 'grocery',
   OTHER = 'other',
 }
 
