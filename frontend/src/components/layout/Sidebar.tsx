@@ -222,6 +222,12 @@ const navigation: NavigationItem[] = [
         icon: ExclamationTriangleIcon,
         requiredFeature: 'wastage-management',
       },
+      {
+        name: 'Purchase Returns',
+        href: '/dashboard/purchase-returns',
+        icon: ExclamationTriangleIcon,
+        requiredFeature: 'purchase-orders',
+      },
     ],
   },
   {

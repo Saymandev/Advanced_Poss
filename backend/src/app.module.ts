@@ -41,6 +41,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { POSModule } from './modules/pos/pos.module';
 import { PublicModule } from './modules/public/public.module';
 import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
+import { PurchaseReturnsModule } from './modules/purchase-returns/purchase-returns.module';
 import { QRCodesModule } from './modules/qr-codes/qr-codes.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
@@ -182,6 +183,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
     SuperAdminNotificationsModule,
     NotificationsModule,
     PurchaseOrdersModule,
+    PurchaseReturnsModule,
     SystemFeedbackModule,
     TransactionsModule,
   ],
