@@ -29,6 +29,7 @@ import { ProcessPaymentDto } from './dto/process-payment.dto';
 import { UpdatePOSOrderDto } from './dto/update-pos-order.dto';
 import { POSService } from './pos.service';
 import { ReceiptService } from './receipt.service';
+import { MenuItemsService } from '../menu-items/menu-items.service';
 
 @Controller('pos')
 @UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard, WorkPeriodCheckGuard)
@@ -37,6 +38,7 @@ export class POSController {
   constructor(
     private readonly posService: POSService,
     private readonly receiptService: ReceiptService,
+    private readonly menuItemsService: MenuItemsService,
   ) { }
 
   // POS Orders
@@ -101,6 +103,13 @@ export class POSController {
   @RequiresFeature(FEATURES.DASHBOARD)
   async getQuickStats(@Request() req, @Query('date') date?: string) {
     return this.posService.getQuickStats(req.user.branchId, date);
+  }
+
+  @Get('products/barcode/:barcode')
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
+  async findByBarcode(@Param('barcode') barcode: string, @Request() req) {
+    const companyId = req.user?.companyId || req.user?.company?.id;
+    return this.menuItemsService.findByBarcode(barcode, companyId);
   }
 
   // Tables
