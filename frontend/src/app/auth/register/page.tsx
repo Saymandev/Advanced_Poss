@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { useRegisterCompanyOwnerMutation } from '@/lib/api/endpoints/authApi';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { COUNTRIES } from '@/lib/constants/countries';
-import { setCredentials } from '@/lib/slices/authSlice';
+import { setCredentials, setCompanyContext } from '@/lib/slices/authSlice';
 import { useAppDispatch } from '@/lib/store';
 import {
   BuildingStorefrontIcon,
@@ -211,6 +211,17 @@ export default function RegisterPage() {
           user: sanitizedUser,
         })
       );
+
+      // Store company context for sidebar businessType filtering
+      const companyData = responseData;
+      if (companyData?.company) {
+        dispatch(setCompanyContext({
+          companyId: companyData.company.id,
+          companyName: companyData.company.name,
+          companySlug: companyData.company.slug,
+          businessType: companyData.company.businessType || 'restaurant',
+        }));
+      }
 
       toast.success('Registration successful! Welcome to Advanced POS.');
 
