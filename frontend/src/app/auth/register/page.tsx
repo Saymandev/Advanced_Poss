@@ -212,21 +212,21 @@ export default function RegisterPage() {
         })
       );
 
-      // Store company context for sidebar businessType filtering
-      const companyData = responseData;
-      if (companyData?.company) {
-        dispatch(setCompanyContext({
-          companyId: companyData.company.id,
-          companyName: companyData.company.name,
-          companySlug: companyData.company.slug,
-          businessType: companyData.company.businessType || 'restaurant',
-        }));
-      }
-
       toast.success('Registration successful! Welcome to Advanced POS.');
 
       // Check if payment is required (Premium/Enterprise plans)
       const responseData = (response?.data || response) as any;
+
+      // Store company context for sidebar businessType filtering
+      if (responseData?.company) {
+        dispatch(setCompanyContext({
+          companyId: responseData.company.id,
+          companyName: responseData.company.name,
+          companySlug: responseData.company.slug,
+          businessType: responseData.company.businessType || 'restaurant',
+        }));
+      }
+
       if (responseData?.requiresPayment) {
         // Redirect to payment page after registration for Premium/Enterprise plans
         // User can complete payment immediately or start trial first
