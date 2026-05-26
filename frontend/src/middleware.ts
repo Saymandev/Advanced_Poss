@@ -166,7 +166,7 @@ export function middleware(request: NextRequest) {
   }
 
   const normalizedRole = role?.toLowerCase() || '';
-  const roleFeatures = DEFAULT_ROLE_FEATURES[normalizedRole] || permissions || [];
+  const roleFeatures = permissions?.length ? permissions : (DEFAULT_ROLE_FEATURES[normalizedRole] || []);
   const effectiveFeatures = normalizedRole === 'super_admin' ? [] : roleFeatures;
 
   const hasAccess = requiredFeatures.some((feature) => effectiveFeatures.includes(feature));
