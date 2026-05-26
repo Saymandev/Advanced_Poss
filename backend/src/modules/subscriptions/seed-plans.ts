@@ -26,10 +26,12 @@ export async function seedSubscriptionPlans(
 
   if (plansToInsert.length > 0) {
     for (const plan of plansToInsert) {
-      plan.enabledFeatureKeys = [
-        ...ensureCoreFeatures([]),
-        ...convertLegacyFeaturesToKeys(plan.features),
-      ];
+      if (!plan.enabledFeatureKeys || plan.enabledFeatureKeys.length === 0) {
+        plan.enabledFeatureKeys = [
+          ...ensureCoreFeatures([]),
+          ...convertLegacyFeaturesToKeys(plan.features),
+        ];
+      }
     }
     await planModel.insertMany(plansToInsert);
     console.log(`Seeded ${plansToInsert.length} new grocery plan(s)`);
@@ -46,11 +48,15 @@ function getGroceryPlans(): Partial<SubscriptionPlan>[] {
       currency: 'BDT',
       billingCycle: 'monthly',
       trialPeriod: 168,
-      features: {
-        pos: true, inventory: true, crm: true, accounting: false,
-        aiInsights: false, multiBranch: false, staff: false, hotel: false,
-        maxUsers: 3, maxBranches: 1,
-      },
+      features: { pos: false, inventory: false, crm: false, accounting: false, aiInsights: false, multiBranch: false, staff: false, hotel: false, maxUsers: 3, maxBranches: 1 },
+      enabledFeatureKeys: [
+        'dashboard', 'reports',
+        'order-management', 'customer-management', 'loyalty-program',
+        'inventory', 'suppliers', 'purchase-orders', 'wastage-management',
+        'expenses', 'income', 'work-periods',
+        'menu-management', 'categories',
+        'notifications',
+      ],
       limits: {
         storageGB: 10, maxMenuItems: 1000, maxTables: 0,
         publicOrderingEnabled: false, maxPublicBranches: 0, whitelabelEnabled: false,
@@ -67,11 +73,17 @@ function getGroceryPlans(): Partial<SubscriptionPlan>[] {
       currency: 'BDT',
       billingCycle: 'monthly',
       trialPeriod: 168,
-      features: {
-        pos: true, inventory: true, crm: true, accounting: true,
-        aiInsights: false, multiBranch: true, staff: false, hotel: false,
-        maxUsers: -1, maxBranches: -1,
-      },
+      features: { pos: false, inventory: false, crm: false, accounting: false, aiInsights: false, multiBranch: false, staff: false, hotel: false, maxUsers: -1, maxBranches: -1 },
+      enabledFeatureKeys: [
+        'dashboard', 'reports',
+        'order-management', 'delivery-management', 'customer-management', 'loyalty-program',
+        'inventory', 'suppliers', 'purchase-orders', 'wastage-management',
+        'expenses', 'income', 'accounting', 'work-periods',
+        'menu-management', 'categories',
+        'settings', 'branches', 'notifications',
+        'marketing', 'cms',
+        'ai-menu-optimization', 'ai-insights',
+      ],
       limits: {
         storageGB: 50, maxMenuItems: -1, maxTables: 0,
         publicOrderingEnabled: true, maxPublicBranches: 3,
