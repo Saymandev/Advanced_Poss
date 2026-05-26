@@ -133,12 +133,14 @@ const navigation: NavigationItem[] = [
     href: '/dashboard/tables',
     icon: TableCellsIcon,
     requiredFeature: 'table-management',
+    restaurantOnly: true,
   },
   {
     name: 'Hotel Management',
     href: '/dashboard/hotel',
     icon: BuildingOfficeIcon,
     requiredFeature: ['room-management', 'booking-management'], // Show if user has ANY
+    restaurantOnly: true,
     children: [
       {
         name: 'Hotel Dashboard',
@@ -165,6 +167,7 @@ const navigation: NavigationItem[] = [
     href: '/dashboard/kitchen',
     icon: BeakerIcon,
     requiredFeature: 'kitchen-display',
+    restaurantOnly: true,
   },
   {
     name: 'Customer Display',
@@ -289,7 +292,8 @@ const navigation: NavigationItem[] = [
         name: 'QR Menus',
         href: '/dashboard/qr-code-menus',
         icon: TableCellsIcon,
-        requiredFeature: 'menu-management',
+        requiredFeature: 'qr-menus',
+        restaurantOnly: true,
       },
     ],
   },
