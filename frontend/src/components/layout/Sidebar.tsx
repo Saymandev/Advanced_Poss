@@ -48,6 +48,8 @@ interface NavigationItem {
   children?: NavigationItem[];
   roles?: string[];
   requiredFeature?: string | string[]; // Feature ID(s) required to show this menu item
+  groceryOnly?: boolean;
+  restaurantOnly?: boolean;
 }
 
 const navigation: NavigationItem[] = [
@@ -71,12 +73,14 @@ const navigation: NavigationItem[] = [
         href: '/dashboard/pos',
         icon: ShoppingBagIcon,
         requiredFeature: 'order-management',
+        restaurantOnly: true,
       },
       {
         name: 'Grocery POS',
         href: '/dashboard/grocery-pos',
         icon: ShoppingBagIcon,
         requiredFeature: 'order-management',
+        groceryOnly: true,
       },
       {
         name: 'POS Settings',
@@ -495,6 +499,10 @@ export function Sidebar({ className }: SidebarProps) {
   };
 
   const hasAccess = (item: NavigationItem) => {
+    const bizType = companyContext?.businessType;
+    if (item.groceryOnly && bizType !== 'grocery') return false;
+    if (item.restaurantOnly && bizType === 'grocery') return false;
+
     // While permissions are loading, show menu items to avoid flickering
     // Once loaded, we'll filter properly
     if (permissionsLoading) {
