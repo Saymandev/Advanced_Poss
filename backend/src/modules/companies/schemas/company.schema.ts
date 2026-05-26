@@ -71,7 +71,7 @@ export class Company {
   // Subscription
   @Prop({
     type: String,
-    enum: ['basic', 'premium', 'enterprise'],
+    enum: ['basic', 'premium', 'enterprise', 'grocery_starter', 'grocery_pro'],
     default: 'basic',
   })
   subscriptionPlan: string;
