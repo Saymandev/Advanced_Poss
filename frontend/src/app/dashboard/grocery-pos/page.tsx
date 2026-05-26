@@ -349,6 +349,14 @@ export default function GroceryPOSPage() {
     return () => stopCameraScan();
   }, []);
 
+  // Sidebar collapse
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  useEffect(() => {
+    const handleToggle = (e: CustomEvent) => setSidebarCollapsed(e.detail.collapsed);
+    window.addEventListener('sidebar-toggle', handleToggle as EventListener);
+    return () => window.removeEventListener('sidebar-toggle', handleToggle as EventListener);
+  }, []);
+
   // Work period lock
   if (!isOwner && !workPeriodLoading && !activeWorkPeriod) {
     return (
@@ -406,7 +414,10 @@ export default function GroceryPOSPage() {
   );
 
   return (
-    <div className="fixed inset-0 top-16 flex bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100">
+    <div className={cn(
+      "fixed inset-0 top-16 z-0 flex bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden transition-all duration-300",
+      sidebarCollapsed ? "left-0 lg:left-16" : "left-0 lg:left-64"
+    )}>
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
