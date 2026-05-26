@@ -20,7 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
@@ -84,6 +84,20 @@ export default function RegisterPage() {
     pin: '',
     confirmPin: '',
   });
+
+  const filteredPlans = useMemo(() => {
+    const isGrocery = formData.businessType === 'grocery';
+    return activePlans.filter((p: any) => 
+      isGrocery ? p.name?.includes('grocery') : !p.name?.includes('grocery')
+    );
+  }, [activePlans, formData.businessType]);
+  const displayPlans = filteredPlans.length > 0 ? filteredPlans : activePlans;
+
+  useEffect(() => {
+    if (displayPlans.length > 0 && !displayPlans.find((p: any) => p.name === formData.subscriptionPackage)) {
+      setFormData(prev => ({ ...prev, subscriptionPackage: displayPlans[0].name }));
+    }
+  }, [displayPlans]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
@@ -526,11 +540,9 @@ export default function RegisterPage() {
                   <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4">
                     <p className="text-gray-400 text-sm">Loading plans...</p>
                   </div>
-                ) : activePlans.length > 0 && (
-                  <div>
-                    <label className="text-sm text-gray-400 mb-4 block font-semibold">Select Plan</label>
-                    <div className={`grid grid-cols-1 ${activePlans.length > 1 ? 'md:grid-cols-2' : ''} gap-4 mb-4`}>
-                      {activePlans.map((plan: any, index: number) => {
+                ) : displayPlans.length > 0 ? (
+                    <div className={`grid grid-cols-1 ${displayPlans.length > 1 ? 'md:grid-cols-2' : ''} gap-4 mb-4`}>
+                      {displayPlans.map((plan: any, index: number) => {
                         const isPopular = plan.isPopular || index === 1;
                         const isSelected = formData.subscriptionPackage === plan.name;
                         
@@ -624,8 +636,7 @@ export default function RegisterPage() {
                         );
                       })}
                     </div>
-                  </div>
-                )}
+                ) : null}
 
                 <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4">
                   <Checkbox
