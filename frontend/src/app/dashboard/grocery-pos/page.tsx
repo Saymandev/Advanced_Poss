@@ -262,19 +262,6 @@ export default function GroceryPOSPage() {
     if (typeof window !== 'undefined') localStorage.removeItem('grocery_cart');
   };
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'F1') { e.preventDefault(); setIsQueueOpen(prev => !prev); }
-      if (e.key === 'F2') { e.preventDefault(); setIsPaymentOpen(true); }
-      if (e.key === 'Escape') { e.preventDefault(); setIsPaymentOpen(false); setIsQueueOpen(false); setIsCustomerModalOpen(false); }
-      if (e.key === 'Enter' && cart.length > 0 && !isPaymentOpen) { e.preventDefault(); setIsPaymentOpen(true); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [cart.length, isPaymentOpen]);
-
   // Customer
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', email: '' });
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -310,6 +297,19 @@ export default function GroceryPOSPage() {
   // Payment
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+
+  // Keyboard shortcuts - must be after state declarations
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'F1') { e.preventDefault(); setIsQueueOpen(prev => !prev); }
+      if (e.key === 'F2') { e.preventDefault(); setIsPaymentOpen(true); }
+      if (e.key === 'Escape') { e.preventDefault(); setIsPaymentOpen(false); setIsQueueOpen(false); setIsCustomerModalOpen(false); }
+      if (e.key === 'Enter' && cart.length > 0 && !isPaymentOpen) { e.preventDefault(); setIsPaymentOpen(true); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [cart.length, isPaymentOpen]);
   const [amountReceived, setAmountReceived] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
