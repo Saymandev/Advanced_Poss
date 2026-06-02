@@ -457,6 +457,7 @@ export default function GroceryPOSPage() {
   );
 
   return (
+    <>
     <div className={cn(
       "fixed inset-0 top-16 z-0 flex flex-col lg:flex-row bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden transition-all duration-300",
       sidebarCollapsed ? "left-0 lg:left-16" : "left-0 lg:left-64"
@@ -799,5 +800,6 @@ export default function GroceryPOSPage() {
         )}
       </button>
     )}
+    </>
   );
 }
