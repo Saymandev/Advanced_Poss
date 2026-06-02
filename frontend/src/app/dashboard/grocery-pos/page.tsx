@@ -13,6 +13,8 @@ import {
   useGetPOSMenuItemsQuery,
   useGetPOSOrdersQuery,
   useGetPOSSettingsQuery,
+  useGetReceiptHTMLQuery,
+  usePrintReceiptMutation,
   useProcessPaymentMutation,
 } from '@/lib/api/endpoints/posApi';
 import { useGetCustomersQuery, useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
@@ -299,7 +301,13 @@ export default function GroceryPOSPage() {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountReceived, setAmountReceived] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [saleSuccess, setSaleSuccess] = useState<{ orderNumber: string; total: number; change: number } | null>(null);
+  const [saleSuccess, setSaleSuccess] = useState<{ orderId: string; orderNumber: string; total: number; change: number } | null>(null);
+  const [currentOrderId, setCurrentOrderId] = useState('');
+
+  const { data: receiptHTML, isFetching: receiptLoading } = useGetReceiptHTMLQuery(currentOrderId, {
+    skip: !currentOrderId,
+  });
+  const [printReceipt] = usePrintReceiptMutation();
 
   const cashMethod = paymentMethods.find(m => m.code === 'cash');
   const isCash = paymentMethod === 'cash';
@@ -352,7 +360,8 @@ export default function GroceryPOSPage() {
       }
 
       toast.success(`Order #${order.orderNumber || orderId} completed`);
-      setSaleSuccess({ orderNumber: order.orderNumber || orderId, total: cartTotal, change });
+      setSaleSuccess({ orderId, orderNumber: order.orderNumber || orderId, total: cartTotal, change });
+      setCurrentOrderId(orderId);
       clearCart();
       setIsPaymentOpen(false);
       refetchQueue();
@@ -657,28 +666,39 @@ export default function GroceryPOSPage() {
         </div>
       </div>
 
-      {/* Sale Success */}
-      <Modal isOpen={!!saleSuccess} onClose={() => setSaleSuccess(null)} title="Sale Complete" size="sm">
+      {/* Sale Receipt */}
+      <Modal isOpen={!!saleSuccess} onClose={() => setSaleSuccess(null)} title="Receipt" size="md">
         {saleSuccess && (
-          <div className="text-center space-y-4 py-4">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
-              <CheckIcon className="h-8 w-8 text-green-600" />
-            </div>
-            <div>
+          <div className="space-y-4">
+            <div className="text-center py-2 border-b">
               <div className="text-sm text-gray-500">Order</div>
               <div className="text-2xl font-black">#{saleSuccess.orderNumber}</div>
+              <div className="text-3xl font-black text-green-600 dark:text-green-400 mt-2">
+                {formatCurrency(saleSuccess.total)}
+              </div>
+              {saleSuccess.change > 0 && (
+                <div className="text-sm font-bold text-emerald-600 mt-1">
+                  Change: {formatCurrency(saleSuccess.change)}
+                </div>
+              )}
             </div>
-            <div className="text-3xl font-black text-blue-600 dark:text-blue-400">
-              {formatCurrency(saleSuccess.total)}
-            </div>
-            {saleSuccess.change > 0 && (
-              <div className="text-sm font-bold text-emerald-600">
-                Change: {formatCurrency(saleSuccess.change)}
+            {receiptHTML ? (
+              <div dangerouslySetInnerHTML={{ __html: receiptHTML }} />
+            ) : receiptLoading ? (
+              <div className="text-center py-4 text-gray-400">Loading receipt...</div>
+            ) : (
+              <div className="text-center py-2 text-gray-500 text-sm">
+                Receipt generation in progress...
               </div>
             )}
-            <Button className="w-full" onClick={() => setSaleSuccess(null)}>
-              Done
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={async () => {
+                try { await printReceipt({ orderId: saleSuccess.orderId }).unwrap(); toast.success('Receipt printed'); } catch {}
+              }}>
+                Print Receipt
+              </Button>
+              <Button className="flex-1" onClick={() => setSaleSuccess(null)}>Close</Button>
+            </div>
           </div>
         )}
       </Modal>
