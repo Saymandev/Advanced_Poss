@@ -1167,7 +1167,6 @@ export default function OrdersPage() {
                     size="sm"
                     onClick={() => {
                       setIsViewModalOpen(false);
-                      const due = (selectedOrder as any).remainingAmount || (selectedOrder.totalAmount - ((selectedOrder as any).paidAmount || 0));
                       const posPath = companyContext?.businessType === 'grocery' ? '/dashboard/grocery-pos' : '/dashboard/pos';
                       router.push(`${posPath}?orderId=${selectedOrder.id}`);
                     }}
