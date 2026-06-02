@@ -314,27 +314,27 @@ export default function GroceryPOSPage() {
   const cashMethod = paymentMethods.find(m => m.code === 'cash');
   const isCash = paymentMethod === 'cash';
 
+  const received = parseFloat(amountReceived || '0');
+
+  const due = useMemo(() => {
+    if (!isCash) return 0;
+    return Math.max(0, cartTotal - received);
+  }, [cartTotal, received, isCash]);
+
   const change = useMemo(() => {
     if (!isCash) return 0;
-    const received = parseFloat(amountReceived || '0');
     return Math.max(0, received - cartTotal);
-  }, [amountReceived, cartTotal, isCash]);
+  }, [received, cartTotal, isCash]);
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (isProcessing) return;
-
-    const received = parseFloat(amountReceived || '0');
-    if (isCash) {
-      if (!Number.isFinite(received) || received <= 0) {
-        toast.error('Enter the amount received');
-        return;
-      }
-      if (received < cartTotal) {
-        toast.error(`Amount received (${formatCurrency(received)}) is less than total (${formatCurrency(cartTotal)})`);
-        return;
-      }
+    if (isCash && (!Number.isFinite(received) || received <= 0)) {
+      toast.error('Enter the amount received');
+      return;
     }
+
+    const isFullPayment = !isCash || received >= cartTotal;
 
     setIsProcessing(true);
 
@@ -352,7 +352,7 @@ export default function GroceryPOSPage() {
         serviceChargeRate: serviceChargeRate,
         serviceChargeAmount: cartServiceCharge,
         totalAmount: cartTotal,
-        status: paymentMethod === 'cash' && parseFloat(amountReceived) >= cartTotal ? 'paid' as const : 'pending' as const,
+        status: isFullPayment ? 'paid' as const : 'pending' as const,
         paymentMethod: paymentMethod,
         ...(selectedCustomerId ? { customerId: selectedCustomerId } : {}),
         customerInfo,
@@ -364,12 +364,12 @@ export default function GroceryPOSPage() {
 
       if (!orderId) throw new Error('Order creation failed');
 
-      if (paymentMethod !== 'cash' || parseFloat(amountReceived || '0') < cartTotal) {
+      if (isCash && received > 0) {
         await processPayment({
           orderId,
-          amount: cartTotal,
+          amount: Math.min(received, cartTotal),
           method: paymentMethod,
-          amountReceived: parseFloat(amountReceived || '0'),
+          amountReceived: received,
           changeDue: change,
         }).unwrap();
       }
@@ -776,6 +776,11 @@ export default function GroceryPOSPage() {
                   Change: {formatCurrency(change)}
                 </div>
               )}
+              {isCash && due > 0 && (
+                <div className="text-sm font-bold text-amber-600 mt-1">
+                  Due: {formatCurrency(due)}
+                </div>
+              )}
             </div>
           )}
 
@@ -811,10 +816,31 @@ export default function GroceryPOSPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="font-bold text-sm">{formatCurrency(order.totalAmount || order.total || 0)}</div>
+                  <div>
+                    <div className="font-bold text-sm">{formatCurrency(order.totalAmount || order.total || 0)}</div>
+                    {order.status === 'pending' && (
+                      <div className="text-[10px] text-amber-600 font-bold">
+                        Due: {formatCurrency(order.remainingAmount || (order.totalAmount - (order.paidAmount || 0)))}
+                      </div>
+                    )}
+                  </div>
                   <Badge className={order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
                     {order.status}
                   </Badge>
+                  {order.status === 'pending' && (
+                    <button
+                      onClick={async () => {
+                        const due = order.remainingAmount || (order.totalAmount - (order.paidAmount || 0));
+                        setAmountReceived(due ? due.toFixed(2) : order.totalAmount.toFixed(2));
+                        setPaymentMethod('cash');
+                        setIsQueueOpen(false);
+                        setIsPaymentOpen(true);
+                      }}
+                      className="text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 px-2 py-1 rounded hover:bg-amber-200"
+                    >
+                      Collect
+                    </button>
+                  )}
                   <button onClick={() => handleCancelOrder(order.id || order._id)} className="text-red-500 hover:text-red-700" title="Cancel">
                     <XMarkIcon className="h-4 w-4" />
                   </button>
