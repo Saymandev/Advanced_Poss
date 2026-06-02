@@ -528,14 +528,21 @@ export default function GroceryPOSPage() {
             </div>
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {filteredProducts.map(product => (
+              {filteredProducts.map(product => {
+                const cartQty = cart.find(item => item.menuItemId === product.id)?.quantity || 0;
+                return (
                 <button
                   key={product.id}
                   onClick={() => addToCart(product)}
-                  className="group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-3 text-left hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all active:scale-95"
+                  className="group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-3 text-left hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all active:scale-95 relative"
                 >
-                  <div className="aspect-square bg-gray-50 dark:bg-slate-800 rounded-xl mb-2 flex items-center justify-center text-3xl group-hover:scale-105 transition-transform">
+                  <div className="aspect-square bg-gray-50 dark:bg-slate-800 rounded-xl mb-2 flex items-center justify-center text-3xl group-hover:scale-105 transition-transform relative">
                     🛒
+                    {cartQty > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow">
+                        {cartQty}
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm font-bold truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
                     {product.name}
@@ -549,7 +556,8 @@ export default function GroceryPOSPage() {
                     <div className="text-[10px] text-gray-400 mt-0.5 font-mono">{product.barcode}</div>
                   )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
