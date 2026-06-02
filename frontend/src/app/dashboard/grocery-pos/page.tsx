@@ -305,6 +305,8 @@ export default function GroceryPOSPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [saleSuccess, setSaleSuccess] = useState<{ orderId: string; orderNumber: string; total: number; change: number } | null>(null);
   const [currentOrderId, setCurrentOrderId] = useState('');
+  const [paymentMode, setPaymentMode] = useState<'checkout' | 'collect'>('checkout');
+  const [collectOrderData, setCollectOrderData] = useState<any>(null);
 
   const { data: receiptHTML, isFetching: receiptLoading } = useGetReceiptHTMLQuery(currentOrderId, {
     skip: !currentOrderId,
@@ -327,8 +329,32 @@ export default function GroceryPOSPage() {
   }, [received, cartTotal, isCash]);
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return;
     if (isProcessing) return;
+
+    // Collect mode - collecting on existing order
+    if (paymentMode === 'collect' && collectOrderData) {
+      setIsProcessing(true);
+      try {
+        const amt = parseFloat(amountReceived || '0');
+        await processPayment({
+          orderId: collectOrderData.id || collectOrderData._id,
+          amount: amt,
+          method: paymentMethod,
+          amountReceived: amt,
+          changeDue: 0,
+        }).unwrap();
+        toast.success('Payment collected');
+        setIsPaymentOpen(false);
+        setPaymentMode('checkout');
+        setCollectOrderData(null);
+        refetchQueue();
+      } catch (e: any) { toast.error(e?.data?.message || 'Failed'); }
+      finally { setIsProcessing(false); }
+      return;
+    }
+
+    // Checkout mode
+    if (cart.length === 0) return;
     if (isCash && (!Number.isFinite(received) || received <= 0)) {
       toast.error('Enter the amount received');
       return;
@@ -690,6 +716,7 @@ export default function GroceryPOSPage() {
             variant="primary"
             onClick={() => {
               if (cart.length === 0) return;
+              setPaymentMode('checkout');
               setIsPaymentOpen(true);
               setAmountReceived(cartTotal.toFixed(2));
             }}
@@ -746,11 +773,22 @@ export default function GroceryPOSPage() {
       </Modal>
 
       {/* Payment Modal */}
-      <Modal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} title="Payment" size="sm">
+      <Modal isOpen={isPaymentOpen} onClose={() => { setIsPaymentOpen(false); setPaymentMode('checkout'); }} title={paymentMode === 'collect' ? 'Collect Payment' : 'Payment'} size="sm">
         <div className="space-y-4">
           <div className="text-center py-2">
-            <div className="text-3xl font-black">{formatCurrency(cartTotal)}</div>
-            <div className="text-xs text-gray-500">{cart.length} items in cart</div>
+            {paymentMode === 'collect' && collectOrderData ? (
+              <>
+                <div className="text-sm text-gray-500">Order #{collectOrderData.orderNumber}</div>
+                <div className="text-2xl font-black">{formatCurrency(collectOrderData.totalAmount || collectOrderData.total || 0)}</div>
+                <div className="text-xs text-gray-500">Paid: {formatCurrency(collectOrderData.paidAmount || 0)}</div>
+                <div className="text-sm font-bold text-amber-600">Due: {formatCurrency((collectOrderData.remainingAmount || (collectOrderData.totalAmount || collectOrderData.total || 0) - (collectOrderData.paidAmount || 0)))}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-black">{formatCurrency(cartTotal)}</div>
+                <div className="text-xs text-gray-500">{cart.length} items in cart</div>
+              </>
+            )}
           </div>
 
           <div>
@@ -795,7 +833,7 @@ export default function GroceryPOSPage() {
             <Button
               variant="primary"
               onClick={handleCheckout}
-              disabled={isProcessing || cart.length === 0 || cartTotal <= 0}
+              disabled={isProcessing || (paymentMode === 'checkout' && (cart.length === 0 || cartTotal <= 0))}
               className="flex-1 bg-emerald-600 hover:bg-emerald-500"
             >
               {isProcessing ? 'Processing...' : isCash ? 'Complete Sale' : `Charge ${formatCurrency(cartTotal)}`}
@@ -831,12 +869,15 @@ export default function GroceryPOSPage() {
                   <Badge className={order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
                     {order.status}
                   </Badge>
-                  {order.status === 'pending' && (
+                  {order.paymentStatus === 'partial' || order.status === 'pending' ? (
                     <button
-                      onClick={async () => {
-                        const due = order.remainingAmount || (order.totalAmount - (order.paidAmount || 0));
-                        setAmountReceived(due ? due.toFixed(2) : order.totalAmount.toFixed(2));
+                      onClick={() => {
+                        const due = order.remainingAmount || ((order.totalAmount || order.total || 0) - (order.paidAmount || 0));
+                        const orderTotal = order.totalAmount || order.total || 0;
+                        setAmountReceived(due > 0 ? due.toFixed(2) : orderTotal.toFixed(2));
                         setPaymentMethod('cash');
+                        setPaymentMode('collect');
+                        setCollectOrderData(order);
                         setIsQueueOpen(false);
                         setIsPaymentOpen(true);
                       }}
