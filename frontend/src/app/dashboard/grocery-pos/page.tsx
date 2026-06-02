@@ -12,6 +12,7 @@ import {
   useCreatePOSOrderMutation,
   useGetPOSMenuItemsQuery,
   useGetPOSOrdersQuery,
+  useGetPOSSettingsQuery,
   useProcessPaymentMutation,
 } from '@/lib/api/endpoints/posApi';
 import { useGetCustomersQuery, useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
@@ -68,6 +69,14 @@ export default function GroceryPOSPage() {
 
   const branchId = (user as any)?.branchId || (companyContext as any)?.branchId || '';
   const companyId = (user as any)?.companyId || (companyContext as any)?.companyId || '';
+
+  // POS Settings (tax, service charge)
+  const { data: posSettings } = useGetPOSSettingsQuery(
+    { branchId: user?.branchId || undefined },
+    { skip: !branchId }
+  );
+  const taxRate = posSettings?.taxRate ?? 0;
+  const serviceChargeRate = posSettings?.serviceCharge ?? 0;
 
   // Product data
   const { data: productsData, isLoading: productsLoading } = useGetPOSMenuItemsQuery({
@@ -241,7 +250,10 @@ export default function GroceryPOSPage() {
     }).filter(Boolean) as CartItem[]);
   };
 
-  const cartTotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.quantity, 0), [cart]);
+  const cartSubtotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.quantity, 0), [cart]);
+  const cartTax = useMemo(() => (cartSubtotal * taxRate) / 100, [cartSubtotal, taxRate]);
+  const cartServiceCharge = useMemo(() => (cartSubtotal * serviceChargeRate) / 100, [cartSubtotal, serviceChargeRate]);
+  const cartTotal = useMemo(() => cartSubtotal + cartTax + cartServiceCharge, [cartSubtotal, cartTax, cartServiceCharge]);
 
   const clearCart = () => {
     setCart([]);
@@ -323,11 +335,11 @@ export default function GroceryPOSPage() {
           quantity: item.quantity,
           price: item.price,
         })),
-        subtotal: cartTotal,
-        taxRate: 0,
-        taxAmount: 0,
-        serviceChargeRate: 0,
-        serviceChargeAmount: 0,
+        subtotal: cartSubtotal,
+        taxRate: taxRate,
+        taxAmount: cartTax,
+        serviceChargeRate: serviceChargeRate,
+        serviceChargeAmount: cartServiceCharge,
         totalAmount: cartTotal,
         status: paymentMethod === 'cash' && parseFloat(amountReceived) >= cartTotal ? 'paid' as const : 'pending' as const,
         paymentMethod: paymentMethod,
@@ -609,11 +621,29 @@ export default function GroceryPOSPage() {
           </button>
 
           {/* Total */}
-          <div className="flex justify-between items-center text-lg">
-            <span className="font-bold">Total</span>
-            <span className="font-black text-xl text-blue-600 dark:text-blue-400">
-              {formatCurrency(cartTotal)}
-            </span>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between text-gray-500">
+              <span>Subtotal</span>
+              <span>{formatCurrency(cartSubtotal)}</span>
+            </div>
+            {(taxRate > 0 || cartTax > 0) && (
+              <div className="flex justify-between text-gray-500">
+                <span>Tax ({taxRate}%)</span>
+                <span>{formatCurrency(cartTax)}</span>
+              </div>
+            )}
+            {(serviceChargeRate > 0 || cartServiceCharge > 0) && (
+              <div className="flex justify-between text-gray-500">
+                <span>Service Charge ({serviceChargeRate}%)</span>
+                <span>{formatCurrency(cartServiceCharge)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-lg font-bold border-t pt-1">
+              <span>Total</span>
+              <span className="font-black text-xl text-blue-600 dark:text-blue-400">
+                {formatCurrency(cartTotal)}
+              </span>
+            </div>
           </div>
 
           {/* Checkout */}
