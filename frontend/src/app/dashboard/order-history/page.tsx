@@ -381,7 +381,7 @@ export default function OrdersPage() {
         taxRate: order.taxRate ?? posSettings?.taxRate ?? 0,
         serviceChargeRate: order.serviceChargeRate ?? posSettings?.serviceCharge ?? 0,
         paymentMethod: order.paymentMethod,
-        paymentStatus: order.status === 'paid' ? 'paid' : 'pending',
+        paymentStatus: order.paymentStatus || (order.status === 'paid' ? 'paid' : 'pending'),
         createdAt: order.createdAt || new Date().toISOString(),
         updatedAt: order.updatedAt || new Date().toISOString(),
         servedAt: order.servedAt,
@@ -773,6 +773,7 @@ export default function OrdersPage() {
     const variants: Record<string, 'warning' | 'success' | 'danger' | 'secondary'> = {
       pending: 'warning',
       unpaid: 'warning',
+      partial: 'warning',
       paid: 'success',
       refunded: 'danger',
       cancelled: 'danger',
@@ -781,6 +782,7 @@ export default function OrdersPage() {
     const labelMap: Record<string, string> = {
       pending: 'Unpaid',
       unpaid: 'Unpaid',
+      partial: 'Partial',
       paid: 'Paid',
       refunded: 'Refunded',
       cancelled: 'Cancelled',

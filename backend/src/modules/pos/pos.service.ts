@@ -1237,11 +1237,13 @@ export class POSService {
         });
       }
     } else {
+      const order = await this.posOrderModel.findById(processPaymentDto.orderId);
+      const isFullPayment = processPaymentDto.amount >= (order?.totalAmount || 0);
       updatedOrder = await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
-        status: 'paid',
-        paymentStatus: 'paid',
+        status: isFullPayment ? 'paid' : 'pending',
+        paymentStatus: isFullPayment ? 'paid' : 'partial',
         paymentId: savedPayment._id,
-        completedAt: new Date(),
+        completedAt: isFullPayment ? new Date() : undefined,
         amountReceived: processPaymentDto.amountReceived,
         changeDue: processPaymentDto.changeDue,
       }, { new: true }).exec();
