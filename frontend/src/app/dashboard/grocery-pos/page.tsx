@@ -673,9 +673,6 @@ export default function GroceryPOSPage() {
             <div className="text-center py-2 border-b">
               <div className="text-sm text-gray-500">Order</div>
               <div className="text-2xl font-black">#{saleSuccess.orderNumber}</div>
-              <div className="text-3xl font-black text-green-600 dark:text-green-400 mt-2">
-                {formatCurrency(saleSuccess.total)}
-              </div>
               {saleSuccess.change > 0 && (
                 <div className="text-sm font-bold text-emerald-600 mt-1">
                   Change: {formatCurrency(saleSuccess.change)}
@@ -768,7 +765,9 @@ export default function GroceryPOSPage() {
                 <div>
                   <div className="font-bold text-sm">#{order.orderNumber}</div>
                   <div className="text-xs text-gray-500">{formatDateTime(order.createdAt)}</div>
-                  <div className="text-xs text-gray-500">{order.items?.length || 0} items</div>
+                  <div className="text-xs text-gray-500">
+                    {order.items?.length || 0} lines, {order.items?.reduce((s: number, i: any) => s + (i.quantity || 1), 0) || 0} items
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="font-bold text-sm">{formatCurrency(order.totalAmount || order.total || 0)}</div>
