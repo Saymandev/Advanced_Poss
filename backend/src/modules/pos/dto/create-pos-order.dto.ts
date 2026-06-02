@@ -102,8 +102,8 @@ export class DeliveryDetailsDto {
 
 export class CreatePOSOrderDto {
   @IsNotEmpty()
-  @IsEnum(['dine-in', 'delivery', 'takeaway', 'room_service'])
-  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
+  @IsEnum(['dine-in', 'delivery', 'takeaway', 'room_service', 'counter_sale'])
+  orderType: 'dine-in' | 'delivery' | 'takeaway' | 'room_service' | 'counter_sale';
 
   @ValidateIf((o) => o.orderType === 'dine-in')
   @IsNotEmpty()

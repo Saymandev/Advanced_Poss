@@ -188,8 +188,22 @@ export default function GroceryPOSPage() {
     return () => clearTimeout(timer);
   }, [barcodeInput]);
 
-  // Cart
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Cart with localStorage persistence
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('grocery_cart');
+        return saved ? JSON.parse(saved) : [];
+      } catch { return []; }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('grocery_cart', JSON.stringify(cart));
+    }
+  }, [cart]);
 
   const addToCart = (product: any) => {
     setCart(prev => {
@@ -233,7 +247,21 @@ export default function GroceryPOSPage() {
     setCart([]);
     setCustomerInfo({ name: '', phone: '', email: '' });
     setSelectedCustomerId('');
+    if (typeof window !== 'undefined') localStorage.removeItem('grocery_cart');
   };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'F1') { e.preventDefault(); setIsQueueOpen(prev => !prev); }
+      if (e.key === 'F2') { e.preventDefault(); setIsPaymentOpen(true); }
+      if (e.key === 'Escape') { e.preventDefault(); setIsPaymentOpen(false); setIsQueueOpen(false); setIsCustomerModalOpen(false); }
+      if (e.key === 'Enter' && cart.length > 0 && !isPaymentOpen) { e.preventDefault(); setIsPaymentOpen(true); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [cart.length, isPaymentOpen]);
 
   // Customer
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', email: '' });
