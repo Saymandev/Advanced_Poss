@@ -456,8 +456,7 @@ export default function GroceryPOSPage() {
     </Modal>
   );
 
-  return (
-    <div className={cn(
+  return <div className={cn(
       "fixed inset-0 top-16 z-0 flex flex-col lg:flex-row bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 transition-all duration-300",
       sidebarCollapsed ? "left-0 lg:left-16" : "left-0 lg:left-64"
     )}>
@@ -781,6 +780,37 @@ export default function GroceryPOSPage() {
             </Button>
         </div>
       </div>
+      </Modal>
+
+      {/* Queue Modal */}
+      <Modal isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} title="Orders Queue" size="lg">
+        <div className="space-y-2">
+          {queueOrders.length === 0 ? (
+            <div className="text-center text-gray-400 py-8">No orders</div>
+          ) : (
+            queueOrders.map((order: any) => (
+              <div key={order.id || order._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900 rounded-xl">
+                <div>
+                  <div className="font-bold text-sm">#{order.orderNumber}</div>
+                  <div className="text-xs text-gray-500">{formatDateTime(order.createdAt)}</div>
+                  <div className="text-xs text-gray-500">
+                    {order.items?.length || 0} lines, {order.items?.reduce((s: number, i: any) => s + (i.quantity || 1), 0) || 0} items
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="font-bold text-sm">{formatCurrency(order.totalAmount || order.total || 0)}</div>
+                  <Badge className={order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
+                    {order.status}
+                  </Badge>
+                  <button onClick={() => handleCancelOrder(order.id || order._id)} className="text-red-500 hover:text-red-700" title="Cancel">
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
 
       {renderCustomerModal()}
 
@@ -798,6 +828,5 @@ export default function GroceryPOSPage() {
           )}
         </button>
       )}
-    </div>
-  );
+    </div>;
 }
