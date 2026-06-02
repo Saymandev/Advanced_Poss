@@ -2670,7 +2670,7 @@ export default function SubscriptionsPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600 dark:text-gray-400">Storage</span>
                       <span className={`text-sm font-medium ${getUsageColor(getUsagePercentage(usageStats.storageUsed, effectiveSubscription.plan?.limits?.storageGB || 0))}`}>
-                        {usageStats.storageUsed.toFixed(2)} GB / {effectiveSubscription.plan?.limits?.storageGB} GB
+                        {(usageStats?.storageUsed || 0).toFixed(2)} GB / {effectiveSubscription.plan?.limits?.storageGB} GB
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
