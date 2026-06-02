@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useRefundOrderMutation, useUpdatePOSOrderMutation } from '@/lib/api/endpoints/posApi';
+import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useProcessPaymentMutation, useRefundOrderMutation, useUpdatePOSOrderMutation } from '@/lib/api/endpoints/posApi';
 import { useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -266,9 +266,13 @@ export default function OrdersPage() {
   
   const [updatePOSOrder, { isLoading: isUpdating }] = useUpdatePOSOrderMutation();
   const [cancelPOSOrder, { isLoading: isCancelling }] = useCancelPOSOrderMutation();
+  const [processPayment, { isLoading: isProcessingPayment }] = useProcessPaymentMutation();
   const [refundOrder, { isLoading: isRefunding }] = useRefundOrderMutation();
 
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
+  const [collectOrder, setCollectOrder] = useState<any>(null);
+  const [collectAmount, setCollectAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [refundAmount, setRefundAmount] = useState<number | ''>('');
 
@@ -696,6 +700,25 @@ export default function OrdersPage() {
     setRefundAmount(order.total);
     setRefundReason('');
     setIsRefundModalOpen(true);
+  };
+
+  const handleCollectPayment = async () => {
+    if (!collectOrder || !collectAmount) return;
+    try {
+      await processPayment({
+        orderId: collectOrder.id,
+        amount: parseFloat(collectAmount),
+        method: 'cash',
+        amountReceived: parseFloat(collectAmount),
+        changeDue: 0,
+      }).unwrap();
+      toast.success('Payment collected');
+      setIsCollectModalOpen(false);
+      setCollectOrder(null);
+      refetch();
+    } catch (e: any) {
+      toast.error(e?.data?.message || 'Collection failed');
+    }
   };
 
   const openViewModal = (order: Order) => {
@@ -1167,8 +1190,10 @@ export default function OrdersPage() {
                     size="sm"
                     onClick={() => {
                       setIsViewModalOpen(false);
-                      const posPath = companyContext?.businessType === 'grocery' ? '/dashboard/grocery-pos' : '/dashboard/pos';
-                      router.push(`${posPath}?orderId=${selectedOrder.id}`);
+                      const due = (selectedOrder as any).remainingAmount || (selectedOrder.total - ((selectedOrder as any).paidAmount || 0));
+                      setCollectOrder(selectedOrder);
+                      setCollectAmount(due > 0 ? due.toFixed(2) : selectedOrder.total.toFixed(2));
+                      setIsCollectModalOpen(true);
                     }}
                     className="flex items-center justify-center gap-2 bg-amber-100 hover:bg-amber-200 text-amber-700 w-full sm:w-auto"
                   >
@@ -1637,6 +1662,39 @@ export default function OrdersPage() {
                   </table>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Collect Payment Modal */}
+      <Modal isOpen={isCollectModalOpen} onClose={() => setIsCollectModalOpen(false)} title="Collect Payment" size="sm">
+        {collectOrder && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="text-sm text-gray-500">Order #{collectOrder.orderNumber}</div>
+              <div className="text-2xl font-black">{formatCurrency(collectOrder.total)}</div>
+              <div className="text-xs text-amber-600">Paid: {formatCurrency((collectOrder as any).paidAmount || 0)}</div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1">Amount to Collect</label>
+              <Input
+                type="number"
+                value={collectAmount}
+                onChange={(e) => setCollectAmount(e.target.value)}
+                className="text-lg font-bold"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="ghost" onClick={() => setIsCollectModalOpen(false)} className="flex-1">Cancel</Button>
+              <Button
+                variant="primary"
+                onClick={handleCollectPayment}
+                disabled={isProcessingPayment || !collectAmount}
+                className="flex-1 bg-emerald-600"
+              >
+                {isProcessingPayment ? 'Processing...' : `Collect ${formatCurrency(parseFloat(collectAmount || '0'))}`}
+              </Button>
             </div>
           </div>
         )}
