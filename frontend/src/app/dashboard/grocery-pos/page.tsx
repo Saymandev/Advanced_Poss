@@ -395,6 +395,9 @@ export default function GroceryPOSPage() {
     return () => window.removeEventListener('sidebar-toggle', handleToggle as EventListener);
   }, []);
 
+  // Mobile cart toggle
+  const [showMobileCart, setShowMobileCart] = useState(false);
+
   // Work period lock
   if (!isOwner && !workPeriodLoading && !activeWorkPeriod) {
     return (
@@ -453,7 +456,7 @@ export default function GroceryPOSPage() {
 
   return (
     <div className={cn(
-      "fixed inset-0 top-16 z-0 flex bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden transition-all duration-300",
+      "fixed inset-0 top-16 z-0 flex flex-col lg:flex-row bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden transition-all duration-300",
       sidebarCollapsed ? "left-0 lg:left-16" : "left-0 lg:left-64"
     )}>
       {/* Main content */}
@@ -553,7 +556,11 @@ export default function GroceryPOSPage() {
       </div>
 
       {/* Cart sidebar */}
-      <div className="w-[380px] border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col">
+      <div className={cn(
+        "border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col",
+        "fixed inset-y-0 top-16 right-0 w-full sm:w-[400px] lg:relative lg:w-[380px] z-30 lg:z-0 transition-transform lg:transition-none",
+        showMobileCart ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+      )}>
         {/* Cart header */}
         <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
           <div>
@@ -568,6 +575,9 @@ export default function GroceryPOSPage() {
               Clear
             </button>
           )}
+          <button onClick={() => setShowMobileCart(false)} className="lg:hidden text-gray-400 hover:text-gray-600">
+            <XMarkIcon className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Cart items */}
@@ -750,8 +760,21 @@ export default function GroceryPOSPage() {
             >
               {isProcessing ? 'Processing...' : isCash ? 'Complete Sale' : `Charge ${formatCurrency(cartTotal)}`}
             </Button>
-          </div>
         </div>
+      </div>
+
+      {/* Mobile floating cart button */}
+      {!showMobileCart && cart.length > 0 && (
+        <button
+          onClick={() => setShowMobileCart(true)}
+          className="lg:hidden fixed bottom-4 right-4 z-40 bg-emerald-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center hover:bg-emerald-500 active:scale-95"
+        >
+          <ShoppingBagIcon className="h-6 w-6" />
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+            {cart.reduce((s, i) => s + i.quantity, 0)}
+          </span>
+        </button>
+      )}
       </Modal>
 
       {/* Queue Modal */}
