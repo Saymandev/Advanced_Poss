@@ -688,7 +688,11 @@ export default function GroceryPOSPage() {
           {/* Checkout */}
           <Button
             variant="primary"
-            onClick={() => { setIsPaymentOpen(true); setAmountReceived(cartTotal.toFixed(2)); }}
+            onClick={() => {
+              if (cart.length === 0) return;
+              setIsPaymentOpen(true);
+              setAmountReceived(cartTotal.toFixed(2));
+            }}
             disabled={cart.length === 0}
             className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base"
           >
@@ -791,7 +795,7 @@ export default function GroceryPOSPage() {
             <Button
               variant="primary"
               onClick={handleCheckout}
-              disabled={isProcessing || (!isCash && cart.length === 0)}
+              disabled={isProcessing || cart.length === 0 || cartTotal <= 0}
               className="flex-1 bg-emerald-600 hover:bg-emerald-500"
             >
               {isProcessing ? 'Processing...' : isCash ? 'Complete Sale' : `Charge ${formatCurrency(cartTotal)}`}
