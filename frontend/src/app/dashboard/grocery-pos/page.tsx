@@ -100,7 +100,7 @@ export default function GroceryPOSPage() {
   // Queue
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const { data: queueData, refetch: refetchQueue } = useGetPOSOrdersQuery(
-    { branchId, limit: 25, page: 1, status: 'pending' },
+    { branchId, limit: 25, page: 1 },
     { skip: !branchId }
   );
   const queueOrders = useMemo(() => (queueData as any)?.orders || [], [queueData]);
@@ -297,21 +297,9 @@ export default function GroceryPOSPage() {
   // Payment
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
-
-  // Keyboard shortcuts - must be after state declarations
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'F1') { e.preventDefault(); setIsQueueOpen(prev => !prev); }
-      if (e.key === 'F2') { e.preventDefault(); setIsPaymentOpen(true); }
-      if (e.key === 'Escape') { e.preventDefault(); setIsPaymentOpen(false); setIsQueueOpen(false); setIsCustomerModalOpen(false); }
-      if (e.key === 'Enter' && cart.length > 0 && !isPaymentOpen) { e.preventDefault(); setIsPaymentOpen(true); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [cart.length, isPaymentOpen]);
   const [amountReceived, setAmountReceived] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [saleSuccess, setSaleSuccess] = useState<{ orderNumber: string; total: number; change: number } | null>(null);
 
   const cashMethod = paymentMethods.find(m => m.code === 'cash');
   const isCash = paymentMethod === 'cash';
@@ -364,6 +352,7 @@ export default function GroceryPOSPage() {
       }
 
       toast.success(`Order #${order.orderNumber || orderId} completed`);
+      setSaleSuccess({ orderNumber: order.orderNumber || orderId, total: cartTotal, change });
       clearCart();
       setIsPaymentOpen(false);
       refetchQueue();
@@ -667,6 +656,32 @@ export default function GroceryPOSPage() {
           </Button>
         </div>
       </div>
+
+      {/* Sale Success */}
+      <Modal isOpen={!!saleSuccess} onClose={() => setSaleSuccess(null)} title="Sale Complete" size="sm">
+        {saleSuccess && (
+          <div className="text-center space-y-4 py-4">
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
+              <CheckIcon className="h-8 w-8 text-green-600" />
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">Order</div>
+              <div className="text-2xl font-black">#{saleSuccess.orderNumber}</div>
+            </div>
+            <div className="text-3xl font-black text-blue-600 dark:text-blue-400">
+              {formatCurrency(saleSuccess.total)}
+            </div>
+            {saleSuccess.change > 0 && (
+              <div className="text-sm font-bold text-emerald-600">
+                Change: {formatCurrency(saleSuccess.change)}
+              </div>
+            )}
+            <Button className="w-full" onClick={() => setSaleSuccess(null)}>
+              Done
+            </Button>
+          </div>
+        )}
+      </Modal>
 
       {/* Payment Modal */}
       <Modal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} title="Payment" size="sm">

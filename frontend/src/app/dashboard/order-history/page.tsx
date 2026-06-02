@@ -883,7 +883,11 @@ export default function OrdersPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push(`/dashboard/pos?orderId=${row.id}`)}
+              onClick={() => {
+                const isCounterSale = (row as any).orderType === 'counter_sale' || (row as any).type === 'counter_sale';
+                const posPath = isCounterSale ? '/dashboard/grocery-pos' : '/dashboard/pos';
+                router.push(`${posPath}?orderId=${row.id}`);
+              }}
               title="View in POS"
             >
               <ComputerDesktopIcon className="w-4 h-4" />
