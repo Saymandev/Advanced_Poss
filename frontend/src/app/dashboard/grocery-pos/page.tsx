@@ -782,57 +782,22 @@ export default function GroceryPOSPage() {
         </div>
       </div>
 
-      {/* Mobile floating cart button */}
-      {!showMobileCart && (
-        <button
-          onClick={() => setShowMobileCart(true)}
-          className="lg:hidden fixed bottom-4 right-4 z-40 bg-emerald-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center hover:bg-emerald-500 active:scale-95"
-        >
-          <ShoppingBagIcon className="h-6 w-6" />
-          {cart.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-              {cart.reduce((s, i) => s + i.quantity, 0)}
-            </span>
-          )}
-        </button>
-      )}
-      </Modal>
-
-      {/* Queue Modal */}
-      <Modal isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} title="Orders Queue" size="lg">
-        <div className="space-y-2">
-          {queueOrders.length === 0 ? (
-            <div className="text-center text-gray-400 py-8">No pending orders</div>
-          ) : (
-            queueOrders.map((order: any) => (
-              <div key={order.id || order._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900 rounded-xl">
-                <div>
-                  <div className="font-bold text-sm">#{order.orderNumber}</div>
-                  <div className="text-xs text-gray-500">{formatDateTime(order.createdAt)}</div>
-                  <div className="text-xs text-gray-500">
-                    {order.items?.length || 0} lines, {order.items?.reduce((s: number, i: any) => s + (i.quantity || 1), 0) || 0} items
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="font-bold text-sm">{formatCurrency(order.totalAmount || order.total || 0)}</div>
-                  <Badge className={order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
-                    {order.status}
-                  </Badge>
-                  <button
-                    onClick={() => handleCancelOrder(order.id || order._id)}
-                    className="text-red-500 hover:text-red-700"
-                    title="Cancel"
-                  >
-                    <XMarkIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </Modal>
-
       {renderCustomerModal()}
     </div>
+
+    {/* Mobile floating cart button — outside overflow-hidden container */}
+    {!showMobileCart && (
+      <button
+        onClick={() => setShowMobileCart(true)}
+        className="lg:hidden fixed bottom-4 right-4 z-50 bg-emerald-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center hover:bg-emerald-500 active:scale-95"
+      >
+        <ShoppingBagIcon className="h-6 w-6" />
+        {cart.length > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+            {cart.reduce((s, i) => s + i.quantity, 0)}
+          </span>
+        )}
+      </button>
+    )}
   );
 }
