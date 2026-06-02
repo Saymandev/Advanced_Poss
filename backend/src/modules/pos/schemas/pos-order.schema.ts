@@ -127,6 +127,12 @@ export class POSOrder {
   @Prop({ default: 'cash' })
   paymentMethod?: string;
 
+  @Prop({ default: 0 })
+  paidAmount: number;
+
+  @Prop({ default: 0 })
+  remainingAmount: number;
+
   @Prop()
   notes?: string;
 

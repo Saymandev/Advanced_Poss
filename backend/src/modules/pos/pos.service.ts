@@ -1196,8 +1196,10 @@ export class POSService {
     }
 
     const orderTotal = isPublic ? order.total : order.totalAmount;
-    if (Math.abs(orderTotal - processPaymentDto.amount) > 0.01) {
-      throw new BadRequestException('Payment amount does not match order total');
+    const totalPaid = (order as any).paidAmount || 0;
+    const remaining = orderTotal - totalPaid;
+    if (processPaymentDto.amount <= 0 || processPaymentDto.amount > remaining + 0.01) {
+      throw new BadRequestException(`Payment amount must be between 0 and ${remaining.toFixed(2)}`);
     }
     const paymentData: any = {
       orderId: new Types.ObjectId(processPaymentDto.orderId),
@@ -1238,10 +1240,13 @@ export class POSService {
       }
     } else {
       const order = await this.posOrderModel.findById(processPaymentDto.orderId);
-      const isFullPayment = processPaymentDto.amount >= (order?.totalAmount || 0);
+      const totalPaid = (order?.paidAmount || 0) + processPaymentDto.amount;
+      const isFullPayment = totalPaid >= (order?.totalAmount || 0);
       updatedOrder = await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
         status: isFullPayment ? 'paid' : 'pending',
         paymentStatus: isFullPayment ? 'paid' : 'partial',
+        paidAmount: totalPaid,
+        remainingAmount: Math.max(0, (order?.totalAmount || 0) - totalPaid),
         paymentId: savedPayment._id,
         completedAt: isFullPayment ? new Date() : undefined,
         amountReceived: processPaymentDto.amountReceived,
