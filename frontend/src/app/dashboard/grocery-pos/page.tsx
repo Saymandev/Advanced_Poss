@@ -589,7 +589,7 @@ export default function GroceryPOSPage() {
       {/* Cart sidebar */}
       <div className={cn(
         "border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col",
-        "fixed inset-y-0 top-16 right-0 w-full sm:w-[400px] lg:relative lg:w-[380px] z-30 lg:z-0 transition-transform lg:transition-none",
+        "fixed inset-y-0 top-16 right-0 w-full sm:w-[400px] lg:relative lg:top-0 lg:w-[380px] z-30 lg:z-0 transition-transform lg:transition-none",
         showMobileCart ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       )}>
         {/* Cart header */}

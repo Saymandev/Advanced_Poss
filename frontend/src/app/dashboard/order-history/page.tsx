@@ -16,6 +16,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
   ArrowPathIcon,
   ComputerDesktopIcon,
+  CreditCardIcon,
   DocumentTextIcon,
   EyeIcon,
   MagnifyingGlassIcon,
@@ -948,7 +949,10 @@ export default function OrdersPage() {
             filename="order-history-import-template"
             variant="secondary"
           />
-          <Button onClick={() => window.open('/dashboard/pos', '_blank')} className="w-full sm:w-auto">
+          <Button onClick={() => {
+            const posPath = companyContext?.businessType === 'grocery' ? '/dashboard/grocery-pos' : '/dashboard/pos';
+            window.open(posPath, '_blank');
+          }} className="w-full sm:w-auto">
             <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
             <span className="text-sm sm:text-base">New Order</span>
           </Button>
@@ -1157,11 +1161,30 @@ export default function OrdersPage() {
                     Refund
                   </Button>
                 )}
+                {selectedOrder?.paymentStatus === 'partial' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setIsViewModalOpen(false);
+                      const due = (selectedOrder as any).remainingAmount || (selectedOrder.totalAmount - ((selectedOrder as any).paidAmount || 0));
+                      const posPath = companyContext?.businessType === 'grocery' ? '/dashboard/grocery-pos' : '/dashboard/pos';
+                      router.push(`${posPath}?orderId=${selectedOrder.id}`);
+                    }}
+                    className="flex items-center justify-center gap-2 bg-amber-100 hover:bg-amber-200 text-amber-700 w-full sm:w-auto"
+                  >
+                    <CreditCardIcon className="w-4 h-4" />
+                    Collect Payment
+                  </Button>
+                )}
                 {canAccessPOS && (
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={() => router.push(`/dashboard/pos?orderId=${selectedOrder.id}`)}
+                    onClick={() => {
+                      const posPath = companyContext?.businessType === 'grocery' ? '/dashboard/grocery-pos' : '/dashboard/pos';
+                      router.push(`${posPath}?orderId=${selectedOrder.id}`);
+                    }}
                     className="flex items-center justify-center gap-2 w-full sm:w-auto"
                   >
                     <ComputerDesktopIcon className="w-4 h-4" />
