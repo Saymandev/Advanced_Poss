@@ -682,8 +682,8 @@ export default function GroceryPOSPage() {
                 </div>
               )}
             </div>
-            {receiptHTML ? (
-              <div dangerouslySetInnerHTML={{ __html: receiptHTML }} />
+            {receiptHTML?.html ? (
+              <div dangerouslySetInnerHTML={{ __html: receiptHTML.html }} />
             ) : receiptLoading ? (
               <div className="text-center py-4 text-gray-400">Loading receipt...</div>
             ) : (
