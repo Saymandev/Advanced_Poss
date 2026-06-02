@@ -323,6 +323,19 @@ export default function GroceryPOSPage() {
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (isProcessing) return;
+
+    const received = parseFloat(amountReceived || '0');
+    if (isCash) {
+      if (!Number.isFinite(received) || received <= 0) {
+        toast.error('Enter the amount received');
+        return;
+      }
+      if (received < cartTotal) {
+        toast.error(`Amount received (${formatCurrency(received)}) is less than total (${formatCurrency(cartTotal)})`);
+        return;
+      }
+    }
+
     setIsProcessing(true);
 
     try {
