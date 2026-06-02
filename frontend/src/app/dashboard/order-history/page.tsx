@@ -885,7 +885,7 @@ export default function OrdersPage() {
               size="sm"
               onClick={() => {
                 const rawType = (row as any).orderType || (row as any).order_type || (row as any).type || '';
-                const isCounterSale = rawType === 'counter_sale';
+                const isCounterSale = rawType === 'counter_sale' || rawType === 'counter-sale';
                 const posPath = isCounterSale ? '/dashboard/grocery-pos' : '/dashboard/pos';
                 router.push(`${posPath}?orderId=${row.id}`);
               }}
