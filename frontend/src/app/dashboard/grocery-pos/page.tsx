@@ -124,6 +124,8 @@ export default function GroceryPOSPage() {
       barcode: p.barcode || p.sku || '',
       weightBased: p.weightBasedPricing || false,
       unitType: p.unitType || 'piece',
+      stock: p.stock ?? null,
+      stockStatus: p.stockStatus || (p.isOutOfStock ? 'out' : p.isLowStock ? 'low' : 'ok'),
     }));
   }, [productsData]);
 
@@ -552,6 +554,15 @@ export default function GroceryPOSPage() {
                     {formatCurrency(product.price)}
                     {product.weightBased && <span className="text-xs text-gray-400 ml-1">/{product.unitType}</span>}
                   </div>
+                  {product.stock != null && (
+                    <div className={`text-[10px] font-bold mt-0.5 ${
+                      product.stockStatus === 'out' ? 'text-red-500' :
+                      product.stockStatus === 'low' ? 'text-amber-500' :
+                      'text-green-600'
+                    }`}>
+                      Stock: {product.stock} {product.stock === 0 ? '— Out' : product.stock < 5 ? '— Low' : ''}
+                    </div>
+                  )}
                   {product.barcode && (
                     <div className="text-[10px] text-gray-400 mt-0.5 font-mono">{product.barcode}</div>
                   )}
@@ -772,15 +783,17 @@ export default function GroceryPOSPage() {
       </div>
 
       {/* Mobile floating cart button */}
-      {!showMobileCart && cart.length > 0 && (
+      {!showMobileCart && (
         <button
           onClick={() => setShowMobileCart(true)}
           className="lg:hidden fixed bottom-4 right-4 z-40 bg-emerald-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center hover:bg-emerald-500 active:scale-95"
         >
           <ShoppingBagIcon className="h-6 w-6" />
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-            {cart.reduce((s, i) => s + i.quantity, 0)}
-          </span>
+          {cart.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {cart.reduce((s, i) => s + i.quantity, 0)}
+            </span>
+          )}
         </button>
       )}
       </Modal>
