@@ -457,9 +457,8 @@ export default function GroceryPOSPage() {
   );
 
   return (
-    <>
     <div className={cn(
-      "fixed inset-0 top-16 z-0 flex flex-col lg:flex-row bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden transition-all duration-300",
+      "fixed inset-0 top-16 z-0 flex flex-col lg:flex-row bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 transition-all duration-300",
       sidebarCollapsed ? "left-0 lg:left-16" : "left-0 lg:left-64"
     )}>
       {/* Main content */}
@@ -784,22 +783,21 @@ export default function GroceryPOSPage() {
       </div>
 
       {renderCustomerModal()}
-    </div>
 
-    {/* Mobile floating cart button — outside overflow-hidden container */}
-    {!showMobileCart && (
-      <button
-        onClick={() => setShowMobileCart(true)}
-        className="lg:hidden fixed bottom-4 right-4 z-50 bg-emerald-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center hover:bg-emerald-500 active:scale-95"
-      >
-        <ShoppingBagIcon className="h-6 w-6" />
-        {cart.length > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-            {cart.reduce((s, i) => s + i.quantity, 0)}
-          </span>
-        )}
-      </button>
-    )}
-    </>
+      {/* Mobile floating cart button */}
+      {!showMobileCart && (
+        <button
+          onClick={() => setShowMobileCart(true)}
+          className="lg:hidden fixed bottom-4 right-4 z-50 bg-emerald-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center hover:bg-emerald-500 active:scale-95"
+        >
+          <ShoppingBagIcon className="h-6 w-6" />
+          {cart.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {cart.reduce((s, i) => s + i.quantity, 0)}
+            </span>
+          )}
+        </button>
+      )}
+    </div>
   );
 }
