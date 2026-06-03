@@ -965,7 +965,7 @@ export default function OrdersPage() {
               onClick={() => {
                 const rawType = (row as any).orderType || (row as any).order_type || (row as any).type || '';
                 const isCounterSale = rawType === 'counter_sale' || rawType === 'counter-sale';
-                const posPath = isCounterSale ? '/dashboard/grocery-pos' : '/dashboard/pos';
+                const posPath = isCounterSale ? '/dashboard/retail-pos' : '/dashboard/pos';
                 router.push(`${posPath}?orderId=${row.id}`);
               }}
               title="View in POS"
@@ -1026,7 +1026,7 @@ export default function OrdersPage() {
             variant="secondary"
           />
           <Button onClick={() => {
-            const posPath = companyContext?.businessType === 'grocery' ? '/dashboard/grocery-pos' : '/dashboard/pos';
+            const posPath = companyContext?.businessType === 'retail' ? '/dashboard/retail-pos' : '/dashboard/pos';
             window.open(posPath, '_blank');
           }} className="w-full sm:w-auto">
             <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
@@ -1259,7 +1259,7 @@ export default function OrdersPage() {
                     variant="primary"
                     size="sm"
                     onClick={() => {
-                      const posPath = companyContext?.businessType === 'grocery' ? '/dashboard/grocery-pos' : '/dashboard/pos';
+                      const posPath = companyContext?.businessType === 'retail' ? '/dashboard/retail-pos' : '/dashboard/pos';
                       router.push(`${posPath}?orderId=${selectedOrder.id}`);
                     }}
                     className="flex items-center justify-center gap-2 w-full sm:w-auto"

@@ -65,7 +65,7 @@ export default function BarcodePrintingPage() {
             Barcode Printing
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Print thermal labels for grocery items
+            Print thermal labels for retail items
           </p>
         </div>
         <div className="flex items-center gap-3">

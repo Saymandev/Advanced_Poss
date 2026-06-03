@@ -38,11 +38,14 @@ const ROLE_OPTIONS = [
 
 export default function StaffPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  const isGrocery = companyContext?.businessType === 'grocery';
+  const isRetail = companyContext?.businessType === 'retail';
+
   const availableRoles = useMemo(() => {
-    if (!isGrocery) return ROLE_OPTIONS;
-    return ROLE_OPTIONS.filter(r => !['chef', 'waiter'].includes(r.value));
-  }, [isGrocery]);
+    if (!isRetail) return ROLE_OPTIONS;
+
+    // Filter out restaurant-specific roles for retail businesses
+    return ROLE_OPTIONS.filter(role => ['admin', 'manager', 'cashier', 'staff'].includes(role.value));
+  }, [isRetail]);
   
   // Redirect if user doesn't have staff-management feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('staff-management');

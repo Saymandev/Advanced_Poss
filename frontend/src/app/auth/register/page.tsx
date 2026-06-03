@@ -32,7 +32,7 @@ const businessTypes = [
   { value: 'bakery', label: 'Bakery' },
   { value: 'bar', label: 'Bar' },
   { value: 'food_truck', label: 'Food Truck' },
-  { value: 'grocery', label: 'Grocery Store' },
+  { value: 'retail', label: 'Retail Store' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -86,9 +86,9 @@ export default function RegisterPage() {
   });
 
   const filteredPlans = useMemo(() => {
-    const isGrocery = formData.businessType === 'grocery';
+    const isRetail = formData.businessType === 'retail';
     return activePlans.filter((p: any) => 
-      isGrocery ? p.name?.includes('grocery') : !p.name?.includes('grocery')
+      isRetail ? p.name?.includes('retail') : !p.name?.includes('retail')
     );
   }, [activePlans, formData.businessType]);
   const displayPlans = filteredPlans.length > 0 ? filteredPlans : activePlans;

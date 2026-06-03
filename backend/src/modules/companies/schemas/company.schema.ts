@@ -63,7 +63,7 @@ export class Company {
   // Business type - determines which features are enabled
   @Prop({
     type: String,
-    enum: ['restaurant', 'grocery'],
+    enum: ['restaurant', 'retail'],
     default: 'restaurant',
   })
   businessType: string;
@@ -71,7 +71,7 @@ export class Company {
   // Subscription
   @Prop({
     type: String,
-    enum: ['basic', 'premium', 'enterprise', 'grocery_starter', 'grocery_pro'],
+    enum: ['basic', 'premium', 'enterprise', 'retail_starter', 'retail_pro'],
     default: 'basic',
   })
   subscriptionPlan: string;

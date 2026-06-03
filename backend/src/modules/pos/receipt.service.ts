@@ -502,6 +502,7 @@ export class ReceiptService {
       paymentDetails: order.paymentId || undefined,
       amountReceived: (order as any).amountReceived || (order.paymentId as any)?.amountReceived || 0,
       changeDue: (order as any).changeDue || (order.paymentId as any)?.changeDue || 0,
+      dueAmount: Math.max(0, actualTotal - ((order as any).amountReceived || (order.paymentId as any)?.amountReceived || 0)),
       createdAt: (order as any)?.createdAt || new Date(),
       completedAt: (order as any)?.completedAt || undefined,
       // Restaurant info
@@ -810,7 +811,10 @@ export class ReceiptService {
 
         <div class="payment-details" style="margin: 10px 0; font-size: 1em;">
             <div>Paid by: ${receiptData.paymentMethod ? receiptData.paymentMethod.toUpperCase() : 'N/A'}</div>
-            <div>Change: ${receiptData.changeDue.toFixed(2)} (Tendered: ${receiptData.amountReceived.toFixed(0)})</div>
+            ${receiptData.dueAmount > 0 
+              ? `<div>Paid: ${receiptData.amountReceived.toFixed(2)}</div><div style="font-weight: bold; margin-top: 4px;">Due: ${receiptData.dueAmount.toFixed(2)}</div>`
+              : `<div>Change: ${receiptData.changeDue.toFixed(2)} (Tendered: ${receiptData.amountReceived.toFixed(0)})</div>`
+            }
         </div>
 
         <div class="separator-double" style="margin-top: 15px;">---------------------------------------</div>

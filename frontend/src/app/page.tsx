@@ -250,11 +250,11 @@ export default function LandingPage() {
     return plans.filter((plan: any) => plan.isActive !== false).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }, [plans]);
 
-  const restaurantPlans = useMemo(() => activePlans.filter((p: any) => !p.name?.includes('grocery')), [activePlans]);
-  const groceryPlans = useMemo(() => activePlans.filter((p: any) => p.name?.includes('grocery')), [activePlans]);
+  const restaurantPlans = useMemo(() => activePlans.filter((p: any) => !p.name?.includes('retail')), [activePlans]);
+  const retailPlans = useMemo(() => activePlans.filter((p: any) => p.name?.includes('retail')), [activePlans]);
 
-  const [planType, setPlanType] = useState<'restaurant' | 'grocery'>('restaurant');
-  const displayPlans = planType === 'grocery' ? groceryPlans : restaurantPlans;
+  const [planType, setPlanType] = useState<'restaurant' | 'retail'>('restaurant');
+  const displayPlans = planType === 'retail' ? retailPlans : restaurantPlans;
   
   // Hardcoded features for the landing page marketing
   const features = useMemo(() => {
@@ -766,7 +766,7 @@ export default function LandingPage() {
             <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Choose the perfect plan for your business. Start free, upgrade anytime.
             </p>
-            {groceryPlans.length > 0 && (
+            {retailPlans.length > 0 && (
               <div className="mt-8 inline-flex bg-gray-200 dark:bg-gray-800 rounded-full p-1">
                 <button
                   onClick={() => setPlanType('restaurant')}
@@ -779,14 +779,14 @@ export default function LandingPage() {
                   🍽️ Restaurant
                 </button>
                 <button
-                  onClick={() => setPlanType('grocery')}
-                  className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
-                    planType === 'grocery'
+                  onClick={() => setPlanType('retail')}
+                  className={`flex-1 rounded-full py-2.5 px-4 text-sm font-semibold transition-all ${
+                    planType === 'retail'
                       ? 'bg-white dark:bg-gray-700 text-primary-600 shadow'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  🛒 Grocery
+                  🛒 Retail
                 </button>
               </div>
             )}

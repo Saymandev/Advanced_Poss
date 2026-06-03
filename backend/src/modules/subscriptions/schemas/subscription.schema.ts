@@ -9,8 +9,8 @@ export enum SubscriptionPlan {
   PREMIUM = 'premium',
   PROFESSIONAL = 'professional',
   ENTERPRISE = 'enterprise',
-  GROCERY_STARTER = 'grocery_starter',
-  GROCERY_PRO = 'grocery_pro',
+  RETAIL_STARTER = 'retail_starter',
+  RETAIL_PRO = 'retail_pro',
 }
 
 export enum SubscriptionStatus {

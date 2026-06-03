@@ -475,7 +475,7 @@ export class AuthService {
     }
 
     // Map companyType to businessType (drives feature set)
-    const businessType = companyType === 'grocery' ? 'grocery' : 'restaurant';
+    const businessType = companyType === 'retail' ? 'retail' : 'restaurant';
 
     // Create company first (without ownerId initially)
     const company = await this.companiesService.create({
@@ -1065,9 +1065,9 @@ export class AuthService {
         });
         const availableRoles = [...new Set(mergedUsers.map(user => user.role))];
 
-        // For grocery companies, filter out restaurant-only roles
+        // For retail companies, filter out restaurant-only roles
         const companyBusinessType = (company as any).businessType;
-        const filteredRoles = companyBusinessType === 'grocery'
+        const filteredRoles = companyBusinessType === 'retail'
           ? availableRoles.filter(role => !['chef', 'cook', 'waiter'].includes(role.toLowerCase()))
           : availableRoles;
         this.logger.log(`📍 Branch: ${branch.name} - Users: ${mergedUsers.length}, Roles: ${filteredRoles.join(', ')}`);

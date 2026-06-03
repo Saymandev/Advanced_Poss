@@ -17,9 +17,9 @@ export async function seedSubscriptionPlans(
     return;
   }
 
-  // Existing database — seed only missing grocery plans
+  // Existing database — seed only missing retail plans
   const plansToInsert: any[] = [];
-  for (const plan of getGroceryPlans()) {
+  for (const plan of getRetailPlans()) {
     const exists = await planModel.findOne({ name: plan.name });
     if (!exists) plansToInsert.push(plan);
   }
@@ -34,16 +34,16 @@ export async function seedSubscriptionPlans(
       }
     }
     await planModel.insertMany(plansToInsert);
-    console.log(`Seeded ${plansToInsert.length} new grocery plan(s)`);
+    console.log(`Seeded ${plansToInsert.length} new retail plan(s)`);
   }
 }
 
-function getGroceryPlans(): Partial<SubscriptionPlan>[] {
+function getRetailPlans(): Partial<SubscriptionPlan>[] {
   return [
     {
-      name: 'grocery_starter',
-      displayName: 'Grocery Starter',
-      description: 'Perfect for small grocery and retail stores',
+      name: 'retail_starter',
+      displayName: 'Retail Starter',
+      description: 'Perfect for small retail stores and boutiques',
       price: 2000,
       currency: 'BDT',
       billingCycle: 'monthly',
@@ -61,14 +61,14 @@ function getGroceryPlans(): Partial<SubscriptionPlan>[] {
         storageGB: 10, maxMenuItems: 1000, maxTables: 0,
         publicOrderingEnabled: false, maxPublicBranches: 0, whitelabelEnabled: false,
       },
-      featureList: ['Grocery POS with barcode scanning', 'Inventory & stock management', 'Customer CRM', 'Supplier & purchase orders', 'Single store'],
-      stripePriceId: process.env['STRIPE_PRICE_GROCERY_STARTER_MONTHLY'] || 'price_grocery_starter_monthly',
+      featureList: ['Retail POS with barcode scanning', 'Inventory & stock management', 'Customer CRM', 'Supplier & purchase orders', 'Single store'],
+      stripePriceId: process.env['STRIPE_PRICE_RETAIL_STARTER_MONTHLY'] || 'price_retail_starter_monthly',
       isActive: true, sortOrder: 5, isPopular: false,
     },
     {
-      name: 'grocery_pro',
-      displayName: 'Grocery Pro',
-      description: 'For growing grocery stores and retail chains',
+      name: 'retail_pro',
+      displayName: 'Retail Pro',
+      description: 'For growing retail stores and chains',
       price: 5000,
       currency: 'BDT',
       billingCycle: 'monthly',
@@ -90,7 +90,7 @@ function getGroceryPlans(): Partial<SubscriptionPlan>[] {
         whitelabelEnabled: true, customDomainEnabled: true,
       },
       featureList: ['Everything in Starter', 'Multi-store management', 'Accounting & reports', 'Public online ordering', 'Unlimited products & users'],
-      stripePriceId: process.env['STRIPE_PRICE_GROCERY_PRO_MONTHLY'] || 'price_grocery_pro_monthly',
+      stripePriceId: process.env['STRIPE_PRICE_RETAIL_PRO_MONTHLY'] || 'price_retail_pro_monthly',
       isActive: true, sortOrder: 6, isPopular: true,
     },
   ];
@@ -255,7 +255,7 @@ async function seedAllPlans(planModel: Model<SubscriptionPlanDocument>) {
       isActive: true,
       sortOrder: 4,
     },
-    ...getGroceryPlans(),
+    ...getRetailPlans(),
   ];
   await planModel.insertMany(plans);
   }

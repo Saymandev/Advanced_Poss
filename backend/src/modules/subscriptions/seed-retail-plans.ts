@@ -1,6 +1,6 @@
 /**
- * Seed grocery subscription plans into the database.
- * Run: cd backend && npx ts-node src/modules/subscriptions/seed-grocery-plans.ts
+ * Seed retail subscription plans into the database.
+ * Run: cd backend && npx ts-node src/modules/subscriptions/seed-retail-plans.ts
  */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../app.module';
@@ -15,11 +15,11 @@ async function bootstrap() {
     getModelToken('SubscriptionPlan'),
   );
 
-  const groceryPlans = [
+  const retailPlans = [
     {
-      name: 'grocery_starter',
-      displayName: 'Grocery Starter',
-      description: 'Perfect for small grocery and retail stores',
+      name: 'retail_starter',
+      displayName: 'Retail Starter',
+      description: 'Perfect for small retail stores and boutiques',
       price: 2000,
       currency: 'BDT',
       billingCycle: 'monthly',
@@ -45,7 +45,7 @@ async function bootstrap() {
         whitelabelEnabled: false,
       },
       featureList: [
-        'Grocery POS with barcode scanning',
+        'Retail POS with barcode scanning',
         'Inventory & stock management',
         'Customer CRM',
         'Supplier & purchase orders',
@@ -56,9 +56,9 @@ async function bootstrap() {
       isPopular: false,
     },
     {
-      name: 'grocery_pro',
-      displayName: 'Grocery Pro',
-      description: 'For growing grocery stores and retail chains',
+      name: 'retail_pro',
+      displayName: 'Retail Pro',
+      description: 'For growing retail stores and chains',
       price: 5000,
       currency: 'BDT',
       billingCycle: 'monthly',
@@ -97,7 +97,7 @@ async function bootstrap() {
     },
   ];
 
-  for (const plan of groceryPlans) {
+  for (const plan of retailPlans) {
     const existing = await planModel.findOne({ name: plan.name });
     if (existing) {
       console.log(`Skipping "${plan.displayName}" — already exists`);
@@ -107,7 +107,7 @@ async function bootstrap() {
     }
   }
 
-  console.log('Grocery plans seeded successfully!');
+  console.log('Retail plans seeded successfully!');
   await app.close();
   process.exit(0);
 }

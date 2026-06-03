@@ -34,11 +34,14 @@ const ROLE_OPTIONS: { value: CompanyRole; label: string }[] = [
 
 export default function CompanyFeaturesPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  const isGrocery = companyContext?.businessType === 'grocery';
+  const isRetail = companyContext?.businessType === 'retail';
+
   const availableRoles = useMemo(() => {
-    if (!isGrocery) return ROLE_OPTIONS;
-    return ROLE_OPTIONS.filter(r => !['chef', 'cook', 'waiter'].includes(r.value));
-  }, [isGrocery]);
+    if (!isRetail) return ROLE_OPTIONS;
+
+    // Filter out restaurant-specific roles for retail businesses
+    return ROLE_OPTIONS.filter(role => !['chef', 'waiter'].includes(role.value));
+  }, [isRetail]);
   const router = useRouter();
 
   useEffect(() => {

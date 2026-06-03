@@ -50,7 +50,7 @@ const ROLE_CATEGORY_MAP: Partial<Record<UserRole, string[] | 'all'>> = {
 
 export default function RoleAccessPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
-  const isGrocery = companyContext?.businessType === 'grocery';
+  const isRetail = companyContext?.businessType === 'retail';
   
   // Redirect if user doesn't have role-management feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('role-management');
@@ -164,10 +164,9 @@ export default function RoleAccessPage() {
   }, [allFeatureKeys, featureCategoryMap]);
 
   const filteredRoleAccess = useMemo(() => {
-    if (!isGrocery) return allRoleAccess;
-    const excludedRoles = [UserRole.CHEF, UserRole.COOK, UserRole.WAITER];
-    return allRoleAccess.filter(r => !excludedRoles.includes(r.role));
-  }, [allRoleAccess, isGrocery]);
+    if (!isRetail) return allRoleAccess;
+    return allRoleAccess.filter(ra => !['chef', 'waiter'].includes(ra.role));
+  }, [allRoleAccess, isRetail]);
 
   const companyRoleAccess = useMemo(
     () => filteredRoleAccess.filter((role) => role.role !== UserRole.SUPER_ADMIN),

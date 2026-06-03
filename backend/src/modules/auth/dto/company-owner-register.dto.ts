@@ -7,7 +7,7 @@ export enum CompanyType {
   BAKERY = 'bakery',
   BAR = 'bar',
   FOOD_TRUCK = 'food_truck',
-  GROCERY = 'grocery',
+  RETAIL = 'retail',
   OTHER = 'other',
 }
 
@@ -15,8 +15,8 @@ export enum SubscriptionPackage {
   BASIC = 'basic',
   PREMIUM = 'premium',
   ENTERPRISE = 'enterprise',
-  GROCERY_STARTER = 'grocery_starter',
-  GROCERY_PRO = 'grocery_pro',
+  RETAIL_STARTER = 'retail_starter',
+  RETAIL_PRO = 'retail_pro',
 }
 
 export class CompanyOwnerRegisterDto {

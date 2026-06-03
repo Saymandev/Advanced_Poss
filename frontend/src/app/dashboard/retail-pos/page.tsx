@@ -59,7 +59,7 @@ interface PaymentState {
   change: number;
 }
 
-export default function GroceryPOSPage() {
+export default function RetailPOSPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const formatCurrency = useFormatCurrency();
 
@@ -207,7 +207,7 @@ export default function GroceryPOSPage() {
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('grocery_cart');
+        const saved = localStorage.getItem('retail_cart');
         return saved ? JSON.parse(saved) : [];
       } catch { return []; }
     }
@@ -216,7 +216,7 @@ export default function GroceryPOSPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('grocery_cart', JSON.stringify(cart));
+      localStorage.setItem('retail_cart', JSON.stringify(cart));
     }
   }, [cart]);
 
@@ -284,7 +284,7 @@ export default function GroceryPOSPage() {
     setDiscountType('none');
     setDiscountValue('');
     setDiscountReason('');
-    if (typeof window !== 'undefined') localStorage.removeItem('grocery_cart');
+    if (typeof window !== 'undefined') localStorage.removeItem('retail_cart');
   };
 
   // Customer

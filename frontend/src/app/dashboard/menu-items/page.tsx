@@ -1902,7 +1902,7 @@ export default function MenuItemsPage() {
               />
             </div>
           </div>
-          {companyContext?.businessType === 'grocery' && (
+          {companyContext?.businessType === 'retail' && (
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
