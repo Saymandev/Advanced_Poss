@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import { Badge } from '@/components/ui/Badge';
@@ -866,7 +867,7 @@ export default function RetailPOSPage() {
               <span className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-[10px] text-gray-500 hidden sm:inline">{shortcuts.toggleQueue}</span>
             </Button>
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setShowKeyboardShortcuts(true)}
               className="h-10 px-3 rounded-xl border-gray-200 dark:border-slate-800"
               title="Keyboard Shortcuts (Ctrl+/)"
