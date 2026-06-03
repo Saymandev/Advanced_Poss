@@ -628,7 +628,7 @@ export default function PurchaseOrdersPage() {
                   value={newItem.ingredientId}
                   onChange={(value) => {
                     const selectedIngredient = ingredients?.items?.find(i => i.id === value);
-                    const defaultPrice = selectedIngredient?.unitCost || selectedIngredient?.lastPurchasePrice || 0;
+                    const defaultPrice = selectedIngredient?.unitCost || (selectedIngredient as any)?.lastPurchasePrice || 0;
                     setNewItem({ ...newItem, ingredientId: value, unitPrice: defaultPrice });
                   }}
                   placeholder="Select ingredient"
