@@ -5,6 +5,7 @@ import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
     useExportReportMutation,
+    useGetCustomerReportQuery,
     useGetDashboardQuery,
     useGetDueSettlementsQuery,
     useGetFinancialSummaryQuery,
@@ -33,10 +34,13 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import {
+    Area,
+    AreaChart,
     Bar,
     BarChart,
     CartesianGrid,
     Cell,
+    Legend,
     Line,
     LineChart,
     Pie,
@@ -63,7 +67,7 @@ export default function ReportsPage() {
   // Redirect if user doesn't have reports feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('reports');
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('week');
-  const [activeReport, setActiveReport] = useState<'financial' | 'sales' | 'wastage' | 'food' | 'settlement' | 'inventory'>('financial');
+  const [activeReport, setActiveReport] = useState<'financial' | 'sales' | 'wastage' | 'food' | 'settlement' | 'inventory' | 'analytics'>('financial');
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -256,6 +260,20 @@ export default function ReportsPage() {
     branchId: branchId || undefined,
   }, {
     skip: !companyId || activeReport !== 'inventory',
+    refetchOnMountOrArgChange: true,
+  });
+  // Customer analytics query for analytics tab
+  const {
+    data: customerAnalytics,
+    isLoading: isLoadingCustomerAnalytics,
+    refetch: refetchCustomerAnalytics
+  } = useGetCustomerReportQuery({
+    companyId: companyId as string,
+    branchId: branchId || undefined,
+    startDate,
+    endDate,
+  }, {
+    skip: !companyId || activeReport !== 'analytics',
     refetchOnMountOrArgChange: true,
   });
   const [exportReport, { isLoading: isExporting }] = useExportReportMutation();
@@ -493,6 +511,53 @@ export default function ReportsPage() {
     if (!topItems || topItems.length === 0) return null;
     return topItems[0];
   }, [topItems]);
+  // Predictive Revenue Data for analytics tab
+  const predictiveRevenueData = useMemo(() => {
+    if (!salesAnalytics?.salesByDay || salesAnalytics.salesByDay.length === 0) return [];
+    const data = salesAnalytics.salesByDay
+      .filter((item: any) => (Number(item.sales) || 0) > 0 || (Number(item.orders) || 0) > 0)
+      .map((item: any) => {
+        const dateStr = item.day || item.date || '';
+        let date: Date;
+        try { date = new Date(dateStr); if (isNaN(date.getTime())) date = new Date(); } catch { date = new Date(); }
+        return {
+          name: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          actual: Number(item.sales) || 0,
+          predicted: null as number | null,
+        };
+      });
+    // Simple linear projection for 3 future days
+    if (data.length >= 2) {
+      let sumChange = 0;
+      for (let i = 1; i < data.length; i++) sumChange += data[i].actual - data[i - 1].actual;
+      const avgChange = sumChange / (data.length - 1);
+      const lastVal = data[data.length - 1].actual;
+      const lastDate = new Date();
+      for (let i = 1; i <= 3; i++) {
+        const nextDate = new Date(lastDate);
+        nextDate.setDate(lastDate.getDate() + i);
+        data.push({
+          name: nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          actual: 0,
+          predicted: Math.max(0, Math.round(lastVal + avgChange * i)),
+        });
+      }
+    }
+    return data;
+  }, [salesAnalytics?.salesByDay]);
+  // Customer behavior pie data
+  const customerPieData = useMemo(() => {
+    if (!customerAnalytics) return [];
+    const raw = customerAnalytics as any;
+    const unique = raw?.period?.uniqueCustomers || 0;
+    const repeat = raw?.period?.repeatCustomers || 0;
+    const newC = Math.max(0, unique - repeat);
+    if (unique === 0) return [];
+    return [
+      { name: 'Returning', value: repeat },
+      { name: 'New', value: newC },
+    ];
+  }, [customerAnalytics]);
   const isLoading = isLoadingDashboard
     || isLoadingAnalytics
     || isLoadingTopItems
@@ -788,6 +853,26 @@ export default function ReportsPage() {
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Stock & valuation
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all ${activeReport === 'analytics' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          onClick={() => setActiveReport('analytics')}
+        >
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${activeReport === 'analytics' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <ArrowTrendingUpIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${activeReport === 'analytics' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+              </div>
+              <div className="min-w-0">
+                <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'analytics' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+                  Analytics
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  Trends & customers
                 </p>
               </div>
             </div>
@@ -1713,6 +1798,138 @@ export default function ReportsPage() {
             )}
           </CardContent>
         </Card>
+      )}
+      {/* Analytics Tab */}
+      {activeReport === 'analytics' && (
+        <>
+          {/* Predictive Revenue Trend */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Forecast (3-Day Projection)</CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
+              {isLoadingAnalytics ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+                </div>
+              ) : predictiveRevenueData.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <p>No sales data available for the selected period.</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={predictiveRevenueData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                    <XAxis dataKey="name" stroke="#9ca3af" />
+                    <YAxis stroke="#9ca3af" tickFormatter={(val) => formatCurrency(val)} />
+                    <Tooltip formatter={(value: any) => formatCurrency(value)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Legend />
+                    <Area type="monotone" dataKey="actual" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorActual)" name="Actual Revenue" />
+                    <Area type="monotone" dataKey="predicted" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" fillOpacity={1} fill="url(#colorPredicted)" name="Projected" connectNulls={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Customer Behavior */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer Retention</CardTitle>
+              </CardHeader>
+              <CardContent className="h-64">
+                {isLoadingCustomerAnalytics ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+                  </div>
+                ) : customerPieData.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>No customer data available yet.</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={customerPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {customerPieData.map((_entry, index) => (
+                          <Cell key={`cust-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend verticalAlign="bottom" height={36}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer Metrics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between border-b pb-4 dark:border-gray-700">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                        <UsersIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Unique Customers</p>
+                        <p className="text-xs text-gray-500">In selected period</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{(customerAnalytics as any)?.period?.uniqueCustomers || 0}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between border-b pb-4 dark:border-gray-700">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                        <ArrowTrendingUpIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Repeat Rate</p>
+                        <p className="text-xs text-gray-500">% of returning buyers</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-purple-600">{Math.round((customerAnalytics as any)?.period?.repeatRate || 0)}%</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                        <CurrencyDollarIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Customer Revenue</p>
+                        <p className="text-xs text-gray-500">Identified buyers</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency((customerAnalytics as any)?.period?.revenue || 0)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
       )}
     </div>
   );

@@ -421,14 +421,18 @@ export const reportsApi = apiSlice.injectEndpoints({
       providesTags: ['Report'],
     }),
     getCustomerReport: builder.query<CustomerReport, { 
+      companyId: string;
       branchId?: string; 
       startDate?: string; 
       endDate?: string 
     }>({
-      query: (params) => ({
-        url: '/reports/customers',
-        params,
-      }),
+      query: (params) => {
+        const { companyId, ...queryParams } = params;
+        return {
+          url: `/reports/customers/analytics/${companyId}`,
+          params: queryParams,
+        };
+      },
       transformResponse: (response: any) => {
         return response.data || response;
       },
