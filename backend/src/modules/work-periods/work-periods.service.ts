@@ -528,8 +528,17 @@ export class WorkPeriodsService {
     const endTime = workPeriod.endTime ? new Date(workPeriod.endTime).toLocaleString() : 'Active';
     const duration = workPeriod.duration || 'N/A';
 
-    const startedBy = workPeriod.startedBy ? `${workPeriod.startedBy.firstName} ${workPeriod.startedBy.lastName}` : 'Unknown';
-    const endedBy = workPeriod.endedBy ? `${workPeriod.endedBy.firstName} ${workPeriod.endedBy.lastName}` : 'N/A';
+    const startedBy = workPeriod.startedBy ? `${workPeriod.startedBy.firstName || ''} ${workPeriod.startedBy.lastName || ''}`.trim() : 'Unknown';
+    const endedBy = workPeriod.endedBy ? `${workPeriod.endedBy.firstName || ''} ${workPeriod.endedBy.lastName || ''}`.trim() : 'N/A';
+    
+    // Variance calculation
+    const cashData = summary.paymentMethods?.find((pm: any) => pm.type.toLowerCase() === 'cash');
+    const cashSales = cashData ? cashData.amount : 0;
+    const expectedCash = (workPeriod.openingBalance || 0) + cashSales;
+    const actualCash = workPeriod.closingBalance || 0;
+    const variance = actualCash - expectedCash;
+    const isVarianceNegative = variance < 0;
+    const varianceColor = variance === 0 ? '#27ae60' : (isVarianceNegative ? '#e74c3c' : '#f39c12');
 
     return `
       <!DOCTYPE html>
@@ -573,13 +582,15 @@ export class WorkPeriodsService {
             <div class="meta-item"><span class="meta-label">Status:</span> ${workPeriod.status.toUpperCase()}</div>
             <div class="meta-item"><span class="meta-label">Started By:</span> ${startedBy}</div>
             <div class="meta-item"><span class="meta-label">Start Time:</span> ${startTime}</div>
-            <div class="meta-item"><span class="meta-label">Opening Balance:</span> ${formatCurrency(workPeriod.openingBalance)}</div>
+            <div class="meta-item"><span class="meta-label">Opening Balance:</span> ${formatCurrency(workPeriod.openingBalance || 0)}</div>
           </div>
           <div class="meta-column">
             <div class="meta-item"><span class="meta-label">Duration:</span> ${duration}</div>
             <div class="meta-item"><span class="meta-label">Ended By:</span> ${endedBy}</div>
             <div class="meta-item"><span class="meta-label">End Time:</span> ${endTime}</div>
+            <div class="meta-item"><span class="meta-label">Expected Cash:</span> ${formatCurrency(expectedCash)}</div>
             <div class="meta-item"><span class="meta-label">Closing Balance:</span> ${workPeriod.closingBalance !== undefined ? formatCurrency(workPeriod.closingBalance) : 'N/A'}</div>
+            ${workPeriod.closingBalance !== undefined ? `<div class="meta-item"><span class="meta-label">Cash Variance:</span> <strong style="color: ${varianceColor}">${variance > 0 ? '+' : ''}${formatCurrency(variance)}</strong></div>` : ''}
           </div>
         </div>
         
@@ -600,6 +611,26 @@ export class WorkPeriodsService {
           <div class="summary-card">
             <div class="summary-value">${summary.cancelCount}</div>
             <div class="summary-label">Cancelled Orders</div>
+          </div>
+        </div>
+
+        <div class="section-title">Financial Reconciliation</div>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-value" style="color: #27ae60;">${formatCurrency(summary.netSales)}</div>
+            <div class="summary-label">Net Revenue</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-value" style="color: #e74c3c;">${formatCurrency(summary.refundTotal)}</div>
+            <div class="summary-label">Total Refunds</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-value">${formatCurrency(summary.manualIncomeTotal || 0)}</div>
+            <div class="summary-label">Manual Incomes</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-value">${formatCurrency(summary.manualExpenseTotal || 0)}</div>
+            <div class="summary-label">Manual Expenses</div>
           </div>
         </div>
         

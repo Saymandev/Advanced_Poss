@@ -121,11 +121,13 @@ export default function GroceryPOSPage() {
       price: p.price || 0,
       category: p.category?.name || '',
       image: p.image,
+      images: p.images || [],
       barcode: p.barcode || p.sku || '',
       weightBased: p.weightBasedPricing || false,
       unitType: p.unitType || 'piece',
       stock: p.stock ?? null,
       stockStatus: p.stockStatus || (p.isOutOfStock ? 'out' : p.isLowStock ? 'low' : 'ok'),
+      trackInventory: p.trackInventory || false,
     }));
   }, [productsData]);
 
@@ -257,12 +259,31 @@ export default function GroceryPOSPage() {
   const cartSubtotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.quantity, 0), [cart]);
   const cartTax = useMemo(() => (cartSubtotal * taxRate) / 100, [cartSubtotal, taxRate]);
   const cartServiceCharge = useMemo(() => (cartSubtotal * serviceChargeRate) / 100, [cartSubtotal, serviceChargeRate]);
-  const cartTotal = useMemo(() => cartSubtotal + cartTax + cartServiceCharge, [cartSubtotal, cartTax, cartServiceCharge]);
+
+  // Discount state
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'flat'>('none');
+  const [discountValue, setDiscountValue] = useState<string>('');
+  const [discountReason, setDiscountReason] = useState<string>('');
+
+  const discountAmount = useMemo(() => {
+    const val = parseFloat(discountValue) || 0;
+    if (discountType === 'percentage') return Math.min((cartSubtotal * val) / 100, cartSubtotal);
+    if (discountType === 'flat') return Math.min(val, cartSubtotal);
+    return 0;
+  }, [discountType, discountValue, cartSubtotal]);
+
+  const cartTotal = useMemo(
+    () => Math.max(0, cartSubtotal + cartTax + cartServiceCharge - discountAmount),
+    [cartSubtotal, cartTax, cartServiceCharge, discountAmount],
+  );
 
   const clearCart = () => {
     setCart([]);
     setCustomerInfo({ name: '', phone: '', email: '' });
     setSelectedCustomerId('');
+    setDiscountType('none');
+    setDiscountValue('');
+    setDiscountReason('');
     if (typeof window !== 'undefined') localStorage.removeItem('grocery_cart');
   };
 
@@ -382,6 +403,13 @@ export default function GroceryPOSPage() {
         paymentMethod: paymentMethod,
         ...(selectedCustomerId ? { customerId: selectedCustomerId } : {}),
         customerInfo,
+        // Discount data
+        ...(discountAmount > 0 ? {
+          discountType,
+          discountValue: parseFloat(discountValue) || 0,
+          discountAmount,
+          discountReason: discountReason || undefined,
+        } : {}),
       };
 
       const response: any = await createOrder(orderData as any).unwrap();
@@ -577,12 +605,28 @@ export default function GroceryPOSPage() {
                   onClick={() => addToCart(product)}
                   className="group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-3 text-left hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all active:scale-95 relative"
                 >
-                  <div className="aspect-square bg-gray-50 dark:bg-slate-800 rounded-xl mb-2 flex items-center justify-center text-3xl group-hover:scale-105 transition-transform relative">
-                    🛒
+                  <div className="aspect-square bg-gray-50 dark:bg-slate-800 rounded-xl mb-2 flex items-center justify-center text-3xl group-hover:scale-105 transition-transform relative overflow-hidden">
+                    {product.images && product.images.length > 0 ? (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        className="w-full h-full object-cover rounded-xl"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="text-2xl font-black text-gray-300 dark:text-slate-600">
+                        {product.name?.charAt(0)?.toUpperCase() || '?'}
+                      </span>
+                    )}
                     {cartQty > 0 && (
                       <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow">
                         {cartQty}
                       </span>
+                    )}
+                    {product.stock != null && product.stock <= 0 && product.trackInventory && (
+                      <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                        <span className="text-xs font-bold text-white bg-red-600 px-2 py-1 rounded">OUT OF STOCK</span>
+                      </div>
                     )}
                   </div>
                   <div className="text-sm font-bold truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
@@ -704,6 +748,46 @@ export default function GroceryPOSPage() {
                 <span>{formatCurrency(cartServiceCharge)}</span>
               </div>
             )}
+            {/* Discount Section */}
+            <div className="border-t border-dashed pt-2 mt-1 space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as any)}
+                  className="text-xs bg-gray-100 dark:bg-slate-800 border-none rounded px-1.5 py-1 text-gray-700 dark:text-gray-300 flex-shrink-0"
+                >
+                  <option value="none">No Discount</option>
+                  <option value="percentage">% Discount</option>
+                  <option value="flat">Flat Discount</option>
+                </select>
+                {discountType !== 'none' && (
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder={discountType === 'percentage' ? '10' : '50'}
+                    className="text-xs bg-gray-100 dark:bg-slate-800 border-none rounded px-1.5 py-1 w-16 text-right text-gray-700 dark:text-gray-300"
+                  />
+                )}
+              </div>
+              {discountType !== 'none' && (
+                <input
+                  type="text"
+                  value={discountReason}
+                  onChange={(e) => setDiscountReason(e.target.value)}
+                  placeholder="Reason (optional)"
+                  className="text-xs bg-gray-100 dark:bg-slate-800 border-none rounded px-1.5 py-1 w-full text-gray-700 dark:text-gray-300"
+                />
+              )}
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-red-500 font-medium">
+                  <span>Discount {discountType === 'percentage' ? `(${discountValue}%)` : ''}</span>
+                  <span>-{formatCurrency(discountAmount)}</span>
+                </div>
+              )}
+            </div>
             <div className="flex justify-between items-center text-lg font-bold border-t pt-1">
               <span>Total</span>
               <span className="font-black text-xl text-blue-600 dark:text-blue-400">

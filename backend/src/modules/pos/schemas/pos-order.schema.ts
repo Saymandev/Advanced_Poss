@@ -172,6 +172,19 @@ export class POSOrder {
   @Prop({ type: Number, default: 0 })
   loyaltyDiscount?: number; // Discount amount from loyalty points
 
+  // Manual discount (grocery/shop)
+  @Prop({ type: String, enum: ['percentage', 'flat', 'none'], default: 'none' })
+  discountType?: 'percentage' | 'flat' | 'none';
+
+  @Prop({ type: Number, default: 0 })
+  discountValue?: number; // The input value (e.g. 10 for 10% or 50 for ৳50)
+
+  @Prop({ type: Number, default: 0 })
+  discountAmount?: number; // The calculated discount in currency
+
+  @Prop({ type: String })
+  discountReason?: string; // "Manager discount", "Damaged", "Clearance", etc.
+
   @Prop({ type: Number })
   amountReceived?: number;
 

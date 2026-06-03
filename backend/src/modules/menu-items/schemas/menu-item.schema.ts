@@ -118,6 +118,22 @@ export class MenuItem {
   @Prop({ default: false })
   trackInventory: boolean;
 
+  // Direct product stock (for grocery/shop — not ingredient-based)
+  @Prop({ type: Number })
+  stock?: number;
+
+  @Prop({ type: Number, default: 5 })
+  minimumStock?: number;
+
+  @Prop({ type: Number, default: 10 })
+  stockAlertThreshold?: number;
+
+  @Prop()
+  expiryDate?: Date;
+
+  @Prop({ trim: true })
+  batchNumber?: string;
+
   @Prop({
     type: [
       {
@@ -205,6 +221,9 @@ MenuItemSchema.index({ categoryId: 1 });
 MenuItemSchema.index({ isAvailable: 1 });
 MenuItemSchema.index({ tags: 1 });
 MenuItemSchema.index({ name: 'text', description: 'text' });
+MenuItemSchema.index({ barcode: 1 }, { sparse: true });
+MenuItemSchema.index({ sku: 1 }, { sparse: true });
+MenuItemSchema.index({ expiryDate: 1 }, { sparse: true });
 
 // Calculate margin before save
 MenuItemSchema.pre('save', function (next) {

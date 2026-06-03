@@ -612,6 +612,21 @@ export class POSService {
           // Log error but don't fail order creation
           console.error('Failed to create kitchen order:', kitchenError);
         }
+        // Auto-deduct product stock for paid orders (grocery/shop)
+        if (savedOrder.status === 'paid') {
+          try {
+            const stockItems = savedOrder.items.map((item: any) => ({
+              menuItemId: item.menuItemId?.toString() || item.menuItemId,
+              quantity: item.quantity || 1,
+            }));
+            const stockResult = await this.menuItemsService.deductStockForOrder(stockItems);
+            if (stockResult.outOfStock.length > 0) {
+              console.warn(`Out of stock after order ${savedOrder.orderNumber}:`, stockResult.outOfStock);
+            }
+          } catch (stockError) {
+            console.error('Failed to deduct stock:', stockError);
+          }
+        }
         // Handle customer loyalty redemption and stats update if order is paid
         if (savedOrder.status === 'paid') {
           // If loyalty points were redeemed, deduct them from customer
@@ -1151,6 +1166,18 @@ export class POSService {
       } catch (tableError) {
         // Log error but don't fail cancellation
         console.error('Failed to free table after cancellation:', tableError);
+      }
+    }
+    // Restore product stock on cancellation (grocery/shop)
+    if (order.items && order.items.length > 0) {
+      try {
+        const stockItems = order.items.map((item: any) => ({
+          menuItemId: item.menuItemId?.toString() || item.menuItemId,
+          quantity: item.quantity || 1,
+        }));
+        await this.menuItemsService.restoreStockForOrder(stockItems);
+      } catch (stockError) {
+        console.error('Failed to restore stock on cancellation:', stockError);
       }
     }
     // Notify via WebSocket: order cancelled
@@ -1895,6 +1922,75 @@ export class POSService {
     }
 
     return savedRefund;
+  }
+
+  // Process itemized refund for an order (restoring stock or recording wastage)
+  async refundItems(
+    orderId: string,
+    dto: import('./dto/refund-items.dto').RefundItemsDto,
+    userId: string,
+    branchId: string,
+  ): Promise<POSPayment> {
+    const order = await this.getOrderById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const companyId = order.companyId?.toString();
+    let totalRefundAmount = 0;
+
+    for (const refundItem of dto.items) {
+      // Find the item in the order
+      const orderItem = order.items.find(i => i.menuItemId?.toString() === refundItem.menuItemId);
+      if (!orderItem) {
+        throw new BadRequestException(`Item ${refundItem.menuItemId} not found in order`);
+      }
+      
+      // Calculate amount to refund for this item
+      const itemRefundAmount = orderItem.price * refundItem.quantity;
+      totalRefundAmount += itemRefundAmount;
+
+      // Handle stock or wastage
+      if (refundItem.isWastage) {
+        if (this.wastageService && companyId) {
+          try {
+            await this.wastageService.create({
+              menuItemId: refundItem.menuItemId,
+              quantity: refundItem.quantity,
+              unit: 'pcs', // Defaulting unit as order items might lack it
+              reason: WastageReason.DAMAGED,
+              unitCost: orderItem.price,
+              wastageDate: new Date().toISOString(),
+              notes: `Item-wise refund wastage. Reason: ${dto.reason || 'Damaged'}`,
+            }, companyId, branchId, userId);
+          } catch (e) {
+            console.error('Failed to record wastage for refunded item:', e);
+          }
+        }
+      } else {
+        // Restore stock
+        if (this.menuItemsService) {
+          try {
+            await this.menuItemsService.adjustStock(refundItem.menuItemId, {
+              type: 'add',
+              quantity: refundItem.quantity,
+            });
+          } catch (e) {
+            console.error('Failed to restore stock for refunded item:', e);
+          }
+        }
+      }
+    }
+
+    // Process the financial refund via existing method
+    return this.processRefund(
+      orderId,
+      totalRefundAmount,
+      dto.reason || 'Item-wise refund',
+      userId,
+      branchId,
+      { isDamage: false } // We already handled wastage individually
+    );
   }
   // Get order history for a specific table
   async getTableOrderHistory(tableId: string, limit: number = 10): Promise<POSOrder[]> {

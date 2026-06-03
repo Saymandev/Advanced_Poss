@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+    IsDateString,
     IsArray,
     IsBoolean,
     IsNotEmpty,
@@ -10,6 +11,7 @@ import {
     Min,
     ValidateNested,
 } from 'class-validator';
+import { IsFutureDateString } from '../../../common/validators/is-future-date.validator';
 
 export class VariantOptionDto {
   @IsString()
@@ -210,4 +212,44 @@ export class CreateMenuItemDto {
     fat?: number;
     allergens?: string[];
   };
+
+  // Grocery / Shop stock fields
+  @ApiPropertyOptional({ example: 100 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stock?: number;
+
+  @ApiPropertyOptional({ example: 5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minimumStock?: number;
+
+  @ApiPropertyOptional({ example: 10 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stockAlertThreshold?: number;
+
+  @ApiPropertyOptional({ example: '2027-12-31T00:00:00.000Z' })
+  @IsOptional()
+  @IsDateString()
+  @IsFutureDateString()
+  expiryDate?: string;
+
+  @ApiPropertyOptional({ example: 'BATCH-2027-1' })
+  @IsOptional()
+  @IsString()
+  batchNumber?: string;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  weightBasedPricing?: boolean;
+
+  @ApiPropertyOptional({ example: 'kg' })
+  @IsOptional()
+  @IsString()
+  unitType?: string;
 }

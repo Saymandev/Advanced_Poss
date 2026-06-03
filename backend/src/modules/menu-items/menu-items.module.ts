@@ -6,11 +6,13 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { MenuItemsController } from './menu-items.controller';
 import { MenuItemsService } from './menu-items.service';
 import { MenuItem, MenuItemSchema } from './schemas/menu-item.schema';
+import { Category, CategorySchema } from '../categories/schemas/category.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: MenuItem.name, schema: MenuItemSchema },
+      { name: Category.name, schema: CategorySchema },
     ]),
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
@@ -20,4 +22,3 @@ import { MenuItem, MenuItemSchema } from './schemas/menu-item.schema';
   exports: [MenuItemsService],
 })
 export class MenuItemsModule {}
-

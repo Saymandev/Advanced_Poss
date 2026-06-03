@@ -39,6 +39,8 @@ interface MenuItem {
   isAvailable: boolean;
   preparationTime?: number; // in minutes
   requiresKitchen?: boolean; // Kitchen routing
+  expiryDate?: string;
+  batchNumber?: string;
   ingredients?: string[];
   allergens?: string[];
   nutritionalInfo?: {
@@ -118,6 +120,8 @@ export default function MenuItemsPage() {
     categoryId: '',
     barcode: '',
     sku: '',
+    expiryDate: '',
+    batchNumber: '',
     preparationTime: 0,
     isAvailable: true,
     requiresKitchen: true, // Kitchen routing
@@ -457,6 +461,8 @@ export default function MenuItemsPage() {
         price: itemData.price || 0,
         barcode: (itemData as any).barcode || '',
         sku: (itemData as any).sku || '',
+        expiryDate: (itemData as any).expiryDate ? new Date((itemData as any).expiryDate).toISOString().split('T')[0] : '',
+        batchNumber: (itemData as any).batchNumber || '',
         categoryId: categoryIdValue,
         preparationTime: itemData.preparationTime || 0,
         isAvailable: itemData.isAvailable !== false,
@@ -490,6 +496,8 @@ export default function MenuItemsPage() {
         price: 0,
         barcode: '',
         sku: '',
+        expiryDate: '',
+        batchNumber: '',
         categoryId: categories[0]?.id || '',
         preparationTime: 0,
         isAvailable: true,
@@ -596,6 +604,8 @@ export default function MenuItemsPage() {
         price: formData.price,
         barcode: formData.barcode || undefined,
         sku: formData.sku || undefined,
+        expiryDate: formData.expiryDate ? new Date(formData.expiryDate).toISOString() : undefined,
+        batchNumber: formData.batchNumber || undefined,
         preparationTime: formData.preparationTime || undefined,
         isAvailable: formData.isAvailable !== false,
         requiresKitchen: formData.requiresKitchen !== false,
@@ -657,6 +667,8 @@ export default function MenuItemsPage() {
         price: 0,
         barcode: '',
         sku: '',
+        expiryDate: '',
+        batchNumber: '',
         categoryId: categories[0]?.id || '',
         preparationTime: 0,
         isAvailable: true,
@@ -715,6 +727,8 @@ export default function MenuItemsPage() {
         price: formData.price,
         barcode: formData.barcode || undefined,
         sku: formData.sku || undefined,
+        expiryDate: formData.expiryDate ? new Date(formData.expiryDate).toISOString() : undefined,
+        batchNumber: formData.batchNumber || undefined,
         preparationTime: formData.preparationTime || undefined,
         isAvailable: formData.isAvailable !== false,
         requiresKitchen: formData.requiresKitchen !== false,
@@ -1888,6 +1902,31 @@ export default function MenuItemsPage() {
               />
             </div>
           </div>
+          {companyContext?.businessType === 'grocery' && (
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Expiry Date
+                </label>
+                <Input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={formData.expiryDate}
+                  onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Batch Number
+                </label>
+                <Input
+                  value={formData.batchNumber}
+                  onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })}
+                  placeholder="e.g. BATCH-001"
+                />
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

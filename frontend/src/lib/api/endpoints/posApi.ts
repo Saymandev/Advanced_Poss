@@ -468,6 +468,20 @@ export const posApi = apiSlice.injectEndpoints({
       invalidatesTags: ['POS'],
     }),
 
+    // Item-wise refund
+    refundItems: builder.mutation<POSPayment, {
+      orderId: string;
+      items: Array<{ menuItemId: string; quantity: number; isWastage?: boolean }>;
+      reason?: string;
+    }>({
+      query: ({ orderId, ...body }) => ({
+        url: `/pos/orders/${orderId}/refund-items`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['POS'],
+    }),
+
     // Get order history for table
     getTableOrderHistory: builder.query<POSOrder[], {
       tableId: string;
@@ -761,6 +775,7 @@ export const {
   useGetQuickStatsQuery,
   useSplitOrderMutation,
   useRefundOrderMutation,
+  useRefundItemsMutation,
   useGetTableOrderHistoryQuery,
   usePrintReceiptMutation,
   usePrintReceiptPDFMutation,

@@ -314,4 +314,258 @@ export class MenuItemsService {
       .countDocuments({ categoryId: new Types.ObjectId(categoryId) })
       .exec();
   }
+
+  /**
+   * Bulk import products from parsed CSV rows.
+   * Auto-creates categories if they don't exist.
+   * Detects duplicates by barcode or SKU within the same company.
+   */
+  async bulkImportFromCSV(
+    companyId: string,
+    branchId: string | undefined,
+    rows: Array<{
+      name: string;
+      barcode?: string;
+      sku?: string;
+      price: number;
+      cost?: number;
+      category?: string;
+      unitType?: string;
+      weightBased?: boolean;
+      stock?: number;
+      minimumStock?: number;
+      description?: string;
+      expiryDate?: string;
+      batchNumber?: string;
+    }>,
+    categoryModel: Model<any>,
+  ): Promise<{ imported: number; skipped: number; errors: Array<{ row: number; reason: string }> }> {
+    const errors: Array<{ row: number; reason: string }> = [];
+    let imported = 0;
+    let skipped = 0;
+
+    const companyObjId = new Types.ObjectId(companyId);
+    const branchObjId = branchId ? new Types.ObjectId(branchId) : undefined;
+
+    // Cache categories to avoid repeated lookups
+    const categoryCache = new Map<string, Types.ObjectId>();
+
+    // Pre-load existing categories
+    const existingCategories = await categoryModel
+      .find({ companyId: companyObjId })
+      .lean()
+      .exec();
+    for (const cat of existingCategories) {
+      categoryCache.set((cat as any).name.toLowerCase(), (cat as any)._id);
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2; // +2 for header row + 0-indexed
+
+      try {
+        if (!row.name || row.name.trim() === '') {
+          errors.push({ row: rowNum, reason: 'Missing product name' });
+          skipped++;
+          continue;
+        }
+        if (row.price === undefined || row.price === null || isNaN(Number(row.price))) {
+          errors.push({ row: rowNum, reason: 'Missing or invalid price' });
+          skipped++;
+          continue;
+        }
+
+        // Check for duplicate by barcode or SKU
+        if (row.barcode && row.barcode.trim()) {
+          const existing = await this.menuItemModel.findOne({
+            companyId: companyObjId,
+            $or: [{ barcode: row.barcode.trim() }, { sku: row.barcode.trim() }],
+          });
+          if (existing) {
+            errors.push({ row: rowNum, reason: `Duplicate barcode: ${row.barcode}` });
+            skipped++;
+            continue;
+          }
+        }
+        if (row.sku && row.sku.trim()) {
+          const existing = await this.menuItemModel.findOne({
+            companyId: companyObjId,
+            sku: row.sku.trim(),
+          });
+          if (existing) {
+            errors.push({ row: rowNum, reason: `Duplicate SKU: ${row.sku}` });
+            skipped++;
+            continue;
+          }
+        }
+
+        // Resolve or create category
+        let categoryId: Types.ObjectId;
+        const categoryName = (row.category || 'General').trim();
+        const categoryKey = categoryName.toLowerCase();
+
+        if (categoryCache.has(categoryKey)) {
+          categoryId = categoryCache.get(categoryKey)!;
+        } else {
+          const lastCat = await categoryModel
+            .findOne({ companyId: companyObjId })
+            .sort({ sortOrder: -1 });
+          const sortOrder = lastCat ? (lastCat as any).sortOrder + 1 : 0;
+
+          const newCat = await categoryModel.create({
+            name: categoryName,
+            companyId: companyObjId,
+            branchId: branchObjId || null,
+            isActive: true,
+            sortOrder,
+          });
+          categoryId = (newCat as any)._id;
+          categoryCache.set(categoryKey, categoryId);
+        }
+
+        // Create the product
+        const menuItemData: any = {
+          companyId: companyObjId,
+          branchId: branchObjId || null,
+          categoryId,
+          name: row.name.trim(),
+          price: Number(row.price),
+          isAvailable: true,
+          trackInventory: row.stock !== undefined && row.stock !== null,
+          requiresKitchen: false,
+        };
+
+        if (row.barcode) menuItemData.barcode = row.barcode.trim();
+        if (row.sku) menuItemData.sku = row.sku.trim();
+        if (row.cost !== undefined && row.cost !== null) menuItemData.cost = Number(row.cost);
+        if (row.description) menuItemData.description = row.description.trim();
+        if (row.unitType) menuItemData.unitType = row.unitType.trim();
+        if (row.weightBased !== undefined) menuItemData.weightBasedPricing = row.weightBased;
+        if (row.stock !== undefined && row.stock !== null) menuItemData.stock = Number(row.stock);
+        if (row.minimumStock !== undefined) menuItemData.minimumStock = Number(row.minimumStock);
+        if (row.expiryDate) menuItemData.expiryDate = new Date(row.expiryDate);
+        if (row.batchNumber) menuItemData.batchNumber = row.batchNumber.trim();
+
+        await this.menuItemModel.create(menuItemData);
+        imported++;
+      } catch (err: any) {
+        errors.push({ row: rowNum, reason: err.message || 'Unknown error' });
+        skipped++;
+      }
+    }
+
+    return { imported, skipped, errors };
+  }
+
+  /** Adjust stock for a single product (add, remove, or set). */
+  async adjustStock(
+    id: string,
+    adjustment: { type: 'add' | 'remove' | 'set'; quantity: number },
+  ): Promise<MenuItem> {
+    const menuItem = await this.menuItemModel.findById(id);
+    if (!menuItem) throw new NotFoundException('Menu item not found');
+
+    const currentStock = (menuItem as any).stock || 0;
+    switch (adjustment.type) {
+      case 'add':
+        (menuItem as any).stock = currentStock + adjustment.quantity;
+        break;
+      case 'remove':
+        (menuItem as any).stock = Math.max(0, currentStock - adjustment.quantity);
+        break;
+      case 'set':
+        (menuItem as any).stock = adjustment.quantity;
+        break;
+    }
+    return menuItem.save();
+  }
+
+  /** Deduct stock for all items in a completed order. */
+  async deductStockForOrder(
+    items: Array<{ menuItemId: string; quantity: number }>,
+  ): Promise<{ success: boolean; outOfStock: string[] }> {
+    const outOfStock: string[] = [];
+    for (const item of items) {
+      try {
+        const menuItem = await this.menuItemModel.findById(item.menuItemId);
+        if (!menuItem) continue;
+        if (menuItem.trackInventory && (menuItem as any).stock != null) {
+          const newStock = Math.max(0, ((menuItem as any).stock || 0) - item.quantity);
+          (menuItem as any).stock = newStock;
+          if (newStock <= 0) outOfStock.push(menuItem.name);
+          await menuItem.save();
+        }
+      } catch (err) {
+        console.error(`Failed to deduct stock for item ${item.menuItemId}:`, err);
+      }
+    }
+    return { success: true, outOfStock };
+  }
+
+  /** Restore stock for all items when an order is cancelled. */
+  async restoreStockForOrder(
+    items: Array<{ menuItemId: string; quantity: number }>,
+  ): Promise<void> {
+    for (const item of items) {
+      try {
+        const menuItem = await this.menuItemModel.findById(item.menuItemId);
+        if (!menuItem) continue;
+        if (menuItem.trackInventory && (menuItem as any).stock != null) {
+          (menuItem as any).stock = ((menuItem as any).stock || 0) + item.quantity;
+          await menuItem.save();
+        }
+      } catch (err) {
+        console.error(`Failed to restore stock for item ${item.menuItemId}:`, err);
+      }
+    }
+  }
+
+  /** Get expiring products (grocery) */
+  async getExpiringProducts(companyId: string, branchId?: string, days: number = 30): Promise<MenuItem[]> {
+    const query: any = {
+      companyId: new Types.ObjectId(companyId),
+      expiryDate: { $exists: true, $ne: null }
+    };
+    if (branchId) {
+      query.branchId = new Types.ObjectId(branchId);
+    }
+
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + days);
+
+    query.expiryDate = { $lte: futureDate };
+
+    return this.menuItemModel
+      .find(query)
+      .populate('categoryId', 'name')
+      .sort({ expiryDate: 1 })
+      .exec();
+  }
+
+  /** Generate unique barcode for store item */
+  async generateUniqueBarcode(companyId: string): Promise<string> {
+    // Generate a 12 digit code starting with '20' (Internal EAN prefix)
+    let isUnique = false;
+    let barcode = '';
+
+    while (!isUnique) {
+      // 20 + 9 random digits = 11 digits. We will add a check digit.
+      const randomPart = Math.floor(100000000 + Math.random() * 900000000).toString();
+      const code11 = `20${randomPart}`;
+      
+      // Calculate EAN-13 check digit (dummy standard approach)
+      let sum = 0;
+      for (let i = 0; i < 11; i++) {
+        sum += parseInt(code11[i]) * (i % 2 === 0 ? 1 : 3);
+      }
+      const checkDigit = (10 - (sum % 10)) % 10;
+      barcode = `${code11}${checkDigit}`;
+
+      const existing = await this.menuItemModel.findOne({ barcode });
+      if (!existing) {
+        isUnique = true;
+      }
+    }
+    return barcode;
+  }
 }

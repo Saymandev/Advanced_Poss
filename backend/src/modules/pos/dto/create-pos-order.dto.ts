@@ -229,6 +229,25 @@ export class CreatePOSOrderDto {
   @Min(0)
   loyaltyDiscount?: number; // Discount amount from loyalty points
 
+  // Manual discount (grocery/shop)
+  @IsOptional()
+  @IsEnum(['percentage', 'flat', 'none'])
+  discountType?: 'percentage' | 'flat' | 'none';
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountValue?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  discountReason?: string;
+
   @IsOptional()
   @IsNumber()
   @Min(0)

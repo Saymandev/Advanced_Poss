@@ -205,10 +205,10 @@ export default function WorkPeriodsPage() {
     setIsViewModalOpen(true);
   };
 
-  // Fetch sales summary when viewing a work period
+  // Fetch sales summary when viewing a work period or closing
   const { data: salesSummary, isLoading: isLoadingSalesSummary } = useGetWorkPeriodSalesSummaryQuery(
     selectedWorkPeriod?.id || '',
-    { skip: !selectedWorkPeriod || !isViewModalOpen }
+    { skip: !selectedWorkPeriod || (!isViewModalOpen && !isCloseModalOpen) }
   );
 
   // Fetch full work period details when viewing
@@ -752,7 +752,20 @@ export default function WorkPeriodsPage() {
                     {formatCurrency(selectedWorkPeriod.openingBalance)}
                   </span>
                 </div>
-                {selectedWorkPeriod.closingBalance && (
+                {salesSummary && !isLoadingSalesSummary && (() => {
+                  const cashData = salesSummary.paymentMethods?.find((pm: any) => pm.type.toLowerCase() === 'cash');
+                  const cashSales = cashData ? cashData.amount : 0;
+                  const expectedCash = (selectedWorkPeriod.openingBalance || 0) + cashSales;
+                  return (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Expected Cash:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {formatCurrency(expectedCash)}
+                      </span>
+                    </div>
+                  );
+                })()}
+                {selectedWorkPeriod.closingBalance !== undefined && (
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Closing Balance:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
@@ -764,15 +777,34 @@ export default function WorkPeriodsPage() {
             </div>
           )}
 
-          <Input
-            label="Actual Closing Balance *"
-            type="number"
-            step="0.01"
-            value={closeFormData.actualClosingBalance}
-            onChange={(e) => setCloseFormData({ ...closeFormData, actualClosingBalance: parseFloat(e.target.value) || 0 })}
-            placeholder="0.00"
-            required
-          />
+          <div className="space-y-4">
+            <Input
+              label="Actual Closing Balance (Cash) *"
+              type="number"
+              step="0.01"
+              value={closeFormData.actualClosingBalance}
+              onChange={(e) => setCloseFormData({ ...closeFormData, actualClosingBalance: parseFloat(e.target.value) || 0 })}
+              placeholder="0.00"
+              required
+            />
+
+            {salesSummary && !isLoadingSalesSummary && closeFormData.actualClosingBalance > 0 && (() => {
+              const cashData = salesSummary.paymentMethods?.find((pm: any) => pm.type.toLowerCase() === 'cash');
+              const expectedCash = (selectedWorkPeriod?.openingBalance || 0) + (cashData ? cashData.amount : 0);
+              const variance = closeFormData.actualClosingBalance - expectedCash;
+              const isNegative = variance < 0;
+              const color = variance === 0 ? 'text-green-600 dark:text-green-400' : (isNegative ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400');
+              
+              return (
+                <div className={`flex justify-between p-3 rounded-lg border \${variance === 0 ? 'bg-green-50 border-green-200 dark:bg-green-900/20' : (isNegative ? 'bg-red-50 border-red-200 dark:bg-red-900/20' : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20')}`}>
+                  <span className={`font-medium \${color}`}>Cash Variance:</span>
+                  <span className={`font-bold \${color}`}>
+                    {variance > 0 ? '+' : ''}{formatCurrency(variance)}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

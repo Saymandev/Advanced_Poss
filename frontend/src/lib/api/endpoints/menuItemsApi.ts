@@ -13,6 +13,12 @@ export interface MenuItem {
   preparationTime?: number;
   calories?: number;
   requiresKitchen?: boolean;
+  barcode?: string;
+  sku?: string;
+  expiryDate?: string;
+  batchNumber?: string;
+  unitType?: string;
+  stock?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -180,6 +186,8 @@ export const menuItemsApi = apiSlice.injectEndpoints({
           preparationTime: item.preparationTime,
           calories: item.calories,
           requiresKitchen: item.requiresKitchen !== false,
+          expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : undefined,
+          batchNumber: item.batchNumber,
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt: item.updatedAt || new Date().toISOString(),
         } as MenuItem;
@@ -251,6 +259,42 @@ export const menuItemsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['MenuItem'],
     }),
+    bulkImportCSV: builder.mutation<{ success: boolean; imported: number; errors: any[] }, FormData>({
+      query: (formData) => ({
+        url: '/menu-items/bulk-import',
+        method: 'POST',
+        body: formData,
+      }),
+      invalidatesTags: ['MenuItem'],
+    }),
+    getCSVTemplate: builder.query<string, void>({
+      query: () => ({
+        url: '/menu-items/csv-template',
+        responseHandler: 'text',
+      }),
+    }),
+    adjustStock: builder.mutation<MenuItem, { id: string; type: 'add' | 'remove' | 'set'; quantity: number }>({
+      query: ({ id, ...body }) => ({
+        url: `/menu-items/${id}/adjust-stock`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['MenuItem'],
+    }),
+    getExpiringProducts: builder.query<MenuItem[], { days?: number }>({
+      query: (params) => ({
+        url: '/menu-items/alerts/expiring',
+        params,
+      }),
+      providesTags: ['MenuItem'],
+    }),
+    generateBarcode: builder.mutation<{ success: boolean; barcode: string; product: MenuItem }, string>({
+      query: (id) => ({
+        url: `/menu-items/${id}/generate-barcode`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['MenuItem'],
+    }),
   }),
 });
 
@@ -262,4 +306,9 @@ export const {
   useDeleteMenuItemMutation,
   useToggleAvailabilityMutation,
   useUploadMenuImagesMutation,
+  useBulkImportCSVMutation,
+  useGetCSVTemplateQuery,
+  useAdjustStockMutation,
+  useGetExpiringProductsQuery,
+  useGenerateBarcodeMutation,
 } = menuItemsApi;

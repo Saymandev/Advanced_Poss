@@ -160,9 +160,19 @@ export class POSController {
   }
 
   @Post('refunds')
-  @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
+  @ApiOperation({ summary: 'Process refund for an order' })
   async refundOrder(@Body() body: { orderId: string; amount: number; reason: string; isDamage?: boolean }, @Request() req) {
     return this.posService.processRefund(body.orderId, body.amount, body.reason, req.user.id, req.user.branchId, { isDamage: body.isDamage });
+  }
+
+  @Post('orders/:id/refund-items')
+  @ApiOperation({ summary: 'Process item-wise refund, restore stock, and optionally record wastage' })
+  async refundItems(
+    @Param('id') orderId: string,
+    @Body() dto: import('./dto/refund-items.dto').RefundItemsDto,
+    @Request() req
+  ) {
+    return this.posService.refundItems(orderId, dto, req.user.id, req.user.branchId);
   }
 
   @Get('tables/:tableId/orders')
