@@ -60,10 +60,8 @@ export class SubscriptionPlansService implements OnModuleInit {
 
   async findAll(filterActive?: boolean): Promise<any[]> {
     const query: any = {};
-    // Only filter by isActive if explicitly provided
-    if (filterActive !== undefined) {
-      query.isActive = filterActive;
-    }
+    // Default to active plans only; set ?isActive=false to see all
+    query.isActive = filterActive !== undefined ? filterActive : true;
     const plans = await this.subscriptionPlanModel
       .find(query)
       .sort({ sortOrder: 1 })
