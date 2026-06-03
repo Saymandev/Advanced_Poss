@@ -18,9 +18,9 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // Cookie parser (for httpOnly cookies)
   app.use(cookieParser());
-  // Increase body size limit to handle large base64 images (50MB)
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  // Increase body size limit moderately for base64 images, but avoid 50mb DoS risk
+  app.use(express.json({ limit: '5mb' }));
+  app.use(express.urlencoded({ limit: '5mb', extended: true }));
   const configService = app.get(ConfigService);
   const port = configService.get('PORT') || 5000;
     const frontendUrl = (configService.get('APP_URL') || 'http://localhost:3000').replace(/\/$/, '');
@@ -53,8 +53,7 @@ async function bootstrap() {
       if (!origin || 
           origin === frontendUrl || origin === 'https://raha.bd' ||
           origin === 'http://localhost:3000' || 
-          
-          origin.includes('raha.bd')) {
+          origin.endsWith('.raha.bd')) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -98,42 +97,44 @@ async function bootstrap() {
   app.useGlobalInterceptors(new EncryptionInterceptor(app.get(ConfigService)));
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalInterceptors(new LoggingInterceptor());
-  // Swagger documentation
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Restaurant POS API')
-    .setDescription('Advanced Restaurant Management & POS System API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('Authentication')
-    .addTag('Users')
-    .addTag('Companies')
-    .addTag('Branches')
-    .addTag('Menu')
-    .addTag('Orders')
-    .addTag('Tables')
-    .addTag('Kitchen')
-    .addTag('Customers')
-    .addTag('Inventory')
-    .addTag('Staff')
-    .addTag('Reports')
-    .addTag('Subscriptions')
-    .addTag('AI')
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document, {
-    customSiteTitle: 'Restaurant POS API Documentation',
-    customCss: '.swagger-ui .topbar { display: none }',
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-    customJs: [
-      'https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js',
-      'https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-standalone-preset.js',
-    ],
-    customCssUrl: [
-      'https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css',
-    ],
-  });
+  // Swagger documentation (Disabled in production for security)
+  if (configService.get('nodeEnv') !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Restaurant POS API')
+      .setDescription('Advanced Restaurant Management & POS System API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('Authentication')
+      .addTag('Users')
+      .addTag('Companies')
+      .addTag('Branches')
+      .addTag('Menu')
+      .addTag('Orders')
+      .addTag('Tables')
+      .addTag('Kitchen')
+      .addTag('Customers')
+      .addTag('Inventory')
+      .addTag('Staff')
+      .addTag('Reports')
+      .addTag('Subscriptions')
+      .addTag('AI')
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document, {
+      customSiteTitle: 'Restaurant POS API Documentation',
+      customCss: '.swagger-ui .topbar { display: none }',
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+      customJs: [
+        'https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js',
+        'https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-standalone-preset.js',
+      ],
+      customCssUrl: [
+        'https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css',
+      ],
+    });
+  }
   // Health check endpoint
   app.getHttpAdapter().get('/health', (req: any, res: any) => {
     res.status(200).json({

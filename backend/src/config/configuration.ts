@@ -18,9 +18,9 @@ export default () => ({
   },
 
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-secret-key',
+    secret: process.env.JWT_SECRET || (() => { if (process.env.NODE_ENV === 'production') throw new Error('FATAL: JWT_SECRET is required in production'); return 'dev-only-secret-change-me'; })(),
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || (() => { if (process.env.NODE_ENV === 'production') throw new Error('FATAL: JWT_REFRESH_SECRET is required in production'); return 'dev-only-refresh-secret-change-me'; })(),
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
 
@@ -81,7 +81,7 @@ export default () => ({
 
   superAdmin: {
     email: process.env.SUPER_ADMIN_EMAIL || 'admin@rahapossolution.com',
-    password: process.env.SUPER_ADMIN_PASSWORD || 'Admin@123456',
+    password: process.env.SUPER_ADMIN_PASSWORD || (() => { if (process.env.NODE_ENV === 'production') throw new Error('FATAL: SUPER_ADMIN_PASSWORD is required in production'); return 'DevOnly@123456'; })(),
     firstName: process.env.SUPER_ADMIN_FIRST_NAME || 'Super',
     lastName: process.env.SUPER_ADMIN_LAST_NAME || 'Admin',
   },

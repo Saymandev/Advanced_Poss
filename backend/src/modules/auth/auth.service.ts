@@ -408,8 +408,8 @@ export class AuthService {
     }
 
     const tokens = await this.generateTokens(user);
-    // @ts-ignore - Mongoose virtual property
-    await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
+    const userId = (user as any).id || (user as any)._id?.toString();
+    await this.usersService.updateRefreshToken(userId, tokens.refreshToken);
 
     return {
       user: {
@@ -421,7 +421,7 @@ export class AuthService {
         role: user.role,
       },
       tokens,
-      verificationToken, // For development only
+      // verificationToken removed — only sent via email for security
     };
   }
 
@@ -684,12 +684,7 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string) {
-    this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    this.logger.log(`🔄 REFRESH TOKEN - Starting refresh`);
-    this.logger.log(`🔑 Refresh Token (first 50 chars): ${refreshToken ? refreshToken.substring(0, 50) + '...' : 'MISSING'}`);
-
     if (!refreshToken) {
-      this.logger.error(`❌ Refresh token is missing`);
       throw new UnauthorizedException('Refresh token is required');
     }
 
@@ -697,81 +692,42 @@ export class AuthService {
       const refreshSecret = this.configService.get('jwt.refreshSecret');
       const accessSecret = this.configService.get('jwt.secret');
 
-      this.logger.log(`🔐 Refresh Secret: ${refreshSecret ? 'SET (' + refreshSecret.substring(0, 10) + '...)' : 'NOT SET'}`);
-      this.logger.log(`🔐 Access Secret: ${accessSecret ? 'SET (' + accessSecret.substring(0, 10) + '...)' : 'NOT SET'}`);
-      this.logger.log(`🔍 Secrets match: ${refreshSecret === accessSecret ? 'YES (PROBLEM!)' : 'NO (GOOD)'}`);
-
-      // Try to decode the token first (without verification) to see what's in it
-      try {
-        const decoded = this.jwtService.decode(refreshToken);
-        this.logger.log(`📋 Decoded token (without verification): ${JSON.stringify(decoded, null, 2)}`);
-      } catch (decodeError) {
-        this.logger.warn(`⚠️  Could not decode token: ${decodeError.message}`);
-      }
-
-      // Try verifying with refresh secret first
+      // Verify with refresh secret
       let payload;
       try {
-        this.logger.log(`🔍 Attempting verification with refresh secret...`);
         payload = this.jwtService.verify(refreshToken, {
           secret: refreshSecret,
         });
-        this.logger.log(`✅ Token verified successfully with refresh secret`);
       } catch (refreshError) {
-        this.logger.error(`❌ Verification with refresh secret failed: ${refreshError.message}`);
-
-        // Try with access secret as fallback (to see if old tokens were generated with wrong secret)
+        // Fallback: try access secret for legacy tokens
         try {
-          this.logger.log(`🔍 Attempting verification with access secret (fallback)...`);
           payload = this.jwtService.verify(refreshToken, {
             secret: accessSecret,
           });
-          this.logger.warn(`⚠️  Token verified with ACCESS secret (wrong secret used during generation!)`);
-          this.logger.warn(`⚠️  This means the token was generated with the wrong secret.`);
-        } catch (accessError) {
-          this.logger.error(`❌ Verification with access secret also failed: ${accessError.message}`);
-          throw refreshError; // Throw original error
+          this.logger.warn('Refresh token verified with access secret (legacy token)');
+        } catch {
+          throw refreshError;
         }
       }
-
-      this.logger.log(`👤 User ID from token: ${payload.sub}`);
-      this.logger.log(`📧 Email from token: ${payload.email}`);
-      this.logger.log(`🎭 Role from token: ${payload.role}`);
 
       const user = await this.usersService.findOne(payload.sub);
 
       if (!user) {
-        this.logger.error(`❌ User not found with ID: ${payload.sub}`);
         throw new UnauthorizedException('User not found');
       }
 
-      this.logger.log(`✅ User found: ${user.email} (${user.firstName} ${user.lastName})`);
-
       const tokens = await this.generateTokens(user);
-      // @ts-ignore - Mongoose virtual property
-      await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
+      const userId = (user as any).id || (user as any)._id?.toString();
+      await this.usersService.updateRefreshToken(userId, tokens.refreshToken);
 
       // Get permissions
       const permissions = await this.getUserPermissions(user);
 
-      this.logger.log(`✅ REFRESH TOKEN - Success`);
-      this.logger.log(`🔑 New tokens generated`);
-      this.logger.log(`🔑 Access token: ${tokens.accessToken.substring(0, 30)}...`);
-      this.logger.log(`🔑 Refresh token: ${tokens.refreshToken.substring(0, 30)}...`);
-      this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-
-      // Return both tokens for frontend to update
-      // Also return user info if needed, but standard refresh usually just returns tokens
-      // However, if permissions changed, we might want to return them here too. 
-      // For now, let's keep standard behavior but maybe frontend re-fetches user profile?
-      // Or we can include user in refresh response if frontend expects it.
-      // Based on authSlice, it seems refresh logic happens in interceptor or separate flow.
-      // Looking at authSlice.ts, setCredentials takes user and tokens.
+      this.logger.log(`Token refreshed for user ${payload.sub}`);
 
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        // Optional: return user with permissions to update state
         user: {
           id: (user as any).id || (user as any)._id.toString(),
           email: user.email,
@@ -785,22 +741,7 @@ export class AuthService {
         }
       };
     } catch (error) {
-      this.logger.error(`❌ REFRESH TOKEN - Failed`);
-      this.logger.error(`📛 Error Type: ${error.constructor.name}`);
-      this.logger.error(`📛 Error Message: ${error.message || 'Unknown error'}`);
-      this.logger.error(`📋 Error Stack: ${error.stack || 'No stack trace'}`);
-
-      // Log specific JWT errors
-      if (error.name === 'JsonWebTokenError') {
-        this.logger.error(`🚫 JWT Error: Invalid token format or signature`);
-      } else if (error.name === 'TokenExpiredError') {
-        this.logger.error(`⏰ JWT Error: Token has expired`);
-      } else if (error.name === 'NotBeforeError') {
-        this.logger.error(`⏰ JWT Error: Token not active yet`);
-      }
-
-      this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-
+      this.logger.error(`Token refresh failed: ${error.name || 'Unknown'}`);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -889,14 +830,6 @@ export class AuthService {
     // Handle both Mongoose documents (_id) and plain objects (id)
     const userId = user.id || (user as any)._id?.toString() || user._id;
 
-    this.logger.log(`🔑 Token Generation - User ID resolution:`);
-    this.logger.log(`   - user.id: ${user.id || 'NOT SET'}`);
-    this.logger.log(`   - user._id: ${(user as any)._id || 'NOT SET'}`);
-    this.logger.log(`   - user._id?.toString(): ${(user as any)._id?.toString() || 'NOT SET'}`);
-    this.logger.log(`   - Final userId: ${userId}`);
-    this.logger.log(`   - userId type: ${typeof userId}`);
-    this.logger.log(`   - userId is valid ObjectId: ${Types.ObjectId.isValid(userId)}`);
-
     const payload = {
       sub: userId,
       email: user.email,
@@ -905,19 +838,10 @@ export class AuthService {
       branchId: manualBranchId || user.branchId?.toString(),
     };
 
-    this.logger.log(`🔑 Token payload.sub (user ID in token): ${payload.sub}`);
-
     const accessSecret = this.configService.get('jwt.secret');
     const refreshSecret = this.configService.get('jwt.refreshSecret');
     const accessExpiresIn = this.configService.get('jwt.expiresIn');
     const refreshExpiresIn = this.configService.get('jwt.refreshExpiresIn');
-
-    this.logger.log(`🔑 Generating tokens for user: ${user.email}`);
-    this.logger.log(`🔐 Access secret: ${accessSecret ? 'SET' : 'NOT SET'}`);
-    this.logger.log(`🔐 Refresh secret: ${refreshSecret ? 'SET' : 'NOT SET'}`);
-    this.logger.log(`🔍 Secrets are different: ${accessSecret !== refreshSecret ? 'YES (GOOD)' : 'NO (PROBLEM!)'}`);
-    this.logger.log(`⏱️  Access expires in: ${accessExpiresIn}`);
-    this.logger.log(`⏱️  Refresh expires in: ${refreshExpiresIn}`);
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {

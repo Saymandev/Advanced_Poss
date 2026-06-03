@@ -66,6 +66,7 @@ import { WorkPeriodsModule } from './modules/work-periods/work-periods.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
+import { ObjectIdValidationMiddleware } from './common/middleware/object-id-validation.middleware';
 import { SubscriptionLockMiddleware } from './common/middleware/subscription-lock.middleware';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 
@@ -195,6 +196,11 @@ export class AppModule implements NestModule {
     // Apply maintenance mode middleware globally (runs first)
     consumer
       .apply(MaintenanceMiddleware)
+      .forRoutes('*');
+
+    // Apply ObjectId validation middleware globally
+    consumer
+      .apply(ObjectIdValidationMiddleware)
       .forRoutes('*');
     
     // Apply subscription lock middleware globally (runs after maintenance)
