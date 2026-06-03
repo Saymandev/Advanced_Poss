@@ -626,7 +626,11 @@ export default function PurchaseOrdersPage() {
                 <Select
                   options={ingredients?.items?.map(i => ({ value: i.id, label: i.name })) || []}
                   value={newItem.ingredientId}
-                  onChange={(value) => setNewItem({ ...newItem, ingredientId: value })}
+                  onChange={(value) => {
+                    const selectedIngredient = ingredients?.items?.find(i => i.id === value);
+                    const defaultPrice = selectedIngredient?.unitCost || selectedIngredient?.lastPurchasePrice || 0;
+                    setNewItem({ ...newItem, ingredientId: value, unitPrice: defaultPrice });
+                  }}
                   placeholder="Select ingredient"
                 />
               </div>

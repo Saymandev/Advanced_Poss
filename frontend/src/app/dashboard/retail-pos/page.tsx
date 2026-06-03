@@ -420,7 +420,7 @@ export default function RetailPOSPage() {
 
       if (!orderId) throw new Error('Order creation failed');
 
-      if (isCash && received > 0) {
+      if (!isFullPayment && received > 0) {
         await processPayment({
           orderId,
           amount: Math.min(received, cartTotal),
