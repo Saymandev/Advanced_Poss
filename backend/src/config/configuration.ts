@@ -81,7 +81,7 @@ export default () => ({
 
   superAdmin: {
     email: process.env.SUPER_ADMIN_EMAIL || 'admin@rahapossolution.com',
-    password: process.env.SUPER_ADMIN_PASSWORD || (() => { if (process.env.NODE_ENV === 'production') throw new Error('FATAL: SUPER_ADMIN_PASSWORD is required in production'); return 'DevOnly@123456'; })(),
+    password: process.env.SUPER_ADMIN_PASSWORD || 'DevOnly@123456',
     firstName: process.env.SUPER_ADMIN_FIRST_NAME || 'Super',
     lastName: process.env.SUPER_ADMIN_LAST_NAME || 'Admin',
   },
