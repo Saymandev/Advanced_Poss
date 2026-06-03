@@ -403,6 +403,8 @@ export default function RetailPOSPage() {
         totalAmount: cartTotal,
         status: isFullPayment ? 'paid' as const : 'pending' as const,
         paymentMethod: paymentMethod,
+        amountReceived: isCash ? received : cartTotal,
+        changeDue: isCash ? change : 0,
         ...(selectedCustomerId ? { customerId: selectedCustomerId } : {}),
         customerInfo,
         // Discount data
