@@ -37,6 +37,7 @@ import {
   XMarkIcon,
   QrCodeIcon,
   CameraIcon,
+  CommandLineIcon,
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -467,6 +468,48 @@ export default function RetailPOSPage() {
   // Mobile cart toggle
   const [showMobileCart, setShowMobileCart] = useState(false);
 
+  // Keyboard shortcuts
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const DEFAULT_SHORTCUTS = {
+    toggleQueue: 'F1',
+    openPayment: 'F12',
+    closeAll: 'Escape',
+    showShortcuts: '?',
+  };
+  const [shortcuts, setShortcuts] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_SHORTCUTS;
+    try {
+      const saved = localStorage.getItem('retail_pos_shortcuts');
+      return saved ? { ...DEFAULT_SHORTCUTS, ...JSON.parse(saved) } : DEFAULT_SHORTCUTS;
+    } catch { return DEFAULT_SHORTCUTS; }
+  });
+
+  const saveShortcuts = (updated: typeof shortcuts) => {
+    setShortcuts(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('retail_pos_shortcuts', JSON.stringify(updated));
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName)) {
+        if (event.key === 'Escape') {
+          (event.target as HTMLElement).blur();
+        }
+        return;
+      }
+      const key = event.key;
+      if ((event.ctrlKey || event.metaKey) && key === '/') { event.preventDefault(); setShowKeyboardShortcuts(prev => !prev); return; }
+      if (key === shortcuts.toggleQueue) { event.preventDefault(); setIsQueueOpen(prev => !prev); return; }
+      if (key === shortcuts.closeAll) { event.preventDefault(); setIsPaymentOpen(false); setShowKeyboardShortcuts(false); setIsCustomerModalOpen(false); setIsQueueOpen(false); return; }
+      if (key === shortcuts.openPayment && cart.length > 0) { event.preventDefault(); setPaymentMode('checkout'); setIsPaymentOpen(true); setAmountReceived(cartTotal.toFixed(2)); return; }
+      if (key === shortcuts.showShortcuts) { event.preventDefault(); setShowKeyboardShortcuts(prev => !prev); return; }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart.length, shortcuts, cartTotal]);
+
   // Work period lock
   if (!isOwner && !workPeriodLoading && !activeWorkPeriod) {
     return (
@@ -812,14 +855,25 @@ export default function RetailPOSPage() {
             Checkout
           </Button>
 
-          {/* Queue */}
-          <Button
-            variant="secondary"
-            onClick={() => setIsQueueOpen(true)}
-            className="w-full h-10 rounded-xl text-xs font-bold uppercase"
-          >
-            Orders ({queueOrders.length})
-          </Button>
+          {/* Queue and Shortcuts */}
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setIsQueueOpen(true)}
+              className="flex-1 h-10 rounded-xl text-xs font-bold uppercase"
+            >
+              Orders ({queueOrders.length})
+              <span className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-[10px] text-gray-500 hidden sm:inline">{shortcuts.toggleQueue}</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowKeyboardShortcuts(true)}
+              className="h-10 px-3 rounded-xl border-gray-200 dark:border-slate-800"
+              title="Keyboard Shortcuts (Ctrl+/)"
+            >
+              <CommandLineIcon className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -997,6 +1051,59 @@ export default function RetailPOSPage() {
           )}
         </button>
       )}
+
+      {/* Keyboard Shortcuts Modal */}
+      <Modal
+        isOpen={showKeyboardShortcuts}
+        onClose={() => setShowKeyboardShortcuts(false)}
+        title="Keyboard Shortcuts"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-xl border border-amber-100 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200 mb-4">
+            Click any key badge below, then press your desired key to reassign it.
+          </div>
+          <div className="space-y-3">
+            {[
+              { key: 'toggleQueue', label: 'Toggle Orders Queue', shortcut: shortcuts.toggleQueue },
+              { key: 'openPayment', label: 'Open Payment', shortcut: shortcuts.openPayment },
+              { key: 'closeAll', label: 'Close All Modals', shortcut: shortcuts.closeAll },
+              { key: 'showShortcuts', label: 'Show This Help', shortcut: shortcuts.showShortcuts },
+            ].map(({ key, label, shortcut }) => (
+              <div key={key} className="flex justify-between items-center p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg">
+                <span className="text-sm font-medium">{label}</span>
+                <button
+                  className="px-2 py-1 bg-gray-100 dark:bg-slate-700 hover:bg-amber-100 dark:hover:bg-amber-900/30 hover:border-amber-400 border border-transparent rounded text-xs font-mono font-bold transition-colors group relative"
+                  onClick={() => {
+                    const handleKey = (e: KeyboardEvent) => {
+                      e.preventDefault();
+                      const k = e.key;
+                      saveShortcuts({ ...shortcuts, [key]: k });
+                      window.removeEventListener('keydown', handleKey);
+                      toast.success(`Shortcut mapped to ${k}`);
+                    };
+                    window.addEventListener('keydown', handleKey);
+                  }}
+                  title="Click to change shortcut"
+                >
+                  <span className="group-hover:hidden">{shortcuts[key as keyof typeof shortcuts]}</span>
+                  <span className="hidden group-hover:inline text-amber-600">✎ Set</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="pt-4 border-t border-gray-100 dark:border-slate-800 mt-4 flex justify-between items-center">
+            <span className="text-xs text-gray-500">Global: <kbd className="bg-gray-100 dark:bg-slate-800 px-1 rounded">Ctrl</kbd> + <kbd className="bg-gray-100 dark:bg-slate-800 px-1 rounded">/</kbd></span>
+            <button
+              className="text-xs text-blue-500 hover:text-blue-600"
+              onClick={() => { saveShortcuts(DEFAULT_SHORTCUTS); toast.success('Shortcuts reset to defaults'); }}
+            >
+              Reset Defaults
+            </button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 }
