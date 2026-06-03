@@ -420,6 +420,15 @@ export default function SubscriptionsPage() {
     skip: !companyId,
     refetchOnMountOrArgChange: true, // Always refetch to get latest data
   });
+  // Filter plans by business type for non-super-admin users
+  const displayPlans = useMemo(() => {
+    if (!plans.length) return [];
+    if (isSuperAdmin) return plans;
+    const businessType = (companyData as any)?.businessType;
+    if (businessType === 'retail') return plans.filter((p: any) => p.name?.includes('retail'));
+    if (businessType === 'restaurant') return plans.filter((p: any) => !p.name?.includes('retail'));
+    return plans;
+  }, [plans, isSuperAdmin, companyData]);
   const { 
     data: currentSubscription, 
     isFetching: isSubscriptionLoading,
@@ -2833,7 +2842,7 @@ export default function SubscriptionsPage() {
             </CardContent>
           </Card>
         )}
-        {plans.length === 0 && !isPlanLoading && !plansError && (
+        {displayPlans.length === 0 && !isPlanLoading && !plansError && (
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-gray-600 dark:text-gray-400 mb-4">
@@ -2846,7 +2855,7 @@ export default function SubscriptionsPage() {
           </Card>
         )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((plan: any) => (
+          {displayPlans.map((plan: any) => (
             <Card
               key={plan.id}
                       className={`hover:shadow-lg transition-all ${
@@ -2995,7 +3004,7 @@ export default function SubscriptionsPage() {
         </div>
       </div>
       {/* Plan Features Comparison */}
-      {plans.length > 0 && (
+      {displayPlans.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Feature Comparison</CardTitle>
@@ -3011,7 +3020,7 @@ export default function SubscriptionsPage() {
                     <th className="text-left py-4 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                       Feature
                     </th>
-                    {plans.map((plan: any) => (
+                    {displayPlans.map((plan: any) => (
                       <th
                         key={plan.id}
                         className={`text-center py-4 px-4 text-sm font-semibold ${
@@ -3029,7 +3038,7 @@ export default function SubscriptionsPage() {
                   {/* Pricing */}
                   <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                     <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">Monthly Price</td>
-                    {plans.map((plan: any) => (
+                    {displayPlans.map((plan: any) => (
                       <td key={plan.id} className="text-center py-3 px-4 text-sm font-bold text-gray-900 dark:text-white">
                         {plan.price === 0 ? 'Free' : formatCurrency(plan.price, plan.currency)}
                       </td>
@@ -3038,7 +3047,7 @@ export default function SubscriptionsPage() {
                   {/* Trial Period */}
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Trial Period</td>
-                    {plans.map((plan: any) => (
+                    {displayPlans.map((plan: any) => (
                       <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
                         {plan.trialPeriod ? `${Math.floor(plan.trialPeriod / 24)} days` : 'No trial'}
                       </td>
@@ -3046,7 +3055,7 @@ export default function SubscriptionsPage() {
                   </tr>
                   {/* Feature Flags */}
                   <tr className="border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <td colSpan={plans.length + 1} className="py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <td colSpan={displayPlans.length + 1} className="py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Core Features
                     </td>
                   </tr>
@@ -3082,7 +3091,7 @@ export default function SubscriptionsPage() {
                     return featureRows.map((feature) => (
                       <tr key={feature.key} className="border-b border-gray-100 dark:border-gray-800">
                         <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">{feature.label}</td>
-                        {plans.map((plan: any) => (
+                        {displayPlans.map((plan: any) => (
                           <td key={plan.id} className="text-center py-3 px-4">
                             {checkFeature(plan, feature.key, feature.legacy) ? (
                               <CheckCircleIcon className="w-5 h-5 text-green-500 mx-auto" />
@@ -3096,13 +3105,13 @@ export default function SubscriptionsPage() {
                   })()}
                   {/* Limits Section */}
                   <tr className="border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <td colSpan={plans.length + 1} className="py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <td colSpan={displayPlans.length + 1} className="py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Limits
                     </td>
                   </tr>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Branches</td>
-                    {plans.map((plan: any) => {
+                    {displayPlans.map((plan: any) => {
                       const maxBranches = plan.limits?.maxBranches ?? plan.features?.maxBranches;
                       return (
                         <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
@@ -3113,7 +3122,7 @@ export default function SubscriptionsPage() {
                   </tr>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Users</td>
-                    {plans.map((plan: any) => {
+                    {displayPlans.map((plan: any) => {
                       const maxUsers = plan.limits?.maxUsers ?? plan.features?.maxUsers;
                       return (
                         <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
@@ -3124,7 +3133,7 @@ export default function SubscriptionsPage() {
                   </tr>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Storage</td>
-                    {plans.map((plan: any) => {
+                    {displayPlans.map((plan: any) => {
                       const storageGB = plan.limits?.storageGB;
                       return (
                         <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
@@ -3133,10 +3142,10 @@ export default function SubscriptionsPage() {
                       );
                     })}
                   </tr>
-                  {plans.some((p: any) => p.limits?.maxTables !== undefined) && (
+                  {displayPlans.some((p: any) => p.limits?.maxTables !== undefined) && (
                     <tr className="border-b border-gray-100 dark:border-gray-800">
                       <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Tables</td>
-                      {plans.map((plan: any) => {
+                      {displayPlans.map((plan: any) => {
                         const maxTables = plan.limits?.maxTables;
                         return (
                           <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
@@ -3146,10 +3155,10 @@ export default function SubscriptionsPage() {
                       })}
                     </tr>
                   )}
-                  {plans.some((p: any) => p.limits?.maxMenuItems !== undefined) && (
+                  {displayPlans.some((p: any) => p.limits?.maxMenuItems !== undefined) && (
                     <tr className="border-b border-gray-100 dark:border-gray-800">
                       <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300">Max Menu Items</td>
-                      {plans.map((plan: any) => {
+                      {displayPlans.map((plan: any) => {
                         const maxMenuItems = plan.limits?.maxMenuItems;
                         return (
                           <td key={plan.id} className="text-center py-3 px-4 text-sm font-medium">
