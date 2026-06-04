@@ -767,10 +767,18 @@ export class ReceiptService {
                 <div>Date : ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, '24h').split(',')[0]}</div>
                 <div>Time : ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, '12h').split(',')[1].trim()}</div>
             </div>
+            ${receiptData.orderType === 'counter_sale' ? `
+            <div style="display: flex; justify-content: space-between;">
+                <div>Cashier: ${receiptData.waiterName}</div>
+            </div>` : receiptData.orderType === 'dine-in' ? `
             <div style="display: flex; justify-content: space-between;">
                 <div>Table : ${receiptData.tableNumber}</div>
                 <div>Waiter: ${receiptData.waiterName}</div>
-            </div>
+            </div>` : `
+            <div style="display: flex; justify-content: space-between;">
+                <div>Type : ${receiptData.orderType === 'takeaway' ? 'Takeaway' : receiptData.orderType === 'delivery' ? 'Delivery' : receiptData.orderType}</div>
+                <div>Cashier: ${receiptData.waiterName}</div>
+            </div>`}
         </div>
 
         <div class="separator-dashed">---------------------------------------</div>
