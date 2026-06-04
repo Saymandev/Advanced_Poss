@@ -1225,6 +1225,8 @@ export class POSService {
     let orderTotal = isPublic ? order.total : order.totalAmount;
     const totalPaid = (order as any).paidAmount || 0;
 
+    console.log(`[POS Payment DEBUG] orderId=${processPaymentDto.orderId}, isPublic=${isPublic}, orderTotal=${orderTotal}, totalPaid=${totalPaid}, order.totalAmount=${order.totalAmount}, order.total=${order.total}, order.status=${order.status}, paymentDto.amount=${processPaymentDto.amount}`);
+
     // Safety: if orderTotal is 0/undefined but order has items, recalculate from items
     if ((!orderTotal || orderTotal <= 0) && order.items && order.items.length > 0) {
       const recalculated = order.items.reduce((sum: number, item: any) => {
