@@ -158,9 +158,9 @@ export class ReportsService {
         sales: salesDaily[date] || 0,
         expenses: expenseDaily[date] || 0,
         purchases: purchaseDaily[date] || 0,
-        net: (salesDaily[date] || 0) - (expenseDaily[date] || 0) - (purchaseDaily[date] || 0),
+        net: (salesDaily[date] || 0) - (expenseDaily[date] || 0),
       }));
-    const netProfit = salesTotal - expenseTotals.paid - purchaseTotals.received;
+    const netProfit = salesTotal - expenseTotals.paid;
     return {
       period: {
         startDate,
