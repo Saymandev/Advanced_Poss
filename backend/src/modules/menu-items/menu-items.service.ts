@@ -520,6 +520,26 @@ export class MenuItemsService {
     }
   }
 
+  /** Synchronize stock for MenuItems when an Ingredient is purchased (Retail Mode) */
+  async syncIngredientStock(ingredientId: string, quantityAdded: number): Promise<void> {
+    try {
+      // Find all MenuItems that track inventory and use this ingredient
+      // In retail mode, this usually maps 1:1
+      const menuItems = await this.menuItemModel.find({
+        'ingredients.ingredientId': new Types.ObjectId(ingredientId),
+        trackInventory: true,
+      });
+
+      for (const item of menuItems) {
+        const currentStock = (item as any).stock || 0;
+        (item as any).stock = currentStock + quantityAdded;
+        await item.save();
+      }
+    } catch (err) {
+      console.error(`Failed to sync MenuItem stock for ingredient ${ingredientId}:`, err);
+    }
+  }
+
   /** Get expiring products (grocery) */
   async getExpiringProducts(companyId: string, branchId?: string, days: number = 30): Promise<MenuItem[]> {
     const query: any = {

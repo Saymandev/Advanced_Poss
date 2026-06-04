@@ -5,6 +5,7 @@ import { Ingredient, IngredientSchema } from '../ingredients/schemas/ingredient.
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { Supplier, SupplierSchema } from '../suppliers/schemas/supplier.schema';
 import { WorkPeriodsModule } from '../work-periods/work-periods.module';
+import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import {
@@ -22,6 +23,7 @@ import {
     forwardRef(() => ExpensesModule),
     forwardRef(() => SubscriptionsModule),
     forwardRef(() => WorkPeriodsModule),
+    forwardRef(() => MenuItemsModule),
   ],
   controllers: [PurchaseOrdersController],
   providers: [PurchaseOrdersService],

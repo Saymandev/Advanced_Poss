@@ -18,6 +18,7 @@ import {
 } from '../ingredients/schemas/ingredient.schema';
 import { Supplier, SupplierDocument } from '../suppliers/schemas/supplier.schema';
 import { WorkPeriodsService } from '../work-periods/work-periods.service';
+import { MenuItemsService } from '../menu-items/menu-items.service';
 import { ApprovePurchaseOrderDto } from './dto/approve-purchase-order.dto';
 import { CancelPurchaseOrderDto } from './dto/cancel-purchase-order.dto';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
@@ -41,6 +42,8 @@ export class PurchaseOrdersService {
     private readonly expensesService: ExpensesService,
     @Inject(forwardRef(() => WorkPeriodsService))
     private readonly workPeriodsService: WorkPeriodsService,
+    @Inject(forwardRef(() => MenuItemsService))
+    private readonly menuItemsService: MenuItemsService,
   ) {}
 
   private generateOrderNumber(date = new Date()): string {
@@ -389,6 +392,9 @@ export class PurchaseOrdersService {
             ingredient.lastRestockedDate = new Date();
             await ingredient.save();
             fs.appendFileSync(logPath, `[PO-RECEIVE] Updated inventory for ${orderItem.ingredientName}: +${deltaQty}\n`);
+            
+            // Sync with Retail Menu Items
+            await this.menuItemsService.syncIngredientStock(orderItem.ingredientId.toString(), deltaQty);
           } else {
             fs.appendFileSync(logPath, `[PO-RECEIVE] FAILED: Ingredient ${orderItem.ingredientId} not found\n`);
           }
@@ -436,7 +442,7 @@ export class PurchaseOrdersService {
           purchaseOrderId: order._id.toString(),
         };
 
-        const createdExpense = await this.expensesService.create(expenseData);
+        const createdExpense = await this.expensesService.create(expenseData as any, 'super_admin');
         fs.appendFileSync(logPath, `[PO-RECEIVE] SUCCESS: Created partial expense ${createdExpense.expenseNumber}\n`);
       } catch (expenseError: any) {
         console.error('❌ Failed to create partial expense from purchase order:', expenseError);
@@ -527,6 +533,9 @@ export class PurchaseOrdersService {
       lastRestockedDate: new Date(),
     });
 
+    // Sync with Retail Menu Items
+    await this.menuItemsService.syncIngredientStock(data.ingredientId, data.quantity);
+
     // 3. Create Expense (which triggers Ledger)
     try {
       const expenseData = {
@@ -547,7 +556,7 @@ export class PurchaseOrdersService {
         createdBy: data.createdBy || data.companyId,
       };
 
-      await this.expensesService.create(expenseData);
+      await this.expensesService.create(expenseData as any, 'super_admin');
     } catch (error) {
       console.error('Failed to create expense for quick purchase:', error);
     }
