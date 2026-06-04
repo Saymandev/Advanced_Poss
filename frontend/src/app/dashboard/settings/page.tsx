@@ -16,6 +16,7 @@ import {
     useRemoveCustomDomainMutation,
     useUploadCompanyLogoMutation,
     useVerifyCustomDomainMutation,
+    useUpdateCompanyMutation,
 } from '@/lib/api/endpoints/companiesApi';
 import {
     useCreatePaymentMethodMutation,
@@ -40,8 +41,10 @@ import {
     type InvoiceSettings,
 } from '@/lib/api/endpoints/settingsApi';
 import { useGetSubscriptionByCompanyQuery } from '@/lib/api/endpoints/subscriptionsApi';
-import { useAppSelector } from '@/lib/store';
+import { useAppSelector, useAppDispatch } from '@/lib/store';
+import { setCompanyContext } from '@/lib/slices/authSlice';
 import {
+  BuildingOfficeIcon,
     ClipboardDocumentIcon,
     CogIcon,
     CreditCardIcon,
@@ -78,6 +81,7 @@ interface ServiceChargeSetting {
 }
 export default function SettingsPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  const dispatch = useAppDispatch();
   // Redirect if user doesn't have settings feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('settings');
   const isSuperAdmin = user?.role === 'super_admin';
@@ -105,6 +109,16 @@ export default function SettingsPage() {
   }, [isSuperAdmin, companyContext, selectedCompanyId]);
   const [activeTab, setActiveTab] = useState<'general' | 'taxes' | 'service-charges' | 'invoice' | 'payment-methods' | 'custom-domain'>('general');
   const [invoiceForm, setInvoiceForm] = useState<Partial<InvoiceSettings>>({});
+  const [receiptSettingsForm, setReceiptSettingsForm] = useState({
+    header: '',
+    footer: '',
+    fontSize: 12,
+    paperWidth: 80,
+    wifi: '',
+    wifiPassword: '',
+    showLogo: true,
+    logoUrl: '',
+  });
   const [editingBranchUrl, setEditingBranchUrl] = useState<{ branchId: string; url: string } | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -114,8 +128,26 @@ export default function SettingsPage() {
     companyId, 
     { skip: !companyId }
   );
+  
+  useEffect(() => {
+    if (companySettings?.receiptSettings) {
+      setReceiptSettingsForm({
+        header: companySettings.receiptSettings.header || '',
+        footer: companySettings.receiptSettings.footer || '',
+        fontSize: companySettings.receiptSettings.fontSize || 12,
+        paperWidth: companySettings.receiptSettings.paperWidth || 80,
+        wifi: companySettings.receiptSettings.wifi || '',
+        wifiPassword: companySettings.receiptSettings.wifiPassword || '',
+        showLogo: companySettings.receiptSettings.showLogo ?? true,
+        logoUrl: companySettings.receiptSettings.logoUrl || '',
+      });
+    }
+  }, [companySettings?.receiptSettings]);
+
   const [updateCompanySettings] = useUpdateCompanySettingsMutation();
   const [uploadCompanyLogo, { isLoading: isUploadingLogo }] = useUploadCompanyLogoMutation();
+  const [updateCompany, { isLoading: isUpdatingCompany }] = useUpdateCompanyMutation();
+  const [companyName, setCompanyName] = useState('');
   // Get categories for dynamic tax appliesTo options
   const { data: categoriesData } = useGetCategoriesQuery(
     { companyId, branchId },
@@ -157,6 +189,10 @@ export default function SettingsPage() {
   const { data: company, refetch: refetchCompany } = useGetCompanyByIdQuery(companyId, {
     skip: !companyId,
   });
+
+  useEffect(() => {
+    if (company?.name) setCompanyName(company.name);
+  }, [company?.name]);
   // Get subscription to check for customDomainEnabled feature
   const { data: subscription } = useGetSubscriptionByCompanyQuery(
     { companyId },
@@ -542,6 +578,10 @@ export default function SettingsPage() {
       // Set logo preview immediately with the returned URL
       if (result.logoUrl) {
         setLogoPreview(result.logoUrl);
+        // Update Redux state so sidebar reflects changes immediately
+        if (companyContext) {
+          dispatch(setCompanyContext({ ...companyContext, logoUrl: result.logoUrl }));
+        }
       }
       // Clear the file input
       setLogoFile(null);
@@ -998,6 +1038,49 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
                 )}
+                {/* Company Name Update */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BuildingOfficeIcon className="w-5 h-5" />
+                      Company Name
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Company Name
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          value={companyName}
+                          onChange={(e) => setCompanyName(e.target.value)}
+                          placeholder="Enter Company Name"
+                          className="flex-1"
+                        />
+                        <Button
+                          disabled={!companyName.trim() || isUpdatingCompany}
+                          onClick={async () => {
+                            try {
+                              await updateCompany({ id: companyId, name: companyName.trim() }).unwrap();
+                              toast.success('Company name updated successfully!');
+                              refetchCompany();
+                              if (companyContext) {
+                                dispatch(setCompanyContext({ ...companyContext, companyName: companyName.trim() }));
+                              }
+                            } catch (error: any) {
+                              toast.error(error?.data?.message || 'Failed to update company name');
+                            }
+                          }}
+                          variant="primary"
+                        >
+                          {isUpdatingCompany ? 'Saving...' : 'Save Name'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Company Logo Upload */}
                 <Card>
             <CardHeader>
@@ -1091,23 +1174,8 @@ export default function SettingsPage() {
               <div>
                 <Input
                   label="Receipt Header"
-                  value={companySettings?.receiptSettings?.header || ''}
-                  onChange={async (e) => {
-                    try {
-                      await updateCompanySettings({
-                        companyId,
-                        data: {
-                          receiptSettings: {
-                            ...companySettings?.receiptSettings,
-                            header: e.target.value,
-                          },
-                        },
-                      }).unwrap();
-                      toast.success('Receipt header updated');
-                    } catch (error: any) {
-                      toast.error(error?.data?.message || 'Failed to update receipt header');
-                    }
-                  }}
+                  value={receiptSettingsForm.header}
+                  onChange={(e) => setReceiptSettingsForm(prev => ({ ...prev, header: e.target.value }))}
                   disabled={!companyId}
                   placeholder="Welcome to Our Restaurant"
                 />
@@ -1115,23 +1183,8 @@ export default function SettingsPage() {
               <div>
                 <Input
                   label="Receipt Footer"
-                  value={companySettings?.receiptSettings?.footer || ''}
-                  onChange={async (e) => {
-                    try {
-                      await updateCompanySettings({
-                        companyId,
-                        data: {
-                          receiptSettings: {
-                            ...companySettings?.receiptSettings,
-                            footer: e.target.value,
-                          },
-                        },
-                      }).unwrap();
-                      toast.success('Receipt footer updated');
-                    } catch (error: any) {
-                      toast.error(error?.data?.message || 'Failed to update receipt footer');
-                    }
-                  }}
+                  value={receiptSettingsForm.footer}
+                  onChange={(e) => setReceiptSettingsForm(prev => ({ ...prev, footer: e.target.value }))}
                   disabled={!companyId}
                   placeholder="Thank you for your visit!"
                 />
@@ -1143,25 +1196,10 @@ export default function SettingsPage() {
                     type="number"
                     min="8"
                     max="24"
-                    value={companySettings?.receiptSettings?.fontSize || 12}
-                    onChange={async (e) => {
+                    value={receiptSettingsForm.fontSize}
+                    onChange={(e) => {
                       const value = parseInt(e.target.value, 10);
-                      if (!isNaN(value) && value >= 8 && value <= 24) {
-                        try {
-                          await updateCompanySettings({
-                            companyId,
-                            data: {
-                              receiptSettings: {
-                                ...companySettings?.receiptSettings,
-                                fontSize: value,
-                              },
-                            },
-                          }).unwrap();
-                          toast.success('Font size updated');
-                        } catch (error: any) {
-                          toast.error(error?.data?.message || 'Failed to update font size');
-                        }
-                      }
+                      if (!isNaN(value)) setReceiptSettingsForm(prev => ({ ...prev, fontSize: value }));
                     }}
                     disabled={!companyId}
                   />
@@ -1172,25 +1210,10 @@ export default function SettingsPage() {
                     type="number"
                     min="50"
                     max="100"
-                    value={companySettings?.receiptSettings?.paperWidth || 80}
-                    onChange={async (e) => {
+                    value={receiptSettingsForm.paperWidth}
+                    onChange={(e) => {
                       const value = parseInt(e.target.value, 10);
-                      if (!isNaN(value) && value >= 50 && value <= 100) {
-                        try {
-                          await updateCompanySettings({
-                            companyId,
-                            data: {
-                              receiptSettings: {
-                                ...companySettings?.receiptSettings,
-                                paperWidth: value,
-                              },
-                            },
-                          }).unwrap();
-                          toast.success('Paper width updated');
-                        } catch (error: any) {
-                          toast.error(error?.data?.message || 'Failed to update paper width');
-                        }
-                      }
+                      if (!isNaN(value)) setReceiptSettingsForm(prev => ({ ...prev, paperWidth: value }));
                     }}
                     disabled={!companyId}
                   />
@@ -1199,23 +1222,8 @@ export default function SettingsPage() {
               <div>
                 <Input
                   label="WiFi Name (Optional)"
-                  value={companySettings?.receiptSettings?.wifi || ''}
-                  onChange={async (e) => {
-                    try {
-                      await updateCompanySettings({
-                        companyId,
-                        data: {
-                          receiptSettings: {
-                            ...companySettings?.receiptSettings,
-                            wifi: e.target.value,
-                          },
-                        },
-                      }).unwrap();
-                      toast.success('WiFi name updated');
-                    } catch (error: any) {
-                      toast.error(error?.data?.message || 'Failed to update WiFi name');
-                    }
-                  }}
+                  value={receiptSettingsForm.wifi}
+                  onChange={(e) => setReceiptSettingsForm(prev => ({ ...prev, wifi: e.target.value }))}
                   disabled={!companyId}
                   placeholder="Enter WiFi network name"
                 />
@@ -1224,23 +1232,8 @@ export default function SettingsPage() {
                 <Input
                   label="WiFi Password (Optional)"
                   type="password"
-                  value={companySettings?.receiptSettings?.wifiPassword || ''}
-                  onChange={async (e) => {
-                    try {
-                      await updateCompanySettings({
-                        companyId,
-                        data: {
-                          receiptSettings: {
-                            ...companySettings?.receiptSettings,
-                            wifiPassword: e.target.value,
-                          },
-                        },
-                      }).unwrap();
-                      toast.success('WiFi password updated');
-                    } catch (error: any) {
-                      toast.error(error?.data?.message || 'Failed to update WiFi password');
-                    }
-                  }}
+                  value={receiptSettingsForm.wifiPassword}
+                  onChange={(e) => setReceiptSettingsForm(prev => ({ ...prev, wifiPassword: e.target.value }))}
                   disabled={!companyId}
                   placeholder="Enter WiFi password"
                 />
@@ -1251,54 +1244,46 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="checkbox"
-                  checked={companySettings?.receiptSettings?.showLogo ?? true}
-                  onChange={async (e) => {
-                    try {
-                      await updateCompanySettings({
-                        companyId,
-                        data: {
-                          receiptSettings: {
-                            ...companySettings?.receiptSettings,
-                            showLogo: e.target.checked,
-                          },
-                        },
-                      }).unwrap();
-                      toast.success('Show logo setting updated');
-                    } catch (error: any) {
-                      toast.error(error?.data?.message || 'Failed to update show logo setting');
-                    }
-                  }}
+                  checked={receiptSettingsForm.showLogo}
+                  onChange={(e) => setReceiptSettingsForm(prev => ({ ...prev, showLogo: e.target.checked }))}
                   disabled={!companyId}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
               </div>
-              {companySettings?.receiptSettings?.showLogo && (
+              {receiptSettingsForm.showLogo && (
                 <div>
                   <Input
                     label="Logo URL (Optional)"
-                    value={companySettings?.receiptSettings?.logoUrl || ''}
-                    onChange={async (e) => {
-                      try {
-                        await updateCompanySettings({
-                          companyId,
-                          data: {
-                            receiptSettings: {
-                              ...companySettings?.receiptSettings,
-                              logoUrl: e.target.value,
-                            },
-                          },
-                        }).unwrap();
-                        toast.success('Logo URL updated');
-                      } catch (error: any) {
-                        toast.error(error?.data?.message || 'Failed to update logo URL');
-                      }
-                    }}
+                    value={receiptSettingsForm.logoUrl}
+                    onChange={(e) => setReceiptSettingsForm(prev => ({ ...prev, logoUrl: e.target.value }))}
                     disabled={!companyId}
                     placeholder="https://example.com/logo.png"
                     type="url"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Leave blank to automatically use your uploaded Company Logo on receipts.
+                  </p>
                 </div>
               )}
+              
+              <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button 
+                  onClick={async () => {
+                    try {
+                      await updateCompanySettings({
+                        companyId,
+                        data: { receiptSettings: receiptSettingsForm }
+                      }).unwrap();
+                      toast.success('Receipt settings saved successfully');
+                    } catch (error: any) {
+                      toast.error(error?.data?.message || 'Failed to save receipt settings');
+                    }
+                  }}
+                  variant="primary"
+                >
+                  Save Receipt Settings
+                </Button>
+              </div>
             </CardContent>
           </Card>
           <Card>
