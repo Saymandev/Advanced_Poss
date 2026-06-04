@@ -86,7 +86,7 @@ export default function RetailPOSPage() {
   const serviceChargeRate = posSettings?.serviceCharge ?? 0;
 
   // Product data
-  const { data: productsData, isLoading: productsLoading } = useGetPOSMenuItemsQuery({
+  const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useGetPOSMenuItemsQuery({
     branchId: user?.branchId || undefined,
     isAvailable: true,
   });
@@ -226,9 +226,21 @@ export default function RetailPOSPage() {
   }, [cart]);
 
   const addToCart = (product: any) => {
+    // Prevent adding to cart if item tracks inventory and stock is 0 or less
+    if (product.trackInventory && (product.stock === undefined || product.stock <= 0)) {
+      toast.error(`${product.name} is out of stock!`);
+      return;
+    }
+
     setCart(prev => {
       const existing = prev.find(item => item.menuItemId === product.id);
       if (existing) {
+        // Prevent exceeding available stock when incrementing quantity
+        if (product.trackInventory && existing.quantity >= (product.stock || 0)) {
+          toast.error(`Only ${product.stock} available in stock!`);
+          return prev;
+        }
+
         return prev.map(item =>
           item.menuItemId === product.id
             ? { ...item, quantity: item.quantity + 1 }
@@ -254,11 +266,21 @@ export default function RetailPOSPage() {
   };
 
   const updateQuantity = (itemId: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
+    setCart(prev => {
+      const item = prev.find(i => i.id === itemId);
+      if (!item) return prev;
+      
       const newQty = item.quantity + delta;
-      return newQty <= 0 ? null : { ...item, quantity: newQty };
-    }).filter(Boolean) as CartItem[]);
+      if (newQty <= 0) return prev.filter(i => i.id !== itemId);
+
+      const product = products.find(p => p.id === item.menuItemId);
+      if (product && product.trackInventory && delta > 0 && newQty > (product.stock || 0)) {
+        toast.error(`Only ${product.stock} available in stock!`);
+        return prev;
+      }
+
+      return prev.map(i => i.id === itemId ? { ...i, quantity: newQty } : i);
+    });
   };
 
   const cartSubtotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.quantity, 0), [cart]);
@@ -495,6 +517,7 @@ export default function RetailPOSPage() {
       clearCart();
       setIsPaymentOpen(false);
       refetchQueue();
+      refetchProducts(); // Auto-refresh products to reflect updated inventory stock immediately
     } catch (error: any) {
       toast.error(error?.data?.message || 'Checkout failed');
     } finally {

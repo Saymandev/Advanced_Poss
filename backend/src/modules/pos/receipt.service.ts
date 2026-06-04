@@ -751,6 +751,7 @@ export class ReceiptService {
     <div class="receipt-container">
         <div class="header text-center">
             <div class="separator-double">---------------------------------------</div>
+            ${receiptData.receiptSettings.showLogo && receiptData.receiptSettings.logoUrl ? `<img src="${receiptData.receiptSettings.logoUrl}" alt="Logo" style="max-width: 150px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;" />` : ''}
             <h1>${receiptData.restaurantName.toUpperCase()}</h1>
             <p style="white-space: pre-wrap;">${receiptData.restaurantAddress}</p>
             <p>Tel: ${receiptData.restaurantPhone}</p>
