@@ -696,11 +696,11 @@ export function Sidebar({ className }: SidebarProps) {
             isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
           )}>
             <div className="flex items-center gap-3">
-              {companyContext?.logoUrl ? (
+              {companyContext?.logoUrl || user?.company?.logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={companyContext.logoUrl}
-                  alt={companyContext.companyName || "Company logo"}
+                  src={companyContext?.logoUrl || user?.company?.logo}
+                  alt={companyContext?.companyName || user?.company?.name || "Company logo"}
                   className="w-10 h-10 rounded-md object-contain bg-white dark:bg-gray-800 p-0.5 border border-gray-200 dark:border-gray-700"
                 />
               ) : (
@@ -710,7 +710,7 @@ export function Sidebar({ className }: SidebarProps) {
               )}
               <div>
                 <h2 className="font-semibold text-gray-900 dark:text-white text-base leading-tight">
-                  {companyContext?.companyName || "My Company"}
+                  {companyContext?.companyName || user?.company?.name || "My Company"}
                 </h2>
                 
               </div>
