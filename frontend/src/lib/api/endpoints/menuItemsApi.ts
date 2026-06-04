@@ -19,6 +19,8 @@ export interface MenuItem {
   batchNumber?: string;
   unitType?: string;
   stock?: number;
+  stockStatus?: string;
+  trackInventory?: boolean;
   createdAt: string;
   updatedAt: string;
 }

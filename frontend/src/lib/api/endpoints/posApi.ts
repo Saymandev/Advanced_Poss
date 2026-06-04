@@ -364,6 +364,7 @@ export const posApi = apiSlice.injectEndpoints({
       variants?: any[];
       selections?: any[];
       addons?: any[];
+      trackInventory?: boolean;
     }>, {
       branchId?: string;
       categoryId?: string;
@@ -411,6 +412,7 @@ export const posApi = apiSlice.injectEndpoints({
             price: Number(a.price || 0),
             isAvailable: a.isAvailable !== false
           })),
+          trackInventory: item.trackInventory === true,
         });
 
         if (Array.isArray(data)) {
