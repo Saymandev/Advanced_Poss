@@ -142,7 +142,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!userInfoCookie?.value && isDashboardRoute) {
+  if (!userInfoCookie?.value) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
     return NextResponse.redirect(url);
