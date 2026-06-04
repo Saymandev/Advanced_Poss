@@ -52,6 +52,7 @@ function getRetailPlans(): Partial<SubscriptionPlan>[] {
       enabledFeatureKeys: [
         'dashboard', 'reports',
         'order-management', 'customer-management', 'loyalty-program',
+        'pos-settings', 'printer-management', 'digital-receipts',
         'inventory', 'suppliers', 'purchase-orders', 'wastage-management',
         'expenses', 'income', 'work-periods',
         'menu-management', 'categories',
@@ -77,6 +78,7 @@ function getRetailPlans(): Partial<SubscriptionPlan>[] {
       enabledFeatureKeys: [
         'dashboard', 'reports',
         'order-management', 'delivery-management', 'customer-management', 'loyalty-program',
+        'pos-settings', 'printer-management', 'digital-receipts',
         'inventory', 'suppliers', 'purchase-orders', 'wastage-management',
         'expenses', 'income', 'accounting', 'work-periods',
         'menu-management', 'categories',
