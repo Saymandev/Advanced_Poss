@@ -77,7 +77,9 @@ import {
   UserCircleIcon,
   UserGroupIcon,
   ClipboardDocumentIcon,
+  GiftIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -330,6 +332,17 @@ export default function POSPage() {
     }
     return '';
   });
+  const [useLoyaltyPoints, setUseLoyaltyPoints] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pos_useLoyaltyPoints') === 'true';
+    }
+    return false;
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pos_useLoyaltyPoints', useLoyaltyPoints.toString());
+    }
+  }, [useLoyaltyPoints]);
   // Fetch customer details for loyalty points
   const { data: selectedCustomer } = useGetCustomerByIdQuery(selectedCustomerId, {
     skip: !selectedCustomerId,
@@ -1021,7 +1034,7 @@ export default function POSPage() {
       discountAmount = Math.min(discountAmount, base.subtotal);
     }
     // Add loyalty discount
-    const loyaltyDiscount = loyaltyRedemption.discount || 0;
+    const loyaltyDiscount = useLoyaltyPoints ? (loyaltyRedemption.discount || 0) : 0;
     const totalDiscount = discountAmount + loyaltyDiscount;
     const taxableSubtotal = Math.max(baseSubtotal - totalDiscount, 0);
     const taxAmount = (taxableSubtotal * taxRate) / 100;
@@ -1513,9 +1526,11 @@ export default function POSPage() {
     setFullPaymentMethod('cash');
     setFullPaymentReceived('0');
     setMultiPayments([]);
+    setUseLoyaltyPoints(false);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('pos_cart');
       localStorage.removeItem('pos_customerId');
+      localStorage.removeItem('pos_useLoyaltyPoints');
       removeEncryptedItem('pos_customerInfo');
     }
     toast.success('Cart cleared');
@@ -1974,7 +1989,7 @@ export default function POSPage() {
         customerInfo: customerInfo,
         status: 'pending' as const,
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
-        ...(selectedCustomerId && loyaltyRedemption.pointsRedeemed > 0
+        ...(selectedCustomerId && useLoyaltyPoints && loyaltyRedemption.pointsRedeemed > 0
           ? {
               customerId: selectedCustomerId,
               loyaltyPointsRedeemed: loyaltyRedemption.pointsRedeemed,
@@ -2357,7 +2372,7 @@ export default function POSPage() {
         transactionId: transactionReference, // Passed to backend for split payment breakdown parsing
         notes: noteSegments.length > 0 ? noteSegments.join('\n') : undefined,
         ...(selectedWaiterId ? { waiterId: selectedWaiterId } : {}),
-        ...(selectedCustomerId && loyaltyRedemption.pointsRedeemed > 0
+        ...(selectedCustomerId && useLoyaltyPoints && loyaltyRedemption.pointsRedeemed > 0
           ? {
               customerId: selectedCustomerId,
               loyaltyPointsRedeemed: loyaltyRedemption.pointsRedeemed,

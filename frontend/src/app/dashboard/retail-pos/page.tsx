@@ -39,7 +39,10 @@ import {
   QrCodeIcon,
   CameraIcon,
   CommandLineIcon,
+  GiftIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
+import { useGetCustomerByIdQuery } from '@/lib/api/endpoints/customersApi';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -267,6 +270,53 @@ export default function RetailPOSPage() {
   const [discountValue, setDiscountValue] = useState<string>('');
   const [discountReason, setDiscountReason] = useState<string>('');
 
+  // Customer State
+  const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', email: '' });
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+
+  const [useLoyaltyPoints, setUseLoyaltyPoints] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('retail_useLoyaltyPoints') === 'true';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('retail_useLoyaltyPoints', useLoyaltyPoints.toString());
+    }
+  }, [useLoyaltyPoints]);
+
+  const { data: selectedCustomer } = useGetCustomerByIdQuery(selectedCustomerId, {
+    skip: !selectedCustomerId,
+  });
+
+  const loyaltyRedemption = useMemo(() => {
+    if (!selectedCustomer || !selectedCustomerId) {
+      return { pointsRedeemed: 0, discount: 0 };
+    }
+    const MIN_ORDER_AMOUNT = 1000;
+    const POINTS_PER_DISCOUNT = 2000;
+    const DISCOUNT_AMOUNT = 20;
+    const availablePoints = selectedCustomer.loyaltyPoints || 0;
+    if (cartSubtotal < MIN_ORDER_AMOUNT) {
+      return { pointsRedeemed: 0, discount: 0 };
+    }
+    const discountBlocks = Math.floor(availablePoints / POINTS_PER_DISCOUNT);
+    if (discountBlocks > 0) {
+      const maxDiscount = discountBlocks * DISCOUNT_AMOUNT;
+      const discount = Math.min(maxDiscount, cartSubtotal);
+      const blocksToRedeem = Math.floor(discount / DISCOUNT_AMOUNT);
+      const pointsRedeemed = blocksToRedeem * POINTS_PER_DISCOUNT;
+      return { pointsRedeemed, discount };
+    }
+    return { pointsRedeemed: 0, discount: 0 };
+  }, [selectedCustomer, selectedCustomerId, cartSubtotal]);
+
+  const loyaltyDiscount = useLoyaltyPoints ? (loyaltyRedemption.discount || 0) : 0;
+
   const discountAmount = useMemo(() => {
     const val = parseFloat(discountValue) || 0;
     if (discountType === 'percentage') return Math.min((cartSubtotal * val) / 100, cartSubtotal);
@@ -275,8 +325,8 @@ export default function RetailPOSPage() {
   }, [discountType, discountValue, cartSubtotal]);
 
   const cartTotal = useMemo(
-    () => Math.max(0, cartSubtotal + cartTax + cartServiceCharge - discountAmount),
-    [cartSubtotal, cartTax, cartServiceCharge, discountAmount],
+    () => Math.max(0, cartSubtotal + cartTax + cartServiceCharge - discountAmount - loyaltyDiscount),
+    [cartSubtotal, cartTax, cartServiceCharge, discountAmount, loyaltyDiscount],
   );
 
   const clearCart = () => {
@@ -286,14 +336,14 @@ export default function RetailPOSPage() {
     setDiscountType('none');
     setDiscountValue('');
     setDiscountReason('');
-    if (typeof window !== 'undefined') localStorage.removeItem('retail_cart');
+    setUseLoyaltyPoints(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('retail_cart');
+      localStorage.removeItem('retail_useLoyaltyPoints');
+    }
   };
 
-  // Customer
-  const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', email: '' });
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  // Customer Data
 
   const customers = useMemo(() => {
     const list = (customersData as any)?.customers || customersData || [];
@@ -414,6 +464,13 @@ export default function RetailPOSPage() {
           discountAmount,
           discountReason: discountReason || undefined,
         } : {}),
+        // Loyalty data
+        ...(selectedCustomerId && useLoyaltyPoints && loyaltyRedemption.pointsRedeemed > 0
+          ? {
+              loyaltyPointsRedeemed: loyaltyRedemption.pointsRedeemed,
+              loyaltyDiscount: loyaltyRedemption.discount,
+            }
+          : {}),
       };
 
       const response: any = await createOrder(orderData as any).unwrap();
@@ -776,6 +833,45 @@ export default function RetailPOSPage() {
             )}
           </button>
 
+          {/* Loyalty Section */}
+          {selectedCustomer && (
+            <div className="rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 p-3 text-white shadow-md relative overflow-hidden group">
+              <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-white/10 blur-xl group-hover:bg-white/20 transition-all duration-500" />
+              <div className="relative z-10">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <StarIcon className={cn("h-4 w-4", 
+                      selectedCustomer.tier === 'platinum' ? 'text-cyan-300' : 
+                      selectedCustomer.tier === 'gold' ? 'text-yellow-300' : 
+                      selectedCustomer.tier === 'silver' ? 'text-gray-300' : 'text-orange-300'
+                    )} />
+                    <span className="font-bold text-sm capitalize">{selectedCustomer.tier || 'Bronze'}</span>
+                  </div>
+                  <span className="text-xs font-black bg-black/20 px-2 py-0.5 rounded-full">
+                    {selectedCustomer.loyaltyPoints?.toLocaleString() || 0} pts
+                  </span>
+                </div>
+                {loyaltyRedemption.pointsRedeemed > 0 && (
+                  <div className="flex justify-between items-center bg-black/20 rounded-lg p-2 mt-2 backdrop-blur-sm">
+                    <div>
+                      <p className="text-[10px] text-white/80">Redeem {loyaltyRedemption.pointsRedeemed} pts</p>
+                      <p className="text-xs font-bold text-emerald-300">Save {formatCurrency(loyaltyRedemption.discount)}</p>
+                    </div>
+                    <button
+                      onClick={() => setUseLoyaltyPoints(!useLoyaltyPoints)}
+                      className={cn(
+                        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        useLoyaltyPoints ? 'bg-emerald-400' : 'bg-white/20'
+                      )}
+                    >
+                      <span className={cn("pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out", useLoyaltyPoints ? 'translate-x-4' : 'translate-x-0')} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Total */}
           <div className="space-y-1 text-sm">
             <div className="flex justify-between text-gray-500">
@@ -831,6 +927,12 @@ export default function RetailPOSPage() {
                 <div className="flex justify-between text-red-500 font-medium">
                   <span>Discount {discountType === 'percentage' ? `(${discountValue}%)` : ''}</span>
                   <span>-{formatCurrency(discountAmount)}</span>
+                </div>
+              )}
+              {loyaltyDiscount > 0 && (
+                <div className="flex justify-between text-emerald-500 font-medium">
+                  <span>Loyalty Discount</span>
+                  <span>-{formatCurrency(loyaltyDiscount)}</span>
                 </div>
               )}
             </div>
