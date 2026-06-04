@@ -124,8 +124,25 @@ export function middleware(request: NextRequest) {
   }
 
   const userInfoCookie = request.cookies.get('user_info');
+  const isAuthRoute = pathname.startsWith('/auth/');
+  const isHomeRoute = pathname === '/';
+  const isDashboardRoute = pathname.startsWith('/dashboard');
 
-  if (!userInfoCookie?.value) {
+  if (isAuthRoute || isHomeRoute) {
+    if (userInfoCookie?.value) {
+      try {
+        const parsedInfo = JSON.parse(decodeURIComponent(userInfoCookie.value));
+        const url = request.nextUrl.clone();
+        url.pathname = getRoleDashboardPath(parsedInfo.role);
+        return NextResponse.redirect(url);
+      } catch {
+        // Fall back to continuing if cookie is invalid
+      }
+    }
+    return NextResponse.next();
+  }
+
+  if (!userInfoCookie?.value && isDashboardRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
     return NextResponse.redirect(url);
@@ -181,5 +198,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/dashboard/:path*',
+  matcher: ['/dashboard/:path*', '/auth/:path*', '/'],
 };
