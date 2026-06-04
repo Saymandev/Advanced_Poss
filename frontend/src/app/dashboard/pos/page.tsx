@@ -1455,6 +1455,24 @@ export default function POSPage() {
   }, [appendCartItem, buildCartItemFromMenuItem, modifierEditor]);
   // Cart functions
   const addToCart = useCallback((menuItem: any) => {
+    const outOfStock = menuItem.isOutOfStock || (menuItem.trackInventory && menuItem.stock != null && menuItem.stock <= 0);
+    if (outOfStock) {
+      toast.error('This item is out of stock');
+      return;
+    }
+    
+    // Check if adding one more would exceed stock
+    if (menuItem.trackInventory && menuItem.stock != null) {
+      const currentCartQty = cart
+        .filter(item => item.menuItemId === (menuItem.id || menuItem._id))
+        .reduce((sum, item) => sum + item.quantity, 0);
+        
+      if (currentCartQty + 1 > menuItem.stock) {
+        toast.error(`Cannot add more. Only ${menuItem.stock} items available in stock.`);
+        return;
+      }
+    }
+
     if (hasMenuItemModifiers(menuItem)) {
       const defaults = getDefaultModifierConfig(menuItem);
       setModifierEditor({
@@ -1468,11 +1486,29 @@ export default function POSPage() {
     }
     const cartItem = buildCartItemFromMenuItem(menuItem, { quantity: 1 });
     appendCartItem(cartItem);
-  }, [appendCartItem, buildCartItemFromMenuItem, getDefaultModifierConfig, hasMenuItemModifiers]);
+  }, [appendCartItem, buildCartItemFromMenuItem, getDefaultModifierConfig, hasMenuItemModifiers, cart]);
+  
   const updateQuantity = (itemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(itemId);
     } else {
+      // Check stock limit before updating
+      const cartItem = cart.find(item => item.id === itemId);
+      if (cartItem) {
+        const menuItem = menuItemsArray.find((mi: any) => (mi.id || mi._id) === cartItem.menuItemId);
+        if (menuItem?.trackInventory && menuItem?.stock != null) {
+          // Calculate total quantity of this menu item across all cart items (in case of different modifiers)
+          const otherItemsQty = cart
+            .filter(item => item.menuItemId === cartItem.menuItemId && item.id !== itemId)
+            .reduce((sum, item) => sum + item.quantity, 0);
+            
+          if (quantity + otherItemsQty > menuItem.stock) {
+            toast.error(`Cannot increase quantity. Only ${menuItem.stock} items available in stock.`);
+            return;
+          }
+        }
+      }
+
       setCart(cart.map(item =>
         item.id === itemId ? { ...item, quantity } : item
       ));
@@ -3305,17 +3341,25 @@ export default function POSPage() {
           </div>
         ) : filteredMenuItems.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-            {filteredMenuItems.map((item) => (
+            {filteredMenuItems.map((item) => {
+              const outOfStock = item.isOutOfStock || (item.trackInventory && item.stock != null && item.stock <= 0);
+              const lowStock = !outOfStock && (item.isLowStock || (item.trackInventory && item.stock != null && item.stock > 0 && item.stock < 5));
+              
+              return (
               <Card
                 key={item.id}
                 className={cn(
                   'group relative overflow-hidden rounded-2xl sm:rounded-3xl border-gray-200/60 dark:border-slate-800/60 bg-white dark:bg-slate-900/60 transition-all duration-300 hover:shadow-2xl hover:shadow-sky-500/10 hover:-translate-y-1 cursor-pointer active:scale-95',
-                  (item.isOutOfStock || item.isLowStock) && 'opacity-80'
+                  (outOfStock || lowStock) && 'opacity-80'
                 )}
                 onClick={() => {
-                  if (item.isOutOfStock || item.isLowStock) {
-                    toast.error(item.isOutOfStock ? 'Item is out of stock' : 'Item is low on stock');
+                  if (outOfStock) {
+                    toast.error('Item is out of stock');
                     return;
+                  }
+                  if (lowStock) {
+                    toast.error('Item is low on stock');
+                    // We still allow them to add it if it's low stock
                   }
                   addToCart(item);
                 }}
@@ -3335,11 +3379,11 @@ export default function POSPage() {
                       <div className="text-4xl">🍽️</div>
                     )}
                     {/* Stock overlay in the middle of the image */}
-                    {(item.isOutOfStock || item.isLowStock) && (
+                    {(outOfStock || lowStock) && (
                       <div
                         className={cn(
                           'absolute inset-0 flex items-center justify-center backdrop-blur-[1px]',
-                          item.isOutOfStock
+                          outOfStock
                             ? 'bg-red-900/55'
                             : 'bg-amber-900/45',
                         )}
@@ -3347,7 +3391,7 @@ export default function POSPage() {
                         <div
                           className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border border-white/70 text-red-500 shadow-lg shadow-black/40 bg-white"
                         >
-                          {item.isOutOfStock ? 'Out of stock' : 'Low stock'}
+                          {outOfStock ? 'Out of stock' : 'Low stock'}
                         </div>
                       </div>
                     )}
@@ -3366,8 +3410,8 @@ export default function POSPage() {
                         {item.trackInventory && item.stock != null && (
                           <span className={cn(
                             "text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tighter border",
-                            item.stockStatus === 'out' ? 'bg-red-50 text-red-500 border-red-200 dark:bg-red-900/20 dark:border-red-800/50' :
-                            item.stockStatus === 'low' ? 'bg-amber-50 text-amber-500 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/50' :
+                            item.stock <= 0 ? 'bg-red-50 text-red-500 border-red-200 dark:bg-red-900/20 dark:border-red-800/50' :
+                            item.stock < 5 ? 'bg-amber-50 text-amber-500 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/50' :
                             'bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:border-green-800/50'
                           )}>
                             Stock: {item.stock}
@@ -3387,17 +3431,16 @@ export default function POSPage() {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (item.isOutOfStock) {
+                        if (outOfStock) {
                           toast.error('This item is out of stock.');
                           return;
                         }
-                        if (item.isLowStock) {
+                        if (lowStock) {
                           toast.error('This item is low on stock.');
-                          return;
                         }
                         addToCart(item);
                       }}
-                      disabled={item.isOutOfStock || item.isLowStock}
+                      disabled={outOfStock}
                       className="h-7 w-7 p-0 flex items-center justify-center rounded-lg bg-sky-600 hover:bg-sky-500 disabled:bg-gray-600 text-white shadow-lg shadow-sky-900/20"
                     >
                       <PlusIcon className="h-4 w-4" />
@@ -3405,7 +3448,7 @@ export default function POSPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            )})}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center rounded-3xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/50 backdrop-blur-sm">

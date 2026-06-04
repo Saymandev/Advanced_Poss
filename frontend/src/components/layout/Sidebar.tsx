@@ -697,13 +697,11 @@ export function Sidebar({ className }: SidebarProps) {
           )}>
             <div className="flex items-center gap-3">
               {companyContext?.logoUrl ? (
-                <Image
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   src={companyContext.logoUrl}
                   alt={companyContext.companyName || "Company logo"}
-                  width={40}
-                  height={40}
-                  className="rounded-md object-contain"
-                  priority
+                  className="w-10 h-10 rounded-md object-contain bg-white dark:bg-gray-800 p-0.5 border border-gray-200 dark:border-gray-700"
                 />
               ) : (
                 <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-md flex items-center justify-center">
