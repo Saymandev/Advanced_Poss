@@ -1222,8 +1222,34 @@ export class POSService {
       throw new ConflictException('Order is already paid');
     }
 
-    const orderTotal = isPublic ? order.total : order.totalAmount;
+    let orderTotal = isPublic ? order.total : order.totalAmount;
     const totalPaid = (order as any).paidAmount || 0;
+
+    // Safety: if orderTotal is 0/undefined but order has items, recalculate from items
+    if ((!orderTotal || orderTotal <= 0) && order.items && order.items.length > 0) {
+      const recalculated = order.items.reduce((sum: number, item: any) => {
+        return sum + ((item.price || 0) * (item.quantity || 1));
+      }, 0);
+      const taxAmount = order.taxAmount || 0;
+      const serviceChargeAmount = order.serviceChargeAmount || 0;
+      const deliveryFee = order.deliveryFee || 0;
+      orderTotal = recalculated + taxAmount + serviceChargeAmount + deliveryFee;
+      console.warn(`[POS Payment] Order ${processPaymentDto.orderId} had totalAmount=0. Recalculated from items: ${orderTotal}`);
+      // Also fix the stored order so this doesn't happen again
+      if (orderTotal > 0 && !isPublic) {
+        await this.posOrderModel.findByIdAndUpdate(processPaymentDto.orderId, {
+          totalAmount: orderTotal,
+          remainingAmount: Math.max(0, orderTotal - totalPaid),
+        }).exec();
+      }
+    }
+
+    // If orderTotal is still 0 but the payment amount is valid, trust the frontend amount
+    if ((!orderTotal || orderTotal <= 0) && processPaymentDto.amount > 0) {
+      console.warn(`[POS Payment] Order ${processPaymentDto.orderId} totalAmount is still 0. Using payment amount: ${processPaymentDto.amount}`);
+      orderTotal = processPaymentDto.amount;
+    }
+
     const remaining = orderTotal - totalPaid;
     if (processPaymentDto.amount <= 0 || processPaymentDto.amount > remaining + 0.01) {
       throw new BadRequestException(`Payment amount must be between 0 and ${remaining.toFixed(2)}`);
