@@ -191,8 +191,8 @@ export class ReportsService {
     });
     const totalOrders = orders.length;
     const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-    const totalTax = 0; // POSOrder doesn't have separate tax field
-    const totalDiscount = 0; // POSOrder doesn't have separate discount field
+    const totalTax = orders.reduce((sum, o) => sum + (o.taxAmount || 0), 0);
+    const totalDiscount = orders.reduce((sum, o) => sum + ((o as any).discountAmount || 0) + ((o as any).loyaltyDiscount || 0), 0);
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     // Group by date
     const dailySales = orders.reduce((acc, order: any) => {
@@ -389,14 +389,14 @@ export class ReportsService {
       netRevenue: 0,
     };
     orders.forEach((order) => {
-      breakdown.subtotal += (order.totalAmount || 0);
-      breakdown.tax += 0; // POSOrder doesn't have separate tax field
-      breakdown.serviceCharge += 0; // POSOrder doesn't have separate service charge field
+      breakdown.subtotal += (order.subtotal || order.totalAmount || 0);
+      breakdown.tax += (order.taxAmount || 0);
+      breakdown.serviceCharge += (order.serviceChargeAmount || 0);
       breakdown.deliveryFee += (order.deliveryFee || 0);
-      breakdown.discount += 0; // POSOrder doesn't have separate discount field
+      breakdown.discount += ((order as any).discountAmount || 0) + ((order as any).loyaltyDiscount || 0);
       breakdown.total += (order.totalAmount || 0);
     });
-    breakdown.netRevenue = breakdown.total - breakdown.tax;
+    breakdown.netRevenue = breakdown.total - breakdown.tax - breakdown.serviceCharge;
     return breakdown;
   }
   async getPeakHours(

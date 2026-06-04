@@ -489,10 +489,13 @@ export class POSService {
             };
             const payment = new this.posPaymentModel(paymentData);
             const savedPayment = await payment.save();
-            // Link payment to order
+            // Link payment to order and update payment tracking fields
             await this.posOrderModel.findByIdAndUpdate(savedOrder._id, {
               paymentId: savedPayment._id,
               completedAt: new Date(),
+              paidAmount: savedOrder.totalAmount,
+              remainingAmount: 0,
+              paymentStatus: 'paid',
             }).exec();
             
             // Record transaction in ledger
