@@ -820,7 +820,6 @@ export class ReceiptService {
 
         <div class="footer text-center">
             <p>${receiptData.receiptSettings.footer || 'Thank you for your visit!'}</p>
-            <p>Please come again.</p>
             <br/>
             <p style="font-size: 0.85em; opacity: 0.9; font-weight: normal;">Powered by Raha Pos Solutions</p>
             <div class="separator-double">---------------------------------------</div>
