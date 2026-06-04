@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -18,8 +18,9 @@ export class PurchaseReturnsController {
 
   @Post()
   @ApiOperation({ summary: 'Create purchase return' })
-  create(@Body() dto: CreatePurchaseReturnDto, @CurrentUser('id') userId: string, @CurrentUser('companyId') companyId: string) {
-    return this.service.create(dto, companyId, userId);
+  create(@Body() dto: CreatePurchaseReturnDto, @Request() req) {
+    const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
+    return this.service.create(dto, companyId, req.user.id);
   }
 
   @Get()
