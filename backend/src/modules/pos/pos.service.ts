@@ -2312,7 +2312,7 @@ export class POSService {
 
         if (itemObj.trackInventory === true) {
           if (Array.isArray(itemObj.ingredients) && itemObj.ingredients.length > 0) {
-            let maxPortions = 999;
+            let maxPortions = Infinity;
             for (const ing of itemObj.ingredients) {
               const ingredient: any = ing?.ingredientId;
               const requiredQuantity = ing?.quantity || 1;
@@ -2346,7 +2346,7 @@ export class POSService {
             if (isOutOfStock) {
               stock = 0;
             } else {
-              stock = maxPortions !== 999 ? maxPortions : 0;
+              stock = maxPortions !== Infinity ? maxPortions : 0;
             }
           } else {
             // Direct product inventory (Retail / Shop)
