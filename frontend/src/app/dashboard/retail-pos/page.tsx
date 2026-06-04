@@ -709,9 +709,9 @@ export default function RetailPOSPage() {
                   className="group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-3 text-left hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all active:scale-95 relative"
                 >
                   <div className="aspect-square bg-gray-50 dark:bg-slate-800 rounded-xl mb-2 flex items-center justify-center text-3xl group-hover:scale-105 transition-transform relative overflow-hidden">
-                    {product.images && product.images.length > 0 ? (
+                    {(product.image || (product.images && product.images.length > 0)) ? (
                       <img
-                        src={product.images[0]}
+                        src={product.image || product.images[0]}
                         alt={product.name}
                         className="w-full h-full object-cover rounded-xl"
                         loading="lazy"
@@ -740,7 +740,7 @@ export default function RetailPOSPage() {
                     {formatCurrency(product.price)}
                     {product.weightBased && <span className="text-xs text-gray-400 ml-1">/{product.unitType}</span>}
                   </div>
-                  {product.stock != null && (
+                  {product.trackInventory && product.stock != null && (
                     <div className={`text-[10px] font-bold mt-0.5 ${
                       product.stockStatus === 'out' ? 'text-red-500' :
                       product.stockStatus === 'low' ? 'text-amber-500' :

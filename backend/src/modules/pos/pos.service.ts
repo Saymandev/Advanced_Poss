@@ -2365,6 +2365,7 @@ export class POSService {
           selections: itemObj.selections || [],
           addons: itemObj.addons || [],
           requiresKitchen: itemObj.requiresKitchen !== false,
+          trackInventory: itemObj.trackInventory === true,
         };
       });
     } catch (error) {
