@@ -2310,33 +2310,53 @@ export class POSService {
         let isLowStock = false;
         let isOutOfStock = false;
 
-        if (itemObj.trackInventory === true && Array.isArray(itemObj.ingredients) && itemObj.ingredients.length > 0) {
-          for (const ing of itemObj.ingredients) {
-            const ingredient: any = ing?.ingredientId;
-            if (!ingredient) continue;
+        if (itemObj.trackInventory === true) {
+          if (Array.isArray(itemObj.ingredients) && itemObj.ingredients.length > 0) {
+            let maxPortions = 999;
+            for (const ing of itemObj.ingredients) {
+              const ingredient: any = ing?.ingredientId;
+              const requiredQuantity = ing?.quantity || 1;
+              if (!ingredient) continue;
 
-            // Out of stock if any ingredient is out
-            if (ingredient.isOutOfStock || ingredient.currentStock <= 0) {
+              // Out of stock if any ingredient is out
+              if (ingredient.isOutOfStock || ingredient.currentStock <= 0) {
+                isOutOfStock = true;
+                isLowStock = true;
+                maxPortions = 0;
+                break;
+              }
+
+              const portions = Math.floor((ingredient.currentStock || 0) / requiredQuantity);
+              if (portions < maxPortions) {
+                maxPortions = portions;
+              }
+
+              // Low stock if any ingredient is flagged low
+              if (
+                ingredient.isLowStock ||
+                (typeof ingredient.currentStock === 'number' &&
+                  typeof ingredient.minimumStock === 'number' &&
+                  ingredient.currentStock > 0 &&
+                  ingredient.currentStock <= ingredient.minimumStock)
+              ) {
+                isLowStock = true;
+              }
+            }
+
+            if (isOutOfStock) {
+              stock = 0;
+            } else {
+              stock = maxPortions !== 999 ? maxPortions : 0;
+            }
+          } else {
+            // Direct product inventory (Retail / Shop)
+            stock = typeof itemObj.stock === 'number' ? itemObj.stock : 0;
+            if (stock <= 0) {
               isOutOfStock = true;
               isLowStock = true;
-              break;
-            }
-
-            // Low stock if any ingredient is flagged low
-            if (
-              ingredient.isLowStock ||
-              (typeof ingredient.currentStock === 'number' &&
-                typeof ingredient.minimumStock === 'number' &&
-                ingredient.currentStock > 0 &&
-                ingredient.currentStock <= ingredient.minimumStock)
-            ) {
+            } else if (typeof itemObj.minimumStock === 'number' && stock <= itemObj.minimumStock) {
               isLowStock = true;
             }
-          }
-
-          // If any ingredient is out of stock, treat item as out of stock
-          if (isOutOfStock) {
-            stock = 0;
           }
         }
 

@@ -374,7 +374,7 @@ export const useSocket = (): UseSocketReturn => {
         addNotification({
           type: 'system',
           title: 'Low Stock Alert',
-          message: `${data.name} is low on stock (${data.currentStock} ${data.ingredient?.unit || ''} remaining)`,
+          message: `${data.name} is low on stock (${data.currentStock ?? data.ingredient?.currentStock ?? data.ingredient?.stock ?? 0} ${data.ingredient?.unit || data.ingredient?.unitType || 'pcs'} remaining)`,
           data: { ingredientId: data.ingredientId, ingredient: data.ingredient },
         });
       }
