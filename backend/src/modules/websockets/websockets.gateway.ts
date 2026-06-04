@@ -434,8 +434,9 @@ export class WebsocketsGateway
       },
     });
 
-    // Notify specific waiter if assigned
-    if (order.waiterId) {
+    // Notify specific waiter if assigned, BUT skip for counter_sale (retail) 
+    // since the person creating the order is the one handling it right now.
+    if (order.waiterId && order.orderType !== 'counter_sale') {
       const waiterIdStr = typeof order.waiterId === 'string' ? order.waiterId : String(order.waiterId);
       this.notifyWaiterAssigned(waiterIdStr, order);
     }

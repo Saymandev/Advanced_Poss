@@ -759,26 +759,16 @@ export class ReceiptService {
             <div class="separator-double">---------------------------------------</div>
         </div>
 
-        <div class="order-info">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <div style="flex: 1;">Bill No : ${receiptData.orderNumber}</div>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <div>Date : ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, '24h').split(',')[0]}</div>
-                <div>Time : ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, '12h').split(',')[1].trim()}</div>
-            </div>
+        <div class="order-info text-center">
+            <div style="margin-bottom: 4px;">Bill No : ${receiptData.orderNumber}</div>
+            <div style="margin-bottom: 4px;">Date : ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, '24h').split(',')[0]} &nbsp; Time : ${this.formatReceiptDate(receiptData.createdAt, receiptData.timezone, receiptData.dateFormat, '12h').split(',')[1].trim()}</div>
             ${receiptData.orderType === 'counter_sale' ? `
-            <div style="display: flex; justify-content: space-between;">
-                <div>Cashier: ${receiptData.waiterName}</div>
-            </div>` : receiptData.orderType === 'dine-in' ? `
-            <div style="display: flex; justify-content: space-between;">
-                <div>Table : ${receiptData.tableNumber}</div>
-                <div>Waiter: ${receiptData.waiterName}</div>
-            </div>` : `
-            <div style="display: flex; justify-content: space-between;">
-                <div>Type : ${receiptData.orderType === 'takeaway' ? 'Takeaway' : receiptData.orderType === 'delivery' ? 'Delivery' : receiptData.orderType}</div>
-                <div>Cashier: ${receiptData.waiterName}</div>
-            </div>`}
+            <div>Cashier: ${receiptData.waiterName}</div>
+            ` : receiptData.orderType === 'dine-in' ? `
+            <div>Table : ${receiptData.tableNumber} &nbsp; Waiter: ${receiptData.waiterName}</div>
+            ` : `
+            <div>Type : ${receiptData.orderType === 'takeaway' ? 'Takeaway' : receiptData.orderType === 'delivery' ? 'Delivery' : receiptData.orderType} &nbsp; Cashier: ${receiptData.waiterName}</div>
+            `}
         </div>
 
         <div class="separator-dashed">---------------------------------------</div>
@@ -817,7 +807,7 @@ export class ReceiptService {
             <div class="separator-double">---------------------------------------</div>
         </div>
 
-        <div class="payment-details" style="margin: 10px 0; font-size: 1em;">
+        <div class="payment-details text-center" style="margin: 10px 0; font-size: 1em;">
             <div>Paid by: ${receiptData.paymentMethod ? receiptData.paymentMethod.toUpperCase() : 'N/A'}</div>
             ${receiptData.dueAmount > 0 
               ? `<div>Paid: ${receiptData.amountReceived.toFixed(2)}</div><div style="font-weight: bold; margin-top: 4px;">Due: ${receiptData.dueAmount.toFixed(2)}</div>`
