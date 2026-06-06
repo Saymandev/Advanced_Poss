@@ -1064,7 +1064,7 @@ export class ReportsService {
       ...todayFilter,
       status: 'paid',
     });
-    const totalDueAmount = pendingOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalDueAmount = pendingOrders.reduce((sum, o) => sum + (o.remainingAmount ?? Math.max(0, (o.totalAmount || 0) - (o.paidAmount || 0))), 0);
     const settledTodayAmount = settledToday.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     return {
       pendingSettlements: pendingOrders.length,
@@ -1074,7 +1074,7 @@ export class ReportsService {
       pendingOrders: pendingOrders.map((order: any) => ({
         id: order._id.toString(),
         orderNumber: order.orderNumber,
-        totalAmount: order.totalAmount || 0,
+        totalAmount: order.remainingAmount ?? Math.max(0, (order.totalAmount || 0) - (order.paidAmount || 0)),
         orderType: order.orderType,
         createdAt: order.createdAt,
         tableId: order.tableId?.toString(),

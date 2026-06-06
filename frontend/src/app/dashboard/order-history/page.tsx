@@ -402,6 +402,8 @@ export default function OrdersPage() {
             .filter(Boolean)
             .join(' ') ||
           order.waiterName,
+        paidAmount: order.paidAmount ?? 0,
+        remainingAmount: order.remainingAmount ?? Math.max(0, (order.totalAmount || order.total || 0) - (order.paidAmount || 0)),
       };
     });
   }, [ordersResponse, posSettings]);
