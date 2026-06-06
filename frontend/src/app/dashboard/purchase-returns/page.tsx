@@ -50,9 +50,10 @@ export default function PurchaseReturnsPage() {
   const addItem = () => {
     if (!newItem.productId || newItem.quantity < 1) return;
     const product = products.find((p: any) => p.id === newItem.productId);
+    const finalUnitCost = newItem.unitCost > 0 ? newItem.unitCost : (product?.cost || product?.price || 0);
     setForm({
       ...form,
-      items: [...form.items, { ...newItem, productName: product?.name || '', productId: newItem.productId }],
+      items: [...form.items, { ...newItem, productName: product?.name || '', productId: newItem.productId, unitCost: finalUnitCost }],
     });
     setNewItem({ productId: '', quantity: 1, unitCost: 0, reason: 'damaged', notes: '' });
   };
@@ -157,9 +158,13 @@ export default function PurchaseReturnsPage() {
 
           <div className="border-t pt-4">
             <h4 className="font-bold text-sm mb-2">Items to Return</h4>
-            <div className="grid grid-cols-5 gap-2 mb-2">
-              <Select value={newItem.productId} onChange={(v) => setNewItem({ ...newItem, productId: v })} options={[{ value: '', label: 'Select product...' }, ...products.map((p: any) => ({ value: p.id || p._id, label: p.name }))]} className="col-span-2" />
+            <div className="grid grid-cols-6 gap-2 mb-2">
+              <Select value={newItem.productId} onChange={(v) => {
+                const p = products.find((x: any) => x.id === v || x._id === v);
+                setNewItem({ ...newItem, productId: v, unitCost: p?.cost || p?.price || 0 });
+              }} options={[{ value: '', label: 'Select product...' }, ...products.map((p: any) => ({ value: p.id || p._id, label: p.name }))]} className="col-span-2" />
               <Input type="number" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 0 })} min={1} placeholder="Qty" />
+              <Input type="number" value={newItem.unitCost} onChange={(e) => setNewItem({ ...newItem, unitCost: parseFloat(e.target.value) || 0 })} min={0} placeholder="Unit Cost" step="0.01" />
               <Select value={newItem.reason} onChange={(v) => setNewItem({ ...newItem, reason: v })} options={[{ value: 'damaged', label: 'Damaged' }, { value: 'expired', label: 'Expired' }, { value: 'defective', label: 'Defective' }, { value: 'wrong_item', label: 'Wrong Item' }, { value: 'other', label: 'Other' }]} />
               <Button size="sm" onClick={addItem} variant="primary">Add</Button>
             </div>
@@ -167,6 +172,7 @@ export default function PurchaseReturnsPage() {
               <div key={i} className="flex items-center gap-2 text-sm py-1 border-b last:border-0">
                 <span className="flex-1">{item.productName}</span>
                 <span className="w-16 text-center">×{item.quantity}</span>
+                <span className="w-20 text-center">{formatCurrency(item.unitCost)}</span>
                 <Badge className="text-[10px]">{item.reason}</Badge>
                 <button onClick={() => setForm({ ...form, items: form.items.filter((_, j) => j !== i) })} className="text-red-500">✕</button>
               </div>
