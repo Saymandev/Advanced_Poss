@@ -152,7 +152,10 @@ export default function CompanyLandingPage() {
                 <Link href={`/${companySlug}/gallery`}>
                   <Button variant="ghost" size="sm">Gallery</Button>
                 </Link>
-                {branches.length > 0 && branches[0]?.slug && (company as any)?.settings?.features?.includes('room-management') && (
+                {branches.length > 0 && branches[0]?.slug && (
+                  (Array.isArray((company as any)?.settings?.features) && (company as any)?.settings?.features?.includes('room-management')) || 
+                  (!Array.isArray((company as any)?.settings?.features) && (company as any)?.settings?.features && ((company as any).settings.features['room-management'] || (company as any).settings.features.roomManagement))
+                ) && (
                   <Link href={`/${companySlug}/${branches[0].slug}/rooms`}>
                     <Button variant="ghost" size="sm" className="text-primary-600 dark:text-primary-400 font-semibold">
                       Book a Room
@@ -318,7 +321,10 @@ export default function CompanyLandingPage() {
                               Shop
                             </Button>
                           </Link>
-                          {(company as any)?.settings?.features?.includes('room-management') && (
+                          {(
+                            (Array.isArray((company as any)?.settings?.features) && (company as any)?.settings?.features?.includes('room-management')) || 
+                            (!Array.isArray((company as any)?.settings?.features) && (company as any)?.settings?.features && ((company as any).settings.features['room-management'] || (company as any).settings.features.roomManagement))
+                          ) && (
                             <>
                               <Link href={`/${companySlug}/${branch.slug}/rooms`} className="flex-1">
                                 <Button variant="secondary" size="sm" className="w-full">
