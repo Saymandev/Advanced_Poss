@@ -389,8 +389,8 @@ export class PublicService {
     try {
       let order = null;
       const scopeFilter: any = {};
-      if (companyId) scopeFilter.companyId = companyId;
-      if (branchId) scopeFilter.branchId = branchId;
+      if (companyId && Types.ObjectId.isValid(companyId)) scopeFilter.companyId = new Types.ObjectId(companyId);
+      if (branchId && Types.ObjectId.isValid(branchId)) scopeFilter.branchId = new Types.ObjectId(branchId);
       
       if (Types.ObjectId.isValid(orderIdOrNumber) && orderIdOrNumber.length === 24) {
         order = await this.orderModel

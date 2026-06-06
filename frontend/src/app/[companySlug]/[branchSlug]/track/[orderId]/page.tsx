@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { useGetCompanyBySlugQuery, useTrackOrderQuery } from '@/lib/api/endpoints/publicApi';
+import { useGetBranchBySlugQuery, useGetCompanyBySlugQuery, useTrackOrderQuery } from '@/lib/api/endpoints/publicApi';
 import { usePublicSocket } from '@/lib/hooks/usePublicSocket';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -38,6 +38,12 @@ export default function OrderTrackingPage() {
     skip: !orderId,
     // WebSocket handles real-time updates, API call is for initial load and fallback
   });
+
+  const { data: branch } = useGetBranchBySlugQuery({ companySlug, branchSlug }, {
+    skip: !companySlug || !branchSlug,
+  });
+
+  const contactPhone = orderData?.data?.branchId?.phone || branch?.phone || company?.phone;
   // Local state for real-time order updates
   const [order, setOrder] = useState<any>(null);
   // WebSocket for real-time updates
@@ -385,17 +391,17 @@ export default function OrderTrackingPage() {
                   {order.paymentStatus === 'paid' ? '✓ Paid' : 'Pending Payment'}
                 </p>
               </div>
-              {company?.phone && (
+              {contactPhone && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
                     Need Help?
                   </h3>
                   <a 
-                    href={`tel:${company.phone}`} 
+                    href={`tel:${contactPhone}`} 
                     className="flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
                   >
                     <PhoneIcon className="w-5 h-5" />
-                    <span className="text-sm sm:text-base">{company.phone}</span>
+                    <span className="text-sm sm:text-base">{contactPhone}</span>
                   </a>
                 </div>
               )}

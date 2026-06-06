@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { useGetCompanyBySlugQuery, useTrackOrderQuery } from '@/lib/api/endpoints/publicApi';
+import { useGetBranchBySlugQuery, useGetCompanyBySlugQuery, useTrackOrderQuery } from '@/lib/api/endpoints/publicApi';
 import { CheckCircleIcon, ExclamationTriangleIcon, HomeIcon, PhoneIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -53,6 +53,12 @@ export default function OrderConfirmationPage() {
   } = useTrackOrderQuery({ orderId, companySlug, branchSlug }, {
     skip: !orderId || orderId === 'pending',
   });
+
+  const { data: branch } = useGetBranchBySlugQuery({ companySlug, branchSlug }, {
+    skip: !companySlug || !branchSlug,
+  });
+
+  const contactPhone = orderData?.data?.branchId?.phone || branch?.phone || company?.phone;
 
   const order = orderData?.data || orderData;
 
@@ -113,8 +119,8 @@ export default function OrderConfirmationPage() {
               <Link href={`/${companySlug}/${branchSlug}/shop`}>
                 <Button variant="secondary">Continue Shopping</Button>
               </Link>
-              {company?.phone && (
-                <a href={`tel:${company.phone}`}>
+              {contactPhone && (
+                <a href={`tel:${contactPhone}`}>
                   <Button>
                     <PhoneIcon className="w-4 h-4 mr-2" />
                     Call Us
@@ -197,15 +203,15 @@ export default function OrderConfirmationPage() {
               <li>• The restaurant will review and accept your order shortly.</li>
               <li>• Your status will update to &quot;Confirmed&quot; once accepted.</li>
               <li>• Estimated preparation time: 20-30 minutes</li>
-              {company?.phone && (
+              {contactPhone && (
                 <li className="flex items-center gap-2">
                   <span>• Questions? Call us at</span>
                   <a 
-                    href={`tel:${company.phone}`}
+                    href={`tel:${contactPhone}`}
                     className="text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
                   >
                     <PhoneIcon className="w-4 h-4" />
-                    {company.phone}
+                    {contactPhone}
                   </a>
                 </li>
               )}
