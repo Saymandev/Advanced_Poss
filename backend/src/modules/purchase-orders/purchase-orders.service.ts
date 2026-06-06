@@ -417,6 +417,7 @@ export class PurchaseOrdersService {
     }
 
     // Automatically create an expense entry if anything was received in this call
+    /*
     if (totalReceivedAmountInThisCall > 0) {
       try {
         const supplier = await this.supplierModel.findById(order.supplierId).lean();
@@ -449,6 +450,7 @@ export class PurchaseOrdersService {
         fs.appendFileSync(logPath, `[PO-RECEIVE] Expense Creation FAILED: ${expenseError.message}\n`);
       }
     }
+    */
 
     await order.save();
     return this.findOne(id);
@@ -537,6 +539,7 @@ export class PurchaseOrdersService {
     await this.menuItemsService.syncIngredientStock(data.ingredientId, data.quantity);
 
     // 3. Create Expense (which triggers Ledger)
+    /*
     try {
       const expenseData = {
         companyId: data.companyId,
@@ -560,6 +563,7 @@ export class PurchaseOrdersService {
     } catch (error) {
       console.error('Failed to create expense for quick purchase:', error);
     }
+    */
 
     return this.populateOrder(savedOrder);
   }
