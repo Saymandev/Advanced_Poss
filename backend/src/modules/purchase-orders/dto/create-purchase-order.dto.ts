@@ -70,4 +70,10 @@ export class CreatePurchaseOrderDto {
   @IsOptional()
   @IsString()
   paymentMethod?: string;
+
+  @ApiPropertyOptional({ example: 40 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  appliedCredit?: number;
 }

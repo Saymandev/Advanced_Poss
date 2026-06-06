@@ -288,8 +288,9 @@ export default function PurchaseOrdersPage() {
             <p>Subtotal: ${formatCurrency(order.totalAmount - (order.taxAmount || 0))}</p>
             ${order.taxAmount ? `<p>Tax: ${formatCurrency(order.taxAmount)}</p>` : ''}
             ${order.discountAmount ? `<p>Discount: -${formatCurrency(order.discountAmount)}</p>` : ''}
+            ${order.appliedCredit ? `<p>Applied Credit: -${formatCurrency(order.appliedCredit)}</p>` : ''}
             <div class="grand-total">
-              <p>Total: ${formatCurrency(order.totalAmount)}</p>
+              <p>Total Paid: ${formatCurrency(order.totalAmount - (order.appliedCredit || 0))}</p>
             </div>
           </div>
           <script>
@@ -691,9 +692,35 @@ export default function PurchaseOrdersPage() {
               label="Supplier"
               options={suppliers?.suppliers?.map(s => ({ value: s.id, label: s.name })) || []}
               value={formData.supplierId}
-              onChange={(value) => setFormData({ ...formData, supplierId: value })}
+              onChange={(value) => setFormData({ ...formData, supplierId: value, appliedCredit: 0 })}
               placeholder="Select supplier"
             />
+            {(() => {
+              const selectedSupplierObj = suppliers?.suppliers?.find((s: any) => s.id === formData.supplierId);
+              const availableCredit = selectedSupplierObj && (selectedSupplierObj.currentBalance || 0) < 0 ? Math.abs(selectedSupplierObj.currentBalance || 0) : 0;
+              if (availableCredit > 0) {
+                return (
+                  <div className="col-span-1 sm:col-span-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-semibold text-green-800">Supplier Credit Available: {formatCurrency(availableCredit)}</p>
+                        <p className="text-xs text-green-600">You can apply this credit to your order.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="checkbox" 
+                          id="applyCredit" 
+                          checked={(formData.appliedCredit || 0) > 0} 
+                          onChange={(e) => setFormData({...formData, appliedCredit: e.target.checked ? availableCredit : 0})} 
+                        />
+                        <label htmlFor="applyCredit" className="text-sm text-green-800 cursor-pointer">Apply Credit</label>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <Input
               label="Expected Delivery Date"
               type="date"

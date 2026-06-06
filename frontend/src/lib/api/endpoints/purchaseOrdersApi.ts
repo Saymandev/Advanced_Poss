@@ -20,6 +20,7 @@ export interface PurchaseOrder {
   discountAmount?: number;
   notes?: string;
   paymentMethod?: string;
+  appliedCredit?: number;
   items: Array<{
     id: string;
     ingredientId: string;
@@ -53,6 +54,7 @@ export interface CreatePurchaseOrderRequest {
     notes?: string;
   }>;
   paymentMethod?: string;
+  appliedCredit?: number;
 }
 
 export interface UpdatePurchaseOrderRequest {
@@ -120,6 +122,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
             totalAmount: order.totalAmount || 0,
             taxAmount: order.taxAmount || 0,
             discountAmount: order.discountAmount,
+            appliedCredit: order.appliedCredit || 0,
             notes: order.notes,
             paymentMethod: order.paymentMethod,
             items: (order.items || []).map((item: any) => ({
@@ -178,6 +181,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
           totalAmount: order.totalAmount || 0,
           taxAmount: order.taxAmount || 0,
           discountAmount: order.discountAmount,
+          appliedCredit: order.appliedCredit || 0,
           notes: order.notes,
           paymentMethod: order.paymentMethod,
           items: (order.items || []).map((item: any) => ({
@@ -238,6 +242,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
           totalAmount: order.totalAmount || 0,
           taxAmount: order.taxAmount || 0,
           discountAmount: order.discountAmount,
+          appliedCredit: order.appliedCredit || 0,
           notes: order.notes,
           paymentMethod: order.paymentMethod,
           items: (order.items || []).map((item: any) => ({

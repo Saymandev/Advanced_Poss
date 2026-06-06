@@ -161,6 +161,7 @@ export class PurchaseOrdersService {
       totalAmount,
       taxAmount: 0,
       discountAmount: 0,
+      appliedCredit: createPurchaseOrderDto.appliedCredit || 0,
       items,
       paymentMethod: createPurchaseOrderDto.paymentMethod,
       workPeriodId: (await this.workPeriodsService.findActive(createPurchaseOrderDto.companyId, createPurchaseOrderDto.branchId))?._id || undefined,
@@ -368,6 +369,8 @@ export class PurchaseOrdersService {
     const logPath = path.join(process.cwd(), 'txn-debug.log');
     const receivedItemsDetails: string[] = [];
     const costIncreases: any[] = [];
+    
+    const isFirstReceipt = order.status === PurchaseOrderStatus.APPROVED;
 
     for (const item of dto.receivedItems) {
       const orderItem = order.items.find(
@@ -444,27 +447,47 @@ export class PurchaseOrdersService {
     // Record direct ledger transaction for the purchase amount
     if (totalReceivedAmountInThisCall > 0) {
       try {
-        const paymentMethodId = (order as any).paymentMethod || 'cash';
+        let cashToPay = totalReceivedAmountInThisCall;
         
-        fs.appendFileSync(logPath, `[PO-RECEIVE] Recording purchase transaction for ${order.orderNumber}, Amount: ${totalReceivedAmountInThisCall}\n`);
+        // Handle Supplier Credit if this is the first receipt and credit was applied
+        if (order.appliedCredit > 0 && isFirstReceipt) {
+           const supplier = await this.supplierModel.findById(order.supplierId);
+           if (supplier && supplier.currentBalance < 0) {
+             const availableCredit = Math.abs(supplier.currentBalance);
+             const creditToUse = Math.min(order.appliedCredit, totalReceivedAmountInThisCall, availableCredit);
+             
+             if (creditToUse > 0) {
+                cashToPay -= creditToUse;
+                supplier.currentBalance += creditToUse;
+                await supplier.save();
+                fs.appendFileSync(logPath, `[PO-RECEIVE] Used Supplier Credit: ${creditToUse}. Remaining cash to pay: ${cashToPay}\n`);
+             }
+           }
+        }
 
-        await this.transactionsService.recordTransaction(
-          {
-            paymentMethodId,
-            type: TransactionType.OUT,
-            category: TransactionCategory.PURCHASE,
-            amount: totalReceivedAmountInThisCall,
-            date: new Date().toISOString(),
-            referenceId: order._id.toString(),
-            referenceModel: 'PurchaseOrder',
-            description: `Payment for Purchase Order ${order.orderNumber}`,
-            notes: `Auto-recorded from PO receipt.`,
-          },
-          order.companyId.toString(),
-          order.branchId?.toString() || order.companyId.toString(),
-          order.approvedBy?.toString() || (order as any).createdBy?.toString() || (order as any).companyId?.toString(),
-        );
-        fs.appendFileSync(logPath, `[PO-RECEIVE] SUCCESS: Recorded transaction\n`);
+        if (cashToPay > 0) {
+          const paymentMethodId = (order as any).paymentMethod || 'cash';
+          
+          fs.appendFileSync(logPath, `[PO-RECEIVE] Recording purchase transaction for ${order.orderNumber}, Amount: ${cashToPay}\n`);
+
+          await this.transactionsService.recordTransaction(
+            {
+              paymentMethodId,
+              type: TransactionType.OUT,
+              category: TransactionCategory.PURCHASE,
+              amount: cashToPay,
+              date: new Date().toISOString(),
+              referenceId: order._id.toString(),
+              referenceModel: 'PurchaseOrder',
+              description: `Payment for Purchase Order ${order.orderNumber}`,
+              notes: `Auto-recorded from PO receipt.`,
+            },
+            order.companyId.toString(),
+            order.branchId?.toString() || order.companyId.toString(),
+            order.approvedBy?.toString() || (order as any).createdBy?.toString() || (order as any).companyId?.toString(),
+          );
+          fs.appendFileSync(logPath, `[PO-RECEIVE] SUCCESS: Recorded transaction\n`);
+        }
       } catch (txnError: any) {
         console.error('❌ Failed to record transaction from purchase order:', txnError);
         fs.appendFileSync(logPath, `[PO-RECEIVE] Transaction Creation FAILED: ${txnError.message}\n`);

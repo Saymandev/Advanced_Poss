@@ -6,6 +6,7 @@ import { PurchaseReturn, PurchaseReturnDocument } from './schemas/purchase-retur
 import { PurchaseOrder, PurchaseOrderDocument } from '../purchase-orders/schemas/purchase-order.schema';
 import { Ingredient, IngredientDocument } from '../ingredients/schemas/ingredient.schema';
 import { IncomesService } from '../incomes/incomes.service';
+import { Supplier, SupplierDocument } from '../suppliers/schemas/supplier.schema';
 
 @Injectable()
 export class PurchaseReturnsService {
@@ -16,6 +17,8 @@ export class PurchaseReturnsService {
     private poModel: Model<PurchaseOrderDocument>,
     @InjectModel(Ingredient.name)
     private ingredientModel: Model<IngredientDocument>,
+    @InjectModel(Supplier.name)
+    private supplierModel: Model<SupplierDocument>,
     @Inject(forwardRef(() => IncomesService))
     private incomesService: IncomesService,
   ) {}
@@ -164,6 +167,11 @@ export class PurchaseReturnsService {
           status: 'received',
           createdBy: userId,
         }, 'owner'); // Passing 'owner' bypasses strict workperiod check for system-generated refunds
+      } else if (dto.settlementType === 'credit_note' && savedDoc.supplierId) {
+        // Decrease currentBalance (a negative balance means they owe us / credit)
+        await this.supplierModel.findByIdAndUpdate(savedDoc.supplierId, {
+          $inc: { currentBalance: -savedDoc.totalAmount }
+        });
       }
     }
 

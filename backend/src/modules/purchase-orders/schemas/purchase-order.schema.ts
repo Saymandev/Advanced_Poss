@@ -101,6 +101,9 @@ export class PurchaseOrder {
   @Prop({ type: Date })
   approvedAt?: Date;
 
+  @Prop({ default: 0, min: 0 })
+  appliedCredit: number;
+
   @Prop({ type: String })
   cancellationReason?: string;
 
