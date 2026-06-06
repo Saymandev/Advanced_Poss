@@ -26,7 +26,7 @@ export class PurchaseReturn {
   @Prop({
     type: [
       {
-        productId: { type: Types.ObjectId, ref: 'MenuItem', required: true },
+        productId: { type: Types.ObjectId, ref: 'Ingredient', required: true },
         productName: String,
         quantity: { type: Number, required: true, min: 1 },
         unitCost: { type: Number, default: 0 },

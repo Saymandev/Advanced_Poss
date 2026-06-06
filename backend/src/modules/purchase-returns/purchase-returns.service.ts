@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreatePurchaseReturnDto, UpdatePurchaseReturnDto } from './dto/purchase-return.dto';
 import { PurchaseReturn, PurchaseReturnDocument } from './schemas/purchase-return.schema';
 import { PurchaseOrder, PurchaseOrderDocument } from '../purchase-orders/schemas/purchase-order.schema';
+import { Ingredient, IngredientDocument } from '../ingredients/schemas/ingredient.schema';
+import { IncomesService } from '../incomes/incomes.service';
 
 @Injectable()
 export class PurchaseReturnsService {
@@ -12,6 +14,10 @@ export class PurchaseReturnsService {
     private model: Model<PurchaseReturnDocument>,
     @InjectModel(PurchaseOrder.name)
     private poModel: Model<PurchaseOrderDocument>,
+    @InjectModel(Ingredient.name)
+    private ingredientModel: Model<IngredientDocument>,
+    @Inject(forwardRef(() => IncomesService))
+    private incomesService: IncomesService,
   ) {}
 
   async create(dto: CreatePurchaseReturnDto, companyId: string, userId: string): Promise<PurchaseReturn> {
@@ -113,6 +119,8 @@ export class PurchaseReturnsService {
     const doc = await this.model.findById(id);
     if (!doc) throw new NotFoundException('Purchase return not found');
 
+    const originalStatus = doc.status;
+
     if (dto.status === 'approved' || dto.status === 'rejected') {
       doc.approvedBy = new Types.ObjectId(userId);
     }
@@ -122,7 +130,44 @@ export class PurchaseReturnsService {
     }
 
     Object.assign(doc, dto);
-    return doc.save();
+    const savedDoc = await doc.save();
+
+    // Inventory and Ledger logic
+    if (originalStatus === 'pending' && dto.status === 'approved') {
+      // Deduct stock for all returned items
+      for (const item of savedDoc.items) {
+        await this.ingredientModel.findByIdAndUpdate(item.productId, {
+          $inc: { currentStock: -item.quantity }
+        });
+      }
+    }
+
+    if (originalStatus === 'approved' && dto.status === 'settled') {
+      if (dto.settlementType === 'replacement') {
+        // Add stock back for replacement
+        for (const item of savedDoc.items) {
+          await this.ingredientModel.findByIdAndUpdate(item.productId, {
+            $inc: { currentStock: item.quantity }
+          });
+        }
+      } else if (dto.settlementType === 'refund') {
+        // Create an Income record for the refunded amount
+        await this.incomesService.create({
+          companyId: savedDoc.companyId.toString(),
+          branchId: savedDoc.branchId.toString(),
+          title: `Supplier Refund PR #${savedDoc.returnNumber}`,
+          description: `Refund received from supplier for Purchase Return ${savedDoc.returnNumber}`,
+          category: 'other',
+          amount: savedDoc.totalAmount,
+          date: new Date().toISOString(),
+          paymentMethod: 'cash',
+          status: 'received',
+          createdBy: userId,
+        }, 'owner'); // Passing 'owner' bypasses strict workperiod check for system-generated refunds
+      }
+    }
+
+    return savedDoc;
   }
 
   async remove(id: string): Promise<void> {
