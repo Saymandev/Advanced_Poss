@@ -152,7 +152,7 @@ export default function CompanyLandingPage() {
                 <Link href={`/${companySlug}/gallery`}>
                   <Button variant="ghost" size="sm">Gallery</Button>
                 </Link>
-                {branches.length > 0 && branches[0]?.slug && (
+                {branches.length > 0 && branches[0]?.slug && (company as any)?.settings?.features?.includes('room-management') && (
                   <Link href={`/${companySlug}/${branches[0].slug}/rooms`}>
                     <Button variant="ghost" size="sm" className="text-primary-600 dark:text-primary-400 font-semibold">
                       Book a Room
@@ -318,16 +318,20 @@ export default function CompanyLandingPage() {
                               Shop
                             </Button>
                           </Link>
-                          <Link href={`/${companySlug}/${branch.slug}/rooms`} className="flex-1">
-                            <Button variant="secondary" size="sm" className="w-full">
-                              Rooms
-                            </Button>
-                          </Link>
-                          <Link href={`/${companySlug}/${branch.slug}/book`} className="flex-1">
-                            <Button variant="secondary" size="sm" className="w-full">
-                              Book
-                            </Button>
-                          </Link>
+                          {(company as any)?.settings?.features?.includes('room-management') && (
+                            <>
+                              <Link href={`/${companySlug}/${branch.slug}/rooms`} className="flex-1">
+                                <Button variant="secondary" size="sm" className="w-full">
+                                  Rooms
+                                </Button>
+                              </Link>
+                              <Link href={`/${companySlug}/${branch.slug}/book`} className="flex-1">
+                                <Button variant="secondary" size="sm" className="w-full">
+                                  Book
+                                </Button>
+                              </Link>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
