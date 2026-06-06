@@ -49,10 +49,10 @@ export class CreatePurchaseReturnDto {
   @IsString()
   supplierName?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   @IsString()
-  purchaseOrderId?: string;
+  @IsNotEmpty()
+  purchaseOrderId: string;
 
   @ApiProperty({ type: [ReturnItemDto] })
   @IsArray()

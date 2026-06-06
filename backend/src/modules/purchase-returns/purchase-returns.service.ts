@@ -3,15 +3,41 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreatePurchaseReturnDto, UpdatePurchaseReturnDto } from './dto/purchase-return.dto';
 import { PurchaseReturn, PurchaseReturnDocument } from './schemas/purchase-return.schema';
+import { PurchaseOrder, PurchaseOrderDocument } from '../purchase-orders/schemas/purchase-order.schema';
 
 @Injectable()
 export class PurchaseReturnsService {
   constructor(
     @InjectModel(PurchaseReturn.name)
     private model: Model<PurchaseReturnDocument>,
+    @InjectModel(PurchaseOrder.name)
+    private poModel: Model<PurchaseOrderDocument>,
   ) {}
 
   async create(dto: CreatePurchaseReturnDto, companyId: string, userId: string): Promise<PurchaseReturn> {
+    if (!dto.purchaseOrderId) {
+      throw new BadRequestException('A Purchase Order ID is required to create a return.');
+    }
+
+    const po = await this.poModel.findById(dto.purchaseOrderId);
+    if (!po) {
+      throw new NotFoundException('Purchase Order not found.');
+    }
+
+    for (const item of dto.items) {
+      const poItem = po.items.find(poi => poi.ingredientId.toString() === item.productId);
+      if (!poItem) {
+        throw new BadRequestException(`Item with ID ${item.productId} was not found in the original Purchase Order.`);
+      }
+      
+      // Enforce the original PO unit cost to prevent manual pricing fraud
+      item.unitCost = poItem.unitPrice;
+
+      if (item.quantity > poItem.quantity) {
+        throw new BadRequestException(`Cannot return more than the purchased quantity for item ${item.productId}. Purchased: ${poItem.quantity}`);
+      }
+    }
+
     const totalAmount = dto.items.reduce((sum, item) => sum + (item.quantity * (item.unitCost || 0)), 0);
     const returnNumber = await this.generateReturnNumber(companyId);
 

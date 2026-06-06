@@ -4,10 +4,14 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { PurchaseReturnsController } from './purchase-returns.controller';
 import { PurchaseReturnsService } from './purchase-returns.service';
 import { PurchaseReturn, PurchaseReturnSchema } from './schemas/purchase-return.schema';
+import { PurchaseOrder, PurchaseOrderSchema } from '../purchase-orders/schemas/purchase-order.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: PurchaseReturn.name, schema: PurchaseReturnSchema }]),
+    MongooseModule.forFeature([
+      { name: PurchaseReturn.name, schema: PurchaseReturnSchema },
+      { name: PurchaseOrder.name, schema: PurchaseOrderSchema }
+    ]),
     forwardRef(() => SubscriptionsModule),
   ],
   controllers: [PurchaseReturnsController],

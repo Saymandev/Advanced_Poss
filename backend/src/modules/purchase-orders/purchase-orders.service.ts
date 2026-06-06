@@ -367,6 +367,7 @@ export class PurchaseOrdersService {
     let totalReceivedAmountInThisCall = 0;
     const logPath = path.join(process.cwd(), 'txn-debug.log');
     const receivedItemsDetails: string[] = [];
+    const costIncreases: any[] = [];
 
     for (const item of dto.receivedItems) {
       const orderItem = order.items.find(
@@ -390,12 +391,32 @@ export class PurchaseOrdersService {
         try {
           const ingredient = await this.ingredientModel.findById(orderItem.ingredientId);
           if (ingredient) {
-            ingredient.currentStock += deltaQty;
+            const oldQty = ingredient.currentStock > 0 ? ingredient.currentStock : 0;
+            const oldCost = ingredient.averageCost || ingredient.unitCost || 0;
+            const oldTotalValue = oldQty * oldCost;
+
+            const newTotalValue = deltaQty * orderItem.unitPrice;
+            const newTotalQty = oldQty + deltaQty;
+
+            const newAverageCost = newTotalQty > 0 ? (oldTotalValue + newTotalValue) / newTotalQty : orderItem.unitPrice;
+
+            if (oldCost > 0 && newAverageCost > oldCost * 1.05) {
+              costIncreases.push({
+                ingredientName: ingredient.name,
+                oldCost,
+                newCost: newAverageCost,
+                increasePercentage: ((newAverageCost - oldCost) / oldCost) * 100,
+              });
+            }
+
+            ingredient.currentStock = newTotalQty;
             ingredient.totalPurchased += deltaQty;
             ingredient.lastPurchasePrice = orderItem.unitPrice;
+            ingredient.averageCost = newAverageCost;
+            ingredient.unitCost = newAverageCost;
             ingredient.lastRestockedDate = new Date();
             await ingredient.save();
-            fs.appendFileSync(logPath, `[PO-RECEIVE] Updated inventory for ${orderItem.ingredientName}: +${deltaQty}\n`);
+            fs.appendFileSync(logPath, `[PO-RECEIVE] Updated MAC inventory for ${orderItem.ingredientName}: +${deltaQty}, New MAC: ${newAverageCost}\n`);
             
             // Sync with Retail Menu Items
             await this.menuItemsService.syncIngredientStock(orderItem.ingredientId.toString(), deltaQty);
@@ -451,7 +472,7 @@ export class PurchaseOrdersService {
     }
 
     await order.save();
-    return this.findOne(id);
+    return { order: await this.findOne(id), costIncreases };
   }
 
   async cancel(id: string, dto: CancelPurchaseOrderDto) {

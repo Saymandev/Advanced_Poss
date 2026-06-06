@@ -289,7 +289,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['PurchaseOrder'],
     }),
-    receivePurchaseOrder: builder.mutation<PurchaseOrder, { id: string; data: { receivedItems: Array<{ itemId: string; receivedQuantity: number }> } }>({
+    receivePurchaseOrder: builder.mutation<any, { id: string; data: { receivedItems: Array<{ itemId: string; receivedQuantity: number }> } }>({
       query: ({ id, data }) => ({
         url: `/purchase-orders/${id}/receive`,
         method: 'PATCH',

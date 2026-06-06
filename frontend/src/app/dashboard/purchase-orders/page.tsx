@@ -185,11 +185,21 @@ export default function PurchaseOrdersPage() {
   const handleReceive = async (receivedItems: Array<{ itemId: string; receivedQuantity: number }>) => {
     if (!selectedOrder) return;
     try {
-      await receiveOrder({
+      const result = await receiveOrder({
         id: selectedOrder.id,
         data: { receivedItems },
       }).unwrap();
-      toast.success('Purchase order received successfully');
+      
+      if (result.costIncreases && result.costIncreases.length > 0) {
+        let msg = 'Order received! ⚠️ COST INCREASE WARNING:\n';
+        result.costIncreases.forEach((c: any) => {
+          msg += `${c.ingredientName}: +${c.increasePercentage.toFixed(1)}% (Now ${formatCurrency(c.newCost)})\n`;
+        });
+        toast(msg, { icon: '⚠️', duration: 10000 });
+      } else {
+        toast.success('Purchase order received successfully');
+      }
+      
       setIsReceiveModalOpen(false);
       setSelectedOrder(null);
       setReceivedQuantities({});

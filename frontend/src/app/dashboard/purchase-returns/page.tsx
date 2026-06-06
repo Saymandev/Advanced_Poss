@@ -13,6 +13,7 @@ import {
   useGetPurchaseReturnsQuery,
   useUpdatePurchaseReturnMutation,
 } from '@/lib/api/endpoints/purchaseReturnsApi';
+import { useGetPurchaseOrdersQuery } from '@/lib/api/endpoints/purchaseOrdersApi';
 import { useGetSuppliersQuery } from '@/lib/api/endpoints/suppliersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -40,11 +41,14 @@ export default function PurchaseReturnsPage() {
   const { data: suppliersData } = useGetSuppliersQuery({ companyId }, { skip: !companyId });
   const suppliers = useMemo(() => (suppliersData as any)?.suppliers || [], [suppliersData]);
 
+  const { data: ordersData } = useGetPurchaseOrdersQuery({ companyId, branchId, status: 'received' }, { skip: !companyId });
+  const purchaseOrders = useMemo(() => (ordersData as any)?.orders || [], [ordersData]);
+
   const [createReturn] = useCreatePurchaseReturnMutation();
   const [updateReturn] = useUpdatePurchaseReturnMutation();
   const [deleteReturn] = useDeletePurchaseReturnMutation();
 
-  const [form, setForm] = useState({ supplierId: '', supplierName: '', items: [] as any[], notes: '' });
+  const [form, setForm] = useState({ supplierId: '', supplierName: '', purchaseOrderId: '', items: [] as any[], notes: '' });
   const [newItem, setNewItem] = useState({ productId: '', quantity: 1, unitCost: 0, reason: 'damaged', notes: '' });
 
   const addItem = () => {
@@ -59,12 +63,13 @@ export default function PurchaseReturnsPage() {
   };
 
   const handleCreate = async () => {
+    if (!form.purchaseOrderId) { toast.error('Please select a Purchase Order'); return; }
     if (form.items.length === 0) { toast.error('Add at least one item'); return; }
     try {
       await createReturn({ branchId, ...form }).unwrap();
       toast.success('Purchase return created');
       setIsCreateOpen(false);
-      setForm({ supplierId: '', supplierName: '', items: [], notes: '' });
+      setForm({ supplierId: '', supplierName: '', purchaseOrderId: '', items: [], notes: '' });
       refetch();
     } catch (e: any) { toast.error(e?.data?.message || 'Failed'); }
   };
@@ -147,10 +152,21 @@ export default function PurchaseReturnsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold mb-1">Supplier (optional)</label>
-              <Select value={form.supplierId} onChange={(v) => { const s: any = suppliers.find((x: any) => x.id === v); setForm({ ...form, supplierId: v, supplierName: s?.name || '' }); }} options={[{ value: '', label: 'None' }, ...suppliers.map((s: any) => ({ value: s.id, label: s.name }))]} />
+              <label className="block text-xs font-bold mb-1 text-red-500">Purchase Order *</label>
+              <Select 
+                value={form.purchaseOrderId} 
+                onChange={(v) => { 
+                  const po: any = purchaseOrders.find((x: any) => x.id === v); 
+                  setForm({ ...form, purchaseOrderId: v, supplierId: po?.supplierId || '', supplierName: po?.supplier?.name || '', items: [] }); 
+                }} 
+                options={[{ value: '', label: 'Select PO' }, ...purchaseOrders.map((po: any) => ({ value: po.id, label: `${po.orderNumber} - ${po.supplier?.name}` }))]} 
+              />
             </div>
             <div>
+              <label className="block text-xs font-bold mb-1">Supplier</label>
+              <Input value={form.supplierName} disabled placeholder="Auto-filled from PO" />
+            </div>
+            <div className="col-span-2">
               <label className="block text-xs font-bold mb-1">Notes</label>
               <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" />
             </div>
@@ -160,11 +176,17 @@ export default function PurchaseReturnsPage() {
             <h4 className="font-bold text-sm mb-2">Items to Return</h4>
             <div className="grid grid-cols-6 gap-2 mb-2">
               <Select value={newItem.productId} onChange={(v) => {
-                const p = products.find((x: any) => x.id === v || x._id === v);
-                setNewItem({ ...newItem, productId: v, unitCost: (p as any)?.cost || p?.price || 0 });
+                const selectedPo = purchaseOrders.find((po: any) => po.id === form.purchaseOrderId);
+                const poItem = selectedPo?.items?.find((i: any) => i.ingredientId === v);
+                
+                if (poItem) {
+                  setNewItem({ ...newItem, productId: v, unitCost: poItem.unitPrice });
+                } else {
+                  setNewItem({ ...newItem, productId: v, unitCost: 0 });
+                }
               }} options={[{ value: '', label: 'Select product...' }, ...products.map((p: any) => ({ value: p.id || p._id, label: p.name }))]} className="col-span-2" />
               <Input type="number" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 0 })} min={1} placeholder="Qty" />
-              <Input type="number" value={newItem.unitCost} onChange={(e) => setNewItem({ ...newItem, unitCost: parseFloat(e.target.value) || 0 })} min={0} placeholder="Unit Cost" step="0.01" />
+              <Input type="number" value={newItem.unitCost} disabled placeholder="Unit Cost" step="0.01" title="Locked to PO price" />
               <Select value={newItem.reason} onChange={(v) => setNewItem({ ...newItem, reason: v })} options={[{ value: 'damaged', label: 'Damaged' }, { value: 'expired', label: 'Expired' }, { value: 'defective', label: 'Defective' }, { value: 'wrong_item', label: 'Wrong Item' }, { value: 'other', label: 'Other' }]} />
               <Button size="sm" onClick={addItem} variant="primary">Add</Button>
             </div>
