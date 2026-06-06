@@ -19,6 +19,8 @@ import {
 import { Supplier, SupplierDocument } from '../suppliers/schemas/supplier.schema';
 import { WorkPeriodsService } from '../work-periods/work-periods.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
+import { TransactionsService } from '../transactions/transactions.service';
+import { TransactionType, TransactionCategory } from '../transactions/schemas/transaction.schema';
 import { ApprovePurchaseOrderDto } from './dto/approve-purchase-order.dto';
 import { CancelPurchaseOrderDto } from './dto/cancel-purchase-order.dto';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
@@ -44,6 +46,8 @@ export class PurchaseOrdersService {
     private readonly workPeriodsService: WorkPeriodsService,
     @Inject(forwardRef(() => MenuItemsService))
     private readonly menuItemsService: MenuItemsService,
+    @Inject(forwardRef(() => TransactionsService))
+    private readonly transactionsService: TransactionsService,
   ) {}
 
   private generateOrderNumber(date = new Date()): string {
@@ -416,41 +420,35 @@ export class PurchaseOrdersService {
       order.status = PurchaseOrderStatus.ORDERED;
     }
 
-    // Automatically create an expense entry if anything was received in this call
-    /*
+    // Record direct ledger transaction for the purchase amount
     if (totalReceivedAmountInThisCall > 0) {
       try {
-        const supplier = await this.supplierModel.findById(order.supplierId).lean();
+        const paymentMethodId = (order as any).paymentMethod || 'cash';
         
-        fs.appendFileSync(logPath, `[PO-RECEIVE] Creating partial expense for ${order.orderNumber}, Amount: ${totalReceivedAmountInThisCall}\n`);
+        fs.appendFileSync(logPath, `[PO-RECEIVE] Recording purchase transaction for ${order.orderNumber}, Amount: ${totalReceivedAmountInThisCall}\n`);
 
-        const expenseData = {
-          companyId: order.companyId.toString(),
-          branchId: order.branchId?.toString() || order.companyId.toString(),
-          title: `Purchase Receipt: ${order.orderNumber}`,
-          description: `Partial receipt from ${supplier?.name || 'Supplier'}. Items: ${receivedItemsDetails.join(', ')}`,
-          amount: totalReceivedAmountInThisCall,
-          category: 'ingredient',
-          date: new Date().toISOString().split('T')[0],
-          vendorName: supplier?.name,
-          invoiceNumber: order.orderNumber,
-          supplierId: order.supplierId.toString(),
-          paymentMethod: (order as any).paymentMethod || 'cash',
-          status: 'paid', // Mark as paid to trigger ledger transaction
-          notes: `Auto-created from receipt update of PO ${order.orderNumber}.`,
-          createdBy: order.approvedBy?.toString() || (order as any).createdBy?.toString() || (order as any).companyId?.toString(),
-          isRecurring: false,
-          purchaseOrderId: order._id.toString(),
-        };
-
-        const createdExpense = await this.expensesService.create(expenseData as any, 'super_admin');
-        fs.appendFileSync(logPath, `[PO-RECEIVE] SUCCESS: Created partial expense ${createdExpense.expenseNumber}\n`);
-      } catch (expenseError: any) {
-        console.error('❌ Failed to create partial expense from purchase order:', expenseError);
-        fs.appendFileSync(logPath, `[PO-RECEIVE] Expense Creation FAILED: ${expenseError.message}\n`);
+        await this.transactionsService.recordTransaction(
+          {
+            paymentMethodId,
+            type: TransactionType.OUT,
+            category: TransactionCategory.PURCHASE,
+            amount: totalReceivedAmountInThisCall,
+            date: new Date().toISOString(),
+            referenceId: order._id.toString(),
+            referenceModel: 'PurchaseOrder',
+            description: `Payment for Purchase Order ${order.orderNumber}`,
+            notes: `Auto-recorded from PO receipt.`,
+          },
+          order.companyId.toString(),
+          order.branchId?.toString() || order.companyId.toString(),
+          order.approvedBy?.toString() || (order as any).createdBy?.toString() || (order as any).companyId?.toString(),
+        );
+        fs.appendFileSync(logPath, `[PO-RECEIVE] SUCCESS: Recorded transaction\n`);
+      } catch (txnError: any) {
+        console.error('❌ Failed to record transaction from purchase order:', txnError);
+        fs.appendFileSync(logPath, `[PO-RECEIVE] Transaction Creation FAILED: ${txnError.message}\n`);
       }
     }
-    */
 
     await order.save();
     return this.findOne(id);
@@ -538,32 +536,27 @@ export class PurchaseOrdersService {
     // Sync with Retail Menu Items
     await this.menuItemsService.syncIngredientStock(data.ingredientId, data.quantity);
 
-    // 3. Create Expense (which triggers Ledger)
-    /*
+    // 3. Record Ledger Transaction directly
     try {
-      const expenseData = {
-        companyId: data.companyId,
-        branchId: data.branchId || data.companyId,
-        title: `Purchase Receipt: ${savedOrder.orderNumber}`,
-        description: `Quick purchase of ${ingredient.name} (${data.quantity} ${ingredient.unit}) from ${supplier.name}`,
-        amount: data.quantity * data.unitPrice,
-        category: 'ingredient',
-        date: new Date().toISOString().split('T')[0],
-        vendorName: supplier.name,
-        invoiceNumber: savedOrder.orderNumber,
-        supplierId: data.supplierId,
-        paymentMethod: data.paymentMethod || 'cash',
-        status: 'paid',
-        notes: `Auto-created from quick purchase.`,
-        purchaseOrderId: savedOrder._id.toString(),
-        createdBy: data.createdBy || data.companyId,
-      };
-
-      await this.expensesService.create(expenseData as any, 'super_admin');
+      await this.transactionsService.recordTransaction(
+        {
+          paymentMethodId: data.paymentMethod || 'cash',
+          type: TransactionType.OUT,
+          category: TransactionCategory.PURCHASE,
+          amount: data.quantity * data.unitPrice,
+          date: new Date().toISOString(),
+          referenceId: savedOrder._id.toString(),
+          referenceModel: 'PurchaseOrder',
+          description: `Quick purchase of ${ingredient.name} from ${supplier.name}`,
+          notes: `Auto-recorded from quick purchase.`,
+        },
+        data.companyId,
+        data.branchId || data.companyId,
+        data.createdBy || data.companyId,
+      );
     } catch (error) {
-      console.error('Failed to create expense for quick purchase:', error);
+      console.error('Failed to create transaction for quick purchase:', error);
     }
-    */
 
     return this.populateOrder(savedOrder);
   }

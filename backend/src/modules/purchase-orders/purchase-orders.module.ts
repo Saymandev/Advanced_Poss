@@ -13,6 +13,8 @@ import {
     PurchaseOrderSchema,
 } from './schemas/purchase-order.schema';
 
+import { TransactionsModule } from '../transactions/transactions.module';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -24,6 +26,7 @@ import {
     forwardRef(() => SubscriptionsModule),
     forwardRef(() => WorkPeriodsModule),
     forwardRef(() => MenuItemsModule),
+    forwardRef(() => TransactionsModule),
   ],
   controllers: [PurchaseOrdersController],
   providers: [PurchaseOrdersService],
