@@ -227,6 +227,81 @@ export default function PurchaseOrdersPage() {
     setSelectedOrder(order);
     setIsViewModalOpen(true);
   };
+  
+  const handlePrint = (order: PurchaseOrder) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const html = `
+      <html>
+        <head>
+          <title>Purchase Order - ${order.orderNumber}</title>
+          <style>
+            body { font-family: 'Inter', Arial, sans-serif; padding: 20px; color: #000; max-width: 800px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .details { margin-bottom: 20px; font-size: 14px; display: flex; justify-content: space-between; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
+            th { background-color: #f8f9fa; font-weight: bold; }
+            .total-section { text-align: right; font-size: 14px; margin-top: 20px; border-top: 1px solid #000; padding-top: 10px; }
+            .grand-total { font-size: 18px; font-weight: bold; margin-top: 10px; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>PURCHASE ORDER</h1>
+            <p><strong>#${order.orderNumber}</strong></p>
+          </div>
+          <div class="details">
+            <div>
+              <p><strong>Supplier:</strong> ${order.supplier?.name || 'N/A'}</p>
+              <p><strong>Contact:</strong> ${order.supplier?.contactPerson || 'N/A'} - ${order.supplier?.phoneNumber || 'N/A'}</p>
+            </div>
+            <div style="text-align: right;">
+              <p><strong>Order Date:</strong> ${new Date(order.orderDate).toLocaleDateString()}</p>
+              <p><strong>Status:</strong> ${order.status.toUpperCase()}</p>
+              <p><strong>Expected Delivery:</strong> ${new Date(order.expectedDeliveryDate).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th style="text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.items.map(item => `
+                <tr>
+                  <td>${item.ingredient?.name || 'Unknown'}</td>
+                  <td>${item.quantity} ${item.ingredient?.unit || ''}</td>
+                  <td>${formatCurrency(item.unitPrice)}</td>
+                  <td style="text-align: right;">${formatCurrency(item.quantity * item.unitPrice)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="total-section">
+            <p>Subtotal: ${formatCurrency(order.totalAmount - (order.taxAmount || 0))}</p>
+            ${order.taxAmount ? `<p>Tax: ${formatCurrency(order.taxAmount)}</p>` : ''}
+            ${order.discountAmount ? `<p>Discount: -${formatCurrency(order.discountAmount)}</p>` : ''}
+            <div class="grand-total">
+              <p>Total: ${formatCurrency(order.totalAmount)}</p>
+            </div>
+          </div>
+          <script>
+            window.onload = () => { window.print(); window.close(); };
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const getStatusBadge = (status: PurchaseOrder['status']) => {
     const variants = {
       draft: 'secondary',
@@ -901,6 +976,13 @@ export default function PurchaseOrdersPage() {
             <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 variant="secondary"
+                onClick={() => handlePrint(selectedOrder)}
+                className="w-full sm:w-auto text-sm sm:text-base mr-auto"
+              >
+                🖨️ Print Receipt
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={() => {
                   setIsViewModalOpen(false);
                   setSelectedOrder(null);

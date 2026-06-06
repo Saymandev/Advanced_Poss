@@ -184,7 +184,13 @@ export default function PurchaseReturnsPage() {
                 } else {
                   setNewItem({ ...newItem, productId: v, unitCost: 0 });
                 }
-              }} options={[{ value: '', label: 'Select product...' }, ...products.map((p: any) => ({ value: p.id || p._id, label: p.name }))]} className="col-span-2" />
+              }} 
+              disabled={!form.purchaseOrderId}
+              options={[
+                { value: '', label: form.purchaseOrderId ? 'Select item from PO...' : 'Select PO first...' },
+                ...(purchaseOrders.find((po: any) => po.id === form.purchaseOrderId)?.items?.map((i: any) => ({ value: i.ingredientId, label: `${i.ingredientName} (Bought: ${i.quantity})` })) || [])
+              ]} 
+              className="col-span-2" />
               <Input type="number" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 0 })} min={1} placeholder="Qty" />
               <Input type="number" value={newItem.unitCost} disabled placeholder="Unit Cost" step="0.01" title="Locked to PO price" />
               <Select value={newItem.reason} onChange={(v) => setNewItem({ ...newItem, reason: v })} options={[{ value: 'damaged', label: 'Damaged' }, { value: 'expired', label: 'Expired' }, { value: 'defective', label: 'Defective' }, { value: 'wrong_item', label: 'Wrong Item' }, { value: 'other', label: 'Other' }]} />
