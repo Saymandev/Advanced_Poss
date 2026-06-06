@@ -29,6 +29,8 @@ export interface Order {
   orderType: string;
   createdAt: string;
   updatedAt: string;
+  paidAmount?: number;
+  remainingAmount?: number;
 }
 
 export const ordersApi = apiSlice.injectEndpoints({
