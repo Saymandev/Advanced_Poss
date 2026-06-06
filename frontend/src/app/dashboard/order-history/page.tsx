@@ -63,6 +63,8 @@ interface Order {
   updatedAt: string;
   servedAt?: string;
   completedAt?: string;
+  paidAmount?: number;
+  remainingAmount?: number;
 }
 
 type QuickRange = 'last7' | 'today' | 'yesterday' | 'thisMonth' | 'custom';
