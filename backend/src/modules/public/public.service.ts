@@ -422,6 +422,37 @@ export class PublicService {
       const branchSlug = branch?.slug;
       const orderId = (order as any)._id?.toString() || (order as any).id;
       
+
+      // Merge real-time POS data if order was promoted
+      if (orderId) {
+        try {
+          const posOrder = await this.orderModel.db.collection('posorders').findOne({ externalOrderId: orderId.toString() });
+          if (posOrder) {
+            order.status = posOrder.status === 'paid' ? 'completed' : posOrder.status;
+            order.paymentStatus = posOrder.paymentStatus || order.paymentStatus;
+            
+            if (posOrder.paidAmount !== undefined) order.paidAmount = posOrder.paidAmount;
+            if (posOrder.remainingAmount !== undefined) order.remainingAmount = posOrder.remainingAmount;
+
+            if (posOrder.items && Array.isArray(posOrder.items) && order.items && Array.isArray(order.items)) {
+              order.items = order.items.map((publicItem) => {
+                const posItem = posOrder.items.find((pi) => 
+                  pi.menuItemId?.toString() === publicItem.menuItemId?._id?.toString() ||
+                  pi.menuItemId?.toString() === publicItem.menuItemId?.toString() ||
+                  pi.name === publicItem.name
+                );
+                if (posItem) {
+                  return { ...publicItem, status: posItem.status || publicItem.status };
+                }
+                return publicItem;
+              });
+            }
+          }
+        } catch (mergeError) {
+          console.error('Failed to merge POS order data for public tracking:', mergeError);
+        }
+      }
+
       let trackingUrl = null;
       if (companySlug && branchSlug && orderId) {
         const baseUrl =
