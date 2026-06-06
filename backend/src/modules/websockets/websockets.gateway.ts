@@ -449,6 +449,12 @@ export class WebsocketsGateway
       orderId: order.id || (order._id ? String(order._id) : null),
       orderNumber: order.orderNumber,
       timestamp: new Date(),
+      tableNumber: order.tableNumber,
+      orderType: order.orderType || order.type,
+      totalAmount: order.totalAmount || order.total,
+      items: order.items || [],
+      notes: order.notes || order.specialInstructions || '',
+      order: order // Pass the whole order just in case
     };
     
     this.emitToUser(waiterIdStr, 'order:assigned', notificationData);

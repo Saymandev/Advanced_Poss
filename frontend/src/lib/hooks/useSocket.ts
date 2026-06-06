@@ -65,7 +65,9 @@ interface UseSocketReturn {
   joinTable: (tableId: string) => void;
   leaveTable: (tableId: string) => void;
 }
-export const useSocket = (): UseSocketReturn => {
+export const SocketContext = React.createContext<UseSocketReturn | null>(null);
+
+export const useSocketInternal = (): UseSocketReturn => {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const { addNotification, hydrateNotifications } = useNotifications();
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -488,4 +490,21 @@ export const useSocket = (): UseSocketReturn => {
     joinTable,
     leaveTable,
   };
+};
+
+export const useSocket = (): UseSocketReturn => {
+  const context = React.useContext(SocketContext);
+  if (!context) {
+    return {
+      socket: null,
+      isConnected: false,
+      joinBranch: () => {},
+      leaveBranch: () => {},
+      joinKitchen: () => {},
+      leaveKitchen: () => {},
+      joinTable: () => {},
+      leaveTable: () => {},
+    };
+  }
+  return context;
 };

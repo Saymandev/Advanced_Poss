@@ -1,11 +1,12 @@
 'use client';
 
-import { useSocket } from '@/lib/hooks/useSocket';
+import { SocketContext, useSocketInternal } from '@/lib/hooks/useSocket';
 import { useAppSelector } from '@/lib/store';
 import { useEffect, useMemo } from 'react';
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
-  const { isConnected, joinKitchen } = useSocket();
+  const socketData = useSocketInternal();
+  const { isConnected, joinKitchen } = socketData;
   const { user, companyContext } = useAppSelector((state) => state.auth);
 
   const branchId = useMemo(() => {
@@ -23,6 +24,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isConnected, branchId, joinKitchen, user, companyContext]);
 
-  return <>{children}</>;
+  return (
+    <SocketContext.Provider value={socketData}>
+      {children}
+    </SocketContext.Provider>
+  );
 }
 
