@@ -46,10 +46,12 @@ export const purchaseReturnsApi = apiSlice.injectEndpoints({
     }>({
       query: (params) => ({ url: '/purchase-returns', params }),
       providesTags: ['PurchaseReturn'],
+      transformResponse: (response: any) => response.data || response,
     }),
     getPurchaseReturn: builder.query<PurchaseReturn, string>({
       query: (id) => `/purchase-returns/${id}`,
       providesTags: ['PurchaseReturn'],
+      transformResponse: (response: any) => response.data || response,
     }),
     updatePurchaseReturn: builder.mutation<PurchaseReturn, { id: string; status?: string; settlementType?: string }>({
       query: ({ id, ...body }) => ({ url: `/purchase-returns/${id}`, method: 'PATCH', body }),

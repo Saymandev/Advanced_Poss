@@ -857,7 +857,23 @@ export class POSService {
         .limit(filters.limit || limit)
         .exec();
 
-      const standardizedPublic = publicOrders.map(order => {
+      // Filter out public orders that have already been promoted to POS orders
+      const publicOrderIds = publicOrders.map(o => o._id.toString());
+      let promotedIds = new Set<string>();
+      
+      if (publicOrderIds.length > 0) {
+        const promotedPOSOrders = await this.posOrderModel
+          .find({ externalOrderId: { $in: publicOrderIds } })
+          .select('externalOrderId')
+          .lean()
+          .exec();
+          
+        promotedIds = new Set(promotedPOSOrders.map(p => p.externalOrderId));
+      }
+
+      const unpromotedPublicOrders = publicOrders.filter(o => !promotedIds.has(o._id.toString()));
+
+      const standardizedPublic = unpromotedPublicOrders.map(order => {
         const obj = order.toObject();
         
         // Standardize status: If a public order is completed and fully paid, 
@@ -2771,6 +2787,7 @@ export class POSService {
                  publicOrder.type === 'takeaway' ? 'takeaway' : 'dine-in',
       items: posItems,
       tableId: publicOrder.tableId?.toString(),
+      customerId: publicOrder.customerId?.toString(),
       customerInfo,
       deliveryFee: publicOrder.deliveryFee || 0,
       subtotal: publicOrder.subtotal || 0,
