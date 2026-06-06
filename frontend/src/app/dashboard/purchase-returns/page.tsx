@@ -84,9 +84,13 @@ export default function PurchaseReturnsPage() {
     try { await updateReturn({ id, status: 'rejected' }).unwrap(); refetch(); } catch {}
   };
 
-  const statusBadge = (s: string) => {
+  const statusBadge = (s: string, settlementType?: string) => {
     const m: Record<string, string> = { pending: 'bg-yellow-100 text-yellow-700', approved: 'bg-blue-100 text-blue-700', settled: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700' };
-    return <Badge className={m[s] || ''}>{s}</Badge>;
+    let text = s;
+    if (s === 'settled' && settlementType) {
+      text = `Settled (${settlementType.replace('_', ' ')})`;
+    }
+    return <Badge className={m[s] || ''}>{text}</Badge>;
   };
 
   return (
@@ -116,7 +120,7 @@ export default function PurchaseReturnsPage() {
                       <span className="text-gray-500 ml-3">{r.items?.length || 0} items</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {statusBadge(r.status)}
+                      {statusBadge(r.status, r.settlementType)}
                       <span className="font-bold">{formatCurrency(r.totalAmount)}</span>
                       {r.status === 'pending' && (
                         <>
