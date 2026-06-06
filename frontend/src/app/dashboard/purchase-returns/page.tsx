@@ -141,7 +141,7 @@ export default function PurchaseReturnsPage() {
                   </div>
                   <div className="text-sm text-gray-600">
                     {r.items?.map((item: any, i: number) => (
-                      <span key={i} className="inline-block mr-3">{item.productName || item.productId} ×{item.quantity} ({item.reason})</span>
+                      <span key={i} className="inline-block mr-3">{item.productName || item.productId?.name || 'Unknown Item'} ×{item.quantity} ({item.reason})</span>
                     ))}
                   </div>
                   {r.supplierName && <div className="text-xs text-gray-400 mt-1">Supplier: {r.supplierName}</div>}
