@@ -93,14 +93,28 @@ export const useNotifications = (): UseNotificationsReturn => {
       if (exists) return;
     }
 
-    // Deduplicate by content within last 5 seconds
+    // Deduplicate by content or orderId within last 5 seconds
     const now = Date.now();
-    const duplicate = globalNotifications.find(n =>
-      n.title === notification.title &&
-      n.message === notification.message &&
-      n.type === notification.type &&
-      (now - n.timestamp.getTime()) < 5000
-    );
+    const duplicate = globalNotifications.find(n => {
+      const isRecent = (now - n.timestamp.getTime()) < 5000;
+      if (!isRecent) return false;
+      
+      // Deduplicate by exact match
+      if (n.title === notification.title && n.message === notification.message && n.type === notification.type) {
+        return true;
+      }
+      
+      // Deduplicate by orderId if both are order notifications
+      const hasOrderId = notification.data?.orderId || notification.data?.order?._id;
+      if (n.type === 'order' && notification.type === 'order' && hasOrderId) {
+        const existingOrderId = n.data?.orderId || n.data?.order?._id;
+        if (existingOrderId === hasOrderId) {
+          return true;
+        }
+      }
+      
+      return false;
+    });
     if (duplicate) return;
 
     const newNotification: Notification = {
