@@ -207,19 +207,23 @@ export class CustomersService {
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
-    // Find orders by customer email from POS orders
-    if (!customer.email) {
-      return {
-        orders: [],
-        total: customer.totalOrders || 0,
-      };
-    }
+    // No longer failing early on missing email, as we search by customerId now
     try {
+      const emailFilter = customer.email ? customer.email.toLowerCase().trim() : null;
+      
+      const queryFilter: any = {
+        $or: [
+          { customerId: customer._id }
+        ],
+        status: { $ne: 'cancelled' }
+      };
+
+      if (emailFilter) {
+        queryFilter.$or.push({ 'customerInfo.email': emailFilter });
+      }
+
       const orders = await this.posOrderModel
-        .find({
-          'customerInfo.email': customer.email.toLowerCase().trim(),
-          status: { $ne: 'cancelled' },
-        })
+        .find(queryFilter)
         .sort({ createdAt: -1 })
         .limit(50)
         .lean();

@@ -18,12 +18,14 @@ import {
     PencilIcon,
     PhoneIcon,
     PlusIcon,
+    PrinterIcon,
     StarIcon,
     TrashIcon,
     TrophyIcon,
     UserIcon,
     UsersIcon
 } from '@heroicons/react/24/outline';
+import { usePrintReceiptMutation } from '@/lib/api/endpoints/posApi';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -52,6 +54,19 @@ export default function CustomersPage() {
   const [loyaltyReason, setLoyaltyReason] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  
+  const [printReceipt] = usePrintReceiptMutation();
+
+  const handlePrintReceipt = async (orderId: string) => {
+    try {
+      const result = await printReceipt({ orderId }).unwrap();
+      toast.success(result.message);
+    } catch (error) {
+      console.error('Error printing receipt:', error);
+      toast.error('Failed to print receipt');
+    }
+  };
 
   const companyId = (user as any)?.companyId || 
                    (companyContext as any)?.companyId;
@@ -961,11 +976,32 @@ export default function CustomersPage() {
 
             {/* Orders */}
             <div>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Orders</h4>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Orders</h4>
+                {customerOrdersData && (customerOrdersData as any)?.orders?.length > 0 && (
+                  <Input
+                    placeholder="Search by order # or status"
+                    value={orderSearchQuery}
+                    onChange={(e) => setOrderSearchQuery(e.target.value)}
+                    className="w-48 h-8 text-xs"
+                  />
+                )}
+              </div>
               {customerOrdersData ? (
-                <div className="space-y-2">
-                  {(customerOrdersData as any)?.orders?.length > 0 ? (
-                    ((customerOrdersData as any).orders || []).slice(0, 5).map((order: any) => (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                  {(() => {
+                    const orders = (customerOrdersData as any).orders || [];
+                    const filtered = orders.filter((o: any) => 
+                      !orderSearchQuery || 
+                      (o.orderNumber || o.order_id || '').toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+                      (o.status || '').toLowerCase().includes(orderSearchQuery.toLowerCase())
+                    );
+                    
+                    if (filtered.length === 0) {
+                      return <p className="text-gray-500 dark:text-gray-400 text-center py-4">No orders match your search</p>;
+                    }
+                    
+                    return filtered.map((order: any) => (
                       <div key={order.id || order._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                         <div>
                           <p className="font-medium text-gray-900 dark:text-white">
@@ -975,15 +1011,24 @@ export default function CustomersPage() {
                             {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(order.totalAmount || order.total || 0)}</p>
-                          <Badge variant="secondary">{order.status || 'N/A'}</Badge>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(order.totalAmount || order.total || 0)}</p>
+                            <Badge variant="secondary">{order.status || 'N/A'}</Badge>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            onClick={() => handlePrintReceipt(order.id || order._id)} 
+                            className="h-8 w-8 p-0 rounded-lg bg-slate-100 hover:bg-sky-500 hover:text-white text-slate-600 transition-colors border-none"
+                            title="Print Receipt"
+                          >
+                            <PrinterIcon className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 dark:text-gray-400 text-center py-4">No orders yet</p>
-                  )}
+                    ));
+                  })()}
                 </div>
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-4">Loading orders...</p>
