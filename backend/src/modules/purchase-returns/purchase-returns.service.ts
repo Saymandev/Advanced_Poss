@@ -64,7 +64,12 @@ export class PurchaseReturnsService {
       this.model.countDocuments(query),
     ]);
 
-    return { returns: returns as any, total };
+    const normalizedReturns = returns.map((r: any) => ({
+      ...r,
+      id: r._id.toString(),
+    }));
+
+    return { returns: normalizedReturns as any, total };
   }
 
   async findOne(id: string): Promise<PurchaseReturn> {
