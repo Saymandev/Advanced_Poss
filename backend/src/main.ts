@@ -13,6 +13,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { EncryptionInterceptor } from './common/interceptors/encryption.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 // import { WinstonLogger } from './common/logger/winston.logger';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -97,6 +98,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new EncryptionInterceptor(app.get(ConfigService)));
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalInterceptors(new LoggingInterceptor());
+  app.useGlobalInterceptors(new TenantInterceptor());
   // Swagger documentation (Disabled in production for security)
   if (configService.get('nodeEnv') !== 'production') {
     const swaggerConfig = new DocumentBuilder()
