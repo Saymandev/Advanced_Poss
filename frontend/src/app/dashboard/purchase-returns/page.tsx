@@ -70,7 +70,7 @@ export default function PurchaseReturnsPage() {
     
     setForm({
       ...form,
-      items: [...form.items, { ...newItem, productName: poItem?.ingredientName || 'Unknown Item', productId: newItem.productId, unitCost: finalUnitCost }],
+      items: [...form.items, { ...newItem, productName: poItem?.ingredient?.name || 'Unknown Item', productId: newItem.productId, unitCost: finalUnitCost }],
     });
     setNewItem({ productId: '', quantity: 1, unitCost: 0, reason: 'damaged', notes: '' });
   };
@@ -229,7 +229,7 @@ export default function PurchaseReturnsPage() {
               disabled={!form.purchaseOrderId}
               options={[
                 { value: '', label: form.purchaseOrderId ? 'Select item from PO...' : 'Select PO first...' },
-                ...(purchaseOrders.find((po: any) => po.id === form.purchaseOrderId)?.items?.map((i: any) => ({ value: i.ingredientId, label: `${i.ingredientName} (Bought: ${i.quantity})` })) || [])
+                ...(purchaseOrders.find((po: any) => po.id === form.purchaseOrderId)?.items?.map((i: any) => ({ value: i.ingredientId, label: `${i.ingredient?.name || 'Unknown Item'} (Bought: ${i.quantity})` })) || [])
               ]} 
               className="col-span-2" />
               <Input type="number" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 0 })} min={1} placeholder="Qty" />
