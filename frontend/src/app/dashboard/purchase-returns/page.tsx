@@ -28,6 +28,8 @@ export default function PurchaseReturnsPage() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('pending');
+  const [poSupplierFilter, setPoSupplierFilter] = useState('');
+  const [poDateFilter, setPoDateFilter] = useState('');
 
   const { data, isLoading, refetch } = useGetPurchaseReturnsQuery(
     { companyId, branchId, status: statusFilter || undefined },
@@ -41,7 +43,14 @@ export default function PurchaseReturnsPage() {
   const { data: suppliersData } = useGetSuppliersQuery({ companyId }, { skip: !companyId });
   const suppliers = useMemo(() => (suppliersData as any)?.suppliers || [], [suppliersData]);
 
-  const { data: ordersData } = useGetPurchaseOrdersQuery({ companyId, branchId, status: 'received' }, { skip: !companyId });
+  const { data: ordersData, isFetching: isFetchingOrders } = useGetPurchaseOrdersQuery({ 
+    companyId, 
+    branchId, 
+    status: 'received',
+    supplierId: poSupplierFilter || undefined,
+    startDate: poDateFilter ? `${poDateFilter}T00:00:00.000Z` : undefined,
+    endDate: poDateFilter ? `${poDateFilter}T23:59:59.999Z` : undefined,
+  }, { skip: !companyId });
   const purchaseOrders = useMemo(() => (ordersData as any)?.orders || [], [ordersData]);
 
   const [createReturn] = useCreatePurchaseReturnMutation();
@@ -53,11 +62,15 @@ export default function PurchaseReturnsPage() {
 
   const addItem = () => {
     if (!newItem.productId || newItem.quantity < 1) return;
-    const product = products.find((p: any) => p.id === newItem.productId);
-    const finalUnitCost = newItem.unitCost > 0 ? newItem.unitCost : ((product as any)?.cost || product?.price || 0);
+    
+    const selectedPo = purchaseOrders.find((po: any) => po.id === form.purchaseOrderId);
+    const poItem = selectedPo?.items?.find((i: any) => i.ingredientId === newItem.productId);
+    
+    const finalUnitCost = newItem.unitCost > 0 ? newItem.unitCost : (poItem?.unitPrice || 0);
+    
     setForm({
       ...form,
-      items: [...form.items, { ...newItem, productName: product?.name || '', productId: newItem.productId, unitCost: finalUnitCost }],
+      items: [...form.items, { ...newItem, productName: poItem?.ingredientName || 'Unknown Item', productId: newItem.productId, unitCost: finalUnitCost }],
     });
     setNewItem({ productId: '', quantity: 1, unitCost: 0, reason: 'damaged', notes: '' });
   };
@@ -140,9 +153,12 @@ export default function PurchaseReturnsPage() {
                     </div>
                   </div>
                   <div className="text-sm text-gray-600">
-                    {r.items?.map((item: any, i: number) => (
-                      <span key={i} className="inline-block mr-3">{item.productName || item.productId?.name || 'Unknown Item'} ×{item.quantity} ({item.reason})</span>
-                    ))}
+                    {r.items?.map((item: any, i: number) => {
+                      const itemName = item.productName || (item.productId && typeof item.productId === 'object' ? item.productId.name : 'Unknown Item');
+                      return (
+                        <span key={i} className="inline-block mr-3">{itemName} ×{item.quantity} ({item.reason})</span>
+                      );
+                    })}
                   </div>
                   {r.supplierName && <div className="text-xs text-gray-400 mt-1">Supplier: {r.supplierName}</div>}
                 </div>
@@ -154,6 +170,27 @@ export default function PurchaseReturnsPage() {
 
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create Purchase Return" size="lg">
         <div className="space-y-4">
+          <div className="bg-gray-50 p-3 rounded-lg grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold mb-1 text-gray-600">Filter Dealer/Supplier</label>
+              <Select
+                value={poSupplierFilter}
+                onChange={setPoSupplierFilter}
+                options={[
+                  { value: '', label: 'All Suppliers' },
+                  ...suppliers.map((s: any) => ({ value: s.id, label: s.name }))
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1 text-gray-600">Filter Date</label>
+              <Input
+                type="date"
+                value={poDateFilter}
+                onChange={(e) => setPoDateFilter(e.target.value)}
+              />
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold mb-1 text-red-500">Purchase Order *</label>
@@ -163,7 +200,7 @@ export default function PurchaseReturnsPage() {
                   const po: any = purchaseOrders.find((x: any) => x.id === v); 
                   setForm({ ...form, purchaseOrderId: v, supplierId: po?.supplierId || '', supplierName: po?.supplier?.name || '', items: [] }); 
                 }} 
-                options={[{ value: '', label: 'Select PO' }, ...purchaseOrders.map((po: any) => ({ value: po.id, label: `${po.orderNumber} - ${po.supplier?.name}` }))]} 
+                options={[{ value: '', label: 'Select PO' }, ...purchaseOrders.map((po: any) => ({ value: po.id, label: `${po.orderNumber} - ${po.supplier?.name} (${new Date(po.orderDate || po.createdAt).toLocaleDateString()})` }))]} 
               />
             </div>
             <div>
@@ -202,7 +239,7 @@ export default function PurchaseReturnsPage() {
             </div>
             {form.items.map((item: any, i: number) => (
               <div key={i} className="flex items-center gap-2 text-sm py-1 border-b last:border-0">
-                <span className="flex-1">{item.productName}</span>
+                <span className="flex-1">{item.productName || 'Unknown Item'}</span>
                 <span className="w-16 text-center">×{item.quantity}</span>
                 <span className="w-20 text-center">{formatCurrency(item.unitCost)}</span>
                 <Badge className="text-[10px]">{item.reason}</Badge>
