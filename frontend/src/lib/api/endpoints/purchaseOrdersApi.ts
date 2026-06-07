@@ -300,7 +300,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: ['PurchaseOrder', 'Ingredient', 'MenuItem', 'POS'],
+      invalidatesTags: ['PurchaseOrder', 'Ingredient', 'MenuItem', 'POS', 'Supplier', 'Transactions'],
     }),
     cancelPurchaseOrder: builder.mutation<PurchaseOrder, { id: string; reason: string }>({
       query: ({ id, reason }) => ({
@@ -308,7 +308,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: { reason },
       }),
-      invalidatesTags: ['PurchaseOrder'],
+      invalidatesTags: ['PurchaseOrder', 'Supplier'],
     }),
   }),
 });

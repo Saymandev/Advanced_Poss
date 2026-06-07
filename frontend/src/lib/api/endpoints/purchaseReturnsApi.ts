@@ -55,7 +55,7 @@ export const purchaseReturnsApi = apiSlice.injectEndpoints({
     }),
     updatePurchaseReturn: builder.mutation<PurchaseReturn, { id: string; status?: string; settlementType?: string }>({
       query: ({ id, ...body }) => ({ url: `/purchase-returns/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['PurchaseReturn'],
+      invalidatesTags: ['PurchaseReturn', 'Supplier', 'Ingredient', 'Income'],
     }),
     deletePurchaseReturn: builder.mutation<void, string>({
       query: (id) => ({ url: `/purchase-returns/${id}`, method: 'DELETE' }),
