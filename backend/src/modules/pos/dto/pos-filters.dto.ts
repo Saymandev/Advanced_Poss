@@ -4,6 +4,10 @@ import { IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validato
 export class POSOrderFiltersDto {
   @IsOptional()
   @IsString()
+  companyId?: string;
+
+  @IsOptional()
+  @IsString()
   branchId?: string;
 
   @IsOptional()
@@ -41,6 +45,10 @@ export class POSOrderFiltersDto {
 }
 
 export class POSStatsFiltersDto {
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
   @IsOptional()
   @IsString()
   branchId?: string;

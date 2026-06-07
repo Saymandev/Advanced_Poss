@@ -3,6 +3,10 @@ import { IsBoolean, IsDateString, IsNumber, IsOptional, IsString } from 'class-v
 
 export class PaginationDto {
   @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsNumber()
   page?: number = 1;

@@ -5,6 +5,11 @@ export class DigitalReceiptFilterDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  companyId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   branchId?: string;
 
   @ApiPropertyOptional()

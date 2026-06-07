@@ -4,6 +4,10 @@ import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, Max, Min } from '
 export class ScheduleFiltersDto {
   @IsOptional()
   @IsString()
+  companyId?: string;
+
+  @IsOptional()
+  @IsString()
   branchId?: string;
 
   @IsOptional()

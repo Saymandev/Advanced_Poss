@@ -5,6 +5,10 @@ import { WastageReason } from '../schemas/wastage.schema';
 export class WastageQueryDto {
   @IsOptional()
   @IsString()
+  companyId?: string;
+
+  @IsOptional()
+  @IsString()
   branchId?: string;
 
   @IsOptional()
