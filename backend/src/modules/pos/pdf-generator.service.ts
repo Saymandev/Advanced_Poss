@@ -143,10 +143,16 @@ export class PDFGeneratorService {
       throw new Error('Puppeteer not available. Please install puppeteer package.');
     }
 
-    const browser = await this.puppeteer.launch({
+    const launchOptions: any = {
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    };
+    
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
+    const browser = await this.puppeteer.launch(launchOptions);
 
     try {
       const page = await browser.newPage();
