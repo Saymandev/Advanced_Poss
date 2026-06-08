@@ -200,7 +200,7 @@ const navigation: NavigationItem[] = [
     requiredFeature: ['inventory', 'suppliers', 'purchase-orders', 'wastage-management'], // Show if user has ANY
     children: [
       {
-        name: 'Ingredients',
+        name: 'Items',
         href: '/dashboard/ingredients',
         icon: BeakerIcon,
         requiredFeature: 'inventory',
