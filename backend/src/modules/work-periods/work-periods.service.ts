@@ -349,8 +349,14 @@ export class WorkPeriodsService {
       category: TransactionCategory.EXPENSE,
     }).populate('paymentMethodId', 'name code').lean();
 
+    const purchases = await this.transactionModel.find({
+      workPeriodId: new Types.ObjectId(workPeriodId),
+      category: TransactionCategory.PURCHASE,
+    }).populate('paymentMethodId', 'name code').lean();
+
     const manualIncomeTotal = manualIncomes.reduce((sum, trx) => sum + (trx.amount || 0), 0);
     const manualExpenseTotal = manualExpenses.reduce((sum, trx) => sum + (trx.amount || 0), 0);
+    const purchaseTotal = purchases.reduce((sum, trx) => sum + (trx.amount || 0), 0);
 
     // Add manual incomes to payment method balances
     manualIncomes.forEach((txn) => {
@@ -367,6 +373,19 @@ export class WorkPeriodsService {
 
     // Subtract manual expenses from payment method balances
     manualExpenses.forEach((txn) => {
+      const amount = Number(txn.amount);
+      const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
+      
+      if (!paymentMethods[pmCode]) {
+        paymentMethods[pmCode] = { count: 0, amount: 0 };
+      }
+      paymentMethods[pmCode].count += 1;
+      paymentMethods[pmCode].amount -= amount;
+      totalByPaymentMethod[pmCode] = (totalByPaymentMethod[pmCode] || 0) - amount;
+    });
+
+    // Subtract purchases from payment method balances
+    purchases.forEach((txn) => {
       const amount = Number(txn.amount);
       const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
       
@@ -412,7 +431,8 @@ export class WorkPeriodsService {
       refundTotal,
       manualIncomeTotal,
       manualExpenseTotal,
-      netSales: (grossSales + hotelRevenue + manualIncomeTotal) - (refundTotal + manualExpenseTotal),
+      purchaseTotal,
+      netSales: (grossSales + hotelRevenue + manualIncomeTotal) - (refundTotal + manualExpenseTotal + purchaseTotal),
       subtotal,
       vatTotal,
       serviceCharge,
@@ -631,6 +651,10 @@ export class WorkPeriodsService {
           <div class="summary-card">
             <div class="summary-value">${formatCurrency(summary.manualExpenseTotal || 0)}</div>
             <div class="summary-label">Manual Expenses</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-value">${formatCurrency(summary.purchaseTotal || 0)}</div>
+            <div class="summary-label">Purchases</div>
           </div>
         </div>
         
