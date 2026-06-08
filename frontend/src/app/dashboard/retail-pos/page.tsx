@@ -203,7 +203,7 @@ export default function RetailPOSPage() {
       const matchSearch = !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchBarcode = !barcodeInput || p.barcode === barcodeInput;
       const matchCategory = selectedCategory === 'all' || p.category === selectedCategory;
-      return (matchSearch || matchBarcode) && matchCategory;
+      return matchSearch && matchBarcode && matchCategory;
     });
   }, [products, searchQuery, selectedCategory, barcodeInput]);
 
@@ -222,6 +222,80 @@ export default function RetailPOSPage() {
   }, [barcodeInput]);
 
   // Cart with localStorage persistence
+  
+    const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const [quantityModalProduct, setQuantityModalProduct] = useState<any>(null);
+  const [quantityInputVal, setQuantityInputVal] = useState<string>('1');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const quantityInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isPaymentOpen || quantityModalProduct || isQueueOpen) return;
+      if (
+        document.activeElement?.tagName === 'INPUT' && 
+        document.activeElement !== searchInputRef.current && 
+        document.activeElement?.id !== 'barcode-scanner'
+      ) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => Math.min(prev + 1, filteredProducts.length - 1));
+        // Auto scroll
+        const selectedEl = document.getElementById('product-item-' + (Math.min(selectedIndex + 1, filteredProducts.length - 1)));
+        selectedEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => Math.max(prev - 1, -1));
+        const selectedEl = document.getElementById('product-item-' + (Math.max(selectedIndex - 1, -1)));
+        selectedEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        if (selectedIndex >= 0 && selectedIndex < filteredProducts.length) {
+          e.preventDefault();
+          handleProductClick(filteredProducts[selectedIndex]);
+        }
+      } else if (e.key === 'Escape') {
+        setSelectedIndex(-1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [filteredProducts, selectedIndex, isPaymentOpen, quantityModalProduct, isQueueOpen]);
+
+  useEffect(() => {
+    if (quantityModalProduct) {
+      setTimeout(() => quantityInputRef.current?.focus(), 50);
+    } else {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [quantityModalProduct]);
+
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [searchQuery, selectedCategory]);
+
+  const handleProductClick = (product: any) => {
+    if (product.trackInventory && (product.stock === undefined || product.stock <= 0)) {
+      toast.error(`${product.name} is out of stock!`);
+      return;
+    }
+    setQuantityModalProduct(product);
+    setQuantityInputVal('1');
+  };
+
+  const handleQuantitySubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!quantityModalProduct) return;
+    const qty = parseFloat(quantityInputVal);
+    if (isNaN(qty) || qty <= 0) {
+      toast.error('Invalid quantity');
+      return;
+    }
+    addToCart(quantityModalProduct, qty);
+    setQuantityModalProduct(null);
+  };
+
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -238,7 +312,7 @@ export default function RetailPOSPage() {
     }
   }, [cart]);
 
-  const addToCart = (product: any) => {
+  const addToCart = (product: any, qtyToAdd: number = 1) => {
     // Prevent adding to cart if item tracks inventory and stock is 0 or less
     if (product.trackInventory && (product.stock === undefined || product.stock <= 0)) {
       toast.error(`${product.name} is out of stock!`);
@@ -256,7 +330,7 @@ export default function RetailPOSPage() {
 
         return prev.map(item =>
           item.menuItemId === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + qtyToAdd }
             : item
         );
       }
@@ -265,7 +339,7 @@ export default function RetailPOSPage() {
         menuItemId: product.id,
         name: product.name,
         price: product.price,
-        quantity: 1,
+        quantity: qtyToAdd,
         category: product.category,
         barcode: product.barcode,
         weightBased: product.weightBased,
@@ -407,7 +481,6 @@ export default function RetailPOSPage() {
   }, [customerSearch]);
 
   // Payment
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountReceived, setAmountReceived] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -684,6 +757,7 @@ export default function RetailPOSPage() {
             <Input
               value={barcodeInput}
               onChange={(e) => setBarcodeInput(e.target.value)}
+              id="barcode-scanner"
               placeholder="Scan barcode..."
               className="h-8 w-48 text-sm font-mono bg-transparent border-none focus:ring-0"
               autoFocus
@@ -759,7 +833,7 @@ export default function RetailPOSPage() {
             </div>
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {filteredProducts.map(product => {
+              {filteredProducts.map((product, idx) => {
                 const cartQty = cart.find(item => item.menuItemId === product.id)?.quantity || 0;
                 return (
                 <button
@@ -1266,6 +1340,40 @@ export default function RetailPOSPage() {
             </button>
           </div>
         </div>
+      </Modal>
+
+    
+      {/* Quantity Fast Input Modal */}
+      <Modal
+        isOpen={!!quantityModalProduct}
+        onClose={() => setQuantityModalProduct(null)}
+        title={`Add ${quantityModalProduct?.name}`}
+      >
+        <form onSubmit={handleQuantitySubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Quantity (${quantityModalProduct?.unitType || 'pieces'})
+            </label>
+            <Input
+              ref={quantityInputRef}
+              type="number"
+              step={quantityModalProduct?.weightBased ? "0.001" : "1"}
+              min="0.001"
+              value={quantityInputVal}
+              onChange={(e) => setQuantityInputVal(e.target.value)}
+              className="text-lg font-bold"
+              required
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button type="button" variant="secondary" onClick={() => setQuantityModalProduct(null)}>
+              Cancel (Esc)
+            </Button>
+            <Button type="submit">
+              Add to Cart (Enter)
+            </Button>
+          </div>
+        </form>
       </Modal>
 
     </div>

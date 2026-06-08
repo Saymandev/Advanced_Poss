@@ -3341,7 +3341,7 @@ export default function POSPage() {
           </div>
         ) : filteredMenuItems.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-            {filteredMenuItems.map((item) => {
+            {filteredMenuItems.map((item, idx) => {
               const outOfStock = item.isOutOfStock || (item.trackInventory && item.stock != null && item.stock <= 0);
               const lowStock = !outOfStock && (item.isLowStock || (item.trackInventory && item.stock != null && item.stock > 0 && item.stock < 5));
               
