@@ -274,12 +274,13 @@ export interface PrefetchContext {
   branchId: string;
   companyId: string;
   forceRefresh?: boolean;
+  mode?: 'restaurant' | 'retail';
   onProgress?: (result: PrefetchResult) => void;
 }
 
 export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSummary> => {
   const startedAt = Date.now();
-  const { branchId, companyId, forceRefresh = false, onProgress } = ctx;
+  const { branchId, companyId, forceRefresh = false, mode = 'restaurant', onProgress } = ctx;
 
   
 
@@ -315,26 +316,30 @@ export const runPOSPrefetch = async (ctx: PrefetchContext): Promise<PrefetchSumm
     return result;
   };
 
-  const results = await Promise.allSettled([
+  const fetchers = [
     runFetcher(SNAPSHOT_KEYS.MENU_ITEMS, TTL.MENU_ITEMS, () => fetchMenuItems(branchId, companyId)),
     runFetcher(SNAPSHOT_KEYS.CATEGORIES, TTL.CATEGORIES, () => fetchCategories(branchId, companyId)),
     runFetcher(SNAPSHOT_KEYS.PAYMENT_METHODS, TTL.PAYMENT_METHODS, () => fetchPaymentMethods(companyId, branchId)),
     runFetcher(SNAPSHOT_KEYS.STAFF, TTL.STAFF, () => fetchStaff(companyId, branchId)),
-    runFetcher(SNAPSHOT_KEYS.TABLES, TTL.TABLES, () => fetchTables(branchId, companyId)),
     runFetcher(SNAPSHOT_KEYS.POS_SETTINGS, TTL.POS_SETTINGS, () => fetchPOSSettings(branchId)),
-    runFetcher(SNAPSHOT_KEYS.DELIVERY_ZONES, TTL.DELIVERY_ZONES, () => fetchDeliveryZones(branchId)),
     runFetcher(SNAPSHOT_KEYS.CUSTOMERS, TTL.CUSTOMERS, () => fetchCustomers(companyId, branchId)),
     runFetcher(SNAPSHOT_KEYS.COMPANY_SETTINGS, TTL.GENERIC, () => fetchCompanySettings(companyId)),
     runFetcher(SNAPSHOT_KEYS.COMPANY_INFO, TTL.GENERIC, () => fetchCompanyInfo(companyId)),
     runFetcher(SNAPSHOT_KEYS.ORDERS, TTL.TABLES, () => fetchPOSOrders(branchId)),
-    runFetcher(SNAPSHOT_KEYS.BOOKINGS, TTL.TABLES, () => fetchBookings(branchId)),
-    runFetcher(SNAPSHOT_KEYS.ROOMS, TTL.TABLES, () => fetchRooms(branchId)),
-  ]);
+  ];
 
-  const finalResults: PrefetchResult[] = results.map((r, i) => {
-    const keys = Object.values(SNAPSHOT_KEYS);
+  if (mode !== 'retail') {
+    fetchers.push(runFetcher(SNAPSHOT_KEYS.TABLES, TTL.TABLES, () => fetchTables(branchId, companyId)));
+    fetchers.push(runFetcher(SNAPSHOT_KEYS.DELIVERY_ZONES, TTL.DELIVERY_ZONES, () => fetchDeliveryZones(branchId)));
+    fetchers.push(runFetcher(SNAPSHOT_KEYS.BOOKINGS, TTL.TABLES, () => fetchBookings(branchId)));
+    fetchers.push(runFetcher(SNAPSHOT_KEYS.ROOMS, TTL.TABLES, () => fetchRooms(branchId)));
+  }
+
+  const results = await Promise.allSettled(fetchers);
+
+  const finalResults: PrefetchResult[] = results.map((r) => {
     if (r.status === 'fulfilled') return r.value;
-    return { key: keys[i] as SnapshotKey, success: false, error: (r.reason as Error)?.message };
+    return { key: 'error' as any, success: false, error: (r.reason as Error)?.message };
   });
 
   return {

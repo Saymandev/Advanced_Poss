@@ -18,6 +18,7 @@ const OFFLINE_SNAPSHOT_MAP: Array<{ match: string; key: string }> = [
   { match: '/delivery-zones',         key: SNAPSHOT_KEYS.DELIVERY_ZONES },
   { match: '/settings/company',       key: SNAPSHOT_KEYS.COMPANY_SETTINGS },
   { match: '/companies/',             key: SNAPSHOT_KEYS.COMPANY_INFO },
+  { match: '/customers',              key: SNAPSHOT_KEYS.CUSTOMERS },
   { match: '/pos/orders',             key: SNAPSHOT_KEYS.ORDERS },
   { match: '/bookings',               key: SNAPSHOT_KEYS.BOOKINGS },
   { match: '/rooms',                  key: SNAPSHOT_KEYS.ROOMS },

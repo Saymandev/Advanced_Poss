@@ -79,7 +79,7 @@ export default function RetailPOSPage() {
     lastSyncedAt,
     syncErrors,
     syncNow,
-  } = usePOSOfflinePrefetcher();
+  } = usePOSOfflinePrefetcher('retail');
 
   const isOwner = user?.role === 'owner' || user?.role === 'super_admin';
 

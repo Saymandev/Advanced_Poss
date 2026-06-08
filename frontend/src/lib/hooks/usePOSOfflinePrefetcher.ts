@@ -12,7 +12,7 @@ export interface POSOfflineState {
   syncNow: (forceRefresh?: boolean) => Promise<void>; // Manual trigger
 }
 
-export const usePOSOfflinePrefetcher = (): POSOfflineState => {
+export const usePOSOfflinePrefetcher = (mode: 'restaurant' | 'retail' = 'restaurant'): POSOfflineState => {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const [isOfflineReady, setIsOfflineReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -58,6 +58,7 @@ export const usePOSOfflinePrefetcher = (): POSOfflineState => {
         branchId,
         companyId,
         forceRefresh,
+        mode,
         onProgress: (result: PrefetchResult) => {
           if (!result.success) {
             setSyncErrors(prev => [...prev, `${result.key}: ${result.error}`]);
@@ -81,7 +82,7 @@ export const usePOSOfflinePrefetcher = (): POSOfflineState => {
     } finally {
       setIsSyncing(false);
     }
-  }, [branchId, companyId, isSyncing, isOfflineReady]);
+  }, [branchId, companyId, isSyncing, isOfflineReady, mode]);
 
   // On mount: check existing snapshot, then trigger a background sync if needed
   useEffect(() => {
