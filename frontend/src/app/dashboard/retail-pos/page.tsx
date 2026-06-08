@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
+import { useOfflineSyncManager } from '@/lib/hooks/useOfflineSyncManager';
+import { usePOSOfflinePrefetcher } from '@/lib/hooks/usePOSOfflinePrefetcher';
 import {
   posApi,
   useCancelPOSOrderMutation,
@@ -24,6 +27,7 @@ import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMe
 import { useAppSelector } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
 import {
+  ArrowPathIcon,
   CheckIcon,
   CreditCardIcon,
   CurrencyDollarIcon,
@@ -67,6 +71,15 @@ interface PaymentState {
 export default function RetailPOSPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const formatCurrency = useFormatCurrency();
+
+  const { isOnline, pendingCount, syncOrders } = useOfflineSyncManager();
+  const {
+    isOfflineReady,
+    isSyncing: isPrefetchSyncing,
+    lastSyncedAt,
+    syncErrors,
+    syncNow,
+  } = usePOSOfflinePrefetcher();
 
   const isOwner = user?.role === 'owner' || user?.role === 'super_admin';
 
@@ -656,6 +669,14 @@ export default function RetailPOSPage() {
     )}>
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        <OfflineBanner
+          isOfflineReady={isOfflineReady}
+          isSyncing={isPrefetchSyncing}
+          lastSyncedAt={lastSyncedAt}
+          pendingCount={pendingCount}
+          syncErrors={syncErrors}
+          onSyncNow={() => { syncNow(true); syncOrders(); }}
+        />
         {/* Top bar */}
         <div className="relative bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 px-4 py-2 flex items-center gap-3 z-20">
           <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 h-9 border border-amber-200 dark:border-amber-800">
@@ -708,9 +729,24 @@ export default function RetailPOSPage() {
             </select>
           </div>
 
-          <span className="text-xs text-gray-400 ml-auto">
-            {products.length} products
-          </span>
+          <div className="flex items-center gap-3 ml-auto">
+            <span className="text-xs text-gray-400">
+              {products.length} products
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => { syncNow(true); syncOrders(); }}
+              disabled={isPrefetchSyncing}
+              className={cn(
+                "h-9 w-9 p-0 rounded-lg border-none bg-gray-50 dark:bg-slate-900 text-slate-500 border border-gray-200 dark:border-slate-800",
+                isPrefetchSyncing && "animate-spin text-sky-500"
+              )}
+              title="Sync Data"
+            >
+              <ArrowPathIcon className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Product grid */}
