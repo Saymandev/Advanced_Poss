@@ -68,6 +68,13 @@ export class Company {
   })
   businessType: string;
 
+  // Sub-category or industry type
+  @Prop({
+    type: String,
+    default: '',
+  })
+  industryType: string;
+
   // Subscription
   @Prop({
     type: String,

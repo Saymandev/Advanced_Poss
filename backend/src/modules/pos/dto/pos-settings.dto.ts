@@ -52,9 +52,9 @@ export class PrinterSettingsDto {
   @IsBoolean()
   enabled: boolean;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  printerId: string;
+  printerId?: string;
 
   @IsNotEmpty()
   @IsBoolean()

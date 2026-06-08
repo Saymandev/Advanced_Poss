@@ -65,7 +65,8 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     // Company Info
     companyName: '',
-    businessType: '',
+    businessType: 'restaurant',
+    businessCategory: 'cafe',
     companyEmail: '',
     companyPhone: '',
     country: 'BD',
@@ -173,7 +174,7 @@ export default function RegisterPage() {
     try {
       const response = await registerCompanyOwner({
         companyName: formData.companyName,
-        companyType: formData.businessType,
+        companyType: formData.businessCategory || formData.businessType,
         companyEmail: formData.companyEmail,
         country: formData.country,
         branchName: formData.branchName,
@@ -657,13 +658,9 @@ export default function RegisterPage() {
                     label={
                       <span className="text-sm text-gray-300">
                         I agree to the{' '}
-                        <a href="#" className="text-primary-400 hover:text-primary-300">
-                          Terms and Conditions
-                        </a>
+                        <Link href="/terms" className="text-primary-400 hover:text-primary-300">Terms and Conditions</Link>
                         {' '}and{' '}
-                        <a href="#" className="text-primary-400 hover:text-primary-300">
-                          Privacy Policy
-                        </a>
+                        <Link href="/privacy" className="text-primary-400 hover:text-primary-300">Privacy Policy</Link>
                       </span>
                     }
                   />

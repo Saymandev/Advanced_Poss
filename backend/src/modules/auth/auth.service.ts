@@ -485,6 +485,7 @@ export class AuthService {
       phone: phoneNumber,
       subscriptionPlan: subscriptionPackage,
       businessType,
+      industryType: companyType,
       address: {
         street: streetAddress,
         city: cityAddress,
