@@ -911,10 +911,7 @@ export default function WorkPeriodsPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    // Print functionality
-                    window.print();
-                  }}
+                  onClick={() => handlePrintReport(selectedWorkPeriod.id)}
                   className="flex items-center gap-2"
                 >
                   <PrinterIcon className="w-4 h-4" />
