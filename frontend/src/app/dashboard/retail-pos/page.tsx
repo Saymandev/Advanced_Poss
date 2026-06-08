@@ -371,8 +371,6 @@ export default function RetailPOSPage() {
   };
 
   const cartSubtotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.quantity, 0), [cart]);
-  const cartTax = useMemo(() => (cartSubtotal * taxRate) / 100, [cartSubtotal, taxRate]);
-  const cartServiceCharge = useMemo(() => (cartSubtotal * serviceChargeRate) / 100, [cartSubtotal, serviceChargeRate]);
 
   // Discount state
   const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'flat'>('none');
@@ -433,9 +431,13 @@ export default function RetailPOSPage() {
     return 0;
   }, [discountType, discountValue, cartSubtotal]);
 
+  const taxableSubtotal = Math.max(cartSubtotal - discountAmount - loyaltyDiscount, 0);
+  const cartTax = useMemo(() => (taxableSubtotal * taxRate) / 100, [taxableSubtotal, taxRate]);
+  const cartServiceCharge = useMemo(() => (taxableSubtotal * serviceChargeRate) / 100, [taxableSubtotal, serviceChargeRate]);
+
   const cartTotal = useMemo(
-    () => Math.max(0, cartSubtotal + cartTax + cartServiceCharge - discountAmount - loyaltyDiscount),
-    [cartSubtotal, cartTax, cartServiceCharge, discountAmount, loyaltyDiscount],
+    () => Math.max(0, taxableSubtotal + cartTax + cartServiceCharge),
+    [taxableSubtotal, cartTax, cartServiceCharge],
   );
 
   const clearCart = () => {
