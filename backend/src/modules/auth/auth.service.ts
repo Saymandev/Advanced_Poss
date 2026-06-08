@@ -475,7 +475,8 @@ export class AuthService {
     }
 
     // Map companyType to businessType (drives feature set)
-    const businessType = companyType === 'retail' ? 'retail' : 'restaurant';
+    const retailTypes = ['retail', 'grocery', 'clothing', 'electronics', 'other_retail'];
+    const businessType = retailTypes.includes(companyType) ? 'retail' : 'restaurant';
 
     // Create company first (without ownerId initially)
     const company = await this.companiesService.create({

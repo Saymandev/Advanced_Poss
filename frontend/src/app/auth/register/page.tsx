@@ -43,6 +43,7 @@ export default function RegisterPage() {
   const { data: plansData, isLoading: isLoadingPlans } = useGetSubscriptionPlansQuery({});
   const [step, setStep] = useState(1);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [industryType, setIndustryType] = useState<'restaurant' | 'retail' | null>(null);
   
   // Get available plans from API - handle both array and object responses
   const plans = (() => {
@@ -64,7 +65,7 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     // Company Info
     companyName: '',
-    businessType: 'restaurant',
+    businessType: '',
     companyEmail: '',
     companyPhone: '',
     country: 'BD',

@@ -7,8 +7,12 @@ export enum CompanyType {
   BAKERY = 'bakery',
   BAR = 'bar',
   FOOD_TRUCK = 'food_truck',
-  RETAIL = 'retail',
   OTHER = 'other',
+  RETAIL = 'retail',
+  GROCERY = 'grocery',
+  CLOTHING = 'clothing',
+  ELECTRONICS = 'electronics',
+  OTHER_RETAIL = 'other_retail',
 }
 
 export enum SubscriptionPackage {
