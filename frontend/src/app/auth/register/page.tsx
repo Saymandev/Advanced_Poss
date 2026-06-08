@@ -334,17 +334,81 @@ export default function RegisterPage() {
                     />
                   </div>
 
+                  <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                    <label
+                      className={`cursor-pointer p-4 border rounded-xl flex items-center gap-3 transition-colors ${
+                        formData.businessType === 'restaurant'
+                          ? 'border-primary-500 bg-primary-500/10'
+                          : 'border-gray-700 bg-gray-900/50 hover:bg-gray-800'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="businessType"
+                        value="restaurant"
+                        checked={formData.businessType === 'restaurant'}
+                        onChange={(e) => {
+                          handleChange(e);
+                          setFormData(prev => ({...prev, businessCategory: 'cafe'}));
+                        }}
+                        className="hidden"
+                      />
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${formData.businessType === 'restaurant' ? 'border-primary-500' : 'border-gray-600'}`}>
+                        {formData.businessType === 'restaurant' && <div className="w-3 h-3 rounded-full bg-primary-500" />}
+                      </div>
+                      <span className="text-white font-medium">Restaurant POS</span>
+                    </label>
+                    <label
+                      className={`cursor-pointer p-4 border rounded-xl flex items-center gap-3 transition-colors ${
+                        formData.businessType === 'retail'
+                          ? 'border-primary-500 bg-primary-500/10'
+                          : 'border-gray-700 bg-gray-900/50 hover:bg-gray-800'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="businessType"
+                        value="retail"
+                        checked={formData.businessType === 'retail'}
+                        onChange={(e) => {
+                          handleChange(e);
+                          setFormData(prev => ({...prev, businessCategory: 'retail'}));
+                        }}
+                        className="hidden"
+                      />
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${formData.businessType === 'retail' ? 'border-primary-500' : 'border-gray-600'}`}>
+                        {formData.businessType === 'retail' && <div className="w-3 h-3 rounded-full bg-primary-500" />}
+                      </div>
+                      <span className="text-white font-medium">Retail POS</span>
+                    </label>
+                  </div>
+
                   <select
-                    name="businessType"
-                    value={formData.businessType}
+                    name="businessCategory"
+                    value={formData.businessCategory}
                     onChange={handleChange}
                     className="h-12 bg-gray-900/50 border-gray-700 text-white px-4 py-2 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none"
+                    required
                   >
-                    {businessTypes.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
+                    <option value="" disabled>Select Business Type</option>
+                    {formData.businessType === 'restaurant' ? (
+                      <>
+                        <option value="restaurant">Restaurant</option>
+                        <option value="cafe">Café</option>
+                        <option value="bakery">Bakery</option>
+                        <option value="bar">Bar</option>
+                        <option value="food_truck">Food Truck</option>
+                        <option value="other">Other Food Business</option>
+                      </>
+                    ) : formData.businessType === 'retail' ? (
+                      <>
+                        <option value="retail">General Retail</option>
+                        <option value="grocery">Grocery & Supermarket</option>
+                        <option value="clothing">Clothing & Fashion</option>
+                        <option value="electronics">Electronics & IT</option>
+                        <option value="other_retail">Other Retail</option>
+                      </>
+                    ) : null}
                   </select>
 
                   <select
