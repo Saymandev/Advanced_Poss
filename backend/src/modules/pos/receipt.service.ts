@@ -678,11 +678,15 @@ export class ReceiptService {
             margin: 8px 0; 
             text-align: center;
             color: #000 !important;
+            overflow: hidden;
+            white-space: nowrap;
         }
         .separator-dashed { 
             margin: 8px 0; 
             text-align: center;
             color: #000 !important;
+            overflow: hidden;
+            white-space: nowrap;
         }
         .header { margin-bottom: 15px; }
         .header h1 { 
