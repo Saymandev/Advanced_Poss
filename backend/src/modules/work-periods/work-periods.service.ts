@@ -407,19 +407,12 @@ export class WorkPeriodsService {
 
     const totalIncomePool = grossSales + hotelRevenue + manualIncomeTotal;
 
-    // Calculate payment method percentages and commissions
+    // Format payment methods
     const paymentMethodsArray = Object.entries(paymentMethods).map(([method, data]) => {
-      const percentage = totalIncomePool > 0 ? (data.amount / totalIncomePool) * 100 : 0;
-      // Commission calculation (example: 2% for cash, 3.5% for card)
-      const commissionRate = method === 'cash' ? 0.02 : method === 'card' ? 0.035 : 0;
-      const commission = data.amount * commissionRate;
-
       return {
         type: method.charAt(0).toUpperCase() + method.slice(1),
-        percentage: percentage.toFixed(2),
         count: data.count,
         amount: data.amount,
-        commission: commission.toFixed(2),
       };
     });
 
@@ -522,6 +515,11 @@ export class WorkPeriodsService {
     });
   }
 
+  
+  async getCompany(companyId: string) {
+    return this.usersService.getCompanyById(companyId);
+  }
+
   async emailWorkPeriodReport(workPeriodId: string, email: string): Promise<boolean> {
     const summary = await this.getSalesSummary(workPeriodId);
     const workPeriod = await this.findOne(workPeriodId);
@@ -565,124 +563,87 @@ export class WorkPeriodsService {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Work Period Report</title>
+        <title>Z-Report - Work Period</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; }
-          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
-          .header h1 { margin: 0; color: #2c3e50; }
-          .meta-info { display: flex; justify-content: space-between; margin-bottom: 20px; background: #f9f9f9; padding: 15px; border-radius: 5px; }
-          .meta-column { width: 48%; }
-          .meta-item { margin-bottom: 5px; }
-          .meta-label { font-weight: bold; color: #666; }
+          body { font-family: 'Courier New', Courier, monospace; line-height: 1.4; color: #000; max-width: 400px; margin: 0 auto; padding: 20px; font-size: 14px; }
+          .header { text-align: center; margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+          .header h1 { margin: 0; font-size: 20px; text-transform: uppercase; }
+          .meta-info { margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+          .meta-item { display: flex; justify-content: space-between; margin-bottom: 4px; }
+          .meta-label { font-weight: bold; }
           
-          .section-title { font-size: 18px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; color: #2c3e50; }
+          .section-title { font-size: 16px; font-weight: bold; text-align: center; text-transform: uppercase; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 5px 0; margin: 20px 0 10px 0; }
           
-          .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-          .summary-card { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
-          .summary-value { font-size: 24px; font-weight: bold; color: #2c3e50; }
-          .summary-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+          .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+          .row.bold { font-weight: bold; }
+          .row.indent { padding-left: 15px; }
           
           table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th { text-align: left; background: #f0f0f0; padding: 10px; border-bottom: 2px solid #ddd; }
-          td { padding: 10px; border-bottom: 1px solid #eee; }
+          th { text-align: left; border-bottom: 1px dashed #000; padding: 5px 0; font-weight: bold; }
+          th.right, td.right { text-align: right; }
+          td { padding: 5px 0; border-bottom: 1px dotted #ccc; }
           tr:last-child td { border-bottom: none; }
           
-          .payment-methods { margin-top: 20px; }
-          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+          .footer { margin-top: 30px; text-align: center; font-size: 12px; border-top: 1px dashed #000; padding-top: 10px; }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>Work Period Report</h1>
+          <h1>Z-Report</h1>
           <p>Serial #${workPeriod.serial}</p>
         </div>
         
         <div class="meta-info">
-          <div class="meta-column">
-            <div class="meta-item"><span class="meta-label">Status:</span> ${workPeriod.status.toUpperCase()}</div>
-            <div class="meta-item"><span class="meta-label">Started By:</span> ${startedBy}</div>
-            <div class="meta-item"><span class="meta-label">Start Time:</span> ${startTime}</div>
-            <div class="meta-item"><span class="meta-label">Opening Balance:</span> ${formatCurrency(workPeriod.openingBalance || 0)}</div>
-          </div>
-          <div class="meta-column">
-            <div class="meta-item"><span class="meta-label">Duration:</span> ${duration}</div>
-            <div class="meta-item"><span class="meta-label">Ended By:</span> ${endedBy}</div>
-            <div class="meta-item"><span class="meta-label">End Time:</span> ${endTime}</div>
-            <div class="meta-item"><span class="meta-label">Expected Cash:</span> ${formatCurrency(expectedCash)}</div>
-            <div class="meta-item"><span class="meta-label">Closing Balance:</span> ${workPeriod.closingBalance !== undefined ? formatCurrency(workPeriod.closingBalance) : 'N/A'}</div>
-            ${workPeriod.closingBalance !== undefined ? `<div class="meta-item"><span class="meta-label">Cash Variance:</span> <strong style="color: ${varianceColor}">${variance > 0 ? '+' : ''}${formatCurrency(variance)}</strong></div>` : ''}
-          </div>
-        </div>
-        
-        <div class="section-title">Sales Summary</div>
-        <div class="summary-grid">
-          <div class="summary-card">
-            <div class="summary-value">${formatCurrency(summary.grossSales)}</div>
-            <div class="summary-label">Gross Sales</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-value">${summary.totalOrders}</div>
-            <div class="summary-label">Total Orders</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-value">${summary.voidCount}</div>
-            <div class="summary-label">Voided Orders</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-value">${summary.cancelCount}</div>
-            <div class="summary-label">Cancelled Orders</div>
-          </div>
+          <div class="meta-item"><span class="meta-label">Status:</span> <span>${workPeriod.status.toUpperCase()}</span></div>
+          <div class="meta-item"><span class="meta-label">Started By:</span> <span>${startedBy}</span></div>
+          <div class="meta-item"><span class="meta-label">Ended By:</span> <span>${endedBy}</span></div>
+          <div class="meta-item"><span class="meta-label">Start Time:</span> <span>${startTime}</span></div>
+          <div class="meta-item"><span class="meta-label">End Time:</span> <span>${endTime}</span></div>
+          <div class="meta-item"><span class="meta-label">Duration:</span> <span>${duration}</span></div>
         </div>
 
-        <div class="section-title">Financial Reconciliation</div>
-        <div class="summary-grid">
-          <div class="summary-card">
-            <div class="summary-value" style="color: #27ae60;">${formatCurrency(summary.netSales)}</div>
-            <div class="summary-label">Net Revenue</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-value" style="color: #e74c3c;">${formatCurrency(summary.refundTotal)}</div>
-            <div class="summary-label">Total Refunds</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-value">${formatCurrency(summary.manualIncomeTotal || 0)}</div>
-            <div class="summary-label">Manual Incomes</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-value">${formatCurrency(summary.manualExpenseTotal || 0)}</div>
-            <div class="summary-label">Manual Expenses</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-value">${formatCurrency(summary.purchaseTotal || 0)}</div>
-            <div class="summary-label">Purchases</div>
-          </div>
-        </div>
+        <div class="section-title">Sales Summary</div>
+        <div class="row"><span class="meta-label">Total Orders:</span> <span>${summary.totalOrders}</span></div>
+        <div class="row"><span class="meta-label">Gross Sales:</span> <span>${formatCurrency(summary.grossSales)}</span></div>
+        <div class="row indent"><span>- Refunds:</span> <span>${formatCurrency(summary.refundTotal)}</span></div>
+        <div class="row indent"><span>+ Hotel Revenue:</span> <span>${formatCurrency(summary.hotelRevenue)}</span></div>
+        <div class="row indent"><span>+ Manual Income:</span> <span>${formatCurrency(summary.manualIncomeTotal || 0)}</span></div>
+        <div class="row indent"><span>- Manual Expenses:</span> <span>${formatCurrency(summary.manualExpenseTotal || 0)}</span></div>
+        <div class="row indent"><span>- Purchases:</span> <span>${formatCurrency(summary.purchaseTotal || 0)}</span></div>
+        <div class="row bold mt-2"><span class="meta-label">Net Revenue:</span> <span>${formatCurrency(summary.netSales)}</span></div>
+        
+        <div class="section-title">Financials & Cash</div>
+        <div class="row"><span class="meta-label">Opening Balance:</span> <span>${formatCurrency(workPeriod.openingBalance || 0)}</span></div>
+        <div class="row"><span class="meta-label">Expected Cash:</span> <span>${formatCurrency(expectedCash)}</span></div>
+        <div class="row"><span class="meta-label">Actual Cash:</span> <span>${workPeriod.closingBalance !== undefined ? formatCurrency(workPeriod.closingBalance) : 'N/A'}</span></div>
+        ${workPeriod.closingBalance !== undefined ? `<div class="row bold"><span class="meta-label">Cash Variance:</span> <span>${variance > 0 ? '+' : ''}${formatCurrency(variance)}</span></div>` : ''}
         
         <div class="section-title">Payment Methods</div>
-        <div class="payment-methods">
-          <table>
-            <thead>
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th class="right">Count</th>
+              <th class="right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${summary.paymentMethods.map((pm: any) => `
               <tr>
-                <th>Method</th>
-                <th>Count</th>
-                <th>Amount</th>
-                <th>%</th>
+                <td>${pm.type}</td>
+                <td class="right">${pm.count}</td>
+                <td class="right">${formatCurrency(pm.amount)}</td>
               </tr>
-            </thead>
-            <tbody>
-              ${summary.paymentMethods.map((pm: any) => `
-                <tr>
-                  <td>${pm.type}</td>
-                  <td>${pm.count}</td>
-                  <td>${formatCurrency(pm.amount)}</td>
-                  <td>${pm.percentage}%</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
+            `).join('')}
+          </tbody>
+        </table>
         
+        <div class="section-title">Order Stats</div>
+        <div class="row"><span class="meta-label">Voided Orders:</span> <span>${summary.voidCount}</span></div>
+        <div class="row"><span class="meta-label">Cancelled Orders:</span> <span>${summary.cancelCount}</span></div>
+
         <div class="footer">
+          End of Report<br>
           Generated on ${new Date().toLocaleString()}
         </div>
       </body>

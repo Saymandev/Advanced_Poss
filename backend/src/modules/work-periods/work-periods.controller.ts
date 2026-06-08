@@ -129,8 +129,14 @@ export class WorkPeriodsController {
     @Param('id') id: string,
     @Body('email') email: string,
     @CurrentUser('email') userEmail: string,
+    @CurrentUser('companyId') companyId: string,
   ) {
-    const targetEmail = email || userEmail;
+    let targetEmail = email;
+    if (!targetEmail) {
+      const company = await this.workPeriodsService.getCompany(companyId);
+      targetEmail = company?.email || userEmail;
+    }
+
     if (!targetEmail) {
       throw new BadRequestException('Email address is required');
     }

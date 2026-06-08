@@ -396,9 +396,13 @@ export default function WorkPeriodsPage() {
   const handleDownloadReport = async (id: string, serial: number) => {
     try {
       toast.loading('Generating PDF...', { id: 'download-pdf' });
-      // We use direct fetch here to handle the blob response easily
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/work-periods/${id}/pdf`, {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers = new Headers();
+      if (token) headers.append('Authorization', `Bearer ${token}`);
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/work-periods/${id}/pdf`, {
         method: 'GET',
+        headers,
         credentials: 'include', // Important: send httpOnly cookies
       });
 
@@ -424,13 +428,11 @@ export default function WorkPeriodsPage() {
 
   const handleEmailReport = async (id: string) => {
     try {
-      const email = prompt('Enter email address to send report to:', user?.email);
-      if (!email) return;
-
+      const email = ''; // Empty string so backend automatically resolves company owner email
       toast.loading('Sending email...', { id: 'send-email' });
       await emailWorkPeriodReport({ id, email }).unwrap();
       toast.dismiss('send-email');
-      toast.success(`Report sent to ${email}`);
+      toast.success(`Report sent to owner automatically`);
     } catch (error: any) {
       console.error('Email error:', error);
       toast.dismiss('send-email');
