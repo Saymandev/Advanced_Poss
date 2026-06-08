@@ -393,6 +393,38 @@ export default function WorkPeriodsPage() {
 
   const [emailWorkPeriodReport, { isLoading: isEmailing }] = useEmailWorkPeriodReportMutation();
 
+  const handlePrintReport = async (id: string) => {
+    try {
+      toast.loading('Preparing print...', { id: 'print-pdf' });
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers = new Headers();
+      if (token) headers.append('Authorization', `Bearer ${token}`);
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/work-periods/${id}/pdf`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      if (!response.ok) throw new Error('Failed to generate PDF for printing');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const printWindow = window.open(url, '_blank');
+      if (!printWindow) {
+         toast.error('Popup blocked. Please allow popups to view and print the report.');
+      }
+      
+      toast.dismiss('print-pdf');
+      // Note: we don't revoke the object URL immediately so the new tab can load the PDF
+    } catch (error) {
+      console.error('Print error:', error);
+      toast.dismiss('print-pdf');
+      toast.error('Failed to prepare print');
+    }
+  };
+
   const handleDownloadReport = async (id: string, serial: number) => {
     try {
       toast.loading('Generating PDF...', { id: 'download-pdf' });
