@@ -783,6 +783,7 @@ export default function RetailPOSPage() {
           <div className="relative flex-1 max-w-md">
             <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <Input
+              ref={searchInputRef}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search products..."
@@ -938,7 +939,27 @@ export default function RetailPOSPage() {
                   <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded">
                     <MinusIcon className="h-3.5 w-3.5" />
                   </button>
-                  <span className="text-sm font-bold w-6 text-center">{item.quantity}</span>
+                  <input 
+                    type="number"
+                    min="1"
+                    className="w-12 text-sm font-bold text-center bg-transparent border border-transparent focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded px-1 outline-none appearance-none"
+                    value={item.quantity || ''}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val > 0) {
+                        setCart(prev => prev.map(c => c.id === item.id ? { ...c, quantity: val } : c));
+                      } else if (e.target.value === '') {
+                        // Allow empty string temporarily while typing
+                        setCart(prev => prev.map(c => c.id === item.id ? { ...c, quantity: '' as any } : c));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!item.quantity) {
+                         setCart(prev => prev.map(c => c.id === item.id ? { ...c, quantity: 1 } : c));
+                      }
+                    }}
+                    style={{ WebkitAppearance: 'none', margin: 0, MozAppearance: 'textfield' }}
+                  />
                   <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded">
                     <PlusIcon className="h-3.5 w-3.5" />
                   </button>
