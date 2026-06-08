@@ -130,8 +130,8 @@ export default function WorkPeriodsPage() {
   };
 
   const handleOpen = async () => {
-    if (!openFormData.openingBalance || openFormData.openingBalance < 0) {
-      toast.error('Opening balance is required and must be positive');
+    if (openFormData.openingBalance < 0 || isNaN(openFormData.openingBalance)) {
+      toast.error('Opening balance must be 0 or positive');
       return;
     }
 
@@ -167,8 +167,8 @@ export default function WorkPeriodsPage() {
   const handleClose = async () => {
     if (!selectedWorkPeriod) return;
 
-    if (!closeFormData.actualClosingBalance || closeFormData.actualClosingBalance < 0) {
-      toast.error('Closing balance is required and must be positive');
+    if (closeFormData.actualClosingBalance < 0 || isNaN(closeFormData.actualClosingBalance)) {
+      toast.error('Closing balance must be 0 or positive');
       return;
     }
 
