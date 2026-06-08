@@ -842,7 +842,7 @@ export default function ExpensesPage() {
           resetForm();
         }}
         title="Add New Expense"
-        className="max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="max-w-3xl"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1011,7 +1011,7 @@ export default function ExpensesPage() {
           resetForm();
         }}
         title="Edit Expense"
-        className="max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="max-w-3xl"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
