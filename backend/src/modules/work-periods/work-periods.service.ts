@@ -544,7 +544,15 @@ export class WorkPeriodsService {
 
     const startTime = new Date(workPeriod.startTime).toLocaleString();
     const endTime = workPeriod.endTime ? new Date(workPeriod.endTime).toLocaleString() : 'Active';
-    const duration = workPeriod.duration || 'N/A';
+    const calculateDuration = (start, end) => {
+      const startDate = new Date(start);
+      const endDate = end ? new Date(end) : new Date();
+      const diffMs = endDate.getTime() - startDate.getTime();
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `${hours}h ${minutes}m`;
+    };
+    const duration = calculateDuration(workPeriod.startTime, workPeriod.endTime);
 
     const startedBy = workPeriod.startedBy ? `${workPeriod.startedBy.firstName || ''} ${workPeriod.startedBy.lastName || ''}`.trim() : 'Unknown';
     const endedBy = workPeriod.endedBy ? `${workPeriod.endedBy.firstName || ''} ${workPeriod.endedBy.lastName || ''}`.trim() : 'N/A';
@@ -615,7 +623,7 @@ export class WorkPeriodsService {
         <div class="section-title">Financials & Cash</div>
         <div class="row"><span class="meta-label">Opening Balance:</span> <span>${formatCurrency(workPeriod.openingBalance || 0)}</span></div>
         <div class="row"><span class="meta-label">Expected Cash:</span> <span>${formatCurrency(expectedCash)}</span></div>
-        <div class="row"><span class="meta-label">Actual Cash:</span> <span>${workPeriod.closingBalance !== undefined ? formatCurrency(workPeriod.closingBalance) : 'N/A'}</span></div>
+        <div class="row"><span class="meta-label">Actual Cash:</span> <span>${formatCurrency(actualCash)}</span></div>
         ${workPeriod.closingBalance !== undefined ? `<div class="row bold"><span class="meta-label">Cash Variance:</span> <span>${variance > 0 ? '+' : ''}${formatCurrency(variance)}</span></div>` : ''}
         
         <div class="section-title">Payment Methods</div>
