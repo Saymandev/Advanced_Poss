@@ -305,7 +305,7 @@ export default function RegisterPage() {
                 <SparklesIcon className="w-8 h-8 text-white" />
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">Create Your Account</h1>
-              <p className="text-gray-400">Set up your restaurant in minutes</p>
+              <p className="text-gray-400">Set up your business in minutes</p>
             </div>
           </div>
 
@@ -326,7 +326,7 @@ export default function RegisterPage() {
                       name="companyName"
                       value={formData.companyName}
                       onChange={handleChange}
-                      placeholder="Restaurant Name"
+                      placeholder="Business Name"
                       className="h-12 bg-gray-900/50 border-gray-700 text-white focus:border-primary-500"
                       required
                     />
