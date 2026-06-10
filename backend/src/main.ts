@@ -1,6 +1,6 @@
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
@@ -15,6 +15,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 // import { WinstonLogger } from './common/logger/winston.logger';
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // Cookie parser (for httpOnly cookies)
@@ -24,7 +25,7 @@ async function bootstrap() {
   app.use(express.urlencoded({ limit: '5mb', extended: true }));
   const configService = app.get(ConfigService);
   const port = configService.get('PORT') || 5000;
-    const frontendUrl = (configService.get('APP_URL') || 'http://localhost:3000').replace(/\/$/, '');
+  const frontendUrl = (configService.get('APP_URL') || 'http://localhost:3000').replace(/\/$/, '');
 
   // IMPORTANT: Trust proxy is required for cookies 'secure' flag to work behind Nginx/Cloudflare
   if (configService.get('nodeEnv') === 'production') {
@@ -98,7 +99,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new EncryptionInterceptor(app.get(ConfigService)));
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalInterceptors(new LoggingInterceptor());
-  app.useGlobalInterceptors(new TenantInterceptor());
+  app.useGlobalInterceptors(new TenantInterceptor(app.get(Reflector)));
   // Swagger documentation (Disabled in production for security)
   if (configService.get('nodeEnv') !== 'production') {
     const swaggerConfig = new DocumentBuilder()
