@@ -12,6 +12,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { SettingsModule } from '../settings/settings.module';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
+import { AnalyticsService } from './analytics.service';
 
 @Module({
   imports: [
@@ -27,8 +28,8 @@ import { AiService } from './ai.service';
     SettingsModule,
   ],
   controllers: [AiController],
-  providers: [AiService, OpenAIService, DeepSeekService],
-  exports: [AiService],
+  providers: [AiService, AnalyticsService, OpenAIService, DeepSeekService],
+  exports: [AiService, AnalyticsService],
 })
 export class AiModule {}
 

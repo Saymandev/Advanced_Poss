@@ -290,44 +290,63 @@ export class AiService {
       },
       { $sort: { _id: 1 } },
     ]);
-    // Simple linear regression for prediction
+    
     const n = historicalData.length;
-    if (n < 2) {
+    if (n === 0) {
       return {
         predictions: [],
         confidence: 'low',
         message: 'Insufficient data for accurate prediction',
       };
     }
-    // Calculate trend
-    const sumX = (n * (n - 1)) / 2;
+    
+    // Average baseline calculations
     const sumY = historicalData.reduce((sum, item) => sum + item.dailyRevenue, 0);
-    const sumXY = historicalData.reduce((sum, item, index) => sum + (index * item.dailyRevenue), 0);
-    const sumXX = (n * (n - 1) * (2 * n - 1)) / 6;
-    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
-    // Generate predictions
-    const predictions = [];
     const avgDailyRevenue = sumY / n;
-    const variance = historicalData.reduce((sum, item) => sum + Math.pow(item.dailyRevenue - avgDailyRevenue, 2), 0) / n;
-    const standardDeviation = Math.sqrt(variance);
+    
+    // Try to get AI-powered trend prediction
+    let aiTrend = null;
+    try {
+      const systemSettings = await this.settingsService.getSystemSettings();
+      const aiProvider = (systemSettings.ai?.enabled !== false) 
+        ? (this.deepSeekService.isAvailable() ? this.deepSeekService : (this.openAIService.isAvailable() ? this.openAIService : null))
+        : null;
+        
+      if (aiProvider) {
+        aiTrend = await aiProvider.predictSalesTrend(historicalData);
+      }
+    } catch (e) {
+      this.logger.warn('AI Sales Prediction failed. Falling back to simple average.');
+    }
+
+    const growthMultiplier = aiTrend ? (1 + (aiTrend.predictedGrowth / 100)) : 1;
+    const predictions = [];
+    
     for (let i = 1; i <= daysAhead; i++) {
-      const predictedRevenue = slope * (n + i - 1) + intercept;
-      const confidence = Math.max(0, 1 - (standardDeviation / avgDailyRevenue));
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + i);
+      
+      const isWeekend = targetDate.getDay() === 0 || targetDate.getDay() === 6;
+      const seasonalMultiplier = isWeekend ? 1.2 : 0.9;
+      
+      const predictedRevenue = avgDailyRevenue * seasonalMultiplier * growthMultiplier;
+      
       predictions.push({
-        date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        predictedRevenue: Math.max(0, predictedRevenue),
-        confidence: Math.round(confidence * 100),
+        date: targetDate.toISOString().split('T')[0],
+        predictedRevenue: Math.max(0, Math.round(predictedRevenue * 100) / 100),
+        confidence: aiTrend ? 85 : 60,
         range: {
-          min: Math.max(0, predictedRevenue - standardDeviation),
-          max: predictedRevenue + standardDeviation,
+          min: Math.max(0, predictedRevenue * 0.8),
+          max: predictedRevenue * 1.2,
         },
       });
     }
+
     return {
       predictions,
-      confidence: standardDeviation < avgDailyRevenue * 0.3 ? 'high' : 'medium',
-      trend: slope > 0 ? 'increasing' : slope < 0 ? 'decreasing' : 'stable',
+      confidence: aiTrend ? 'high' : 'medium',
+      trend: aiTrend ? aiTrend.trend : 'stable',
+      anomalies: aiTrend ? aiTrend.anomalies : [],
       averageDailyRevenue: avgDailyRevenue,
     };
   }
@@ -688,63 +707,58 @@ export class AiService {
         },
       ]),
     ]);
+    
     const revenue = revenueData[0] || { totalRevenue: 0, avgOrderValue: 0, maxOrderValue: 0, minOrderValue: 0 };
     const orders = orderData;
     const customers = customerData[0] || { uniqueCustomers: 0, avgOrdersPerCustomer: 0, avgSpentPerCustomer: 0 };
-    // Calculate trends
+    
     const revenueTrend = orders.length > 1 ?
       ((orders[orders.length - 1].dailyRevenue - orders[0].dailyRevenue) / orders[0].dailyRevenue) * 100 : 0;
     const orderTrend = orders.length > 1 ?
       ((orders[orders.length - 1].dailyOrders - orders[0].dailyOrders) / orders[0].dailyOrders) * 100 : 0;
-    // Generate insights
-    const insights = [];
-    if (revenueTrend > 10) {
-      insights.push({
-        type: 'positive',
-        message: `Revenue has increased by ${Math.round(revenueTrend)}% over the period`,
-        impact: 'high',
-      });
-    } else if (revenueTrend < -10) {
-      insights.push({
-        type: 'negative',
-        message: `Revenue has decreased by ${Math.round(Math.abs(revenueTrend))}% over the period`,
-        impact: 'high',
-      });
+      
+    const payloadForAi = {
+      totalRevenue: revenue.totalRevenue,
+      avgOrderValue: revenue.avgOrderValue,
+      uniqueCustomers: customers.uniqueCustomers,
+      revenueTrend,
+      orderTrend,
+      dailySales: orders,
+    };
+    
+    let aiResponse = null;
+    try {
+      const systemSettings = await this.settingsService.getSystemSettings();
+      const aiProvider = (systemSettings.ai?.enabled !== false) 
+        ? (this.deepSeekService.isAvailable() ? this.deepSeekService : (this.openAIService.isAvailable() ? this.openAIService : null))
+        : null;
+        
+      if (aiProvider) {
+        aiResponse = await aiProvider.generateExecutiveSummary(payloadForAi);
+      }
+    } catch (e) {
+      this.logger.warn('AI Business Insights failed. Falling back to rule-based.');
     }
-    if (customers.avgOrdersPerCustomer > 3) {
-      insights.push({
-        type: 'positive',
-        message: 'High customer loyalty - customers are returning frequently',
-        impact: 'medium',
-      });
+    
+    // Generate fallback insights if AI is unavailable
+    const insights = aiResponse ? aiResponse.insights.map((i: string) => ({ type: 'ai_insight', message: i, impact: 'high' })) : [];
+    if (!aiResponse) {
+      if (revenueTrend > 10) {
+        insights.push({ type: 'positive', message: `Revenue has increased by ${Math.round(revenueTrend)}% over the period`, impact: 'high' });
+      }
     }
-    if (revenue.avgOrderValue > revenue.maxOrderValue * 0.7) {
-      insights.push({
-        type: 'positive',
-        message: 'Consistent high-value orders',
-        impact: 'medium',
-      });
-    }
+
     return {
       period,
-      summary: {
-        totalRevenue: revenue.totalRevenue,
-        totalOrders: orders.reduce((sum, order) => sum + order.dailyOrders, 0),
-        uniqueCustomers: customers.uniqueCustomers,
-        avgOrderValue: Math.round(revenue.avgOrderValue * 100) / 100,
-        avgOrdersPerCustomer: Math.round(customers.avgOrdersPerCustomer * 100) / 100,
-        avgSpentPerCustomer: Math.round(customers.avgSpentPerCustomer * 100) / 100,
-      },
+      summary: aiResponse ? { overview: aiResponse.summary, ...payloadForAi } : { overview: `Business performance for the past ${period}.`, ...payloadForAi },
       trends: {
         revenue: Math.round(revenueTrend * 100) / 100,
         orders: Math.round(orderTrend * 100) / 100,
       },
       insights,
-      recommendations: [
+      recommendations: aiResponse ? aiResponse.recommendations : [
         'Monitor daily performance to identify patterns',
-        'Focus on customer retention strategies',
-        'Analyze peak performance days for optimization',
-        'Consider seasonal adjustments based on trends',
+        'Focus on customer retention strategies'
       ],
     };
   }

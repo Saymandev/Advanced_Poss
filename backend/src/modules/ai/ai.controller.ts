@@ -18,12 +18,16 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SubscriptionFeatureGuard } from '../../common/guards/subscription-feature.guard';
 import { AiService } from './ai.service';
+import { AnalyticsService } from './analytics.service';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard, PermissionsGuard, SubscriptionFeatureGuard)
 @RequiresFeature(FEATURES.AI_INSIGHTS, FEATURES.AI_MENU_OPTIMIZATION)
 export class AiController {
-  constructor(private readonly aiService: AiService) { }
+  constructor(
+    private readonly aiService: AiService,
+    private readonly analyticsService: AnalyticsService
+  ) { }
 
   // Predict sales for upcoming days
   @Get('predict-sales')
@@ -49,7 +53,7 @@ export class AiController {
     if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Only Managers and Owners can view pricing recommendations');
     }
-    return await this.aiService.recommendPricing(
+    return await this.analyticsService.recommendPricing(
       menuItemId as unknown as MongooseSchema.Types.ObjectId,
     );
   }
@@ -64,7 +68,7 @@ export class AiController {
     if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Only Managers and Owners can analyze peak hours');
     }
-    return await this.aiService.analyzePeakHours(
+    return await this.analyticsService.analyzePeakHours(
       companyId as unknown as MongooseSchema.Types.ObjectId,
       branchId ? (branchId as unknown as MongooseSchema.Types.ObjectId) : undefined,
     );
@@ -77,7 +81,7 @@ export class AiController {
     if (user?.role !== UserRole.WAITER && user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Only Waiters, Managers and Owners can view customer recommendations');
     }
-    return await this.aiService.getCustomerRecommendations(
+    return await this.analyticsService.getCustomerRecommendations(
       customerId as unknown as MongooseSchema.Types.ObjectId,
     );
   }
@@ -92,7 +96,7 @@ export class AiController {
     if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Only Managers and Owners can analyze menu performance');
     }
-    return await this.aiService.analyzeMenuPerformance(
+    return await this.analyticsService.analyzeMenuPerformance(
       companyId as unknown as MongooseSchema.Types.ObjectId,
       branchId ? (branchId as unknown as MongooseSchema.Types.ObjectId) : undefined,
     );
@@ -127,7 +131,7 @@ export class AiController {
     if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Only Managers and Owners can view sales analytics');
     }
-    return this.aiService.generateSalesAnalytics(
+    return this.analyticsService.generateSalesAnalytics(
       branchId,
       new Date(startDate),
       new Date(endDate),
@@ -145,7 +149,7 @@ export class AiController {
     if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER && user?.role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Only Managers and Owners can view order analytics');
     }
-    return this.aiService.generateOrderAnalytics(
+    return this.analyticsService.generateOrderAnalytics(
       branchId,
       new Date(startDate),
       new Date(endDate),
@@ -214,7 +218,7 @@ export class AiController {
     if (!body.branchId) {
       throw new BadRequestException('Branch ID is required');
     }
-    const offers = await this.aiService.generatePersonalizedOffers(
+    const offers = await this.analyticsService.generatePersonalizedOffers(
       body.customerId,
       body.branchId,
     );

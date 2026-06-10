@@ -307,5 +307,74 @@ Return ONLY valid JSON, no additional text.`;
       return null;
     }
   }
+
+  async generateExecutiveSummary(salesData: any): Promise<{ summary: string; insights: string[]; recommendations: string[] } | null> {
+    if (!this.isEnabled || (!this.openai)) return null;
+    
+    try {
+      const prompt = `
+You are an expert restaurant/retail business consultant. Analyze the following sales data and provide a concise executive summary, 3 key insights, and 3 actionable recommendations.
+Data: ${JSON.stringify(salesData)}
+
+Respond strictly in JSON format matching this structure:
+{
+  "summary": "A 2-3 sentence overview of business performance",
+  "insights": ["insight 1", "insight 2", "insight 3"],
+  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"]
+}
+`;
+
+      const aiClient = this.openai;
+      const model = false ? (this.configService.get('deepseek.model') || 'deepseek-chat') : (this.configService.get('openai.model') || 'gpt-3.5-turbo');
+
+      const response = await aiClient.chat.completions.create({
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.7,
+      });
+
+      const content = response.choices[0].message.content;
+      return JSON.parse(content);
+    } catch (error) {
+      this.logger.error(`Error generating executive summary: ${error.message}`);
+      return null;
+    }
+  }
+
+  async predictSalesTrend(historicalData: any): Promise<{ trend: string; predictedGrowth: number; anomalies: string[] } | null> {
+    if (!this.isEnabled || (!this.openai)) return null;
+
+    try {
+      const prompt = `
+You are a data scientist analyzing sales time-series data for a retail/restaurant business.
+Historical Data (Daily Revenue): ${JSON.stringify(historicalData)}
+
+Analyze the seasonality and predict the short-term trend.
+Respond strictly in JSON format matching this structure:
+{
+  "trend": "upward|downward|stable",
+  "predictedGrowth": <number representing percentage, e.g. 5.5 for 5.5% growth>,
+  "anomalies": ["anomaly 1", "anomaly 2"]
+}
+`;
+
+      const aiClient = this.openai;
+      const model = false ? (this.configService.get('deepseek.model') || 'deepseek-chat') : (this.configService.get('openai.model') || 'gpt-3.5-turbo');
+
+      const response = await aiClient.chat.completions.create({
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+      });
+
+      const content = response.choices[0].message.content;
+      return JSON.parse(content);
+    } catch (error) {
+      this.logger.error(`Error predicting sales trend: ${error.message}`);
+      return null;
+    }
+  }
 }
 
