@@ -411,24 +411,32 @@ export class BranchesService {
         .lean();
     }
 
-    // Fallback 2: in case companyId casting or historical data causes mismatch,
-    // try to find by slug only. This keeps old data working while still preferring
-    // the stricter company+slug match above.
-    if (!branch && normalizedSlug) {
+    // Fallback 2: try exact match if normalization changed anything (though unlikely with slugs)
+    if (!branch && branchSlug !== normalizedSlug) {
       branch = await this.branchModel
-        .findOne({ slug: normalizedSlug })
+        .findOne({ 
+          slug: branchSlug, 
+          companyId: new Types.ObjectId(companyId) 
+        })
         .populate('companyId', 'name email slug')
         .populate('managerId', 'firstName lastName email')
         .lean();
     }
 
-    // Fallback 3: try exact match if normalization changed anything (though unlikely with slugs)
-    if (!branch && branchSlug !== normalizedSlug) {
-      branch = await this.branchModel
-        .findOne({ slug: branchSlug })
+    // Fallback 3: If the branch is not found by exact slug/ID, but the user is requesting 'main' or 'main-branch',
+    // return the first available branch for this company. This fixes issues where a company doesn't have a 'main' branch
+    // but the frontend URL defaults to /main/shop.
+    if (!branch && (normalizedSlug === 'main' || normalizedSlug === 'main-branch')) {
+      const branches = await this.branchModel
+        .find({ companyId: new Types.ObjectId(companyId), deletedAt: { $exists: false } })
         .populate('companyId', 'name email slug')
         .populate('managerId', 'firstName lastName email')
+        .sort({ createdAt: 1 })
         .lean();
+        
+      if (branches && branches.length > 0) {
+        branch = branches[0];
+      }
     }
 
     if (!branch) {
