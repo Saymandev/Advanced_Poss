@@ -387,11 +387,14 @@ export class BranchesService {
 
     // Normalize slug for comparison (URLs are case-insensitive in practice)
     const normalizedSlug = branchSlug?.trim()?.toLowerCase();
+    
+    // Support both ObjectId and string formats in database for backward compatibility
+    const companyIdQuery = { $in: [new Types.ObjectId(companyId), companyId] } as any;
 
     // First, try to find branch by company + slug (preferred, multi-tenant safe)
     let branch = await this.branchModel
       .findOne({
-        companyId: new Types.ObjectId(companyId),
+        companyId: companyIdQuery,
         slug: normalizedSlug,
       })
       .populate('companyId', 'name email slug')
@@ -404,7 +407,7 @@ export class BranchesService {
       branch = await this.branchModel
         .findOne({
           _id: new Types.ObjectId(branchSlug),
-          companyId: new Types.ObjectId(companyId),
+          companyId: companyIdQuery,
         })
         .populate('companyId', 'name email slug')
         .populate('managerId', 'firstName lastName email')
@@ -416,7 +419,7 @@ export class BranchesService {
       branch = await this.branchModel
         .findOne({ 
           slug: branchSlug, 
-          companyId: new Types.ObjectId(companyId) 
+          companyId: companyIdQuery 
         })
         .populate('companyId', 'name email slug')
         .populate('managerId', 'firstName lastName email')
@@ -428,7 +431,7 @@ export class BranchesService {
     // but the frontend URL defaults to /main/shop.
     if (!branch && (normalizedSlug === 'main' || normalizedSlug === 'main-branch')) {
       const branches = await this.branchModel
-        .find({ companyId: new Types.ObjectId(companyId), deletedAt: { $exists: false } })
+        .find({ companyId: companyIdQuery, deletedAt: { $exists: false } })
         .populate('companyId', 'name email slug')
         .populate('managerId', 'firstName lastName email')
         .sort({ createdAt: 1 })
