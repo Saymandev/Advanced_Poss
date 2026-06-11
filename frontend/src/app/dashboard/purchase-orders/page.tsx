@@ -945,11 +945,19 @@ export default function PurchaseOrdersPage() {
                       </span>
                     </div>
                   )}
+                  {selectedOrder.appliedCredit && selectedOrder.appliedCredit > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Applied Credit:</span>
+                      <span className="font-medium text-green-600">
+                        -{formatCurrency(selectedOrder.appliedCredit)}
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
                     <div className="flex justify-between text-lg font-bold">
-                      <span className="text-gray-900 dark:text-white">Total:</span>
+                      <span className="text-gray-900 dark:text-white">Total Paid:</span>
                       <span className="text-gray-900 dark:text-white">
-                        {formatCurrency(selectedOrder.totalAmount)}
+                        {formatCurrency(selectedOrder.totalAmount - (selectedOrder.appliedCredit || 0))}
                       </span>
                     </div>
                   </div>

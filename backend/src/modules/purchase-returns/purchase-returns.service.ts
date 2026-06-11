@@ -48,7 +48,7 @@ export class PurchaseReturnsService {
     }
 
     const totalAmount = dto.items.reduce((sum, item) => sum + (item.quantity * (item.unitCost || 0)), 0);
-    const returnNumber = await this.generateReturnNumber(companyId);
+    const returnNumber = this.generateReturnNumber();
 
     const doc = new this.model({
       ...dto,
@@ -183,13 +183,12 @@ export class PurchaseReturnsService {
     if (!result) throw new NotFoundException('Purchase return not found');
   }
 
-  private async generateReturnNumber(companyId: string): Promise<string> {
+  private generateReturnNumber(): string {
     const date = new Date();
-    const prefix = `PR-${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-    const count = await this.model.countDocuments({
-      companyId: new Types.ObjectId(companyId),
-      returnNumber: { $regex: `^${prefix}` },
-    });
-    return `${prefix}-${(count + 1).toString().padStart(3, '0')}`;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 9000) + 1000;
+    return `PR-${year}${month}${day}-${random}`;
   }
 }
