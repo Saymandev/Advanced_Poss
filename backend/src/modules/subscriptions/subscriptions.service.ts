@@ -329,9 +329,9 @@ export class SubscriptionsService {
           ).exec();
         }
 
-        // If subscription exists but is inactive, we can reuse it by updating it
-        if (!existingSubscription.isActive) {
-          // Update existing inactive subscription instead of creating new one
+        // If subscription exists but is inactive, OR we are overriding it, we can reuse it by updating it
+        if (!existingSubscription.isActive || createSubscriptionDto.overrideActive) {
+          // Update existing subscription instead of creating new one
           if (isFeatureBased) {
             existingSubscription.enabledFeatures = enabledFeatures;
             // Clear plan when using feature-based subscription

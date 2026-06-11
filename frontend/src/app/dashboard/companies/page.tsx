@@ -293,6 +293,7 @@ export default function CompaniesPage() {
         billingCycle: selectedBillingCycle,
         email: selectedCompany.email,
         companyName: selectedCompany.name,
+        overrideActive: true,
       }).unwrap();
       toast.success('Subscription plan assigned successfully');
       setIsAssignPlanModalOpen(false);

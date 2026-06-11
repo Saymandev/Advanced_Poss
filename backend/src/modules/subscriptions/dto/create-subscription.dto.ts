@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsMongoId,
@@ -41,5 +42,9 @@ export class CreateSubscriptionDto {
   @IsString()
   @IsOptional()
   paymentMethodId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  overrideActive?: boolean;
 }
 
