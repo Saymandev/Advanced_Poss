@@ -18,6 +18,7 @@ import {
   useGetCompanyStatsQuery,
   useUpdateCompanyMutation,
 } from '@/lib/api/endpoints/companiesApi';
+import { useCreateSubscriptionMutation, useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { UserRole } from '@/lib/enums/user-role.enum';
 import { useAppSelector } from '@/lib/store';
 import { formatDateTime } from '@/lib/utils';
@@ -32,7 +33,8 @@ import {
   ShoppingBagIcon,
   TrashIcon,
   UsersIcon,
-  XCircleIcon
+  XCircleIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -49,7 +51,10 @@ export default function CompaniesPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [isAssignPlanModalOpen, setIsAssignPlanModalOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState('');
+  const [selectedBillingCycle, setSelectedBillingCycle] = useState('monthly');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [subscriptionFilter, setSubscriptionFilter] = useState('all');
@@ -61,6 +66,17 @@ export default function CompaniesPage() {
   const [deleteCompany, { isLoading: isDeleting }] = useDeleteCompanyMutation();
   const [deactivateCompany] = useDeactivateCompanyMutation();
   const [activateCompany] = useActivateCompanyMutation();
+  const [createSubscription, { isLoading: isAssigningPlan }] = useCreateSubscriptionMutation();
+  const { data: plansData } = useGetSubscriptionPlansQuery({});
+  
+  // Extract plans array from possible paginated format
+  const plans = useMemo(() => {
+    if (!plansData) return [];
+    if (Array.isArray(plansData)) return plansData;
+    if ('plans' in plansData && Array.isArray((plansData as any).plans)) return (plansData as any).plans;
+    return [];
+  }, [plansData]);
+
   const formatCurrency = useFormatCurrency();
   const companies = useMemo(() => {
     if (!companiesData) return [];
@@ -259,6 +275,33 @@ export default function CompaniesPage() {
     setSelectedCompany(company);
     setIsStatsModalOpen(true);
   };
+  const openAssignPlanModal = (company: Company) => {
+    setSelectedCompany(company);
+    setSelectedPlan(company.subscriptionPlan || '');
+    setSelectedBillingCycle('monthly');
+    setIsAssignPlanModalOpen(true);
+  };
+  const handleAssignPlan = async () => {
+    if (!selectedCompany || !selectedPlan) {
+      toast.error('Please select a plan');
+      return;
+    }
+    try {
+      await createSubscription({
+        companyId: selectedCompany.id,
+        plan: selectedPlan,
+        billingCycle: selectedBillingCycle,
+        email: selectedCompany.email,
+        companyName: selectedCompany.name,
+      }).unwrap();
+      toast.success('Subscription plan assigned successfully');
+      setIsAssignPlanModalOpen(false);
+      setSelectedCompany(null);
+      refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to assign plan');
+    }
+  };
   // Fetch company stats when stats modal is open
   const { data: companyStatsData, isLoading: isLoadingStats } = useGetCompanyStatsQuery(
     selectedCompany?.id || '',
@@ -370,6 +413,13 @@ export default function CompaniesPage() {
             title="Edit"
           >
             <PencilIcon className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => openAssignPlanModal(company)}
+            className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+            title="Assign Plan"
+          >
+            <CreditCardIcon className="w-5 h-5" />
           </button>
           <button
             onClick={() => handleDeactivate(company)}
@@ -992,6 +1042,61 @@ export default function CompaniesPage() {
             )}
           </div>
         )}
+      </Modal>
+      {/* Assign Plan Modal */}
+      <Modal
+        isOpen={isAssignPlanModalOpen}
+        onClose={() => {
+          setIsAssignPlanModalOpen(false);
+          setSelectedCompany(null);
+        }}
+        title={`Assign Plan to ${selectedCompany?.name || 'Company'}`}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Subscription Plan *</label>
+            <Select
+              value={selectedPlan}
+              onChange={(value) => setSelectedPlan(value)}
+              options={[
+                { value: '', label: 'Select a plan' },
+                ...plans.map((plan: any) => ({
+                  value: plan.name,
+                  label: `${plan.displayName} (${formatCurrency(plan.price)}/${plan.billingCycle})`,
+                })),
+              ]}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Billing Cycle</label>
+            <Select
+              value={selectedBillingCycle}
+              onChange={(value) => setSelectedBillingCycle(value)}
+              options={[
+                { value: 'monthly', label: 'Monthly' },
+                { value: 'yearly', label: 'Yearly' },
+              ]}
+            />
+          </div>
+          <p className="text-sm text-gray-500">
+            Note: Manually assigning a plan will override the current subscription status and restart the billing cycle as a trial.
+          </p>
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsAssignPlanModalOpen(false);
+                setSelectedCompany(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAssignPlan} isLoading={isAssigningPlan}>
+              Assign Plan
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

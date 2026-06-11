@@ -356,7 +356,7 @@ export default function RegisterPage() {
                       <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${formData.businessType === 'restaurant' ? 'border-primary-500' : 'border-gray-600'}`}>
                         {formData.businessType === 'restaurant' && <div className="w-3 h-3 rounded-full bg-primary-500" />}
                       </div>
-                      <span className="text-white font-medium">Restaurant POS</span>
+                      <span className="text-white font-medium">Hospitality Business</span>
                     </label>
                     <label
                       className={`cursor-pointer p-4 border rounded-xl flex items-center gap-3 transition-colors ${
@@ -379,7 +379,7 @@ export default function RegisterPage() {
                       <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${formData.businessType === 'retail' ? 'border-primary-500' : 'border-gray-600'}`}>
                         {formData.businessType === 'retail' && <div className="w-3 h-3 rounded-full bg-primary-500" />}
                       </div>
-                      <span className="text-white font-medium">Retail POS</span>
+                      <span className="text-white font-medium">Retail Business</span>
                     </label>
                   </div>
 
