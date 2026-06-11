@@ -223,17 +223,25 @@ export class SubscriptionsService {
     // CRITICAL: Update company record to reflect plan change
     // Use plan.name (e.g., 'premium', 'basic') not planKey enum value
     // This ensures company.subscriptionPlan matches the plan's name field for frontend matching
+    const companyUpdate: any = {
+      subscriptionPlan: plan.name, // Use plan.name, not planKey enum
+      subscriptionStatus: subscription.status === SubscriptionStatus.ACTIVE ? 'active' : subscription.status,
+      nextBillingDate: subscription.nextBillingDate,
+      // Update subscription end date to match current period end
+      ...(subscription.currentPeriodEnd && {
+        subscriptionEndDate: subscription.currentPeriodEnd,
+      }),
+    };
+
+    if (plan.name.toLowerCase().includes('retail')) {
+      companyUpdate.businessType = 'retail';
+    } else if (plan.name.toLowerCase().includes('restaurant')) {
+      companyUpdate.businessType = 'restaurant';
+    }
+
     await this.companyModel.findByIdAndUpdate(
       subscription.companyId,
-      {
-        subscriptionPlan: plan.name, // Use plan.name, not planKey enum
-        subscriptionStatus: subscription.status === SubscriptionStatus.ACTIVE ? 'active' : subscription.status,
-        nextBillingDate: subscription.nextBillingDate,
-        // Update subscription end date to match current period end
-        ...(subscription.currentPeriodEnd && {
-          subscriptionEndDate: subscription.currentPeriodEnd,
-        }),
-      },
+      companyUpdate,
       { new: true },
     ).exec();
 
@@ -378,15 +386,23 @@ export class SubscriptionsService {
 
           // CRITICAL: Update company record to sync subscription data
           if (!isFeatureBased && plan) {
+            const companyUpdate: any = {
+              subscriptionPlan: plan.name, // Use plan.name for frontend matching
+              subscriptionStatus: savedSubscription.status,
+              subscriptionStartDate: savedSubscription.trialStartDate,
+              subscriptionEndDate: savedSubscription.trialEndDate,
+              nextBillingDate: savedSubscription.nextBillingDate,
+            };
+
+            if (plan.name.toLowerCase().includes('retail')) {
+              companyUpdate.businessType = 'retail';
+            } else if (plan.name.toLowerCase().includes('restaurant')) {
+              companyUpdate.businessType = 'restaurant';
+            }
+
             await this.companyModel.findByIdAndUpdate(
               createSubscriptionDto.companyId,
-              {
-                subscriptionPlan: plan.name, // Use plan.name for frontend matching
-                subscriptionStatus: savedSubscription.status,
-                subscriptionStartDate: savedSubscription.trialStartDate,
-                subscriptionEndDate: savedSubscription.trialEndDate,
-                nextBillingDate: savedSubscription.nextBillingDate,
-              },
+              companyUpdate,
               { new: true },
             ).exec();
           }
@@ -481,13 +497,20 @@ export class SubscriptionsService {
 
       // CRITICAL: Update company record to sync subscription data
       if (!isFeatureBased && plan) {
-        const companyUpdate = {
+        const companyUpdate: any = {
           subscriptionPlan: plan.name, // Use plan.name for frontend matching
           subscriptionStatus: savedSubscription.status,
           subscriptionStartDate: savedSubscription.trialStartDate,
           subscriptionEndDate: savedSubscription.trialEndDate,
           nextBillingDate: savedSubscription.nextBillingDate,
         };
+
+        if (plan.name.toLowerCase().includes('retail')) {
+          companyUpdate.businessType = 'retail';
+        } else if (plan.name.toLowerCase().includes('restaurant')) {
+          companyUpdate.businessType = 'restaurant';
+        }
+
         await this.companyModel.findByIdAndUpdate(
           createSubscriptionDto.companyId,
           companyUpdate,
