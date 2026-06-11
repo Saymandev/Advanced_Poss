@@ -9,7 +9,7 @@ import {
   IsString,
 } from 'class-validator';
 import { Schema as MongooseSchema } from 'mongoose';
-import { BillingCycle, SubscriptionPlan } from '../schemas/subscription.schema';
+import { BillingCycle, SubscriptionPlan, SubscriptionStatus } from '../schemas/subscription.schema';
 
 export class CreateSubscriptionDto {
   @IsMongoId()
@@ -46,5 +46,9 @@ export class CreateSubscriptionDto {
   @IsBoolean()
   @IsOptional()
   overrideActive?: boolean;
+
+  @IsEnum(SubscriptionStatus)
+  @IsOptional()
+  status?: SubscriptionStatus;
 }
 

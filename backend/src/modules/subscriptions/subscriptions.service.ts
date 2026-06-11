@@ -345,7 +345,7 @@ export class SubscriptionsService {
             existingSubscription.plan = planKey;
           }
 
-          existingSubscription.status = SubscriptionStatus.TRIAL;
+          existingSubscription.status = createSubscriptionDto.status || SubscriptionStatus.TRIAL;
           existingSubscription.billingCycle = createSubscriptionDto.billingCycle as any;
           existingSubscription.price = price;
           existingSubscription.currency = currency;
@@ -382,7 +382,7 @@ export class SubscriptionsService {
               createSubscriptionDto.companyId,
               {
                 subscriptionPlan: plan.name, // Use plan.name for frontend matching
-                subscriptionStatus: 'trial',
+                subscriptionStatus: savedSubscription.status,
                 subscriptionStartDate: savedSubscription.trialStartDate,
                 subscriptionEndDate: savedSubscription.trialEndDate,
                 nextBillingDate: savedSubscription.nextBillingDate,
@@ -429,7 +429,7 @@ export class SubscriptionsService {
 
       const subscriptionData: any = {
         companyId: createSubscriptionDto.companyId,
-        status: SubscriptionStatus.TRIAL,
+        status: createSubscriptionDto.status || SubscriptionStatus.TRIAL,
         billingCycle: createSubscriptionDto.billingCycle,
         price,
         currency,
@@ -483,7 +483,7 @@ export class SubscriptionsService {
       if (!isFeatureBased && plan) {
         const companyUpdate = {
           subscriptionPlan: plan.name, // Use plan.name for frontend matching
-          subscriptionStatus: 'trial',
+          subscriptionStatus: savedSubscription.status,
           subscriptionStartDate: savedSubscription.trialStartDate,
           subscriptionEndDate: savedSubscription.trialEndDate,
           nextBillingDate: savedSubscription.nextBillingDate,

@@ -292,6 +292,7 @@ export const subscriptionsApi = apiSlice.injectEndpoints({
       companyName: string; // REQUIRED
       paymentMethodId?: string; // Optional
       overrideActive?: boolean; // Optional
+      status?: string; // Optional
     }>({
       query: (data) => ({
         url: '/subscriptions',

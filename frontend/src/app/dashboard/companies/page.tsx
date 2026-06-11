@@ -294,6 +294,7 @@ export default function CompaniesPage() {
         email: selectedCompany.email,
         companyName: selectedCompany.name,
         overrideActive: true,
+        status: 'active',
       }).unwrap();
       toast.success('Subscription plan assigned successfully');
       setIsAssignPlanModalOpen(false);
