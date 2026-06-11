@@ -1,10 +1,10 @@
-import { IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { BillingCycle, SubscriptionPlan } from '../schemas/subscription.schema';
 
 export class UpgradeSubscriptionDto {
-  @IsEnum(SubscriptionPlan)
+  @IsString()
   @IsNotEmpty()
-  newPlan: SubscriptionPlan;
+  newPlan: string;
 
   @IsEnum(BillingCycle)
   @IsOptional()

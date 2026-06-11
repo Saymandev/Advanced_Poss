@@ -16,9 +16,9 @@ export class CreateSubscriptionDto {
   companyId: MongooseSchema.Types.ObjectId;
 
   // Plan-based subscription (legacy) - optional if enabledFeatures is provided
-  @IsEnum(SubscriptionPlan)
+  @IsString()
   @IsOptional()
-  plan?: SubscriptionPlan;
+  plan?: string;
 
   // Feature-based subscription (new flexible model)
   @IsArray()
