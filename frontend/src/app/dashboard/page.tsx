@@ -101,6 +101,7 @@ export default function DashboardPage() {
   const branchId = user?.branchId;
   const { companyContext } = useAppSelector((state) => state.auth);
   const companyId = user?.companyId || companyContext?.companyId;
+  const isRetail = companyContext?.businessType === 'retail';
   // Get today's date - always fresh
   const todayStr = useMemo(() => {
     return formatDateInput(new Date());
@@ -505,7 +506,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Overview of your restaurant performance
+            Overview of your {isRetail ? 'business' : 'restaurant'} performance
           </p>
         </div>
       </div>
@@ -704,7 +705,7 @@ export default function DashboardPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">Food Item</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">{isRetail ? 'Product' : 'Food Item'}</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">Category</th>
                       <th className="text-right py-3 px-4 font-semibold text-gray-900 dark:text-white">Qty</th>
                       <th className="text-right py-3 px-4 font-semibold text-gray-900 dark:text-white">Total Sales</th>
@@ -725,10 +726,10 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
-        {/* Top Waiters */}
+        {/* Top Waiters / Staff */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Waiters</CardTitle>
+            <CardTitle>{isRetail ? 'Top Sales Staff' : 'Top Waiters'}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -756,7 +757,7 @@ export default function DashboardPage() {
                   ))}
                   {topWaiters.length === 0 && (
                     <tr>
-                      <td colSpan={2} className="text-center py-8 text-gray-500 dark:text-gray-400">No waiter data available</td>
+                      <td colSpan={2} className="text-center py-8 text-gray-500 dark:text-gray-400">No {isRetail ? 'staff' : 'waiter'} data available</td>
                     </tr>
                   )}
                 </tbody>

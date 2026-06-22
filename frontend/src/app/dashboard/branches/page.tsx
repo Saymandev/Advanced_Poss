@@ -633,7 +633,7 @@ export default function BranchesPage() {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Branch Management</h1>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Manage your restaurant branches and locations
+            Manage your ${companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} branches and locations
             {currentBranchId && data?.branches?.find(b => b.id === currentBranchId) && (
               <span className="ml-2 text-primary-600 dark:text-primary-400 font-medium">
                 • Currently active: <strong className="text-primary-700 dark:text-primary-300">{data.branches.find(b => b.id === currentBranchId)?.name}</strong>
@@ -808,7 +808,7 @@ export default function BranchesPage() {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="branch@restaurant.com"
+              placeholder="branch@${companyContext?.businessType === 'retail' ? 'business' : 'restaurant'}.com"
             />
             <Select
               label="Country"
@@ -1162,7 +1162,7 @@ export default function BranchesPage() {
                   setFormErrors(rest);
                 }
               }}
-              placeholder="branch@restaurant.com"
+              placeholder="branch@${companyContext?.businessType === 'retail' ? 'business' : 'restaurant'}.com"
               error={formErrors.email}
             />
             <Select

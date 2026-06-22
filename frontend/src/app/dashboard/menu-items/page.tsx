@@ -72,6 +72,7 @@ interface MenuItem {
 
 export default function MenuItemsPage() {
   const { companyContext, user } = useAppSelector((state) => state.auth);
+  const isRetail = companyContext?.businessType === 'retail';
   // Redirect if user doesn't have menu-management feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('menu-management');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -1216,9 +1217,9 @@ export default function MenuItemsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Menu Management</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{isRetail ? 'Product Management' : 'Menu Management'}</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage your restaurant menu items and pricing
+              Manage your {isRetail ? 'retail products' : 'restaurant menu items'} and pricing
             </p>
           </div>
         </div>
@@ -1244,9 +1245,9 @@ export default function MenuItemsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Menu Management</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{isRetail ? 'Product Management' : 'Menu Management'}</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage your restaurant menu items and pricing
+              Manage your {isRetail ? 'retail products' : 'restaurant menu items'} and pricing
             </p>
           </div>
         </div>
@@ -1262,9 +1263,9 @@ export default function MenuItemsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Menu Management</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{isRetail ? 'Product Management' : 'Menu Management'}</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Manage your restaurant menu items and pricing
+            Manage your {isRetail ? 'retail products' : 'restaurant menu items'} and pricing
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1326,7 +1327,7 @@ export default function MenuItemsPage() {
           />
           <Button onClick={() => setIsCreateModalOpen(true)}>
             <PlusIcon className="w-5 h-5 mr-2" />
-            Add Menu Item
+            {isRetail ? 'Add Product' : 'Add Menu Item'}
           </Button>
         </div>
       </div>
@@ -1550,7 +1551,7 @@ export default function MenuItemsPage() {
           setIsViewModalOpen(false);
           setSelectedMenuItem(null);
         }}
-        title="Menu Item Details"
+        title={isRetail ? 'Product Details' : 'Menu Item Details'}
         className="max-w-4xl"
       >
         {selectedMenuItem && (
@@ -1578,7 +1579,7 @@ export default function MenuItemsPage() {
                       {selectedMenuItem.isAvailable ? 'Available' : 'Unavailable'}
                     </Badge>
                     <Badge variant={selectedMenuItem.requiresKitchen !== false ? 'info' : 'secondary'} className="mt-2 ml-2">
-                      {selectedMenuItem.requiresKitchen !== false ? 'Kitchen Item' : 'Direct Serve'}
+                      {selectedMenuItem.requiresKitchen !== false ? (isRetail ? 'Prep Item' : 'Kitchen Item') : 'Direct Serve'}
                     </Badge>
                   </div>
                 </div>
@@ -1616,7 +1617,7 @@ export default function MenuItemsPage() {
               {/* Ingredients */}
               {selectedMenuItem.ingredients && selectedMenuItem.ingredients.length > 0 && (
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">Ingredients</h4>
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">{isRetail ? 'Items' : 'Ingredients'}</h4>
                   <div className="flex flex-wrap gap-2">
                     {selectedMenuItem.ingredients.map((ingredient: any, index: number) => {
                       // Ensure ingredient is a string
@@ -1734,7 +1735,7 @@ export default function MenuItemsPage() {
                 Close
               </Button>
               <Button onClick={() => openEditModal(selectedMenuItem)}>
-                Edit Item
+                {isRetail ? 'Edit Product' : 'Edit Item'}
               </Button>
             </div>
           </div>
@@ -1748,7 +1749,7 @@ export default function MenuItemsPage() {
           setIsEditModalOpen(false);
           setSelectedMenuItem(null);
         }}
-        title={isEditModalOpen ? 'Edit Menu Item' : 'Create Menu Item'}
+        title={isEditModalOpen ? (isRetail ? 'Edit Product' : 'Edit Menu Item') : (isRetail ? 'Create Product' : 'Create Menu Item')}
         className="max-w-3xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
@@ -1782,7 +1783,7 @@ export default function MenuItemsPage() {
                   setFormData({ ...formData, name: e.target.value });
                   clearFormError('name');
                 }}
-                placeholder="Menu item name"
+                placeholder={isRetail ? 'Product name' : 'Menu item name'}
                 className={formErrors.name ? 'border-red-500' : ''}
               />
               {formErrors.name && (
@@ -1834,7 +1835,7 @@ export default function MenuItemsPage() {
                   setFormData({ ...formData, description: e.target.value });
                   clearFormError('description');
                 }}
-                placeholder="Menu item description"
+                placeholder={isRetail ? 'Product description' : 'Menu item description'}
                 rows={3}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white ${
                   formErrors.description ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
@@ -1855,7 +1856,7 @@ export default function MenuItemsPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={image}
-                    alt={`Menu item ${index + 1}`}
+                    alt={isRetail ? `Product ${index + 1}` : `Menu item ${index + 1}`}
                     className="w-full h-24 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
                   />
                   <button
@@ -1878,7 +1879,7 @@ export default function MenuItemsPage() {
                 className="hidden"
               />
             </label>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload one or more images for this menu item</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload one or more images for this {isRetail ? 'product' : 'menu item'}</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1978,20 +1979,22 @@ export default function MenuItemsPage() {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Available</span>
               </label>
             </div>
-            <div className="flex items-center pt-6">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.requiresKitchen}
-                  onChange={(e) => setFormData({ ...formData, requiresKitchen: e.target.checked })}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Send to Kitchen</span>
-              </label>
-              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                (Uncheck for drinks/bottled items that do not require prep)
-              </span>
-            </div>
+            {!isRetail && (
+              <div className="flex items-center pt-6">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.requiresKitchen}
+                    onChange={(e) => setFormData({ ...formData, requiresKitchen: e.target.checked })}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Send to Kitchen</span>
+                </label>
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  (Uncheck for drinks/bottled items that do not require prep)
+                </span>
+              </div>
+            )}
             <div className="flex items-center pt-4">
               <label className="flex items-center gap-2">
                 <input
@@ -2009,7 +2012,7 @@ export default function MenuItemsPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Ingredients
+              {isRetail ? 'Items' : 'Ingredients'}
             </label>
             <div className="space-y-3">
               {formData.ingredients.map((ingredient, index) => (
@@ -2017,7 +2020,7 @@ export default function MenuItemsPage() {
                   <div className="col-span-5">
                     {isLoadingIngredients ? (
                       <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 dark:bg-gray-800 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400">
-                        Loading ingredients...
+                        {isRetail ? 'Loading items...' : 'Loading ingredients...'}
                       </div>
                     ) : availableIngredients.length > 0 ? (
                       <Select
@@ -2045,11 +2048,11 @@ export default function MenuItemsPage() {
                             return { ...prev, ingredients: newIngredients };
                           });
                         }}
-                        placeholder="Select ingredient"
+                        placeholder={isRetail ? 'Select item' : 'Select ingredient'}
                       />
                     ) : (
                       <div className="px-3 py-2 border border-yellow-300 rounded-md bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800 text-sm text-yellow-600 dark:text-yellow-400">
-                        No ingredients available. Please create ingredients first.
+                        {isRetail ? 'No items available. Please create items first.' : 'No ingredients available. Please create ingredients first.'}
                       </div>
                     )}
                   </div>
@@ -2097,7 +2100,7 @@ export default function MenuItemsPage() {
                 size="sm"
                 onClick={addIngredient}
               >
-                + Add Ingredient
+                {isRetail ? '+ Add Item' : '+ Add Ingredient'}
               </Button>
             </div>
           </div>

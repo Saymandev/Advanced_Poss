@@ -659,7 +659,7 @@ export default function SettingsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Configure restaurant settings and preferences
+            Configure {companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} settings and preferences
           </p>
         </div>
         <Card>
@@ -718,7 +718,7 @@ export default function SettingsPage() {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {isSuperAdmin ? 'Manage company settings (Super Admin View)' : 'Configure your restaurant settings and preferences'}
+            {isSuperAdmin ? 'Manage company settings (Super Admin View)' : `Configure your ${companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} settings and preferences`}
           </p>
           {isSuperAdmin && (
             <div className="mt-3">
@@ -785,7 +785,7 @@ export default function SettingsPage() {
                   return branchPublicUrl ? (
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                        Share this URL with your customers to access your branch's online menu, place orders, and view your restaurant information.
+                        Share this URL with your customers to access your branch's online menu, place orders, and view your {companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} information.
                       </p>
                       <div className="flex items-center gap-3">
                         <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 flex items-center gap-2">
@@ -998,7 +998,7 @@ export default function SettingsPage() {
               <CardContent>
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    Share this URL with your customers to access your online menu, place orders, and view your restaurant information.
+                    Share this URL with your customers to access your online menu, place orders, and view your {companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} information.
                   </p>
                   <div className="flex items-center gap-3">
                     <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 flex items-center gap-2">
@@ -2313,7 +2313,7 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
               <strong>What is a custom domain?</strong>
             </p>
             <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
-              A custom domain allows you to use your own domain name (e.g., app.yourrestaurant.com) instead of the default subdomain. 
+              A custom domain allows you to use your own domain name (e.g., app.yourbusiness.com) instead of the default subdomain. 
               This feature requires a premium or enterprise subscription plan.
             </p>
           </div>
@@ -2421,7 +2421,7 @@ function CustomDomainSection({ companyId }: { companyId: string }) {
                   type="text"
                   value={domainInput}
                   onChange={(e) => setDomainInput(e.target.value)}
-                  placeholder="app.yourrestaurant.com"
+                  placeholder="app.yourbusiness.com"
                   className="font-mono"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">

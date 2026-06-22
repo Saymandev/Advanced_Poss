@@ -30,6 +30,7 @@ import toast from 'react-hot-toast';
 export default function GalleryPage() {
   // Redirect if user doesn't have settings feature (includes gallery)
   useFeatureRedirect('settings');
+  const { companyContext } = useAppSelector((state) => state.auth);
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -262,7 +263,7 @@ export default function GalleryPage() {
               No images in gallery
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Start by uploading your first image to showcase your restaurant.
+              Start by uploading your first image to showcase your {companyContext?.businessType === 'retail' ? 'business' : 'restaurant'}.
             </p>
             <Button onClick={handleOpenUploadModal}>
               <PlusIcon className="w-5 h-5 mr-2" />

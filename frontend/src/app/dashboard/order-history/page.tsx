@@ -1014,7 +1014,7 @@ export default function OrdersPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Orders Management</h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
-            Manage restaurant orders and transactions
+            Manage {companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} orders and transactions
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

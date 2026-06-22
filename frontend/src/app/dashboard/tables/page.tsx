@@ -517,7 +517,7 @@ export default function TablesPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Table Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Manage your restaurant tables and seating arrangements
+            Manage your {companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} tables and seating arrangements
           </p>
         </div>
         <div className="flex items-center gap-2">

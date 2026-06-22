@@ -607,7 +607,7 @@ export default function StaffPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Staff Management</h1>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Manage your restaurant staff and team members
+            Manage your {companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} staff and team members
           </p>
           {!!error && (
             <p className="text-red-600 dark:text-red-400 text-xs sm:text-sm mt-1">

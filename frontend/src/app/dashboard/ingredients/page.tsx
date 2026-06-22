@@ -536,7 +536,7 @@ export default function IngredientsPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Inventory Management</h1>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Manage your restaurant ingredients and stock levels
+            Manage your {companyContext?.businessType === 'retail' ? 'business' : 'restaurant'} ingredients and stock levels
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
