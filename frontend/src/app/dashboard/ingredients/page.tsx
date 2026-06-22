@@ -603,7 +603,7 @@ export default function IngredientsPage() {
           />
           <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
             <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-            Add Ingredient
+            Add Item
           </Button>
         </div>
       </div>
@@ -760,7 +760,7 @@ export default function IngredientsPage() {
           setIsCreateModalOpen(false);
           resetForm();
         }}
-        title="Add New Ingredient"
+        title="Add New Item"
         className="max-w-2xl"
       >
         <div 
@@ -912,7 +912,7 @@ export default function IngredientsPage() {
               Cancel
             </Button>
             <Button onClick={handleCreate} disabled={isCreating} className="w-full sm:w-auto text-sm sm:text-base">
-              {isCreating ? 'Creating...' : 'Add Ingredient'}
+              {isCreating ? 'Creating...' : 'Add Item'}
             </Button>
           </div>
         </div>
