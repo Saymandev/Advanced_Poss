@@ -1191,6 +1191,26 @@ export default function RetailPOSPage() {
             )}
           </div>
 
+          {paymentMode === 'checkout' && (
+            <div>
+              <label className="block text-xs font-bold mb-2 text-gray-600">Customer</label>
+              <button
+                onClick={() => setIsCustomerModalOpen(true)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl text-sm hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <UserCircleIcon className="h-5 w-5 text-gray-400" />
+                  {selectedCustomerId ? (
+                    <span className="font-bold text-gray-900 dark:text-white">{customerInfo.name || 'Customer'}</span>
+                  ) : (
+                    <span className="text-gray-500 font-medium">Add customer (optional)</span>
+                  )}
+                </div>
+                <span className="text-xs font-bold text-blue-600">{selectedCustomerId ? 'Change' : 'Add'}</span>
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold mb-2 text-gray-600">Payment Method</label>
             <select
