@@ -304,7 +304,8 @@ export default function IngredientsPage() {
               isActive: true,
               sortOrder: 0
             } as any).unwrap();
-            targetCategoryId = newCategory.id || (newCategory as any)._id;
+            const categoryData = (newCategory as any)?.data || newCategory;
+            targetCategoryId = categoryData?.id || categoryData?._id;
         }
 
         // Upload Image
@@ -317,6 +318,14 @@ export default function IngredientsPage() {
             
             const uploadedResponse = await uploadImages(formDataImage).unwrap();
             imageUrls = uploadedResponse.images?.map((img: any) => img.url) || [];
+        }
+
+        const ingredientData = (newIngredient as any)?.data || newIngredient;
+        const ingredientId = ingredientData?.id || ingredientData?._id;
+
+        if (!ingredientId) {
+            console.error('Failed to resolve ingredient ID from response:', newIngredient);
+            throw new Error('Failed to resolve ingredient ID from the response.');
         }
 
         // Create the Menu Item (The "Magic Link" for stock tracking)
@@ -332,7 +341,7 @@ export default function IngredientsPage() {
             requiresKitchen: false,
             isAvailable: true,
             ingredients: [{
-                ingredientId: newIngredient.id || (newIngredient as any)._id,
+                ingredientId: ingredientId,
                 quantity: 1,
                 unit: formData.unit
             }],
