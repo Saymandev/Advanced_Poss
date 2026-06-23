@@ -134,18 +134,25 @@ export class TransactionsService {
     fs.appendFileSync(logPath, `[TXN] ${createTransactionDto.type} for ${paymentMethod.code}: Bal ${currentBalance} -> ${balanceAfter} (Amt: ${amount})\n`);
 
     const transactionNumber = await this.generateTransactionNumber(companyId);
-    const newTransaction = new this.transactionModel({
+    const txnData: any = {
       ...createTransactionDto,
       transactionNumber,
       balanceAfter,
-      companyId: companyId ? new Types.ObjectId(companyId) : undefined,
-      branchId: branchId ? new Types.ObjectId(branchId) : undefined,
       paymentMethodId: paymentMethod._id,
-      referenceId: createTransactionDto.referenceId && Types.ObjectId.isValid(createTransactionDto.referenceId) ? new Types.ObjectId(createTransactionDto.referenceId) : undefined,
-      createdBy: userId ? new Types.ObjectId(userId) : undefined,
       date: createTransactionDto.date ? new Date(createTransactionDto.date) : new Date(),
-      workPeriodId: await this.workPeriodsService.getActiveWorkPeriodId(companyId, branchId),
-    });
+    };
+
+    if (companyId) txnData.companyId = new Types.ObjectId(companyId);
+    if (branchId) txnData.branchId = new Types.ObjectId(branchId);
+    if (createTransactionDto.referenceId && Types.ObjectId.isValid(createTransactionDto.referenceId)) {
+      txnData.referenceId = new Types.ObjectId(createTransactionDto.referenceId);
+    }
+    if (userId) txnData.createdBy = new Types.ObjectId(userId);
+    
+    const workPeriodId = await this.workPeriodsService.getActiveWorkPeriodId(companyId, branchId);
+    if (workPeriodId) txnData.workPeriodId = workPeriodId;
+
+    const newTransaction = new this.transactionModel(txnData);
 
     try {
       const saved = await newTransaction.save();

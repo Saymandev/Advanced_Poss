@@ -156,7 +156,7 @@ export const incomesApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Income'],
+      invalidatesTags: ['Income', 'Transactions' as any],
     }),
     updateIncome: builder.mutation<Income, UpdateIncomeRequest>({
       query: ({ id, ...data }) => ({
@@ -164,21 +164,21 @@ export const incomesApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: ['Income'],
+      invalidatesTags: ['Income', 'Transactions' as any],
     }),
     deleteIncome: builder.mutation<void, string>({
       query: (id) => ({
         url: `/incomes/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Income'],
+      invalidatesTags: ['Income', 'Transactions' as any],
     }),
     markIncomeAsReceived: builder.mutation<Income, string>({
       query: (id) => ({
         url: `/incomes/${id}/mark-received`,
         method: 'POST',
       }),
-      invalidatesTags: ['Income'],
+      invalidatesTags: ['Income', 'Transactions' as any],
     }),
     getIncomeStats: builder.query<IncomeStats, {
       branchId: string;

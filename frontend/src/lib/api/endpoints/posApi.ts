@@ -191,7 +191,7 @@ export const posApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['POS', 'Payment', 'Customer', 'Table'],
+      invalidatesTags: ['POS', 'Payment', 'Customer', 'Table', 'Transactions' as any],
     }),
 
     // Get POS statistics

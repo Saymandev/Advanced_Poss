@@ -230,7 +230,7 @@ export const expensesApi = apiSlice.injectEndpoints({
           updatedAt: exp.updatedAt || new Date().toISOString(),
         } as Expense;
       },
-      invalidatesTags: ['Expense'],
+      invalidatesTags: ['Expense', 'Transactions' as any],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;
@@ -246,14 +246,14 @@ export const expensesApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: ['Expense'],
+      invalidatesTags: ['Expense', 'Transactions' as any],
     }),
     deleteExpense: builder.mutation<void, string>({
       query: (id) => ({
         url: `/expenses/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Expense'],
+      invalidatesTags: ['Expense', 'Transactions' as any],
     }),
     approveExpense: builder.mutation<Expense, { id: string; approverId?: string }>({
       query: ({ id, approverId }) => ({
@@ -261,7 +261,7 @@ export const expensesApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: approverId ? { approverId } : {},
       }),
-      invalidatesTags: ['Expense'],
+      invalidatesTags: ['Expense', 'Transactions' as any],
     }),
     rejectExpense: builder.mutation<Expense, { id: string; approverId?: string; reason?: string }>({
       query: ({ id, approverId, reason }) => ({
@@ -269,7 +269,7 @@ export const expensesApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: { ...(approverId && { approverId }), ...(reason && { reason }) },
       }),
-      invalidatesTags: ['Expense'],
+      invalidatesTags: ['Expense', 'Transactions' as any],
     }),
     getExpenseSummary: builder.query<ExpenseSummary, {
       branchId?: string;
@@ -292,7 +292,7 @@ export const expensesApi = apiSlice.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: ['Expense'],
+      invalidatesTags: ['Expense', 'Transactions' as any],
     }),
   }),
 });
