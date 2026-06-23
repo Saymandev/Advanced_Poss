@@ -19,6 +19,8 @@ import {
   useRemoveStockMutation,
   useUpdateInventoryItemMutation,
 } from '@/lib/api/endpoints/inventoryApi';
+import { useGetCategoriesQuery, useCreateCategoryMutation } from '@/lib/api/endpoints/categoriesApi';
+import { useCreateMenuItemMutation, useUploadMenuImagesMutation } from '@/lib/api/endpoints/menuItemsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -29,8 +31,10 @@ import {
   PencilIcon,
   PlusIcon,
   TrashIcon,
+  PhotoIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 
@@ -42,6 +46,17 @@ export default function IngredientsPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isAdjustStockModalOpen, setIsAdjustStockModalOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<InventoryItem | null>(null);
+  
+  // POS Integration State
+  const [listOnPos, setListOnPos] = useState(companyContext?.businessType === 'retail');
+  const [posData, setPosData] = useState({
+    sellingPrice: 0,
+    categoryId: '',
+    newCategoryName: '',
+    imageFile: null as File | null,
+    imagePreview: '',
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
@@ -95,6 +110,18 @@ export default function IngredientsPage() {
   const [adjustStock] = useAdjustStockMutation();
   const [addStock] = useAddStockMutation();
   const [removeStock] = useRemoveStockMutation();
+
+  // POS Integration Hooks
+  const { data: categoriesResponse } = useGetCategoriesQuery(
+    { companyId: companyId as string, branchId: branchId as string },
+    { skip: !companyId }
+  );
+  const posCategories = categoriesResponse?.categories || [];
+  const posCategoryOptions = posCategories.map(cat => ({ value: cat.id, label: cat.name }));
+
+  const [createCategory] = useCreateCategoryMutation();
+  const [createMenuItem] = useCreateMenuItemMutation();
+  const [uploadImages] = useUploadMenuImagesMutation();
 
   // Extract ingredients from API response
   const ingredients = useMemo(() => {
@@ -164,6 +191,7 @@ export default function IngredientsPage() {
     storageLocation: '',
     storageTemperature: '',
     shelfLife: '',
+    expiryDate: '',
     sku: '',
     barcode: '',
     notes: '',
@@ -198,11 +226,20 @@ export default function IngredientsPage() {
       storageLocation: '',
       storageTemperature: '',
       shelfLife: '',
+      expiryDate: '',
       sku: '',
       barcode: '',
       notes: '',
     });
     setSelectedIngredient(null);
+    setListOnPos(companyContext?.businessType === 'retail');
+    setPosData({
+      sellingPrice: 0,
+      categoryId: '',
+      newCategoryName: '',
+      imageFile: null,
+      imagePreview: '',
+    });
   };
 
   const resetStockAdjustment = () => {
@@ -219,13 +256,24 @@ export default function IngredientsPage() {
       return;
     }
 
+    if (listOnPos) {
+      if (posData.sellingPrice <= 0) {
+        toast.error('Please enter a valid Selling Price for POS listing');
+        return;
+      }
+      if (!posData.categoryId && !posData.newCategoryName.trim()) {
+        toast.error('Please select or create a Menu Category for POS listing');
+        return;
+      }
+    }
+
     if (!companyId) {
       toast.error('Company ID is missing');
       return;
     }
 
     try {
-      await createIngredient({
+      const newIngredient = await createIngredient({
         companyId,
         branchId,
         name: formData.name,
@@ -240,16 +288,69 @@ export default function IngredientsPage() {
         storageLocation: formData.storageLocation || undefined,
         storageTemperature: formData.storageTemperature || undefined,
         shelfLife: formData.shelfLife ? parseInt(formData.shelfLife) : undefined,
+        expiryDate: formData.expiryDate ? new Date(formData.expiryDate).toISOString() : undefined,
         sku: formData.sku || undefined,
         barcode: formData.barcode || undefined,
         notes: formData.notes || undefined,
       } as any).unwrap();
-      toast.success('Ingredient created successfully');
+
+      if (listOnPos) {
+        let targetCategoryId = posData.categoryId;
+        
+        // Inline Category Creation
+        if (posData.newCategoryName.trim() && !posData.categoryId) {
+            const newCategory = await createCategory({ 
+              name: posData.newCategoryName.trim(),
+              isActive: true,
+              sortOrder: 0
+            } as any).unwrap();
+            targetCategoryId = newCategory.id || (newCategory as any)._id;
+        }
+
+        // Upload Image
+        let imageUrls = [];
+        if (posData.imageFile) {
+            const formDataImage = new FormData();
+            formDataImage.append('images', posData.imageFile);
+            if (companyId) formDataImage.append('companyId', companyId);
+            if (branchId) formDataImage.append('branchId', branchId);
+            
+            const uploadedResponse = await uploadImages(formDataImage).unwrap();
+            imageUrls = uploadedResponse.images?.map((img: any) => img.url) || [];
+        }
+
+        // Create the Menu Item (The "Magic Link" for stock tracking)
+        await createMenuItem({
+            companyId,
+            branchId,
+            name: formData.name, 
+            price: posData.sellingPrice,
+            categoryId: targetCategoryId,
+            images: imageUrls.length > 0 ? imageUrls : undefined,
+            expiryDate: formData.expiryDate ? new Date(formData.expiryDate).toISOString() : undefined,
+            trackInventory: true,
+            requiresKitchen: false,
+            isAvailable: true,
+            ingredients: [{
+                ingredientId: newIngredient.id || (newIngredient as any)._id,
+                quantity: 1,
+                unit: formData.unit
+            }],
+            barcode: formData.barcode || undefined,
+            sku: formData.sku || undefined,
+            description: formData.description || undefined,
+        } as any).unwrap();
+        
+        toast.success('Item created and listed on POS!');
+      } else {
+        toast.success('Ingredient created successfully');
+      }
+
       setIsCreateModalOpen(false);
       resetForm();
       await refetch();
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.message || 'Failed to create ingredient');
+      toast.error(error?.data?.message || error?.message || 'Failed to create item');
     }
   };
 
@@ -275,6 +376,7 @@ export default function IngredientsPage() {
         storageLocation: formData.storageLocation || undefined,
         storageTemperature: formData.storageTemperature || undefined,
         shelfLife: formData.shelfLife ? parseInt(formData.shelfLife) : undefined,
+        expiryDate: formData.expiryDate ? new Date(formData.expiryDate).toISOString() : undefined,
         sku: formData.sku || undefined,
         barcode: formData.barcode || undefined,
         notes: formData.notes || undefined,
@@ -346,6 +448,7 @@ export default function IngredientsPage() {
       storageLocation: ingredient.storageLocation || '',
       storageTemperature: ingredient.storageTemperature || '',
       shelfLife: ingredient.shelfLife || '',
+      expiryDate: ingredient.expiryDate ? new Date(ingredient.expiryDate).toISOString().split('T')[0] : '',
       sku: ingredient.sku || '',
       barcode: ingredient.barcode || '',
       notes: ingredient.notes || '',
@@ -839,7 +942,7 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <Input
               label="Maximum Stock (Optional)"
               type="number"
@@ -859,6 +962,12 @@ export default function IngredientsPage() {
               type="number"
               value={formData.shelfLife}
               onChange={(e) => setFormData({ ...formData, shelfLife: parseInt(e.target.value) || undefined })}
+            />
+            <Input
+              label="Expiry Date (Optional)"
+              type="date"
+              value={formData.expiryDate}
+              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
             />
           </div>
 
@@ -898,6 +1007,161 @@ export default function IngredientsPage() {
               className="input w-full"
               placeholder="Additional notes about this ingredient..."
             />
+          </div>
+
+          {/* POS Menu Listing Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white">POS Integration</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Instantly make this item available for sale on the POS menu.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={listOnPos}
+                onClick={() => setListOnPos(!listOnPos)}
+                className={`${
+                  listOnPos ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'
+                } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`${
+                    listOnPos ? 'translate-x-5' : 'translate-x-0'
+                  } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                />
+              </button>
+            </div>
+
+            {listOnPos && (
+              <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg space-y-4 border border-gray-100 dark:border-gray-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Input
+                      label="Selling Price *"
+                      type="number"
+                      step="0.01"
+                      value={posData.sellingPrice}
+                      onChange={(e) => setPosData({ ...posData, sellingPrice: parseFloat(e.target.value) || 0 })}
+                      required
+                    />
+                    {posData.sellingPrice > 0 && formData.unitCost > 0 && (
+                      <p className="text-xs mt-1 font-medium text-green-600 dark:text-green-400">
+                        Profit: {formatCurrency(posData.sellingPrice - formData.unitCost)} (
+                        {Math.round(((posData.sellingPrice - formData.unitCost) / posData.sellingPrice) * 100)}% margin)
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Menu Category *
+                    </label>
+                    {posCategoryOptions.length > 0 && !posData.newCategoryName ? (
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Combobox
+                            value={posData.categoryId}
+                            onChange={(value) => setPosData({ ...posData, categoryId: value })}
+                            options={posCategoryOptions}
+                            placeholder="Select menu category"
+                          />
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="secondary" 
+                          onClick={() => setPosData({ ...posData, categoryId: '', newCategoryName: 'New Category' })}
+                          title="Create new category"
+                        >
+                          <PlusIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 relative">
+                        <Input
+                          label=""
+                          value={posData.newCategoryName}
+                          onChange={(e) => setPosData({ ...posData, newCategoryName: e.target.value })}
+                          placeholder="Type new category name..."
+                          className="flex-1"
+                        />
+                        {posCategoryOptions.length > 0 && (
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            onClick={() => setPosData({ ...posData, newCategoryName: '', categoryId: posCategoryOptions[0].value })}
+                            className="absolute right-0 top-0 h-10 w-10 p-0"
+                          >
+                            <XMarkIcon className="w-4 h-4 text-gray-500" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Item Image (Optional)
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div 
+                      className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center overflow-hidden cursor-pointer hover:border-primary-500 transition-colors bg-white dark:bg-gray-800"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {posData.imagePreview ? (
+                        <img src={posData.imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <PhotoIcon className="w-6 h-6 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Upload Image
+                      </Button>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              toast.error('Image size must be less than 5MB');
+                              return;
+                            }
+                            const previewUrl = URL.createObjectURL(file);
+                            setPosData({ ...posData, imageFile: file, imagePreview: previewUrl });
+                          }
+                        }}
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">JPEG, PNG, WEBP (Max 5MB)</p>
+                    </div>
+                    {posData.imagePreview && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500"
+                        onClick={() => {
+                          if (posData.imagePreview) URL.revokeObjectURL(posData.imagePreview);
+                          setPosData({ ...posData, imageFile: null, imagePreview: '' });
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
@@ -1004,7 +1268,7 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <Input
               label="Maximum Stock (Optional)"
               type="number"
@@ -1024,6 +1288,12 @@ export default function IngredientsPage() {
               type="number"
               value={formData.shelfLife}
               onChange={(e) => setFormData({ ...formData, shelfLife: parseInt(e.target.value) || undefined })}
+            />
+            <Input
+              label="Expiry Date (Optional)"
+              type="date"
+              value={formData.expiryDate}
+              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

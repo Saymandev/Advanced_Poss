@@ -1111,7 +1111,7 @@ export default function MenuItemsPage() {
         </div>
       ),
     },
-    {
+    !isRetail ? {
       key: 'preparationTime',
       title: 'Prep Time',
       sortable: true,
@@ -1124,7 +1124,7 @@ export default function MenuItemsPage() {
           </div>
         </div>
       ),
-    },
+    } : null,
     {
       key: 'popularity',
       title: 'Rating',
@@ -1195,7 +1195,7 @@ export default function MenuItemsPage() {
         </div>
       ),
     },
-  ];
+  ].filter(Boolean) as any[];
   // Filter menu items based on client-side filters (for display)
   const filteredMenuItems = useMemo(() => {
     let filtered = menuItems;
@@ -1218,9 +1218,6 @@ export default function MenuItemsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{isRetail ? 'Product Management' : 'Menu Management'}</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage your {isRetail ? 'retail products' : 'restaurant menu items'} and pricing
-            </p>
           </div>
         </div>
         <Card>
@@ -1246,9 +1243,6 @@ export default function MenuItemsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{isRetail ? 'Product Management' : 'Menu Management'}</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage your {isRetail ? 'retail products' : 'restaurant menu items'} and pricing
-            </p>
           </div>
         </div>
         <div className="text-center py-12">
@@ -1264,9 +1258,6 @@ export default function MenuItemsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{isRetail ? 'Product Management' : 'Menu Management'}</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Manage your {isRetail ? 'retail products' : 'restaurant menu items'} and pricing
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <ImportButton
@@ -1332,7 +1323,7 @@ export default function MenuItemsPage() {
         </div>
       </div>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isRetail ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-4 md:gap-6`}>
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between gap-3">
@@ -1366,17 +1357,19 @@ export default function MenuItemsPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 md:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Prep Time</p>
-                <p className="text-2xl md:text-3xl font-bold text-purple-600">{stats.avgPrepTime.toFixed(0)} min</p>
+        {!isRetail && (
+          <Card>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Avg Prep Time</p>
+                  <p className="text-2xl md:text-3xl font-bold text-purple-600">{stats.avgPrepTime.toFixed(0)} min</p>
+                </div>
+                <ClockIcon className="w-7 h-7 md:w-8 md:h-8 text-purple-600 shrink-0" />
               </div>
-              <ClockIcon className="w-7 h-7 md:w-8 md:h-8 text-purple-600 shrink-0" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1437,7 +1430,7 @@ export default function MenuItemsPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isRetail ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-gray-500 shrink-0">Price:</span>
                 <Input
@@ -1456,25 +1449,27 @@ export default function MenuItemsPage() {
                   className="h-8 text-xs"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-gray-500 shrink-0">Prep:</span>
-                <Input
-                  type="number"
-                  placeholder="Min min"
-                  value={minPrepTime}
-                  onChange={(e) => setMinPrepTime(e.target.value)}
-                  className="h-8 text-xs"
-                />
-                <span className="text-gray-400">-</span>
-                <Input
-                  type="number"
-                  placeholder="Max min"
-                  value={maxPrepTime}
-                  onChange={(e) => setMaxPrepTime(e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-              <div className="lg:col-span-2 flex justify-end items-center">
+              {!isRetail && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500 shrink-0">Prep:</span>
+                  <Input
+                    type="number"
+                    placeholder="Min min"
+                    value={minPrepTime}
+                    onChange={(e) => setMinPrepTime(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                  <span className="text-gray-400">-</span>
+                  <Input
+                    type="number"
+                    placeholder="Max min"
+                    value={maxPrepTime}
+                    onChange={(e) => setMaxPrepTime(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              )}
+              <div className={`${isRetail ? 'lg:col-span-1' : 'lg:col-span-2'} flex justify-end items-center`}>
                 {(minPrice || maxPrice || minPrepTime || maxPrepTime) && (
                   <Button
                     variant="ghost"
@@ -1522,21 +1517,21 @@ export default function MenuItemsPage() {
         exportOptions={{
           columns: [
             { key: 'name', label: 'Menu Item' },
-            { key: 'price', label: 'Price', format: (value) => formatCurrency(value || 0) },
-            { key: 'preparationTime', label: 'Prep Time (min)' },
-            { key: 'category', label: 'Category', format: (value, row) => {
+            { key: 'price', label: 'Price', format: (value: any) => formatCurrency(value || 0) },
+            !isRetail ? { key: 'preparationTime', label: 'Prep Time (min)' } : null,
+            { key: 'category', label: 'Category', format: (value: any, row: any) => {
               if (typeof value === 'object' && value?.name) return value.name;
               if (typeof value === 'string') return value;
               return row.categoryId || 'N/A';
             }},
-            { key: 'isAvailable', label: 'Status', format: (value) => value ? 'Available' : 'Unavailable' },
-            { key: 'popularity', label: 'Rating', format: (value, row) => {
+            { key: 'isAvailable', label: 'Status', format: (value: any) => value ? 'Available' : 'Unavailable' },
+            { key: 'popularity', label: 'Rating', format: (value: any, row: any) => {
               const rating = menuItemsRatings[row.id]?.averageRating || 0;
               return rating > 0 ? rating.toFixed(1) : '0.0';
             }},
             { key: 'description', label: 'Description' },
-            { key: 'createdAt', label: 'Created At', format: (value) => value ? formatDateTime(value) : '' },
-          ],
+            { key: 'createdAt', label: 'Created At', format: (value: any) => value ? formatDateTime(value) : '' },
+          ].filter(Boolean) as any[],
           excludeColumns: ['actions', 'imageUrl', 'images'],
         }}
         onExport={(_format, _items) => {
@@ -1584,12 +1579,14 @@ export default function MenuItemsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4 mt-4">
-                  <div className="flex items-center gap-1">
-                    <ClockIcon className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedMenuItem.preparationTime} min prep
-                    </span>
-                  </div>
+                  {!isRetail && (
+                    <div className="flex items-center gap-1">
+                      <ClockIcon className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedMenuItem.preparationTime} min prep
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1">
                     {(() => {
                       const rating = menuItemsRatings[selectedMenuItem.id]?.averageRating || 0;
@@ -1928,7 +1925,7 @@ export default function MenuItemsPage() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-3 gap-4">
+          <div className={`grid ${isRetail ? 'grid-cols-2' : 'grid-cols-3'} gap-4`}>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Price *
@@ -1949,25 +1946,27 @@ export default function MenuItemsPage() {
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.price}</p>
               )}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Prep Time (min)
-              </label>
-              <Input
-                type="number"
-                value={formData.preparationTime}
-                onChange={(e) => {
-                  setFormData({ ...formData, preparationTime: Number(e.target.value) });
-                  clearFormError('preparationTime');
-                }}
-                placeholder="0"
-                min="0"
-                className={formErrors.preparationTime ? 'border-red-500' : ''}
-              />
-              {formErrors.preparationTime && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.preparationTime}</p>
-              )}
-            </div>
+            {!isRetail && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Prep Time (min)
+                </label>
+                <Input
+                  type="number"
+                  value={formData.preparationTime}
+                  onChange={(e) => {
+                    setFormData({ ...formData, preparationTime: Number(e.target.value) });
+                    clearFormError('preparationTime');
+                  }}
+                  placeholder="0"
+                  min="0"
+                  className={formErrors.preparationTime ? 'border-red-500' : ''}
+                />
+                {formErrors.preparationTime && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.preparationTime}</p>
+                )}
+              </div>
+            )}
             <div className="flex items-center pt-6">
               <label className="flex items-center gap-2">
                 <input
