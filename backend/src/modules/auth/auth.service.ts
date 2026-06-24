@@ -814,8 +814,8 @@ export class AuthService {
       sub: user.id || user._id?.toString(),
       email: user.email,
       role: user.role,
-      companyId: user.companyId?.toString(),
-      branchId: user.branchId?.toString(),
+      companyId: user.companyId?._id?.toString() || user.companyId?.id?.toString() || user.companyId?.toString(),
+      branchId: user.branchId?._id?.toString() || user.branchId?.id?.toString() || user.branchId?.toString(),
       twoFactorRequired: true,
     };
 
@@ -836,8 +836,8 @@ export class AuthService {
       sub: userId,
       email: user.email,
       role: user.role,
-      companyId: user.companyId?.toString(),
-      branchId: manualBranchId || user.branchId?.toString(),
+      companyId: user.companyId?._id?.toString() || user.companyId?.id?.toString() || user.companyId?.toString(),
+      branchId: manualBranchId || user.branchId?._id?.toString() || user.branchId?.id?.toString() || user.branchId?.toString(),
     };
 
     const accessSecret = this.configService.get('jwt.secret');
