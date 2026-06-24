@@ -809,10 +809,10 @@ export default function ReportsPage() {
               </div>
               <div className="min-w-0">
                 <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'food' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
-                  Food Report
+                  {companyContext?.businessType === 'retail' ? 'Items Report' : 'Food Report'}
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  Menu performance
+                  {companyContext?.businessType === 'retail' ? 'Items performance' : 'Menu performance'}
                 </p>
               </div>
             </div>
@@ -1494,7 +1494,7 @@ export default function ReportsPage() {
       {activeReport === 'food' && (
         <Card>
           <CardHeader>
-            <CardTitle>Food Report</CardTitle>
+            <CardTitle>{companyContext?.businessType === 'retail' ? 'Items Report' : 'Food Report'}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -1502,7 +1502,7 @@ export default function ReportsPage() {
                 <Card>
                   <CardContent className="p-4 sm:p-6">
                     <div className="min-w-0">
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Menu Items</p>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">{companyContext?.businessType === 'retail' ? 'Products' : 'Menu Items'}</p>
                       <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-blue-600 truncate" title={(topItems.length || 0).toString()}>
                         {(topItems.length || 0).toLocaleString()}
                       </p>
