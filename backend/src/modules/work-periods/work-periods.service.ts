@@ -354,12 +354,12 @@ export class WorkPeriodsService {
       category: TransactionCategory.PURCHASE,
     }).populate('paymentMethodId', 'name code').lean();
 
-    const manualIncomeTotal = manualIncomes.reduce((sum, trx) => sum + (trx.amount || 0), 0);
-    const manualExpenseTotal = manualExpenses.reduce((sum, trx) => sum + (trx.amount || 0), 0);
-    const purchaseTotal = purchases.reduce((sum, trx) => sum + (trx.amount || 0), 0);
+    const manualIncomeTotal = manualIncomes.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
+    const manualExpenseTotal = manualExpenses.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
+    const purchaseTotal = purchases.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
 
     // Add manual incomes to payment method balances
-    manualIncomes.forEach((txn) => {
+    manualIncomes.forEach((txn: any) => {
       const amount = Number(txn.amount);
       const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
       
@@ -372,7 +372,7 @@ export class WorkPeriodsService {
     });
 
     // Subtract manual expenses from payment method balances
-    manualExpenses.forEach((txn) => {
+    manualExpenses.forEach((txn: any) => {
       const amount = Number(txn.amount);
       const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
       
@@ -385,7 +385,7 @@ export class WorkPeriodsService {
     });
 
     // Subtract purchases from payment method balances
-    purchases.forEach((txn) => {
+    purchases.forEach((txn: any) => {
       const amount = Number(txn.amount);
       const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
       
@@ -403,7 +403,7 @@ export class WorkPeriodsService {
       category: TransactionCategory.HOTEL_BOOKING,
     }).lean();
 
-    const hotelRevenue = hotelTransactions.reduce((sum, trx) => sum + (trx.amount || 0), 0);
+    const hotelRevenue = hotelTransactions.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
 
     const totalIncomePool = grossSales + hotelRevenue + manualIncomeTotal;
 
@@ -532,7 +532,7 @@ export class WorkPeriodsService {
     return this.emailService.sendEmail(email, subject, html);
   }
 
-  private generateWorkPeriodHtml(workPeriod: any, summary: any): string {
+  private generateWorkPeriodHtml(workPeriod: any, summary: any, isRetail: boolean = false): string {
     // Helper to format currency
     const formatCurrency = (amount: number) => {
       try {

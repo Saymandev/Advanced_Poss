@@ -125,8 +125,8 @@ export default function PrinterManagementPage() {
     }
     const errors: Record<string, string> = {};
     if (!formData.name.trim()) errors.name = 'Printer name is required.';
-    if (formData.width < 40 || formData.width > 210) errors.width = 'Width must be between 40 and 210 mm.';
-    if (formData.height < 40 || formData.height > 210) errors.height = 'Height must be between 40 and 210 mm.';
+    if (formData.width < 40 || formData.width > 300) errors.width = 'Width must be between 40 and 300 mm.';
+    if (formData.height < 40 || formData.height > 1000) errors.height = 'Height must be between 40 and 1000 mm.';
     if (formData.type === 'network' && !formData.networkUrl.trim()) errors.networkUrl = 'Network URL required for network printers.';
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -154,8 +154,8 @@ export default function PrinterManagementPage() {
     }
     if (!printerToEdit?.name) return;
     const errors: Record<string, string> = {};
-    if (formData.width < 40 || formData.width > 210) errors.width = 'Width must be between 40 and 210 mm.';
-    if (formData.height < 40 || formData.height > 210) errors.height = 'Height must be between 40 and 210 mm.';
+    if (formData.width < 40 || formData.width > 300) errors.width = 'Width must be between 40 and 300 mm.';
+    if (formData.height < 40 || formData.height > 1000) errors.height = 'Height must be between 40 and 1000 mm.';
     if (formData.type === 'network' && !formData.networkUrl.trim()) errors.networkUrl = 'Network URL required for network printers.';
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
