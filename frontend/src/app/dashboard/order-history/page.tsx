@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useProcessPaymentMutation, useRefundOrderMutation, useRefundItemsMutation, useUpdatePOSOrderMutation } from '@/lib/api/endpoints/posApi';
+import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useProcessPaymentMutation, useRefundOrderMutation, useRefundItemsMutation, useUpdatePOSOrderMutation, usePrintReceiptPDFMutation, usePrintReceiptMutation } from '@/lib/api/endpoints/posApi';
 import { useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -46,9 +46,12 @@ interface Order {
     id: string;
     name: string;
     quantity: number;
+    
     price: number;
     basePrice?: number;
     notes?: string;
+    variantSelections?: any[];
+    addonSelections?: any[];
   }>;
   total: number;
   tax: number;
@@ -271,6 +274,8 @@ export default function OrdersPage() {
   const [processPayment, { isLoading: isProcessingPayment }] = useProcessPaymentMutation();
   const [refundOrder, { isLoading: isRefunding }] = useRefundOrderMutation();
   const [refundItemsMutation, { isLoading: isRefundingItems }] = useRefundItemsMutation();
+  const [printReceiptPDF] = usePrintReceiptPDFMutation();
+  const [printReceipt] = usePrintReceiptMutation();
 
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
@@ -429,6 +434,27 @@ export default function OrdersPage() {
     return `${baseUrl}/display/customerreview/${order.id}`;
   };
 
+  const handleReceiptPrint = async (orderId: string, usePDF: boolean = false) => {
+    try {
+      if (usePDF) {
+        const result = await printReceiptPDF({
+          orderId,
+          printerId: undefined,
+        }).unwrap();
+        toast.success(result.message || 'Receipt sent to printer');
+      } else {
+        const result = await printReceipt({
+          orderId,
+          printerId: undefined,
+        }).unwrap();
+        toast.success(result.message || 'Receipt sent to printer');
+      }
+    } catch (error: any) {
+      console.error('Error printing receipt:', error);
+      toast.error(error?.data?.message || 'Failed to print receipt. Please try again.');
+    }
+  };
+
   const handleKOTPrint = (order: Order) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -501,9 +527,17 @@ export default function OrdersPage() {
             }
             .item-notes {
               font-size: 10px;
-              color: #666;
+              color: #444;
               margin-top: 2px;
-              font-style: italic;
+              margin-left: 10px;
+            }
+            .item-warning {
+              margin-top: 4px;
+              color: #000;
+              font-weight: bold;
+              background: #eee;
+              padding: 2px 4px;
+              font-size: 0.9em;
             }
             .total {
               margin-top: 10px;
@@ -568,16 +602,24 @@ export default function OrdersPage() {
 
           <div class="items">
             <h3 style="margin: 10px 0 5px 0; font-size: 14px;">ITEMS:</h3>
-            ${order.items.map(item => `
+            ${order.items.map(item => {
+              const variantNotes = item.variantSelections && item.variantSelections.length > 0 
+                ? `<div class="item-notes">- ${item.variantSelections.map(v => v.variantName || v.name).join(', ')}</div>` : '';
+              const addonNotes = item.addonSelections && item.addonSelections.length > 0
+                ? `<div class="item-notes">+ ${item.addonSelections.map(a => a.addonName || a.name).join(', ')}</div>` : '';
+              const specialNotes = item.notes ? `<div class="item-warning">⚠️ ${item.notes}</div>` : '';
+              
+              return `
               <div class="item">
                 <div class="item-header">
                   <span>${item.quantity}x ${item.name}</span>
-                  <span>${formatCurrency(item.quantity * item.price)}</span>
                 </div>
-                ${item.notes ? `<div class="item-notes">Note: ${item.notes}</div>` : ''}
+                ${variantNotes}
+                ${addonNotes}
+                ${specialNotes}
               </div>
-            `).join('')}
-          </div>
+            `}).join('')}
+          </div></div>
 
           <div class="total">
             ${(() => {
@@ -811,6 +853,8 @@ export default function OrdersPage() {
             price: item.price, // Actual price used in order (may include modifications)
             basePrice: item.basePrice || item.menuItemId?.price || item.price, // Use stored basePrice, fallback to populated menuItem price, then item price
             notes: item.notes,
+            variantSelections: item.variantSelections || [],
+            addonSelections: item.addonSelections || [],
           })) || [],
         total: orderData.totalAmount ?? orderData.total ?? 0,
         tax: orderData.taxAmount ?? orderData.tax ?? 0,
@@ -1286,12 +1330,23 @@ export default function OrdersPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => handleKOTPrint(selectedOrder)}
+                  onClick={() => handleReceiptPrint(selectedOrder.id, false)}
                   className="flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <PrinterIcon className="w-4 h-4" />
-                  <span className="text-sm">KOT Print</span>
+                  <span className="text-sm">Print Receipt</span>
                 </Button>
+                {companyContext?.businessType !== 'retail' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleKOTPrint(selectedOrder)}
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                  >
+                    <PrinterIcon className="w-4 h-4" />
+                    <span className="text-sm">KOT Print</span>
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"

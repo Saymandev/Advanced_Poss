@@ -27,7 +27,8 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function WorkPeriodsPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
+  const isRetail = companyContext?.businessType === 'retail';
 
   // Redirect if user doesn't have work-periods feature
   useFeatureRedirect('work-periods');
@@ -975,12 +976,14 @@ export default function WorkPeriodsPage() {
                     {formatCurrency(selectedWorkPeriod.closingBalance || 0)}
                   </p>
                 </div>
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Hotel Revenue:</span>
-                  <p className="font-semibold text-blue-600 dark:text-blue-400">
-                    {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.hotelRevenue || 0)}
-                  </p>
-                </div>
+                {!isRetail && (
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Hotel Revenue:</span>
+                    <p className="font-semibold text-blue-600 dark:text-blue-400">
+                      {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.hotelRevenue || 0)}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">Difference:</span>
                   <p className={`font-semibold ${(selectedWorkPeriod.closingBalance || 0) - ((selectedWorkPeriod.openingBalance || 0) + (salesSummary?.netSales || 0)) >= 0
@@ -1041,20 +1044,40 @@ export default function WorkPeriodsPage() {
                           {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.posSales || 0)}
                         </td>
                       </tr>
-                      <tr>
-                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Hotel Revenue</td>
-                        <td className="px-4 py-2 text-right font-semibold text-blue-600 dark:text-blue-400">
-                          {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.hotelRevenue || 0)}
-                        </td>
-                      </tr>
+                      {!isRetail && (
+                        <tr>
+                          <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Hotel Revenue</td>
+                          <td className="px-4 py-2 text-right font-semibold text-blue-600 dark:text-blue-400">
+                            {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.hotelRevenue || 0)}
+                          </td>
+                        </tr>
+                      )}
                       <tr>
                         <td className="px-4 py-2 text-red-600 dark:text-red-400">Refund Total</td>
                         <td className="px-4 py-2 text-right font-semibold text-red-600 dark:text-red-400">
                           {isLoadingSalesSummary ? 'Loading...' : `-${formatCurrency(salesSummary?.refundTotal || 0)}`}
                         </td>
                       </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Manual Income</td>
+                        <td className="px-4 py-2 text-right font-semibold text-green-600 dark:text-green-400">
+                          {isLoadingSalesSummary ? 'Loading...' : `+${formatCurrency(salesSummary?.manualIncomeTotal || 0)}`}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Manual Expenses</td>
+                        <td className="px-4 py-2 text-right font-semibold text-red-600 dark:text-red-400">
+                          {isLoadingSalesSummary ? 'Loading...' : `-${formatCurrency(salesSummary?.manualExpenseTotal || 0)}`}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Purchases</td>
+                        <td className="px-4 py-2 text-right font-semibold text-red-600 dark:text-red-400">
+                          {isLoadingSalesSummary ? 'Loading...' : `-${formatCurrency(salesSummary?.purchaseTotal || 0)}`}
+                        </td>
+                      </tr>
                       <tr className="bg-gray-50 dark:bg-gray-800/50">
-                        <td className="px-4 py-2 font-bold text-gray-900 dark:text-white">Net Sales</td>
+                        <td className="px-4 py-2 font-bold text-gray-900 dark:text-white">Net Revenue</td>
                         <td className="px-4 py-2 text-right font-bold text-gray-900 dark:text-white">
                           {isLoadingSalesSummary ? 'Loading...' : formatCurrency(salesSummary?.netSales || 0)}
                         </td>
