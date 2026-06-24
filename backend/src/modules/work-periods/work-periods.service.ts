@@ -499,8 +499,10 @@ export class WorkPeriodsService {
   async generateWorkPeriodReport(workPeriodId: string): Promise<Buffer> {
     const summary = await this.getSalesSummary(workPeriodId);
     const workPeriod = await this.findOne(workPeriodId);
+    const company = await this.getCompany(workPeriod.companyId.toString());
+    const isRetail = company?.businessType === 'retail';
 
-    const html = this.generateWorkPeriodHtml(workPeriod, summary);
+    const html = this.generateWorkPeriodHtml(workPeriod, summary, isRetail);
 
     return this.pdfGeneratorService.generateReceiptPDF(html, {
       format: 'A4',
@@ -523,8 +525,10 @@ export class WorkPeriodsService {
   async emailWorkPeriodReport(workPeriodId: string, email: string): Promise<boolean> {
     const summary = await this.getSalesSummary(workPeriodId);
     const workPeriod = await this.findOne(workPeriodId);
+    const company = await this.getCompany(workPeriod.companyId.toString());
+    const isRetail = company?.businessType === 'retail';
 
-    const html = this.generateWorkPeriodHtml(workPeriod, summary);
+    const html = this.generateWorkPeriodHtml(workPeriod, summary, isRetail);
 
     const dateStr = new Date(workPeriod.startTime).toLocaleDateString();
     const subject = `Work Period Report - ${dateStr} - Serial #${workPeriod.serial}`;
@@ -614,7 +618,7 @@ export class WorkPeriodsService {
         <div class="row"><span class="meta-label">Total Orders:</span> <span>${summary.totalOrders}</span></div>
         <div class="row"><span class="meta-label">Gross Sales:</span> <span>${formatCurrency(summary.grossSales)}</span></div>
         <div class="row indent"><span>- Refunds:</span> <span>${formatCurrency(summary.refundTotal)}</span></div>
-        <div class="row indent"><span>+ Hotel Revenue:</span> <span>${formatCurrency(summary.hotelRevenue)}</span></div>
+        ${!isRetail ? `<div class="row indent"><span>+ Hotel Revenue:</span> <span>${formatCurrency(summary.hotelRevenue)}</span></div>` : ''}
         <div class="row indent"><span>+ Manual Income:</span> <span>${formatCurrency(summary.manualIncomeTotal || 0)}</span></div>
         <div class="row indent"><span>- Manual Expenses:</span> <span>${formatCurrency(summary.manualExpenseTotal || 0)}</span></div>
         <div class="row indent"><span>- Purchases:</span> <span>${formatCurrency(summary.purchaseTotal || 0)}</span></div>
