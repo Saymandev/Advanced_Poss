@@ -1370,10 +1370,12 @@ export default function OrdersPage() {
                     <span className="text-gray-600 dark:text-gray-400">Invoice Number:</span>
                     <span className="font-medium text-gray-900 dark:text-white">{selectedOrder?.orderNumber?.replace(/[^0-9]/g, '').slice(-6) || selectedOrder?.orderNumber}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">Table:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{selectedOrder?.tableNumber === '—' ? '—' : selectedOrder?.tableNumber}</span>
-                  </div>
+                  {companyContext?.businessType !== 'retail' && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 dark:text-gray-400">Table:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{selectedOrder?.tableNumber === '—' ? '—' : selectedOrder?.tableNumber}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Order Status:</span>
                     {getStatusBadge(selectedOrder?.status)}
@@ -1396,17 +1398,19 @@ export default function OrdersPage() {
                       {selectedOrder?.orderType || 'Dine-In'}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">Waiter Name:</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                        <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  {companyContext?.businessType !== 'retail' && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 dark:text-gray-400">Waiter Name:</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                          <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {selectedOrder?.waiterName || 'Default Waiter'}
+                        </span>
                       </div>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {selectedOrder?.waiterName || 'Default Waiter'}
-                      </span>
                     </div>
-                  </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Customer Name:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
