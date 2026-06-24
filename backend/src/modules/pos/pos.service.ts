@@ -711,6 +711,22 @@ export class POSService {
         } catch (wsError) {
           console.error('❌ Failed to emit WebSocket event:', wsError);
         }
+        // Auto-print receipt if configured and order is paid
+        if (savedOrder.status === 'paid') {
+          try {
+            const posSettings = await this.getPOSSettings(branchId);
+            if (posSettings?.printerSettings?.enabled && posSettings?.printerSettings?.autoPrint) {
+              const orderIdStr = savedOrder._id.toString();
+              this.receiptService.printReceipt(
+                orderIdStr,
+                posSettings.printerSettings.printerId || undefined
+              ).catch(err => console.error('Failed to auto-print receipt on order creation:', err));
+            }
+          } catch (printErr) {
+            console.error('Failed to trigger auto-print:', printErr);
+          }
+        }
+
         return savedOrder;
       } catch (error: any) {
         lastError = error;
@@ -1510,6 +1526,19 @@ export class POSService {
     } catch (wsError) {
       console.error('Failed to emit WebSocket event:', wsError);
     }
+    // Auto-print receipt if configured
+    try {
+      const posSettings = await this.getPOSSettings(branchId);
+      if (posSettings?.printerSettings?.enabled && posSettings?.printerSettings?.autoPrint) {
+        this.receiptService.printReceipt(
+          processPaymentDto.orderId,
+          posSettings.printerSettings.printerId || undefined
+        ).catch(err => console.error('Failed to auto-print receipt on payment:', err));
+      }
+    } catch (printErr) {
+      console.error('Failed to trigger auto-print:', printErr);
+    }
+
     return savedPayment;
   }
   // Get POS statistics
