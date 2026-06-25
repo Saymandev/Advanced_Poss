@@ -21,7 +21,7 @@ import {
   usePrintReceiptMutation,
   useProcessPaymentMutation,
 } from '@/lib/api/endpoints/posApi';
-import { useGetCustomersQuery, useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
+import { useGetCustomersQuery, useLazySearchCustomersQuery, useCreateCustomerMutation } from '@/lib/api/endpoints/customersApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { useAppSelector } from '@/lib/store';
@@ -39,6 +39,7 @@ import {
   ShoppingBagIcon,
   TrashIcon,
   UserCircleIcon,
+  UserPlusIcon,
   XMarkIcon,
   QrCodeIcon,
   CameraIcon,
@@ -106,9 +107,10 @@ export default function RetailPOSPage() {
 
   // Customer data
   const { data: customersData } = useGetCustomersQuery(
-    { companyId, limit: 100 },
+    { companyId, branchId },
     { skip: !companyId }
   );
+  const [createCustomer] = useCreateCustomerMutation();
   const [triggerSearch, { data: searchResults }] = useLazySearchCustomersQuery();
 
   // Payment methods
@@ -732,6 +734,44 @@ export default function RetailPOSPage() {
               {c.phone && <div className="text-xs text-gray-500">{c.phone}</div>}
             </button>
           ))}
+          {customerSearch.trim() !== '' && (
+            <button
+              onClick={async () => {
+                try {
+                  const isPhone = /^[\d\+\-\(\)\s]+$/.test(customerSearch.trim());
+                  const newCustomer = await createCustomer({
+                    companyId: companyId as string,
+                    branchId: branchId as string,
+                    firstName: isPhone ? 'New Customer' : customerSearch.trim(),
+                    phone: isPhone ? customerSearch.trim() : undefined,
+                  }).unwrap();
+                  
+                  setSelectedCustomerId(newCustomer.id || (newCustomer as any)._id);
+                  setCustomerInfo({
+                    name: `${newCustomer.firstName || ''} ${newCustomer.lastName || ''}`.trim(),
+                    phone: newCustomer.phone || '',
+                    email: newCustomer.email || '',
+                  });
+                  setIsCustomerModalOpen(false);
+                  setCustomerSearch('');
+                  toast.success('Customer created successfully');
+                } catch (error: any) {
+                  toast.error(error?.data?.message || 'Failed to create customer');
+                }
+              }}
+              className="w-full text-left px-3 py-3 rounded-lg border border-dashed border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/10 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-sm flex items-center gap-2 mt-2"
+            >
+              <UserPlusIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <div>
+                <div className="font-bold text-emerald-700 dark:text-emerald-400">
+                  Create new customer
+                </div>
+                <div className="text-xs text-emerald-600 dark:text-emerald-500">
+                  Add "{customerSearch}" to database
+                </div>
+              </div>
+            </button>
+          )}
         </div>
       </div>
     </Modal>
