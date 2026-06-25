@@ -561,6 +561,11 @@ export default function IngredientsPage() {
         </Badge>
       ),
     },
+    ...(companyContext?.businessType === 'retail' ? [{
+      key: 'storageLocation',
+      title: 'Rack / Shelf No.',
+      render: (value: string) => value ? <span className="font-medium">{value}</span> : <span className="text-gray-400">-</span>
+    }] : []),
     {
       key: 'expiryDate',
       title: 'Expiry',

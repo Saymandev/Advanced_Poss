@@ -95,6 +95,8 @@ export class IngredientsService {
         { category: { $regex: search, $options: 'i' } },
         { unit: { $regex: search, $options: 'i' } },
         { sku: { $regex: search, $options: 'i' } },
+        { barcode: { $regex: search, $options: 'i' } },
+        { storageLocation: { $regex: search, $options: 'i' } },
       ];
     }
 
