@@ -191,7 +191,7 @@ export default function IngredientsPage() {
     maximumStock: 0,
     unit: 'pcs',
     unitCost: 0,
-    category: 'food',
+    category: '',
     preferredSupplierId: '',
     storageLocation: '',
     storageTemperature: '',
@@ -226,7 +226,7 @@ export default function IngredientsPage() {
       maximumStock: 0,
       unit: 'pcs',
       unitCost: 0,
-      category: lastUsedCategoryRef.current || 'food',
+      category: lastUsedCategoryRef.current || '',
       preferredSupplierId: '',
       storageLocation: '',
       storageTemperature: '',
@@ -952,7 +952,7 @@ export default function IngredientsPage() {
                       className="absolute right-1 top-1/2 -translate-y-1/2"
                       onClick={() => {
                         setIsCreatingItemCategory(false);
-                        setFormData({ ...formData, category: lastUsedCategoryRef.current || ingredientCategoryOptions[0]?.value || 'food' });
+                        setFormData({ ...formData, category: lastUsedCategoryRef.current || ingredientCategoryOptions[0]?.value || '' });
                       }}
                       title="Back to selection"
                     >
@@ -1312,7 +1312,7 @@ export default function IngredientsPage() {
                       className="absolute right-1 top-1/2 -translate-y-1/2"
                       onClick={() => {
                         setIsCreatingItemCategory(false);
-                        setFormData({ ...formData, category: selectedIngredient?.category || ingredientCategoryOptions[0]?.value || 'food' });
+                        setFormData({ ...formData, category: selectedIngredient?.category || ingredientCategoryOptions[0]?.value || '' });
                       }}
                       title="Back to selection"
                     >
