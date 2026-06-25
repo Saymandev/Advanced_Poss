@@ -357,6 +357,7 @@ export default function IngredientsPage() {
             barcode: formData.barcode || undefined,
             sku: formData.sku || undefined,
             description: formData.description || undefined,
+            storageLocation: formData.storageLocation || undefined,
         } as any).unwrap();
         
         toast.success('Item created and listed on POS!');

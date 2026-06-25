@@ -84,6 +84,9 @@ export class MenuItem {
   @Prop({ trim: true })
   barcode?: string;
 
+  @Prop({ trim: true })
+  storageLocation?: string;
+
   @Prop({ default: false })
   weightBasedPricing?: boolean;
 

@@ -218,7 +218,10 @@ export class MenuItemsService {
     return this.menuItemModel
       .find({
         companyId: new Types.ObjectId(companyId),
-        $text: { $search: query },
+        $or: [
+          { $text: { $search: query } },
+          { storageLocation: { $regex: query, $options: 'i' } }
+        ],
         isAvailable: true,
       })
       .populate('categoryId', 'name type')
@@ -437,6 +440,7 @@ export class MenuItemsService {
 
         if (row.barcode) menuItemData.barcode = row.barcode.trim();
         if (row.sku) menuItemData.sku = row.sku.trim();
+        if ((row as any).storageLocation) menuItemData.storageLocation = (row as any).storageLocation.trim();
         if (row.cost !== undefined && row.cost !== null) menuItemData.cost = Number(row.cost);
         if (row.description) menuItemData.description = row.description.trim();
         if (row.unitType) menuItemData.unitType = row.unitType.trim();
