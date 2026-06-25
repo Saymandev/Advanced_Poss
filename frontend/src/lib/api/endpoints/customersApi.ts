@@ -32,9 +32,11 @@ export interface Customer {
 }
 
 export interface CreateCustomerRequest {
+  companyId: string;
+  branchId?: string;
   firstName: string;
-  lastName: string;
-  email: string;
+  lastName?: string;
+  email?: string;
   phone?: string;
   dateOfBirth?: string;
   address?: {

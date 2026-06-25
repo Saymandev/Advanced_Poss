@@ -198,6 +198,8 @@ export default function CustomersPage() {
   }, [selectedCustomerData, selectedCustomerId]);
 
   const [formData, setFormData] = useState<CreateCustomerRequest>({
+    companyId: (companyId as string) || '',
+    branchId: (branchId as string) || undefined,
     firstName: '',
     lastName: '',
     email: '',
@@ -214,6 +216,8 @@ export default function CustomersPage() {
 
   const resetForm = () => {
     setFormData({
+      companyId: (companyId as string) || '',
+      branchId: (branchId as string) || undefined,
       firstName: '',
       lastName: '',
       email: '',
@@ -414,6 +418,8 @@ export default function CustomersPage() {
   const openEditModal = (customer: Customer) => {
     setSelectedCustomer(customer);
     setFormData({
+      companyId: (companyId as string) || '',
+      branchId: (branchId as string) || undefined,
       firstName: customer.firstName,
       lastName: customer.lastName,
       email: customer.email,
