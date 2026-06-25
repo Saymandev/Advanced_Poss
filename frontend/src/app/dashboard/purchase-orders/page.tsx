@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
-import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
+import { useGetInventoryItemsQuery, useLazySearchInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
 import { useGetPaymentMethodsByCompanyQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { CreatePurchaseOrderRequest, PurchaseOrder, useApprovePurchaseOrderMutation, useCancelPurchaseOrderMutation, useCreatePurchaseOrderMutation, useGetPurchaseOrdersQuery, useReceivePurchaseOrderMutation } from '@/lib/api/endpoints/purchaseOrdersApi';
 import { useGetSuppliersQuery } from '@/lib/api/endpoints/suppliersApi';
@@ -24,7 +24,7 @@ import {
   TruckIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 export default function PurchaseOrdersPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
@@ -65,6 +65,29 @@ export default function PurchaseOrdersPage() {
     companyId: companyId || undefined,
     branchId: branchId || undefined,
   }, { skip: !companyId });
+
+  const [triggerItemSearch, { data: searchResults }] = useLazySearchInventoryItemsQuery();
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
+
+  const displayedItems = useMemo(() => {
+    if (searchResults) {
+      const r = (searchResults as any)?.items || searchResults || [];
+      return Array.isArray(r) ? r : [];
+    }
+    const initialItems = ingredients?.items || [];
+    if (itemSearchQuery) {
+      return initialItems.filter((i: any) => 
+        i.name.toLowerCase().includes(itemSearchQuery.toLowerCase())
+      );
+    }
+    return initialItems;
+  }, [ingredients, itemSearchQuery, searchResults]);
+
+  useEffect(() => {
+    if (itemSearchQuery.length >= 2) {
+      triggerItemSearch({ query: itemSearchQuery, companyId });
+    }
+  }, [itemSearchQuery, companyId, triggerItemSearch]);
 
   const { data: paymentMethodsData } = useGetPaymentMethodsByCompanyQuery(companyId || '', {
     skip: !companyId,
@@ -738,13 +761,14 @@ export default function PurchaseOrdersPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{isRetail ? 'Item' : 'Ingredient'}</label>
                 <Combobox
-                  options={ingredients?.items?.map(i => ({ value: i.id, label: i.name })) || []}
+                  options={displayedItems.map((i: any) => ({ value: i.id, label: i.name }))}
                   value={newItem.ingredientId}
                   onChange={(value) => {
-                    const selectedIngredient = ingredients?.items?.find(i => i.id === value);
+                    const selectedIngredient = displayedItems.find((i: any) => i.id === value) || ingredients?.items?.find((i: any) => i.id === value);
                     const defaultPrice = selectedIngredient?.unitCost || (selectedIngredient as any)?.lastPurchasePrice || 0;
                     setNewItem({ ...newItem, ingredientId: value, unitPrice: defaultPrice });
                   }}
+                  onInputChange={(val) => setItemSearchQuery(val)}
                   placeholder={isRetail ? 'Search item...' : 'Search ingredient...'}
                   allowCustom={false}
                 />

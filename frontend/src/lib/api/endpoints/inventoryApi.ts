@@ -203,6 +203,24 @@ export const inventoryApi = apiSlice.injectEndpoints({
       },
       providesTags: ['Ingredient'],
     }),
+    searchInventoryItems: builder.query<InventoryItem[], { query: string; companyId?: string }>({
+      query: (params) => ({
+        url: '/ingredients/search',
+        params: { q: params.query, companyId: params.companyId },
+      }),
+      transformResponse: (response: any) => {
+        const data = response.data || response || [];
+        return Array.isArray(data) ? data.map((item: any) => ({
+          id: item._id || item.id,
+          name: item.name,
+          currentStock: item.currentStock,
+          minimumStock: item.minimumStock || item.minStock,
+          unit: item.unit,
+          unitCost: item.unitCost || item.unitPrice || 0,
+        } as InventoryItem)) : [];
+      },
+      providesTags: ['Ingredient'],
+    }),
     createInventoryItem: builder.mutation<InventoryItem, CreateInventoryItemRequest>({
       query: (data) => ({
         url: '/ingredients',
@@ -354,6 +372,8 @@ export const inventoryApi = apiSlice.injectEndpoints({
 export const {
   useGetInventoryItemsQuery,
   useGetInventoryItemByIdQuery,
+  useSearchInventoryItemsQuery,
+  useLazySearchInventoryItemsQuery,
   useCreateInventoryItemMutation,
   useUpdateInventoryItemMutation,
   useDeleteInventoryItemMutation,

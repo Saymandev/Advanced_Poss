@@ -18,6 +18,7 @@ export interface ComboboxProps {
   error?: string;
   disabled?: boolean;
   allowCustom?: boolean; // Allow typing custom values not in options
+  onInputChange?: (value: string) => void; // For async searches
 }
 
 export function Combobox({
@@ -29,6 +30,7 @@ export function Combobox({
   error,
   disabled,
   allowCustom = true,
+  onInputChange,
 }: ComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const initialOption = options.find((opt) => opt.value === value);
@@ -83,6 +85,10 @@ export function Combobox({
     setIsOpen(true);
     setIsUserTyping(true);
     lastValueRef.current = newValue;
+    
+    if (onInputChange) {
+      onInputChange(newValue);
+    }
     
     if (allowCustom) {
       onChange(newValue);
