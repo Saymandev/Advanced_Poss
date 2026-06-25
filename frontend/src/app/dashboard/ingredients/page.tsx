@@ -73,6 +73,8 @@ export default function IngredientsPage() {
                    (companyContext as any)?.branches?.[0]?._id ||
                    (companyContext as any)?.branches?.[0]?.id;
 
+  const isRetail = companyContext?.businessType === 'retail';
+
   const companyId = (user as any)?.companyId || 
                     (companyContext as any)?.companyId ||
                     (companyContext as any)?._id ||
@@ -1113,7 +1115,7 @@ export default function IngredientsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Menu Category *
+                      {isRetail ? 'Product Category *' : 'Menu Category *'}
                     </label>
                     {posCategoryOptions.length > 0 && !posData.newCategoryName ? (
                       <div className="flex gap-2">
@@ -1122,7 +1124,8 @@ export default function IngredientsPage() {
                             value={posData.categoryId}
                             onChange={(value) => setPosData({ ...posData, categoryId: value })}
                             options={posCategoryOptions}
-                            placeholder="Select menu category"
+                            placeholder={isRetail ? "Select product category" : "Select menu category"}
+                            allowCustom={false}
                           />
                         </div>
                         <Button 
