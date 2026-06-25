@@ -252,4 +252,9 @@ export class CreateMenuItemDto {
   @IsOptional()
   @IsString()
   unitType?: string;
+
+  @ApiPropertyOptional({ example: 'Rack 3, Shelf A' })
+  @IsOptional()
+  @IsString()
+  storageLocation?: string;
 }
