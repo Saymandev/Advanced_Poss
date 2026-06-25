@@ -128,6 +128,9 @@ export class MenuItemsService {
           { name: { $regex: search, $options: 'i' } },
           { description: { $regex: search, $options: 'i' } },
           { tags: { $regex: search, $options: 'i' } },
+          { barcode: { $regex: search, $options: 'i' } },
+          { sku: { $regex: search, $options: 'i' } },
+          { storageLocation: { $regex: search, $options: 'i' } },
         ],
       };
       
