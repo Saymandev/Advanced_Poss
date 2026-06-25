@@ -7,6 +7,7 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { Combobox } from '@/components/ui/Combobox';
 import { useGetInventoryItemsQuery } from '@/lib/api/endpoints/inventoryApi';
 import { useGetPaymentMethodsByCompanyQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { CreatePurchaseOrderRequest, PurchaseOrder, useApprovePurchaseOrderMutation, useCancelPurchaseOrderMutation, useCreatePurchaseOrderMutation, useGetPurchaseOrdersQuery, useReceivePurchaseOrderMutation } from '@/lib/api/endpoints/purchaseOrdersApi';
@@ -27,6 +28,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 export default function PurchaseOrdersPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  const isRetail = companyContext?.businessType === 'retail';
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
@@ -734,8 +736,8 @@ export default function PurchaseOrdersPage() {
             {/* Add New Item */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg items-end">
               <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Ingredient</label>
-                <Select
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{isRetail ? 'Item' : 'Ingredient'}</label>
+                <Combobox
                   options={ingredients?.items?.map(i => ({ value: i.id, label: i.name })) || []}
                   value={newItem.ingredientId}
                   onChange={(value) => {
@@ -743,7 +745,8 @@ export default function PurchaseOrdersPage() {
                     const defaultPrice = selectedIngredient?.unitCost || (selectedIngredient as any)?.lastPurchasePrice || 0;
                     setNewItem({ ...newItem, ingredientId: value, unitPrice: defaultPrice });
                   }}
-                  placeholder="Select ingredient"
+                  placeholder={isRetail ? 'Search item...' : 'Search ingredient...'}
+                  allowCustom={false}
                 />
               </div>
               <div>
@@ -779,7 +782,7 @@ export default function PurchaseOrdersPage() {
                   <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                     <div className="flex-1">
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {ingredient?.name || 'Unknown Ingredient'}
+                        {ingredient?.name || (isRetail ? 'Unknown Item' : 'Unknown Ingredient')}
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         {item.quantity} {ingredient?.unit} × {formatCurrency(item.unitPrice)}
