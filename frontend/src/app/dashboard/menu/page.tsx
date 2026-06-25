@@ -25,7 +25,8 @@ export default function MenuPage() {
   // Redirect if user doesn't have menu-management feature
   useFeatureRedirect('menu-management');
 
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state) => state.auth);
+  const isRetail = companyContext?.businessType === 'retail';
   const { data, isLoading, refetch } = useGetMenuItemsQuery({ branchId: user?.branchId, companyId: (user as any)?.companyId });
 
   const [createMenuItem] = useCreateMenuItemMutation();
@@ -168,12 +169,12 @@ export default function MenuPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Menu Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your restaurant menu items</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{isRetail ? 'Products' : 'Menu Management'}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{isRetail ? 'Manage your retail products' : 'Manage your restaurant menu items'}</p>
         </div>
         <Button onClick={() => handleOpenModal()} className="flex items-center gap-2">
           <PlusIcon className="w-5 h-5" />
-          Add Menu Item
+          {isRetail ? 'Add Product' : 'Add Menu Item'}
         </Button>
       </div>
 
@@ -207,7 +208,7 @@ export default function MenuPage() {
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search menu items..."
+                placeholder={isRetail ? 'Search products...' : 'Search menu items...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="input w-full pl-10"
@@ -283,7 +284,7 @@ export default function MenuPage() {
       {filteredItems.length === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-500 dark:text-gray-400">No menu items found</p>
+            <p className="text-gray-500 dark:text-gray-400">No {isRetail ? 'products' : 'menu items'} found</p>
           </CardContent>
         </Card>
       )}
@@ -292,7 +293,7 @@ export default function MenuPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
+        title={editingItem ? (isRetail ? 'Edit Product' : 'Edit Menu Item') : (isRetail ? 'Add Product' : 'Add Menu Item')}
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -329,6 +330,7 @@ export default function MenuPage() {
               options={categories.filter(c => c !== 'all').map(c => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }))}
             />
           </div>
+          {!isRetail && (
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Preparation Time (minutes)"
@@ -343,6 +345,7 @@ export default function MenuPage() {
               onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
             />
           </div>
+          )}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -360,7 +363,7 @@ export default function MenuPage() {
               Cancel
             </Button>
             <Button type="submit">
-              {editingItem ? 'Update' : 'Create'} Menu Item
+              {editingItem ? 'Update' : 'Create'} {isRetail ? 'Product' : 'Menu Item'}
             </Button>
           </div>
         </form>

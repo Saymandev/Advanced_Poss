@@ -470,12 +470,33 @@ export function Sidebar({ className }: SidebarProps) {
 
   // Combine navigation items - super admin items first, then regular items
   const allNavigationItems = useMemo(() => {
+    const isRetail = companyContext?.businessType === 'retail';
+    
+    // Map navigation items to override names for retail businesses
+    const processedNavigation = navigation.map(item => {
+      if (!isRetail) return item;
+      
+      // Override specific menu items for retail
+      if (item.name === 'Menu') {
+        return {
+          ...item,
+          name: 'Products',
+          children: item.children?.map(child => {
+            if (child.name === 'Menu Items') return { ...child, name: 'Product Items' };
+            if (child.name === 'Categories') return { ...child, name: 'Product Category' };
+            return child;
+          })
+        };
+      }
+      return item;
+    });
+
     const isSuperAdmin = user?.role?.toLowerCase() === 'super_admin';
     if (isSuperAdmin) {
-      return [...superAdminNavigation, ...navigation];
+      return [...superAdminNavigation, ...processedNavigation];
     }
-    return navigation;
-  }, [user?.role]);
+    return processedNavigation;
+  }, [user?.role, companyContext?.businessType]);
 
   const toggleExpanded = (itemName: string) => {
     setExpandedItems(prev =>

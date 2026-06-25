@@ -301,6 +301,8 @@ export default function IngredientsPage() {
         if (posData.newCategoryName.trim() && !posData.categoryId) {
             const newCategory = await createCategory({ 
               name: posData.newCategoryName.trim(),
+              companyId,
+              branchId,
               isActive: true,
               sortOrder: 0
             } as any).unwrap();
@@ -886,17 +888,17 @@ export default function IngredientsPage() {
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Ingredient Name"
+              label="Item Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Category *
+                Item Category *
               </label>
               <Combobox
-                value={formData.category || 'food'}
+                value={formData.category}
                 onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
                 options={ingredientCategoryOptions}
                 placeholder="Select a category or enter custom category..."
@@ -1212,17 +1214,17 @@ export default function IngredientsPage() {
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Ingredient Name"
+              label="Item Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Category *
+                Item Category *
               </label>
               <Combobox
-                value={formData.category || 'food'}
+                value={formData.category}
                 onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
                 options={ingredientCategoryOptions}
                 placeholder="Select a category or enter custom category..."

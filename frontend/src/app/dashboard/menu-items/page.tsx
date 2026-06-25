@@ -2327,6 +2327,7 @@ export default function MenuItemsPage() {
               className="mt-2"
             />
           </div>
+          {!isRetail && (
           <div className="grid grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -2385,6 +2386,7 @@ export default function MenuItemsPage() {
               />
             </div>
           </div>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="secondary"
@@ -2401,7 +2403,7 @@ export default function MenuItemsPage() {
               onClick={isEditModalOpen ? handleUpdateMenuItem : handleCreateMenuItem}
               disabled={isCreating || isUpdating || !formData.name || !formData.price || !formData.categoryId}
             >
-              {isCreating || isUpdating ? 'Saving...' : isEditModalOpen ? 'Update Menu Item' : 'Create Menu Item'}
+              {isCreating || isUpdating ? 'Saving...' : isEditModalOpen ? (isRetail ? 'Update Product' : 'Update Menu Item') : (isRetail ? 'Create Product' : 'Create Menu Item')}
             </Button>
           </div>
         </div>
