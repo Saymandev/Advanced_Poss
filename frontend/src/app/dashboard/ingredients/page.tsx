@@ -313,8 +313,6 @@ export default function IngredientsPage() {
               companyId,
               branchId,
               type: isRetail ? 'retail' : 'food',
-              isActive: true,
-              sortOrder: 0
             } as any).unwrap();
             const categoryData = (newCategory as any)?.data || newCategory;
             targetCategoryId = categoryData?.id || categoryData?._id;
@@ -324,8 +322,6 @@ export default function IngredientsPage() {
               companyId,
               branchId,
               type: isRetail ? 'retail' : 'food',
-              isActive: true,
-              sortOrder: 0
             } as any).unwrap();
             const categoryData = (newCategory as any)?.data || newCategory;
             targetCategoryId = categoryData?.id || categoryData?._id;
