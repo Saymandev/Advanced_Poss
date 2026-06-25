@@ -47,6 +47,9 @@ export default function IngredientsPage() {
   const [isAdjustStockModalOpen, setIsAdjustStockModalOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<InventoryItem | null>(null);
   
+  const lastUsedCategoryRef = useRef<string>('');
+  const [isCreatingItemCategory, setIsCreatingItemCategory] = useState(false);
+  
   // POS Integration State
   const [listOnPos, setListOnPos] = useState(companyContext?.businessType === 'retail');
   const [posData, setPosData] = useState({
@@ -221,7 +224,7 @@ export default function IngredientsPage() {
       maximumStock: 100,
       unit: 'pcs',
       unitCost: 0,
-      category: 'food',
+      category: lastUsedCategoryRef.current || 'food',
       preferredSupplierId: '',
       storageLocation: '',
       storageTemperature: '',
@@ -240,6 +243,7 @@ export default function IngredientsPage() {
       imageFile: null,
       imagePreview: '',
     });
+    setIsCreatingItemCategory(false);
   };
 
   const resetStockAdjustment = () => {
@@ -303,6 +307,7 @@ export default function IngredientsPage() {
               name: posData.newCategoryName.trim(),
               companyId,
               branchId,
+              type: 'food',
               isActive: true,
               sortOrder: 0
             } as any).unwrap();
@@ -357,6 +362,7 @@ export default function IngredientsPage() {
         toast.success('Ingredient created successfully');
       }
 
+      lastUsedCategoryRef.current = formData.category;
       setIsCreateModalOpen(false);
       resetForm();
       await refetch();
@@ -897,13 +903,54 @@ export default function IngredientsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Item Category *
               </label>
-              <Combobox
-                value={formData.category}
-                onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
-                options={ingredientCategoryOptions}
-                placeholder="Select a category or enter custom category..."
-                allowCustom={true}
-              />
+              {ingredientCategoryOptions.length > 0 && !isCreatingItemCategory ? (
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Combobox
+                      value={formData.category}
+                      onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
+                      options={ingredientCategoryOptions}
+                      placeholder="Select a category..."
+                      allowCustom={false}
+                    />
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={() => {
+                      setIsCreatingItemCategory(true);
+                      setFormData({ ...formData, category: '' });
+                    }}
+                    title="Create new category"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2 relative">
+                  <Input
+                    label=""
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    placeholder="Type new category name..."
+                    className="flex-1"
+                  />
+                  {ingredientCategoryOptions.length > 0 && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      className="absolute right-1 top-1/2 -translate-y-1/2"
+                      onClick={() => {
+                        setIsCreatingItemCategory(false);
+                        setFormData({ ...formData, category: lastUsedCategoryRef.current || ingredientCategoryOptions[0]?.value || 'food' });
+                      }}
+                      title="Back to selection"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1223,13 +1270,54 @@ export default function IngredientsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Item Category *
               </label>
-              <Combobox
-                value={formData.category}
-                onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
-                options={ingredientCategoryOptions}
-                placeholder="Select a category or enter custom category..."
-                allowCustom={true}
-              />
+              {ingredientCategoryOptions.length > 0 && !isCreatingItemCategory ? (
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Combobox
+                      value={formData.category}
+                      onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
+                      options={ingredientCategoryOptions}
+                      placeholder="Select a category..."
+                      allowCustom={false}
+                    />
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={() => {
+                      setIsCreatingItemCategory(true);
+                      setFormData({ ...formData, category: '' });
+                    }}
+                    title="Create new category"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2 relative">
+                  <Input
+                    label=""
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    placeholder="Type new category name..."
+                    className="flex-1"
+                  />
+                  {ingredientCategoryOptions.length > 0 && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      className="absolute right-1 top-1/2 -translate-y-1/2"
+                      onClick={() => {
+                        setIsCreatingItemCategory(false);
+                        setFormData({ ...formData, category: selectedIngredient?.category || ingredientCategoryOptions[0]?.value || 'food' });
+                      }}
+                      title="Back to selection"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
