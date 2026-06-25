@@ -211,8 +211,8 @@ export function Combobox({
       )}
       
       {allowCustom && !selectedOption && value && (
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Using custom type: &quot;{value}&quot;
+        <p className="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400">
+          Creating new: &quot;{value}&quot;
         </p>
       )}
     </div>

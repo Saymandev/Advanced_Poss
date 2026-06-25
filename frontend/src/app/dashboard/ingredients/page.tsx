@@ -312,7 +312,7 @@ export default function IngredientsPage() {
               name: targetCategoryId.trim(),
               companyId,
               branchId,
-              type: 'food',
+              type: isRetail ? 'retail' : 'food',
               isActive: true,
               sortOrder: 0
             } as any).unwrap();
@@ -323,7 +323,7 @@ export default function IngredientsPage() {
               name: posData.newCategoryName.trim(),
               companyId,
               branchId,
-              type: 'food',
+              type: isRetail ? 'retail' : 'food',
               isActive: true,
               sortOrder: 0
             } as any).unwrap();
