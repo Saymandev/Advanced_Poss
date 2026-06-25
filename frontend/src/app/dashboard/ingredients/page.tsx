@@ -304,7 +304,21 @@ export default function IngredientsPage() {
         let targetCategoryId = posData.categoryId;
         
         // Inline Category Creation
-        if (posData.newCategoryName.trim() && !posData.categoryId) {
+        const isObjectId = /^[0-9a-fA-F]{24}$/.test(targetCategoryId);
+        
+        if (!isObjectId && targetCategoryId.trim() !== '') {
+            // User typed a custom string into the Combobox
+            const newCategory = await createCategory({ 
+              name: targetCategoryId.trim(),
+              companyId,
+              branchId,
+              type: 'food',
+              isActive: true,
+              sortOrder: 0
+            } as any).unwrap();
+            const categoryData = (newCategory as any)?.data || newCategory;
+            targetCategoryId = categoryData?.id || categoryData?._id;
+        } else if (posData.newCategoryName.trim() && !posData.categoryId) {
             const newCategory = await createCategory({ 
               name: posData.newCategoryName.trim(),
               companyId,
@@ -1122,8 +1136,8 @@ export default function IngredientsPage() {
                             value={posData.categoryId}
                             onChange={(value) => setPosData({ ...posData, categoryId: value })}
                             options={posCategoryOptions}
-                            placeholder={isRetail ? "Select product category" : "Select menu category"}
-                            allowCustom={false}
+                            placeholder={isRetail ? "Select or type product category" : "Select or type menu category"}
+                            allowCustom={true}
                           />
                         </div>
                         <Button 
@@ -1270,8 +1284,8 @@ export default function IngredientsPage() {
                       value={formData.category}
                       onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
                       options={ingredientCategoryOptions}
-                      placeholder="Select a category..."
-                      allowCustom={false}
+                      placeholder="Select or type a category..."
+                      allowCustom={true}
                     />
                   </div>
                   <Button 
