@@ -223,7 +223,7 @@ export default function IngredientsPage() {
       description: '',
       currentStock: 0,
       minimumStock: 10,
-      maximumStock: 100,
+      maximumStock: 0,
       unit: 'pcs',
       unitCost: 0,
       category: lastUsedCategoryRef.current || 'food',
@@ -677,7 +677,7 @@ export default function IngredientsPage() {
                     unit: item.unit || item.Unit || 'pcs',
                     currentStock: parseFloat(item.currentStock || item['Current Stock'] || 0),
                     minimumStock: parseFloat(item.minimumStock || item['Minimum Stock'] || 10),
-                    maximumStock: parseFloat(item.maximumStock || item['Maximum Stock'] || 100),
+                    maximumStock: parseFloat(item.maximumStock || item['Maximum Stock'] || 0),
                     unitCost: parseFloat(item.unitCost || item['Unit Cost'] || item.price || item.Price || 0),
                     preferredSupplierId: item.preferredSupplierId || item['Preferred Supplier'] || undefined,
                     storageLocation: item.storageLocation || item['Storage Location'] || undefined,
@@ -1045,7 +1045,7 @@ export default function IngredientsPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Storage Location (Optional)"
+              label={isRetail ? 'Rack / Shelf No. (Optional)' : 'Storage Location (Optional)'}
               value={formData.storageLocation}
               onChange={(e) => setFormData({ ...formData, storageLocation: e.target.value })}
             />
@@ -1412,7 +1412,7 @@ export default function IngredientsPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Storage Location (Optional)"
+              label={isRetail ? 'Rack / Shelf No. (Optional)' : 'Storage Location (Optional)'}
               value={formData.storageLocation}
               onChange={(e) => setFormData({ ...formData, storageLocation: e.target.value })}
             />
@@ -1549,7 +1549,7 @@ export default function IngredientsPage() {
                   )}
                   {selectedIngredient.storageLocation && (
                     <div>
-                      <span className="text-gray-600 dark:text-gray-400">Storage Location:</span>
+                      <span className="text-gray-600 dark:text-gray-400">{isRetail ? 'Rack / Shelf No.:' : 'Storage Location:'}</span>
                       <span className="ml-2 text-gray-900 dark:text-white font-medium">{selectedIngredient.storageLocation}</span>
                     </div>
                   )}
