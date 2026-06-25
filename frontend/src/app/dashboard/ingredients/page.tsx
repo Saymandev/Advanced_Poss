@@ -284,10 +284,10 @@ export default function IngredientsPage() {
         description: formData.description,
         category: formData.category,
         unit: formData.unit,
-        currentStock: formData.currentStock || 0,
-        minimumStock: formData.minimumStock || 0,
-        maximumStock: formData.maximumStock,
-        unitCost: formData.unitCost,
+        currentStock: formData.currentStock !== '' ? Number(formData.currentStock) : 0,
+        minimumStock: formData.minimumStock !== '' ? Number(formData.minimumStock) : 0,
+        maximumStock: formData.maximumStock !== '' && formData.maximumStock !== undefined ? Number(formData.maximumStock) : undefined,
+        unitCost: formData.unitCost !== '' ? Number(formData.unitCost) : 0,
         preferredSupplierId: formData.preferredSupplierId || undefined,
         storageLocation: formData.storageLocation || undefined,
         storageTemperature: formData.storageTemperature || undefined,
@@ -385,10 +385,10 @@ export default function IngredientsPage() {
         description: formData.description,
         category: formData.category,
         unit: formData.unit,
-        currentStock: formData.currentStock,
-        minimumStock: formData.minimumStock,
-        maximumStock: formData.maximumStock,
-        unitCost: formData.unitCost,
+        currentStock: formData.currentStock !== '' ? Number(formData.currentStock) : 0,
+        minimumStock: formData.minimumStock !== '' ? Number(formData.minimumStock) : 0,
+        maximumStock: formData.maximumStock !== '' && formData.maximumStock !== undefined ? Number(formData.maximumStock) : undefined,
+        unitCost: formData.unitCost !== '' ? Number(formData.unitCost) : 0,
         preferredSupplierId: formData.preferredSupplierId || undefined,
         storageLocation: formData.storageLocation || undefined,
         storageTemperature: formData.storageTemperature || undefined,
@@ -972,7 +972,7 @@ export default function IngredientsPage() {
               label="Current Stock"
               type="number"
               value={formData.currentStock}
-              onChange={(e) => setFormData({ ...formData, currentStock: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setFormData({ ...formData, currentStock: e.target.value })}
               required
             />
             <Select
@@ -995,7 +995,7 @@ export default function IngredientsPage() {
               label="Minimum Stock"
               type="number"
               value={formData.minimumStock}
-              onChange={(e) => setFormData({ ...formData, minimumStock: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setFormData({ ...formData, minimumStock: e.target.value })}
               required
             />
           </div>
@@ -1005,21 +1005,21 @@ export default function IngredientsPage() {
               label="Maximum Stock (Optional)"
               type="number"
               value={formData.maximumStock}
-              onChange={(e) => setFormData({ ...formData, maximumStock: parseFloat(e.target.value) || undefined })}
+              onChange={(e) => setFormData({ ...formData, maximumStock: e.target.value })}
             />
             <Input
               label="Cost per Unit"
               type="number"
               step="0.01"
               value={formData.unitCost}
-              onChange={(e) => setFormData({ ...formData, unitCost: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setFormData({ ...formData, unitCost: e.target.value })}
               required
             />
             <Input
               label="Shelf Life (days, Optional)"
               type="number"
               value={formData.shelfLife}
-              onChange={(e) => setFormData({ ...formData, shelfLife: parseInt(e.target.value) || undefined })}
+              onChange={(e) => setFormData({ ...formData, shelfLife: e.target.value })}
             />
             <Input
               label="Expiry Date (Optional)"
