@@ -186,7 +186,7 @@ export default function IngredientsPage() {
     description: '',
     currentStock: 0,
     minimumStock: 10,
-    maximumStock: 100,
+    maximumStock: 0,
     unit: 'pcs',
     unitCost: 0,
     category: 'food',
