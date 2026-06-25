@@ -482,7 +482,7 @@ export function Sidebar({ className }: SidebarProps) {
           ...item,
           name: 'Products',
           children: item.children?.map(child => {
-            if (child.name === 'Menu Items') return { ...child, name: 'Product Items' };
+            if (child.name === 'Menu Items') return { ...child, name: 'Create Product' };
             if (child.name === 'Categories') return { ...child, name: 'Product Category' };
             return child;
           })
