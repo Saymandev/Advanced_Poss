@@ -31,7 +31,8 @@ export function Combobox({
   allowCustom = true,
 }: ComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value);
+  const initialOption = options.find((opt) => opt.value === value);
+  const [inputValue, setInputValue] = useState(initialOption ? initialOption.label : value);
   const [filteredOptions, setFilteredOptions] = useState(options);
   const [isUserTyping, setIsUserTyping] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,10 +43,11 @@ export function Combobox({
   useEffect(() => {
     // Only sync if value changed externally (not from our onChange) and user isn't actively typing
     if (value !== lastValueRef.current && !isUserTyping) {
-      setInputValue(value);
+      const option = options.find((opt) => opt.value === value);
+      setInputValue(option ? option.label : value);
       lastValueRef.current = value;
     }
-  }, [value, isUserTyping]);
+  }, [value, options, isUserTyping]);
 
   // Filter options based on input
   useEffect(() => {
@@ -88,7 +90,8 @@ export function Combobox({
   };
 
   const handleSelectOption = (optionValue: string) => {
-    setInputValue(optionValue);
+    const option = options.find((opt) => opt.value === optionValue);
+    setInputValue(option ? option.label : optionValue);
     setIsUserTyping(false);
     lastValueRef.current = optionValue;
     onChange(optionValue);
@@ -131,7 +134,8 @@ export function Combobox({
       setIsOpen(false);
       setIsUserTyping(false);
       // Restore original value on escape
-      setInputValue(value);
+      const option = options.find((opt) => opt.value === value);
+      setInputValue(option ? option.label : value);
       lastValueRef.current = value;
       inputRef.current?.blur();
     }
