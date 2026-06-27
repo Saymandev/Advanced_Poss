@@ -920,8 +920,8 @@ export default function IngredientsPage() {
                       value={formData.category}
                       onChange={(value: string) => setFormData({ ...formData, category: value.trim() })}
                       options={ingredientCategoryOptions}
-                      placeholder="Select a category..."
-                      allowCustom={false}
+                      placeholder="Select or type a category..."
+                      allowCustom={true}
                     />
                   </div>
                   <Button 
