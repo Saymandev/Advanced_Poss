@@ -113,6 +113,22 @@ export class Ingredient {
   @Prop()
   deactivatedAt?: Date;
 
+  // Batch Tracking (FIFO)
+  @Prop([{
+    quantity: { type: Number, required: true },
+    expiryDate: { type: Date, required: true },
+    unitCost: { type: Number, required: true },
+    purchaseOrderId: { type: Types.ObjectId, ref: 'PurchaseOrder' },
+    batchNumber: { type: String }
+  }])
+  batches?: {
+    quantity: number;
+    expiryDate: Date;
+    unitCost: number;
+    purchaseOrderId?: Types.ObjectId;
+    batchNumber?: string;
+  }[];
+
   // Additional Info
   @Prop([String])
   tags?: string[];

@@ -31,6 +31,9 @@ export class PurchaseOrderItem {
 
   @Prop()
   notes?: string;
+
+  @Prop({ type: Date })
+  expiryDate?: Date;
 }
 
 const PurchaseOrderItemSchema = SchemaFactory.createForClass(PurchaseOrderItem);

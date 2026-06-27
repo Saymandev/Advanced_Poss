@@ -32,6 +32,11 @@ class PurchaseOrderItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ example: '2025-12-31' })
+  @IsOptional()
+  @IsString()
+  expiryDate?: string;
 }
 
 export class CreatePurchaseOrderDto {

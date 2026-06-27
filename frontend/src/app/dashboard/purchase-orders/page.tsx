@@ -121,6 +121,7 @@ export default function PurchaseOrdersPage() {
     quantity: 0,
     unitPrice: 0,
     notes: '',
+    expiryDate: '',
   });
   useEffect(() => {
     setFormData((prev) => ({
@@ -144,6 +145,7 @@ export default function PurchaseOrdersPage() {
       quantity: 0,
       unitPrice: 0,
       notes: '',
+      expiryDate: '',
     });
   };
   const addItem = () => {
@@ -160,6 +162,7 @@ export default function PurchaseOrdersPage() {
       quantity: 0,
       unitPrice: 0,
       notes: '',
+      expiryDate: '',
     });
   };
   const removeItem = (index: number) => {
@@ -757,7 +760,7 @@ export default function PurchaseOrdersPage() {
           <div>
             <h3 className="font-medium text-gray-900 dark:text-white mb-4">Order Items</h3>
             {/* Add New Item */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg items-end">
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{isRetail ? 'Item' : 'Ingredient'}</label>
                 <Combobox
@@ -792,6 +795,15 @@ export default function PurchaseOrdersPage() {
                   onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
                 />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Expiry Date</label>
+                <Input
+                  type="date"
+                  placeholder="Expiry Date"
+                  value={newItem.expiryDate}
+                  onChange={(e) => setNewItem({ ...newItem, expiryDate: e.target.value })}
+                />
+              </div>
               <div className="flex gap-2">
                 <Button onClick={addItem} className="flex-1 h-10">
                   Add
@@ -810,6 +822,11 @@ export default function PurchaseOrdersPage() {
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         {item.quantity} {ingredient?.unit} × {formatCurrency(item.unitPrice)}
+                        {item.expiryDate && (
+                          <span className="ml-2 text-red-500 text-xs bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-full">
+                            Exp: {new Date(item.expiryDate).toLocaleDateString()}
+                          </span>
+                        )}
                       </p>
                     </div>
                     <div className="text-right mr-3">

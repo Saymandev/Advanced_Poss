@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsNumber, IsString, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNumber, IsString, Min, ValidateNested, IsOptional } from 'class-validator';
 
 class ReceivedItemDto {
   @ApiProperty({ example: 'item-id-123' })
@@ -11,6 +11,11 @@ class ReceivedItemDto {
   @IsNumber()
   @Min(0)
   receivedQuantity: number;
+
+  @ApiProperty({ example: '2025-12-31', required: false })
+  @IsString()
+  @IsOptional()
+  expiryDate?: string;
 }
 
 export class ReceivePurchaseOrderDto {

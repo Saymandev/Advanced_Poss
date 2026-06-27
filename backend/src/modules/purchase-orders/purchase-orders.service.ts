@@ -412,6 +412,26 @@ export class PurchaseOrdersService {
               });
             }
 
+            let effectiveExpiryDate = item.expiryDate || orderItem.expiryDate;
+            
+            // Auto-calculate from shelf life if no explicit date provided
+            if (!effectiveExpiryDate && ingredient.shelfLife && ingredient.shelfLife > 0) {
+              const calcDate = new Date();
+              calcDate.setDate(calcDate.getDate() + ingredient.shelfLife);
+              effectiveExpiryDate = calcDate;
+            }
+            if (effectiveExpiryDate) {
+              if (!ingredient.batches) {
+                ingredient.batches = [];
+              }
+              ingredient.batches.push({
+                quantity: deltaQty,
+                expiryDate: new Date(effectiveExpiryDate),
+                unitCost: orderItem.unitPrice,
+                purchaseOrderId: order._id as Types.ObjectId
+              });
+            }
+
             ingredient.currentStock = newTotalQty;
             ingredient.totalPurchased += deltaQty;
             ingredient.lastPurchasePrice = orderItem.unitPrice;

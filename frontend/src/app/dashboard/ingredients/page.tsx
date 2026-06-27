@@ -458,6 +458,26 @@ export default function IngredientsPage() {
     }
   };
 
+  const handleWasteExpired = async (ingredient: InventoryItem, expiredQuantity: number) => {
+    if (!confirm(`Are you sure you want to waste ${expiredQuantity} ${ingredient.unit} of expired "${ingredient.name}"?`)) return;
+
+    try {
+      await adjustStock({
+        id: ingredient.id,
+        data: {
+          type: 'wastage',
+          quantity: expiredQuantity,
+          reason: 'System Auto-Wastage (Expired Batches)',
+        },
+      }).unwrap();
+
+      toast.success(`Successfully wasted ${expiredQuantity} expired items`);
+      await refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to waste expired stock');
+    }
+  };
+
   const openViewModal = (ingredient: InventoryItem) => {
     setSelectedIngredient(ingredient);
     setIsViewModalOpen(true);
@@ -579,20 +599,79 @@ export default function IngredientsPage() {
     }] : []),
     {
       key: 'expiryDate',
-      title: 'Expiry',
-      render: (value: string) => {
-        if (!value) return <span className="text-gray-500 dark:text-gray-400">No expiry</span>;
+      title: 'Expiry (Batches)',
+      render: (_: any, row: any) => {
+        // Handle Legacy data without batches
+        if (!row.batches || row.batches.length === 0) {
+          if (!row.expiryDate) return <span className="text-gray-500 dark:text-gray-400">No expiry</span>;
+          const expiryDate = new Date(row.expiryDate);
+          const now = new Date();
+          const isExpired = expiryDate < now;
+          const isExpiringSoon = expiryDate < new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          return (
+            <div className={`text-sm ${isExpired ? 'text-red-600' : isExpiringSoon ? 'text-yellow-600' : 'text-gray-600 dark:text-gray-400'}`}>
+              {expiryDate.toLocaleDateString()}
+              {isExpired && <span className="ml-1">(Expired)</span>}
+              {isExpiringSoon && !isExpired && <span className="ml-1">(Soon)</span>}
+            </div>
+          );
+        }
 
-        const expiryDate = new Date(value);
+        // Handle active batches
+        const activeBatches = [...row.batches].sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+        const closestBatch = activeBatches[0];
+        
+        const expiryDate = new Date(closestBatch.expiryDate);
         const now = new Date();
         const isExpired = expiryDate < now;
-        const isExpiringSoon = expiryDate < new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        const isExpiringSoon = expiryDate < new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        const totalExpiredQuantity = activeBatches.reduce((acc: number, batch: any) => {
+          if (new Date(batch.expiryDate) < now) {
+            return acc + batch.quantity;
+          }
+          return acc;
+        }, 0);
 
         return (
-          <div className={`text-sm ${isExpired ? 'text-red-600' : isExpiringSoon ? 'text-yellow-600' : 'text-gray-600 dark:text-gray-400'}`}>
-            {expiryDate.toLocaleDateString()}
-            {isExpired && <span className="ml-1">(Expired)</span>}
-            {isExpiringSoon && !isExpired && <span className="ml-1">(Expiring Soon)</span>}
+          <div className="flex items-center gap-2 relative group">
+            <div className={`text-sm cursor-help underline decoration-dotted ${isExpired ? 'text-red-600 font-semibold' : isExpiringSoon ? 'text-yellow-600 font-semibold' : 'text-gray-600 dark:text-gray-400'}`}>
+              {expiryDate.toLocaleDateString()}
+              {isExpired && <span className="ml-1">(Expired: {closestBatch.quantity})</span>}
+              {isExpiringSoon && !isExpired && <span className="ml-1">(Soon: {closestBatch.quantity})</span>}
+              {activeBatches.length > 1 && <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">+{activeBatches.length - 1} batches</span>}
+            </div>
+            
+            {totalExpiredQuantity > 0 && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => handleWasteExpired(row, totalExpiredQuantity)}
+                className="h-6 text-xs px-2 py-0 ml-2 bg-red-100 hover:bg-red-200 text-red-700 border-0"
+                title={`Waste all ${totalExpiredQuantity} expired items`}
+              >
+                Waste
+              </Button>
+            )}
+
+            <div className="absolute z-10 bottom-full left-0 mb-2 hidden group-hover:block w-48 bg-gray-900 text-white text-xs rounded shadow-lg p-2">
+              <p className="font-semibold mb-1 border-b border-gray-700 pb-1">Batch Breakdown</p>
+              {activeBatches.map((batch: any, i: number) => {
+                const bExp = new Date(batch.expiryDate);
+                const bExpired = bExp < now;
+                return (
+                  <div key={i} className={`flex justify-between py-0.5 ${bExpired ? 'text-red-400' : ''}`}>
+                    <div className="flex flex-col">
+                      <span>{bExp.toLocaleDateString()}</span>
+                      {batch.unitCost !== undefined && (
+                        <span className="text-[10px] text-gray-400 opacity-80">@ {formatCurrency(batch.unitCost)}/{row.unit}</span>
+                      )}
+                    </div>
+                    <span className="self-center">{batch.quantity} {row.unit}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       },
@@ -1370,7 +1449,7 @@ export default function IngredientsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Input
               label="Maximum Stock (Optional)"
               type="number"
@@ -1390,12 +1469,6 @@ export default function IngredientsPage() {
               type="number"
               value={formData.shelfLife}
               onChange={(e) => setFormData({ ...formData, shelfLife: e.target.value })}
-            />
-            <Input
-              label="Expiry Date (Optional)"
-              type="date"
-              value={formData.expiryDate}
-              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -114,6 +114,11 @@ export class CreateIngredientDto {
   @IsArray()
   tags?: string[];
 
+  @ApiPropertyOptional({ example: '2025-12-31' })
+  @IsOptional()
+  @IsString()
+  expiryDate?: string;
+
   @ApiPropertyOptional({ example: 'Store in cool, dry place' })
   @IsOptional()
   @IsString()

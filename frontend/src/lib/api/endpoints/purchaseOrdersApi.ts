@@ -52,6 +52,7 @@ export interface CreatePurchaseOrderRequest {
     quantity: number;
     unitPrice: number;
     notes?: string;
+    expiryDate?: string;
   }>;
   paymentMethod?: string;
   appliedCredit?: number;

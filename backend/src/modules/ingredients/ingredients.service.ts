@@ -280,6 +280,9 @@ export class IngredientsService {
           ingredient.currentStock += quantity;
           ingredient.totalPurchased += quantity;
           ingredient.lastRestockedDate = new Date();
+          
+          // Also add to a default batch if no expiry is known, 
+          // or just don't add to batches since it's legacy without PO.
         }
         break;
 
@@ -287,6 +290,33 @@ export class IngredientsService {
         if (ingredient.currentStock < quantity) {
           throw new BadRequestException('Insufficient stock');
         }
+        
+        let totalDeductedCostRemove = 0;
+        // FIFO Batch Deduction
+        if (ingredient.batches && ingredient.batches.length > 0) {
+          ingredient.batches.sort((a: any, b: any) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+          let remainingToDeduct = quantity;
+          for (let i = 0; i < ingredient.batches.length && remainingToDeduct > 0; i++) {
+            const batchCost = ingredient.batches[i].unitCost || ingredient.unitCost || 0;
+            if (ingredient.batches[i].quantity <= remainingToDeduct) {
+              totalDeductedCostRemove += ingredient.batches[i].quantity * batchCost;
+              remainingToDeduct -= ingredient.batches[i].quantity;
+              ingredient.batches[i].quantity = 0;
+            } else {
+              totalDeductedCostRemove += remainingToDeduct * batchCost;
+              ingredient.batches[i].quantity -= remainingToDeduct;
+              remainingToDeduct = 0;
+            }
+          }
+          if (remainingToDeduct > 0) {
+            totalDeductedCostRemove += remainingToDeduct * (ingredient.unitCost || 0);
+          }
+          // Filter out empty batches
+          ingredient.batches = ingredient.batches.filter((b: any) => b.quantity > 0);
+        } else {
+          totalDeductedCostRemove = quantity * (ingredient.unitCost || 0);
+        }
+
         ingredient.currentStock -= quantity;
         ingredient.totalUsed += quantity;
         ingredient.lastUsedDate = new Date();
@@ -294,12 +324,42 @@ export class IngredientsService {
 
       case 'set':
         ingredient.currentStock = quantity;
+        if (quantity === 0) {
+          ingredient.batches = [];
+        }
         break;
 
       case 'wastage':
         if (ingredient.currentStock < quantity) {
           throw new BadRequestException('Insufficient stock');
         }
+        
+        let totalDeductedCostWastage = 0;
+        // FIFO Batch Deduction
+        if (ingredient.batches && ingredient.batches.length > 0) {
+          ingredient.batches.sort((a: any, b: any) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+          let remainingToDeduct = quantity;
+          for (let i = 0; i < ingredient.batches.length && remainingToDeduct > 0; i++) {
+            const batchCost = ingredient.batches[i].unitCost || ingredient.unitCost || 0;
+            if (ingredient.batches[i].quantity <= remainingToDeduct) {
+              totalDeductedCostWastage += ingredient.batches[i].quantity * batchCost;
+              remainingToDeduct -= ingredient.batches[i].quantity;
+              ingredient.batches[i].quantity = 0;
+            } else {
+              totalDeductedCostWastage += remainingToDeduct * batchCost;
+              ingredient.batches[i].quantity -= remainingToDeduct;
+              remainingToDeduct = 0;
+            }
+          }
+          if (remainingToDeduct > 0) {
+            totalDeductedCostWastage += remainingToDeduct * (ingredient.unitCost || 0);
+          }
+          // Filter out empty batches
+          ingredient.batches = ingredient.batches.filter((b: any) => b.quantity > 0);
+        } else {
+          totalDeductedCostWastage = quantity * (ingredient.unitCost || 0);
+        }
+
         ingredient.currentStock -= quantity;
         ingredient.totalWastage += quantity;
 
@@ -312,8 +372,8 @@ export class IngredientsService {
             quantity: quantity,
             unit: ingredient.unit,
             reason: reason?.toLowerCase().includes('damage') ? WastageReason.DAMAGED : WastageReason.OTHER,
-            unitCost: ingredient.unitCost || 0,
-            totalCost: quantity * (ingredient.unitCost || 0),
+            unitCost: quantity > 0 ? (totalDeductedCostWastage / quantity) : (ingredient.unitCost || 0),
+            totalCost: totalDeductedCostWastage,
             wastageDate: new Date(),
             reportedBy: new Types.ObjectId(userId), // Optional but good to have
             notes: reason || 'Manual stock adjustment (wastage)',
@@ -474,10 +534,18 @@ export class IngredientsService {
     }
     const ingredients = await this.ingredientModel.find(query);
 
-    const totalValue = ingredients.reduce(
-      (sum, ing) => sum + ing.currentStock * ing.unitCost,
-      0,
-    );
+    const totalValue = ingredients.reduce((sum, ing) => {
+      let ingTrueValue = 0;
+      if (ing.batches && ing.batches.length > 0) {
+        const batchValue = ing.batches.reduce((bSum, b) => bSum + (b.quantity * (b.unitCost || ing.unitCost || 0)), 0);
+        const batchQty = ing.batches.reduce((bSum, b) => bSum + b.quantity, 0);
+        const legacyQty = Math.max(0, ing.currentStock - batchQty);
+        ingTrueValue = batchValue + (legacyQty * (ing.unitCost || 0));
+      } else {
+        ingTrueValue = ing.currentStock * (ing.unitCost || 0);
+      }
+      return sum + ingTrueValue;
+    }, 0);
 
     return {
       total: ingredients.length,
@@ -505,13 +573,25 @@ export class IngredientsService {
     }
     const ingredients = await this.ingredientModel.find(query);
 
-    const items = ingredients.map((ing) => ({
-      name: ing.name,
-      quantity: ing.currentStock,
-      unit: ing.unit,
-      unitCost: ing.unitCost,
-      totalValue: ing.currentStock * ing.unitCost,
-    }));
+    const items = ingredients.map((ing) => {
+      let trueValue = 0;
+      if (ing.batches && ing.batches.length > 0) {
+        const batchValue = ing.batches.reduce((sum, b) => sum + (b.quantity * (b.unitCost || ing.unitCost || 0)), 0);
+        const batchQty = ing.batches.reduce((sum, b) => sum + b.quantity, 0);
+        const legacyQty = Math.max(0, ing.currentStock - batchQty);
+        trueValue = batchValue + (legacyQty * (ing.unitCost || 0));
+      } else {
+        trueValue = ing.currentStock * (ing.unitCost || 0);
+      }
+
+      return {
+        name: ing.name,
+        quantity: ing.currentStock,
+        unit: ing.unit,
+        unitCost: ing.unitCost, // Keeping master unitCost as a reference
+        totalValue: trueValue,
+      };
+    });
 
     const totalValue = items.reduce((sum, item) => sum + item.totalValue, 0);
 
