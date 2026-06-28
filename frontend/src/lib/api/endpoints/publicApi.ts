@@ -424,7 +424,7 @@ export const publicApi = apiSlice.injectEndpoints({
       },
     }),
     getBusinessCategories: builder.query<any[], void>({
-      query: () => '/public/business-categories',
+      query: () => '/business-categories/public',
       transformResponse: (response: any) => {
         return response.data || [];
       }

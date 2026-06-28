@@ -383,6 +383,7 @@ export const apiSlice = createApi({
     'ContactForm',
     'Transactions',
     'PaymentMethods',
+    'BusinessCategory',
   ],
   endpoints: () => ({}),
 });

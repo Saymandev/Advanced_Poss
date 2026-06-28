@@ -14,6 +14,23 @@ export class BusinessCategoriesService implements OnModuleInit {
     await this.seedCategories();
   }
 
+  async findAll(): Promise<BusinessCategory[]> {
+    return this.businessCategoryModel.find().sort({ businessType: 1, name: 1 }).exec();
+  }
+
+  async create(createDto: any): Promise<BusinessCategory> {
+    const createdCategory = new this.businessCategoryModel(createDto);
+    return createdCategory.save();
+  }
+
+  async update(id: string, updateDto: any): Promise<BusinessCategory> {
+    return this.businessCategoryModel.findByIdAndUpdate(id, updateDto, { new: true }).exec();
+  }
+
+  async remove(id: string): Promise<any> {
+    return this.businessCategoryModel.findByIdAndDelete(id).exec();
+  }
+
   async findAllActive(): Promise<BusinessCategory[]> {
     return this.businessCategoryModel.find({ isActive: true }).sort({ name: 1 }).exec();
   }

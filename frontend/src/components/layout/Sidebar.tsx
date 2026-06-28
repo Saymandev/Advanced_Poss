@@ -414,6 +414,12 @@ const superAdminNavigation: NavigationItem[] = [
     roles: ['super_admin'],
   },
   {
+    name: 'System Categories',
+    href: '/dashboard/system-categories',
+    icon: TagIcon,
+    roles: ['super_admin'],
+  },
+  {
     name: 'Content Management',
     href: '/dashboard/cms',
     icon: DocumentTextIcon,
