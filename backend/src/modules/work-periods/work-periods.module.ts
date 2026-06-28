@@ -19,7 +19,7 @@ import { WorkPeriodsService } from './work-periods.service';
       { name: User.name, schema: UserSchema },
       { name: Transaction.name, schema: TransactionSchema },
     ]),
-    AiModule,
+    forwardRef(() => AiModule),
     UsersModule,
     forwardRef(() => POSModule),
     forwardRef(() => TransactionsModule),
