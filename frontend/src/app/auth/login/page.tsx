@@ -145,7 +145,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your-restaurant@example.com"
+                  placeholder="your-company@example.com"
                   className="pl-11 h-12 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
                   required
                 />
