@@ -151,7 +151,7 @@ export default function LoginPage() {
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Use the email registered with your restaurant
+                Use the email registered with your company
               </p>
             </div>
 
