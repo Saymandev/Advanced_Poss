@@ -26,14 +26,10 @@ export class PermissionsGuard implements CanActivate {
 
         // Convert to array if it's a single string for backward compatibility
         const features = Array.isArray(requiredFeatures) ? requiredFeatures : [requiredFeatures];
+        this.logger.debug(`[PermissionsGuard] Handler: ${context.getHandler().name}, Class: ${context.getClass().name}, Features: ${features.join(', ')}`);
 
         const request = context.switchToHttp().getRequest();
-        const user = request.user;
-
-        if (!user) {
-            this.logger.warn('User not found in request');
-            throw new ForbiddenException('User not authenticated');
-        }
+        let user = request.user;
 
         // Super admin bypasses all checks
         if (user.role === UserRole.SUPER_ADMIN) {

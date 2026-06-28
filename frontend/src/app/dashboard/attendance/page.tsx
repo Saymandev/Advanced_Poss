@@ -11,8 +11,8 @@ import { usePermissions } from '@/hooks/usePermissions';
 import {
   AttendanceRecord,
   useApproveAttendanceMutation,
-  useCheckInMutation,
-  useCheckOutMutation,
+  useAttendanceCheckInMutation,
+  useAttendanceCheckOutMutation,
   useDeleteAttendanceMutation,
   useForceCheckOutMutation,
   useGetAttendanceRecordsQuery,
@@ -117,8 +117,8 @@ export default function AttendancePage() {
   const totalRecords = attendanceRecordsData?.total || 0;
 
   // Mutations
-  const [checkIn, { isLoading: isCheckingIn }] = useCheckInMutation();
-  const [checkOut, { isLoading: isCheckingOut }] = useCheckOutMutation();
+  const [checkIn, { isLoading: isCheckingIn }] = useAttendanceCheckInMutation();
+  const [checkOut, { isLoading: isCheckingOut }] = useAttendanceCheckOutMutation();
   const [forceCheckOut] = useForceCheckOutMutation();
   const [_markAbsent, { isLoading: _isMarkingAbsent }] = useMarkAbsentMutation();
   const [_updateAttendance, { isLoading: _isUpdating }] = useUpdateAttendanceMutation();

@@ -39,7 +39,7 @@ export interface AttendanceStats {
 
 export const attendanceApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    checkIn: builder.mutation<AttendanceRecord, CheckInRequest>({
+    attendanceCheckIn: builder.mutation<AttendanceRecord, CheckInRequest>({
       query: (data) => ({
         url: '/attendance/check-in',
         method: 'POST',
@@ -67,7 +67,7 @@ export const attendanceApi = apiSlice.injectEndpoints({
         };
       },
     }),
-    checkOut: builder.mutation<AttendanceRecord, CheckOutRequest>({
+    attendanceCheckOut: builder.mutation<AttendanceRecord, CheckOutRequest>({
       query: (data) => ({
         url: '/attendance/check-out',
         method: 'POST',
@@ -283,8 +283,8 @@ export const attendanceApi = apiSlice.injectEndpoints({
 });
 
 export const {
-  useCheckInMutation,
-  useCheckOutMutation,
+  useAttendanceCheckInMutation,
+  useAttendanceCheckOutMutation,
   useForceCheckOutMutation,
   useGetAttendanceRecordsQuery,
   useGetTodayAttendanceQuery,
