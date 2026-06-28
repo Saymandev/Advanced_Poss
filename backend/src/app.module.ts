@@ -69,6 +69,7 @@ import { MaintenanceMiddleware } from './common/middleware/maintenance.middlewar
 import { ObjectIdValidationMiddleware } from './common/middleware/object-id-validation.middleware';
 import { SubscriptionLockMiddleware } from './common/middleware/subscription-lock.middleware';
 import { TransactionsModule } from './modules/transactions/transactions.module';
+import { BusinessCategoriesModule } from './modules/business-categories/business-categories.module';
 
 @Module({
   imports: [
@@ -187,6 +188,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
     PurchaseReturnsModule,
     SystemFeedbackModule,
     TransactionsModule,
+    BusinessCategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService, SubscriptionLockMiddleware],

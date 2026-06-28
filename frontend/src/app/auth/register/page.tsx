@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
 import { useRegisterCompanyOwnerMutation } from '@/lib/api/endpoints/authApi';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
+import { useGetBusinessCategoriesQuery } from '@/lib/api/endpoints/publicApi';
 import { COUNTRIES } from '@/lib/constants/countries';
 import { setCredentials, setCompanyContext } from '@/lib/slices/authSlice';
 import { useAppDispatch } from '@/lib/store';
@@ -41,6 +42,7 @@ export default function RegisterPage() {
   const dispatch = useAppDispatch();
   const [registerCompanyOwner, { isLoading }] = useRegisterCompanyOwnerMutation();
   const { data: plansData, isLoading: isLoadingPlans } = useGetSubscriptionPlansQuery({});
+  const { data: categoriesData, isLoading: isLoadingCategories } = useGetBusinessCategoriesQuery();
   const [step, setStep] = useState(1);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [industryType, setIndustryType] = useState<'restaurant' | 'retail' | null>(null);
@@ -86,6 +88,15 @@ export default function RegisterPage() {
     pin: '',
     confirmPin: '',
   });
+
+  const allCategories = categoriesData || [];
+  const filteredCategories = allCategories.filter((c: any) => c.businessType === formData.businessType);
+
+  useEffect(() => {
+    if (filteredCategories.length > 0 && !filteredCategories.find((c: any) => c.code === formData.businessCategory)) {
+      setFormData(prev => ({ ...prev, businessCategory: filteredCategories[0].code }));
+    }
+  }, [filteredCategories, formData.businessCategory]);
 
   const filteredPlans = useMemo(() => {
     const isRetail = formData.businessType === 'retail';
@@ -390,25 +401,16 @@ export default function RegisterPage() {
                     className="h-12 bg-gray-900/50 border-gray-700 text-white px-4 py-2 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none"
                     required
                   >
-                    <option value="" disabled>Select Business Type</option>
-                    {formData.businessType === 'restaurant' ? (
-                      <>
-                        <option value="restaurant">Restaurant</option>
-                        <option value="cafe">Café</option>
-                        <option value="bakery">Bakery</option>
-                        <option value="bar">Bar</option>
-                        <option value="food_truck">Food Truck</option>
-                        <option value="other">Other Food Business</option>
-                      </>
-                    ) : formData.businessType === 'retail' ? (
-                      <>
-                        <option value="retail">General Retail</option>
-                        <option value="grocery">Grocery & Supermarket</option>
-                        <option value="clothing">Clothing & Fashion</option>
-                        <option value="electronics">Electronics & IT</option>
-                        <option value="other_retail">Other Retail</option>
-                      </>
-                    ) : null}
+                    <option value="" disabled>Select Business Category</option>
+                    {isLoadingCategories ? (
+                      <option value="" disabled>Loading categories...</option>
+                    ) : (
+                      filteredCategories.map((category: any) => (
+                        <option key={category.code} value={category.code}>
+                          {category.name}
+                        </option>
+                      ))
+                    )}
                   </select>
 
                   <select

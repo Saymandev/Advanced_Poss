@@ -1,19 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsEnum, IsNotEmpty, IsPhoneNumber, IsString, Length, Matches } from 'class-validator';
 
-export enum CompanyType {
-  RESTAURANT = 'restaurant',
-  CAFE = 'cafe',
-  BAKERY = 'bakery',
-  BAR = 'bar',
-  FOOD_TRUCK = 'food_truck',
-  OTHER = 'other',
-  RETAIL = 'retail',
-  GROCERY = 'grocery',
-  CLOTHING = 'clothing',
-  ELECTRONICS = 'electronics',
-  OTHER_RETAIL = 'other_retail',
-}
+
 
 export enum SubscriptionPackage {
   BASIC = 'basic',
@@ -35,13 +23,12 @@ export class CompanyOwnerRegisterDto {
   companyName: string;
 
   @ApiProperty({
-    description: 'Company type',
-    enum: CompanyType,
-    example: CompanyType.RESTAURANT,
+    description: 'Company category',
+    example: 'cafe',
   })
   @IsNotEmpty()
-  @IsEnum(CompanyType)
-  companyType: CompanyType;
+  @IsString()
+  companyType: string;
 
   @ApiProperty({
     description: 'Country where the company is located',

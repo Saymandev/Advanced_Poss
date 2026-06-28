@@ -423,10 +423,17 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data;
       },
     }),
+    getBusinessCategories: builder.query<any[], void>({
+      query: () => '/public/business-categories',
+      transformResponse: (response: any) => {
+        return response.data || [];
+      }
+    }),
   }),
 });
 export const {
   useGetCompanyBySlugQuery,
+  useGetBusinessCategoriesQuery,
   useGetCompanySettingsQuery,
   useGetCompanyBranchesQuery,
   useGetBranchBySlugQuery,
