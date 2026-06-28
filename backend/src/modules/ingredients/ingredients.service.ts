@@ -286,7 +286,7 @@ export class IngredientsService {
         }
         break;
 
-      case 'remove':
+      case 'remove': {
         if (ingredient.currentStock < quantity) {
           throw new BadRequestException('Insufficient stock');
         }
@@ -321,6 +321,7 @@ export class IngredientsService {
         ingredient.totalUsed += quantity;
         ingredient.lastUsedDate = new Date();
         break;
+      }
 
       case 'set':
         ingredient.currentStock = quantity;
@@ -329,7 +330,7 @@ export class IngredientsService {
         }
         break;
 
-      case 'wastage':
+      case 'wastage': {
         if (ingredient.currentStock < quantity) {
           throw new BadRequestException('Insufficient stock');
         }
@@ -387,6 +388,7 @@ export class IngredientsService {
           // We don't throw here to avoid failing the stock adjustment if only the log fails
         }
         break;
+      }
 
       default:
         throw new BadRequestException('Invalid adjustment type');

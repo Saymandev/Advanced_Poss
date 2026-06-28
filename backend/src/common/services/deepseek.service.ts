@@ -268,7 +268,7 @@ Respond strictly in JSON format matching this structure:
 `;
 
       const aiClient = this.deepseek;
-      const model = true ? (this.configService.get('deepseek.model') || 'deepseek-chat') : (this.configService.get('openai.model') || 'gpt-3.5-turbo');
+      const model = this.configService.get('deepseek.model') || 'deepseek-chat';
 
       const response = await aiClient.chat.completions.create({
         model: model,
@@ -303,7 +303,7 @@ Respond strictly in JSON format matching this structure:
 `;
 
       const aiClient = this.deepseek;
-      const model = true ? (this.configService.get('deepseek.model') || 'deepseek-chat') : (this.configService.get('openai.model') || 'gpt-3.5-turbo');
+      const model = this.configService.get('deepseek.model') || 'deepseek-chat';
 
       const response = await aiClient.chat.completions.create({
         model: model,
