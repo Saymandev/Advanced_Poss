@@ -231,6 +231,18 @@ export const workPeriodsApi = apiSlice.injectEndpoints({
         body: { email },
       }),
     }),
+    getWorkPeriodAiAnalysis: builder.query<{
+      executiveSummary: string;
+      discrepancyAlerts: string[];
+      actionableInsights: string[];
+    }, string>({
+      query: (id) => `/work-periods/${id}/ai-analysis`,
+      providesTags: ['WorkPeriod'],
+      transformResponse: (response: any) => {
+        // Handle TransformInterceptor format: { success: true, data: ... }
+        return response?.data !== undefined ? response.data : response;
+      },
+    }),
   }),
 });
 
@@ -245,5 +257,6 @@ export const {
   useGetWorkPeriodSalesSummaryQuery,
   useGetCurrentWorkPeriodQuery,
   useGetWorkPeriodActivitiesQuery,
+  useGetWorkPeriodAiAnalysisQuery,
   useEmailWorkPeriodReportMutation,
 } = workPeriodsApi;

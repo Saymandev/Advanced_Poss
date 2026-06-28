@@ -1,7 +1,9 @@
 import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { DeepSeekService } from '../../common/services/deepseek.service';
 import { EmailService } from '../../common/services/email.service';
+import { OpenAIService } from '../../common/services/openai.service';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { PDFGeneratorService } from '../pos/pdf-generator.service';
 import { POSService } from '../pos/pos.service';
@@ -22,6 +24,8 @@ export class WorkPeriodsService {
     private posService: POSService,
     private pdfGeneratorService: PDFGeneratorService,
     private emailService: EmailService,
+    private deepseekService: DeepSeekService,
+    private openaiService: OpenAIService,
     @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
   ) { }
 
@@ -661,5 +665,24 @@ export class WorkPeriodsService {
       </body>
       </html>
     `;
+  }
+
+  async getAiAnalysis(workPeriodId: string, branchId?: string) {
+    const workPeriod = await this.findOne(workPeriodId);
+    const summary = await this.getSalesSummary(workPeriodId, branchId);
+
+    // Try DeepSeek first
+    let analysis = await this.deepseekService.generateShiftAnalysis(workPeriod, summary);
+
+    // Fallback to OpenAI if DeepSeek fails or is not enabled
+    if (!analysis) {
+      analysis = await this.openaiService.generateShiftAnalysis(workPeriod, summary);
+    }
+
+    if (!analysis) {
+      throw new BadRequestException('AI analysis is currently unavailable. Please check your API key configuration in settings.');
+    }
+
+    return analysis;
   }
 }

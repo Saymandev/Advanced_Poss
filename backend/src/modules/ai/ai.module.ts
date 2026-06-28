@@ -29,7 +29,7 @@ import { AnalyticsService } from './analytics.service';
   ],
   controllers: [AiController],
   providers: [AiService, AnalyticsService, OpenAIService, DeepSeekService],
-  exports: [AiService, AnalyticsService],
+  exports: [AiService, AnalyticsService, OpenAIService, DeepSeekService],
 })
 export class AiModule {}
 

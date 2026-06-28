@@ -109,6 +109,16 @@ export class WorkPeriodsController {
     return this.workPeriodsService.getPeriodActivities(id, branchId);
   }
 
+  @Get(':id/ai-analysis')
+  @RequiresFeature(FEATURES.AI_SHIFT_ANALYSIS)
+  @ApiOperation({ summary: 'Get AI analysis for work period' })
+  getAiAnalysis(
+    @Param('id') id: string,
+    @CurrentUser('branchId') branchId?: string,
+  ) {
+    return this.workPeriodsService.getAiAnalysis(id, branchId);
+  }
+
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Download work period report as PDF' })
   async downloadReport(@Param('id') id: string, @Res() res: Response) {

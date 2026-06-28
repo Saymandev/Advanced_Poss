@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
-import { useEmailWorkPeriodReportMutation, useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPeriodActivitiesQuery, useGetWorkPeriodByIdQuery, useGetWorkPeriodSalesSummaryQuery, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
+import { useEmailWorkPeriodReportMutation, useEndWorkPeriodMutation, useGetCurrentWorkPeriodQuery, useGetWorkPeriodActivitiesQuery, useGetWorkPeriodByIdQuery, useGetWorkPeriodSalesSummaryQuery, useGetWorkPeriodsQuery, useStartWorkPeriodMutation, useGetWorkPeriodAiAnalysisQuery, WorkPeriod } from '@/lib/api/endpoints/workPeriodsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -21,7 +22,8 @@ import {
   PlayIcon,
   PrinterIcon,
   StopIcon,
-  UserIcon
+  UserIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -35,7 +37,11 @@ export default function WorkPeriodsPage() {
   const [isOpenModalOpen, setIsOpenModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [selectedWorkPeriod, setSelectedWorkPeriod] = useState<WorkPeriod | null>(null);
+
+  const { hasFeature } = useRolePermissions();
+  const hasAiAnalysis = hasFeature('ai-shift-analysis');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -224,6 +230,12 @@ export default function WorkPeriodsPage() {
     { skip: !selectedWorkPeriod || !isViewModalOpen }
   );
 
+  // Fetch AI Analysis when AI modal is open
+  const { data: aiAnalysis, isLoading: isLoadingAiAnalysis, isError: isAiError, error: aiError } = useGetWorkPeriodAiAnalysisQuery(
+    selectedWorkPeriod?.id || '',
+    { skip: !selectedWorkPeriod || !isAiModalOpen }
+  );
+
   // Removed unused getStatusBadge function
 
   // Live duration counter for active periods
@@ -356,6 +368,20 @@ export default function WorkPeriodsPage() {
           >
             <EyeIcon className="w-4 h-4" />
           </Button>
+          {hasAiAnalysis && row.status === 'completed' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedWorkPeriod(row);
+                setIsAiModalOpen(true);
+              }}
+              title="AI Shift Analysis"
+              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+            >
+              <SparklesIcon className="w-4 h-4" />
+            </Button>
+          )}
           {row.status === 'active' && (
             <Button
               variant="ghost"
@@ -1446,6 +1472,95 @@ export default function WorkPeriodsPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* AI Analysis Modal */}
+      <Modal
+        isOpen={isAiModalOpen}
+        onClose={() => {
+          setIsAiModalOpen(false);
+          setSelectedWorkPeriod(null);
+        }}
+        title={
+          <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+            <SparklesIcon className="w-5 h-5" />
+            <span>AI Shift Analysis</span>
+          </div>
+        }
+        className="max-w-2xl"
+      >
+        <div className="space-y-6">
+          {isLoadingAiAnalysis ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <SparklesIcon className="w-12 h-12 text-purple-500 animate-pulse mb-4" />
+              <p className="text-gray-600 dark:text-gray-400 font-medium">Analyzing shift data...</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Our AI is reviewing sales, discrepancies, and operational patterns.</p>
+            </div>
+          ) : isAiError ? (
+            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-lg">
+              <p className="font-medium">Failed to generate AI analysis.</p>
+              <p className="text-sm mt-1">{((aiError as any)?.data?.message) || 'Please check your AI configuration in settings and try again later.'}</p>
+            </div>
+          ) : aiAnalysis ? (
+            <>
+              {/* Executive Summary */}
+              <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800 rounded-lg p-4">
+                <h4 className="font-semibold text-purple-900 dark:text-purple-300 mb-2">Executive Summary</h4>
+                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+                  {aiAnalysis.executiveSummary}
+                </p>
+              </div>
+
+              {/* Discrepancy Alerts */}
+              {aiAnalysis.discrepancyAlerts && aiAnalysis.discrepancyAlerts.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    Discrepancy Alerts
+                  </h4>
+                  <ul className="space-y-2">
+                    {aiAnalysis.discrepancyAlerts.map((alert: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-3 bg-red-50 dark:bg-red-900/10 p-3 rounded-md text-sm text-red-800 dark:text-red-300">
+                        <span className="mt-0.5">•</span>
+                        <span>{alert}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Actionable Insights */}
+              {aiAnalysis.actionableInsights && aiAnalysis.actionableInsights.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Actionable Insights
+                  </h4>
+                  <ul className="space-y-2">
+                    {aiAnalysis.actionableInsights.map((insight: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-3 bg-green-50 dark:bg-green-900/10 p-3 rounded-md text-sm text-green-800 dark:text-green-300">
+                        <span className="mt-0.5">•</span>
+                        <span>{insight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : null}
+
+          <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Button
+              onClick={() => {
+                setIsAiModalOpen(false);
+                setSelectedWorkPeriod(null);
+              }}
+              variant="secondary"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

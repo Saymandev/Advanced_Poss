@@ -48,6 +48,7 @@ export const FEATURES = {
   AI_MENU_OPTIMIZATION: 'ai-menu-optimization',
   AI_CUSTOMER_LOYALTY: 'ai-customer-loyalty',
   AI_INSIGHTS: 'ai-insights',
+  AI_SHIFT_ANALYSIS: 'ai-shift-analysis',
 
   // Inventory & Suppliers
   INVENTORY: 'inventory',
@@ -95,7 +96,7 @@ export const FEATURE_CATEGORIES = {
     'digital-receipts',
   ],
   CUSTOMERS: ['customer-management', 'loyalty-program', 'marketing'],
-  AI_FEATURES: ['ai-menu-optimization', 'ai-customer-loyalty', 'ai-insights'],
+  AI_FEATURES: ['ai-menu-optimization', 'ai-customer-loyalty', 'ai-insights', 'ai-shift-analysis'],
   INVENTORY: ['inventory', 'suppliers', 'purchase-orders', 'wastage-management'],
   FINANCIAL: ['expenses', 'income', 'accounting', 'work-periods'],
   SYSTEM: ['settings', 'branches', 'notifications', 'cms'],
@@ -130,6 +131,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.AI_MENU_OPTIMIZATION,
     FEATURES.AI_CUSTOMER_LOYALTY,
     FEATURES.AI_INSIGHTS,
+    FEATURES.AI_SHIFT_ANALYSIS,
     FEATURES.INVENTORY,
     FEATURES.SUPPLIERS,
     FEATURES.PURCHASE_ORDERS,
@@ -164,6 +166,7 @@ export const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     FEATURES.MARKETING,
     FEATURES.AI_MENU_OPTIMIZATION,
     FEATURES.AI_INSIGHTS,
+    FEATURES.AI_SHIFT_ANALYSIS,
     FEATURES.INVENTORY,
     FEATURES.SUPPLIERS,
     FEATURES.WASTAGE_MANAGEMENT,

@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AiModule } from '../ai/ai.module';
 import { POSModule } from '../pos/pos.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
@@ -18,6 +19,7 @@ import { WorkPeriodsService } from './work-periods.service';
       { name: User.name, schema: UserSchema },
       { name: Transaction.name, schema: TransactionSchema },
     ]),
+    AiModule,
     UsersModule,
     forwardRef(() => POSModule),
     forwardRef(() => TransactionsModule),

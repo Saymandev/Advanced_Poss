@@ -319,4 +319,69 @@ Respond strictly in JSON format matching this structure:
       return null;
     }
   }
+
+  async generateShiftAnalysis(workPeriodData: any, salesSummary: any): Promise<{
+    executiveSummary: string;
+    discrepancyAlerts: string[];
+    actionableInsights: string[];
+  } | null> {
+    if (!this.isEnabled || !this.deepseek) return null;
+
+    try {
+      const prompt = `
+You are an expert restaurant/retail business consultant and auditor. Analyze the following Work Period (Shift) data and Sales Summary.
+
+Work Period Details:
+${JSON.stringify({
+  startTime: workPeriodData.startTime,
+  endTime: workPeriodData.endTime,
+  duration: workPeriodData.duration,
+  openingBalance: workPeriodData.openingBalance,
+  closingBalance: workPeriodData.closingBalance,
+  status: workPeriodData.status,
+})}
+
+Sales Summary:
+${JSON.stringify({
+  totalOrders: salesSummary.totalOrders,
+  grossSales: salesSummary.grossSales,
+  refundTotal: salesSummary.refundTotal,
+  netSales: salesSummary.netSales,
+  voidCount: salesSummary.voidCount,
+  cancelCount: salesSummary.cancelCount,
+  paymentMethods: salesSummary.paymentMethods,
+})}
+
+Please provide an analysis of this shift. Focus on performance, any cash or payment anomalies (e.g. comparing opening balance and cash sales to actual closing balance), and actionable recommendations.
+
+Respond strictly in JSON format matching this structure:
+{
+  "executiveSummary": "A concise 2-3 sentence overview of the shift's performance and operations.",
+  "discrepancyAlerts": ["Alert 1 (e.g. cash variance)", "Alert 2 (e.g. high voids)"],
+  "actionableInsights": ["Insight 1 (e.g. staffing suggestion)", "Insight 2 (e.g. peak time management)"]
+}
+`;
+
+      const model = this.configService.get('deepseek.model') || 'deepseek-chat';
+
+      const response = await this.deepseek.chat.completions.create({
+        model: model,
+        messages: [
+          { role: 'system', content: 'You are an expert restaurant shift auditor and consultant. Always respond with valid JSON.' },
+          { role: 'user', content: prompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.6,
+        max_tokens: 600,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) return null;
+      
+      return JSON.parse(content);
+    } catch (error) {
+      this.logger.error(`Error generating shift analysis: ${error.message}`);
+      return null;
+    }
+  }
 }

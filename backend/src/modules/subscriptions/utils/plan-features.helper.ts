@@ -41,6 +41,7 @@ export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
     FEATURES.AI_MENU_OPTIMIZATION,
     FEATURES.AI_CUSTOMER_LOYALTY,
     FEATURES.AI_INSIGHTS,
+    FEATURES.AI_SHIFT_ANALYSIS,
   ],
   multiBranch: [
     FEATURES.BRANCHES,
@@ -188,6 +189,7 @@ export function getFeaturesByCategory() {
     'AI Features': [
       { key: FEATURES.AI_MENU_OPTIMIZATION, name: 'AI Menu Optimization' },
       { key: FEATURES.AI_INSIGHTS, name: 'Interactive Business AI' },
+      { key: FEATURES.AI_SHIFT_ANALYSIS, name: 'AI-Powered Shift Analytics' },
     ],
     'Kitchen & Menu': [
       { key: FEATURES.MENU_MANAGEMENT, name: 'Menu Engineering' },
