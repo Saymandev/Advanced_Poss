@@ -7,6 +7,7 @@ export class OpenAIService {
   private readonly logger = new Logger(OpenAIService.name);
   private openai: OpenAI | null = null;
   private isEnabled = false;
+  private dynamicModel: string | null = null;
 
   private getValidModel(configuredModel: string): string {
     // List of valid OpenAI models
