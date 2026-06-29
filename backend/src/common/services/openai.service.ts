@@ -343,7 +343,7 @@ Respond strictly in JSON format matching this structure:
     }
   }
 
-  async generateShiftAnalysis(workPeriodData: any, salesSummary: any): Promise<{
+  async generateShiftAnalysis(workPeriodData: any, salesSummary: any, currency: string = 'BDT'): Promise<{
     executiveSummary: string;
     discrepancyAlerts: string[];
     actionableInsights: string[];
@@ -376,6 +376,7 @@ ${JSON.stringify({
 })}
 
 Please provide an analysis of this shift. Focus on performance, any cash or payment anomalies (e.g. comparing opening balance and cash sales to actual closing balance), and actionable recommendations.
+IMPORTANT: Format ALL monetary amounts using the currency: ${currency}.
 
 Respond strictly in JSON format matching this structure:
 {

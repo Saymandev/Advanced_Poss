@@ -696,17 +696,19 @@ export class WorkPeriodsService {
       });
     }
 
+    const currency = systemSettings.defaultCompanySettings?.currency || 'BDT';
+
     // Try OpenRouter first
-    let analysis = await this.openrouterService.generateShiftAnalysis(workPeriod, summary);
+    let analysis = await this.openrouterService.generateShiftAnalysis(workPeriod, summary, currency);
 
     // Fallback to DeepSeek
     if (!analysis) {
-      analysis = await this.deepseekService.generateShiftAnalysis(workPeriod, summary);
+      analysis = await this.deepseekService.generateShiftAnalysis(workPeriod, summary, currency);
     }
 
     // Fallback to OpenAI
     if (!analysis) {
-      analysis = await this.openaiService.generateShiftAnalysis(workPeriod, summary);
+      analysis = await this.openaiService.generateShiftAnalysis(workPeriod, summary, currency);
     }
 
     if (!analysis) {
