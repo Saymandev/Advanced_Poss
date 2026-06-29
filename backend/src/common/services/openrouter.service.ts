@@ -17,6 +17,7 @@ export class OpenRouterService {
         this.openrouter = new OpenAI({
           apiKey: apiKey,
           baseURL: baseUrl,
+          maxRetries: 0,
           defaultHeaders: {
             'HTTP-Referer': 'https://raha.bd',
             'X-Title': 'Raha POS Solutions',
@@ -38,6 +39,7 @@ export class OpenRouterService {
       this.openrouter = new OpenAI({
         apiKey: config.apiKey,
         baseURL: config.baseUrl || 'https://openrouter.ai/api/v1',
+        maxRetries: 0,
         defaultHeaders: {
           'HTTP-Referer': 'https://raha.bd',
           'X-Title': 'Raha POS Solutions',
