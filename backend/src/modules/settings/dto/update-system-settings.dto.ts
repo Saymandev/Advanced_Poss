@@ -103,6 +103,8 @@ export class UpdateSystemSettingsDto {
   @IsOptional()
   @IsObject()
   ai?: {
+    openrouterApiKey?: string;
+    openrouterModel?: string;
     openaiApiKey?: string;
     openaiModel?: string;
     deepseekApiKey?: string;

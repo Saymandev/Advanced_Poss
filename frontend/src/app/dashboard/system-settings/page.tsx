@@ -772,6 +772,32 @@ export default function SystemSettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded bg-purple-100 flex items-center justify-center">
+                    <span className="text-purple-600 font-bold text-xs">OR</span>
+                  </div>
+                  OpenRouter Settings (Primary)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input
+                  label="OpenRouter API Key"
+                  type="password"
+                  value={formData.ai?.openrouterApiKey || ''}
+                  onChange={(e) => updateField('ai.openrouterApiKey', e.target.value)}
+                  placeholder="sk-or-v1-..."
+                />
+                <Input
+                  label="OpenRouter Model"
+                  value={formData.ai?.openrouterModel || 'meta-llama/llama-3.3-70b-instruct:free'}
+                  onChange={(e) => updateField('ai.openrouterModel', e.target.value)}
+                  placeholder="meta-llama/llama-3.3-70b-instruct:free"
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center">
                     <span className="text-blue-600 font-bold text-xs">DS</span>
                   </div>

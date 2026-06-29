@@ -159,6 +159,8 @@ export interface SystemSettings {
     deepseekApiKey: string;
     deepseekModel: string;
     deepseekBaseUrl: string;
+    openrouterApiKey: string;
+    openrouterModel: string;
     enabled: boolean;
   };
   createdAt?: string;

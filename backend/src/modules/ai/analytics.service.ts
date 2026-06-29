@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { OpenAIService } from '../../common/services/openai.service';
 import { DeepSeekService } from '../../common/services/deepseek.service';
+import { OpenRouterService } from '../../common/services/openrouter.service';
 import { SettingsService } from '../settings/settings.service';
 import { Customer, CustomerDocument } from '../customers/schemas/customer.schema';
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
@@ -19,6 +20,7 @@ export class AnalyticsService {
     private readonly settingsService: SettingsService,
     private openAIService: OpenAIService,
     private deepSeekService: DeepSeekService,
+    private openRouterService: OpenRouterService,
   ) { }
   async generateSalesAnalytics(
     branchId: string,
@@ -870,6 +872,12 @@ export class AnalyticsService {
         if (systemSettings.ai?.openaiApiKey) {
           // You might want to add updateConfig to OpenAIService as well
         }
+        if (systemSettings.ai?.openrouterApiKey) {
+          this.openRouterService.updateConfig({
+            apiKey: systemSettings.ai.openrouterApiKey,
+            model: systemSettings.ai.openrouterModel,
+          });
+        }
         if (systemSettings.ai?.deepseekApiKey) {
           this.deepSeekService.updateConfig({
             apiKey: systemSettings.ai.deepseekApiKey,
@@ -879,7 +887,7 @@ export class AnalyticsService {
         }
 
         // Try to get AI-powered recommendation
-        const aiProvider = this.deepSeekService.isAvailable() ? this.deepSeekService : (this.openAIService.isAvailable() ? this.openAIService : null);
+        const aiProvider = this.openRouterService.isAvailable() ? this.openRouterService : (this.deepSeekService.isAvailable() ? this.deepSeekService : (this.openAIService.isAvailable() ? this.openAIService : null));
         
         if (aiProvider) {
         try {
@@ -1085,7 +1093,7 @@ export class AnalyticsService {
       
       // Generate AI-powered predictions if available
       const aiProvider = (systemSettings.ai?.enabled !== false) 
-        ? (this.deepSeekService.isAvailable() ? this.deepSeekService : (this.openAIService.isAvailable() ? this.openAIService : null))
+        ? (this.openRouterService.isAvailable() ? this.openRouterService : (this.deepSeekService.isAvailable() ? this.deepSeekService : (this.openAIService.isAvailable() ? this.openAIService : null)))
         : null;
       
       if (aiProvider && itemOrders.length > 0) {

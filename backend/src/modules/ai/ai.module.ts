@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OpenAIService } from '../../common/services/openai.service';
+import { OpenRouterService } from '../../common/services/openrouter.service';
 import { DeepSeekService } from '../../common/services/deepseek.service';
 import { CategoriesModule } from '../categories/categories.module';
 import { Customer, CustomerSchema } from '../customers/schemas/customer.schema';
@@ -28,8 +29,8 @@ import { AnalyticsService } from './analytics.service';
     SettingsModule,
   ],
   controllers: [AiController],
-  providers: [AiService, AnalyticsService, OpenAIService, DeepSeekService],
-  exports: [AiService, AnalyticsService, OpenAIService, DeepSeekService],
+  providers: [AiService, AnalyticsService, OpenAIService, DeepSeekService, OpenRouterService],
+  exports: [AiService, AnalyticsService, OpenAIService, DeepSeekService, OpenRouterService],
 })
 export class AiModule {}
 

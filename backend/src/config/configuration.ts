@@ -70,6 +70,12 @@ export default () => ({
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
   },
 
+  openrouter: {
+    apiKey: process.env.OPENROUTER_API_KEY,
+    model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
+    baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+  },
+
   frontend: {
     url: process.env.APP_URL || 'http://localhost:3000',
   },

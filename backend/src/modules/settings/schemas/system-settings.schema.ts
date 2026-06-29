@@ -199,6 +199,8 @@ export class SystemSettings {
 
   @Prop({
     type: {
+      openrouterApiKey: { type: String, default: '' },
+      openrouterModel: { type: String, default: 'meta-llama/llama-3.3-70b-instruct:free' },
       openaiApiKey: { type: String, default: '' },
       openaiModel: { type: String, default: 'gpt-4o-mini' },
       deepseekApiKey: { type: String, default: '' },
@@ -207,6 +209,8 @@ export class SystemSettings {
       enabled: { type: Boolean, default: true },
     },
     default: {
+      openrouterApiKey: '',
+      openrouterModel: 'meta-llama/llama-3.3-70b-instruct:free',
       openaiApiKey: '',
       openaiModel: 'gpt-4o-mini',
       deepseekApiKey: '',
@@ -216,6 +220,8 @@ export class SystemSettings {
     },
   })
   ai: {
+    openrouterApiKey: string;
+    openrouterModel: string;
     openaiApiKey: string;
     openaiModel: string;
     deepseekApiKey: string;
