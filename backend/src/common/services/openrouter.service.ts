@@ -138,7 +138,6 @@ Return ONLY valid JSON.`;
           },
         ],
         temperature: 0.7,
-        max_tokens: 500,
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -146,8 +145,11 @@ Return ONLY valid JSON.`;
 
       // Ensure JSON parsing from Markdown block if model returned it
       let jsonStr = responseContent;
+      jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+      } else if (jsonStr.includes('```')) {
+        jsonStr = jsonStr.replace(/```/g, '');
       }
 
       const result = JSON.parse(jsonStr);
@@ -239,15 +241,17 @@ Return ONLY valid JSON.`;
           },
         ],
         temperature: 0.5,
-        max_tokens: 400,
       });
 
       const responseContent = completion.choices[0]?.message?.content;
       if (!responseContent) return null;
 
       let jsonStr = responseContent;
+      jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+      } else if (jsonStr.includes('```')) {
+        jsonStr = jsonStr.replace(/```/g, '');
       }
       const result = JSON.parse(jsonStr);
       
@@ -296,8 +300,11 @@ Respond strictly in JSON format matching this structure:
 
       const content = response.choices[0].message.content;
       let jsonStr = content;
+      jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+      } else if (jsonStr.includes('```')) {
+        jsonStr = jsonStr.replace(/```/g, '');
       }
       return JSON.parse(jsonStr);
     } catch (error) {
@@ -334,8 +341,11 @@ Respond strictly in JSON format matching this structure:
 
       const content = response.choices[0].message.content;
       let jsonStr = content;
+      jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+      } else if (jsonStr.includes('```')) {
+        jsonStr = jsonStr.replace(/```/g, '');
       }
       return JSON.parse(jsonStr);
     } catch (error) {
@@ -395,15 +405,17 @@ Respond strictly in JSON format matching this structure:
           { role: 'user', content: prompt }
         ],
         temperature: 0.6,
-        max_tokens: 600,
       });
 
       const content = response.choices[0]?.message?.content;
       if (!content) return null;
       
       let jsonStr = content;
+      jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+      } else if (jsonStr.includes('```')) {
+        jsonStr = jsonStr.replace(/```/g, '');
       }
       return JSON.parse(jsonStr);
     } catch (error) {
