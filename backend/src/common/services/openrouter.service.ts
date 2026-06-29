@@ -7,6 +7,7 @@ export class OpenRouterService {
   private readonly logger = new Logger(OpenRouterService.name);
   private openrouter: OpenAI | null = null;
   private isEnabled = false;
+  private dynamicModel: string | null = null;
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('openrouter.apiKey');
@@ -46,7 +47,10 @@ export class OpenRouterService {
         }
       });
       this.isEnabled = true;
-      this.logger.log(`✅ OpenRouter configuration updated dynamically`);
+      if (config.model) {
+        this.dynamicModel = config.model;
+      }
+      this.logger.log(`✅ OpenRouter configuration updated dynamically with model: ${this.dynamicModel}`);
     }
   }
 
@@ -298,7 +302,7 @@ Respond strictly in JSON format matching this structure:
 `;
 
       const aiClient = this.openrouter;
-      const model = this.configService.get('openrouter.model') || 'meta-llama/llama-3.3-70b-instruct:free';
+      const model = this.dynamicModel || this.configService.get('openrouter.model') || 'meta-llama/llama-3.3-70b-instruct:free';
 
       const response = await aiClient.chat.completions.create({
         model: model,
@@ -343,7 +347,7 @@ Respond strictly in JSON format matching this structure:
 `;
 
       const aiClient = this.openrouter;
-      const model = this.configService.get('openrouter.model') || 'meta-llama/llama-3.3-70b-instruct:free';
+      const model = this.dynamicModel || this.configService.get('openrouter.model') || 'meta-llama/llama-3.3-70b-instruct:free';
 
       const response = await aiClient.chat.completions.create({
         model: model,
@@ -412,7 +416,7 @@ Respond strictly in JSON format matching this structure:
 }
 `;
 
-      const model = this.configService.get('openrouter.model') || 'meta-llama/llama-3.3-70b-instruct:free';
+      const model = this.dynamicModel || this.configService.get('openrouter.model') || 'meta-llama/llama-3.3-70b-instruct:free';
 
       const response = await this.openrouter.chat.completions.create({
         model: model,

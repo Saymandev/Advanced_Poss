@@ -7,6 +7,7 @@ export class DeepSeekService {
   private readonly logger = new Logger(DeepSeekService.name);
   private deepseek: OpenAI | null = null;
   private isEnabled = false;
+  private dynamicModel: string | null = null;
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('deepseek.apiKey');
@@ -36,6 +37,9 @@ export class DeepSeekService {
         baseURL: config.baseUrl || 'https://api.deepseek.com',
       });
       this.isEnabled = true;
+      if (config.model) {
+        this.dynamicModel = config.model;
+      }
       this.logger.log(`✅ DeepSeek configuration updated dynamically`);
     }
   }
@@ -362,7 +366,7 @@ Respond strictly in JSON format matching this structure:
 }
 `;
 
-      const model = this.configService.get('deepseek.model') || 'deepseek-chat';
+      const model = this.dynamicModel || this.configService.get('deepseek.model') || 'deepseek-chat';
 
       const response = await this.deepseek.chat.completions.create({
         model: model,
