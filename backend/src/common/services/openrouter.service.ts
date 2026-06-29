@@ -146,6 +146,10 @@ Return ONLY valid JSON.`;
       // Ensure JSON parsing from Markdown block if model returned it
       let jsonStr = responseContent;
       jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
       } else if (jsonStr.includes('```')) {
@@ -248,6 +252,10 @@ Return ONLY valid JSON.`;
 
       let jsonStr = responseContent;
       jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
       } else if (jsonStr.includes('```')) {
@@ -301,6 +309,10 @@ Respond strictly in JSON format matching this structure:
       const content = response.choices[0].message.content;
       let jsonStr = content;
       jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
       } else if (jsonStr.includes('```')) {
@@ -342,6 +354,10 @@ Respond strictly in JSON format matching this structure:
       const content = response.choices[0].message.content;
       let jsonStr = content;
       jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
       } else if (jsonStr.includes('```')) {
@@ -412,6 +428,10 @@ Respond strictly in JSON format matching this structure:
       
       let jsonStr = content;
       jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '');
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
       if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
       } else if (jsonStr.includes('```')) {
