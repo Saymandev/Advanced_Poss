@@ -17,6 +17,10 @@ export class OpenRouterService {
         this.openrouter = new OpenAI({
           apiKey: apiKey,
           baseURL: baseUrl,
+          defaultHeaders: {
+            'HTTP-Referer': 'https://raha.bd',
+            'X-Title': 'Raha POS Solutions',
+          }
         });
         this.isEnabled = true;
         this.logger.log(`✅ OpenRouter service initialized with baseURL: ${baseUrl}`);
@@ -34,6 +38,10 @@ export class OpenRouterService {
       this.openrouter = new OpenAI({
         apiKey: config.apiKey,
         baseURL: config.baseUrl || 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'HTTP-Referer': 'https://raha.bd',
+          'X-Title': 'Raha POS Solutions',
+        }
       });
       this.isEnabled = true;
       this.logger.log(`✅ OpenRouter configuration updated dynamically`);
