@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AiModule } from '../ai/ai.module';
 import { POSModule } from '../pos/pos.module';
+import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { Transaction, TransactionSchema } from '../transactions/schemas/transaction.schema';
@@ -25,6 +26,7 @@ import { WorkPeriodsService } from './work-periods.service';
     forwardRef(() => TransactionsModule),
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard
     forwardRef(() => SubscriptionsModule), // Required for SubscriptionFeatureGuard
+    SettingsModule,
   ],
   controllers: [WorkPeriodsController],
   providers: [WorkPeriodsService],

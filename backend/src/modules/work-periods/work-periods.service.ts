@@ -11,6 +11,7 @@ import { POSService } from '../pos/pos.service';
 import { Transaction, TransactionCategory, TransactionDocument } from '../transactions/schemas/transaction.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { UsersService } from '../users/users.service';
+import { SettingsService } from '../settings/settings.service';
 import { EndWorkPeriodDto } from './dto/end-work-period.dto';
 import { StartWorkPeriodDto } from './dto/start-work-period.dto';
 import { WorkPeriod, WorkPeriodDocument } from './schemas/work-period.schema';
@@ -28,6 +29,7 @@ export class WorkPeriodsService {
     private deepseekService: DeepSeekService,
     private openaiService: OpenAIService,
     private openrouterService: OpenRouterService,
+    private settingsService: SettingsService,
     @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
   ) { }
 
@@ -672,6 +674,27 @@ export class WorkPeriodsService {
   async getAiAnalysis(workPeriodId: string, branchId?: string) {
     const workPeriod = await this.findOne(workPeriodId);
     const summary = await this.getSalesSummary(workPeriodId, branchId);
+
+    // Get latest system settings for AI
+    const systemSettings = await this.settingsService.getSystemSettings();
+    if (systemSettings.ai?.enabled === false) {
+      throw new BadRequestException('AI features are disabled in system settings.');
+    }
+
+    // Update services with DB settings
+    if (systemSettings.ai?.openrouterApiKey) {
+      this.openrouterService.updateConfig({
+        apiKey: systemSettings.ai.openrouterApiKey,
+        model: systemSettings.ai.openrouterModel,
+      });
+    }
+    if (systemSettings.ai?.deepseekApiKey) {
+      this.deepseekService.updateConfig({
+        apiKey: systemSettings.ai.deepseekApiKey,
+        model: systemSettings.ai.deepseekModel,
+        baseUrl: systemSettings.ai.deepseekBaseUrl,
+      });
+    }
 
     // Try OpenRouter first
     let analysis = await this.openrouterService.generateShiftAnalysis(workPeriod, summary);
