@@ -129,7 +129,6 @@ Return ONLY valid JSON.`;
         ],
         temperature: 0.7,
         max_tokens: 500,
-        response_format: { type: 'json_object' },
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -231,7 +230,6 @@ Return ONLY valid JSON.`;
         ],
         temperature: 0.5,
         max_tokens: 400,
-        response_format: { type: 'json_object' },
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -283,7 +281,6 @@ Respond strictly in JSON format matching this structure:
       const response = await aiClient.chat.completions.create({
         model: model,
         messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
         temperature: 0.7,
       });
 
@@ -322,7 +319,6 @@ Respond strictly in JSON format matching this structure:
       const response = await aiClient.chat.completions.create({
         model: model,
         messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
         temperature: 0.3,
       });
 
@@ -388,7 +384,6 @@ Respond strictly in JSON format matching this structure:
           { role: 'system', content: 'You are an expert restaurant shift auditor and consultant. Always respond with valid JSON.' },
           { role: 'user', content: prompt }
         ],
-        response_format: { type: 'json_object' },
         temperature: 0.6,
         max_tokens: 600,
       });
