@@ -1112,31 +1112,117 @@ export class ReportsService {
       const outOfStock = (report.alerts?.outOfStock || []).map((i: any) => ({ Status: 'Out of Stock', Name: i.name, 'Current Stock': 0 }));
       data = [...lowStock, ...outOfStock];
       fields = ['Status', 'Name', 'Current Stock'];
+    } else if (type === 'wastage') {
+      const report = await this.getWastageReport(
+        params.branchId,
+        params.companyId,
+        params.startDate ? new Date(params.startDate) : undefined,
+        params.endDate ? new Date(params.endDate) : undefined
+      );
+      data = (report.byIngredient || []).map((i: any) => ({
+        Ingredient: i.ingredientName,
+        Count: i.count,
+        Quantity: i.totalQuantity,
+        'Total Cost': i.totalCost,
+      }));
+      fields = ['Ingredient', 'Count', 'Quantity', 'Total Cost'];
+    } else if (type === 'items' || type === 'food') {
+      const report = await this.getTopSellingItems(50, params.branchId);
+      data = report.map((i: any) => ({
+        Name: i.name,
+        Quantity: i.quantity,
+        Revenue: i.revenue,
+        Orders: i.orders,
+      }));
+      fields = ['Name', 'Quantity', 'Revenue', 'Orders'];
+    } else if (type === 'due' || type === 'settlement') {
+      const report = await this.getDueSettlements(params.branchId, params.companyId);
+      data = (report.pendingOrders || []).map((o: any) => ({
+        'Order Number': o.orderNumber,
+        Type: o.orderType,
+        Amount: o.totalAmount,
+        Date: new Date(o.createdAt).toLocaleDateString(),
+      }));
+      fields = ['Order Number', 'Type', 'Amount', 'Date'];
+    } else if (type === 'analytics' || type === 'financial') {
+      const report = await this.getDashboardStats(params.branchId, params.companyId);
+      data = [
+        { Metric: 'Today Orders', Value: report.today?.orders || 0 },
+        { Metric: 'Today Revenue', Value: report.today?.revenue || 0 },
+        { Metric: 'Week Revenue', Value: report.week?.revenue || 0 },
+        { Metric: 'Month Revenue', Value: report.month?.revenue || 0 },
+        { Metric: 'Active Orders', Value: report.active?.orders || 0 },
+        { Metric: 'Low Stock Alerts', Value: report.inventory?.lowStock || 0 },
+      ];
+      fields = ['Metric', 'Value'];
     } else {
       data = [{ Message: `Export for ${type} is not fully implemented yet.` }];
       fields = ['Message'];
     }
     
-    // 2. Format as CSV
-    const csvRows = [fields.join(',')];
-    data.forEach(row => {
-      const values = fields.map(field => {
-        const val = row[field] !== undefined && row[field] !== null ? row[field] : '';
-        return `"${String(val).replace(/"/g, '""')}"`;
-      });
-      csvRows.push(values.join(','));
-    });
-    const csvString = csvRows.join('\n');
-    
-    // 3. Save to file
+    // 2. Format and Save
     const uploadsDir = path.join(process.cwd(), 'uploads', 'reports');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
-    const fileName = `export-${type}-${Date.now()}.csv`;
-    const filePath = path.join(uploadsDir, fileName);
-    fs.writeFileSync(filePath, csvString);
-    
-    return { downloadUrl: `/uploads/reports/${fileName}` };
+
+    if (format === 'pdf') {
+      const PDFDocument = require('pdfkit');
+      const doc = new PDFDocument({ margin: 30, size: 'A4' });
+      const fileName = `export-${type}-${Date.now()}.pdf`;
+      const filePath = path.join(uploadsDir, fileName);
+      
+      const stream = fs.createWriteStream(filePath);
+      doc.pipe(stream);
+      
+      doc.fontSize(20).text(`Report: ${type.toUpperCase()}`, { align: 'center' });
+      doc.moveDown();
+      
+      const columnWidth = 530 / fields.length;
+      let y = doc.y;
+      
+      doc.fontSize(10).font('Helvetica-Bold');
+      fields.forEach((field, i) => {
+        doc.text(field, 30 + (i * columnWidth), y, { width: columnWidth - 5, align: 'left' });
+      });
+      doc.moveDown();
+      doc.moveTo(30, doc.y).lineTo(560, doc.y).stroke();
+      doc.moveDown();
+      
+      doc.font('Helvetica');
+      data.forEach((row) => {
+        y = doc.y;
+        if (y > 750) {
+          doc.addPage();
+          y = 30;
+        }
+        fields.forEach((field, i) => {
+          const val = row[field] !== undefined && row[field] !== null ? String(row[field]) : '';
+          doc.text(val, 30 + (i * columnWidth), y, { width: columnWidth - 5, align: 'left' });
+        });
+        doc.moveDown();
+      });
+      
+      doc.end();
+      
+      await new Promise((resolve) => stream.on('finish', resolve));
+      return { downloadUrl: `/uploads/reports/${fileName}` };
+    } else {
+      // Default to CSV
+      const csvRows = [fields.join(',')];
+      data.forEach(row => {
+        const values = fields.map(field => {
+          const val = row[field] !== undefined && row[field] !== null ? row[field] : '';
+          return `"${String(val).replace(/"/g, '""')}"`;
+        });
+        csvRows.push(values.join(','));
+      });
+      const csvString = csvRows.join('\n');
+      const fileName = `export-${type}-${Date.now()}.csv`;
+      const filePath = path.join(uploadsDir, fileName);
+      fs.writeFileSync(filePath, csvString);
+      
+      return { downloadUrl: `/uploads/reports/${fileName}` };
+    }
   }
 }
