@@ -1082,4 +1082,61 @@ export class ReportsService {
       })),
     };
   }
+
+  async exportReport(type: string, format: string, params: any): Promise<{ downloadUrl: string }> {
+    let data: any[] = [];
+    let fields: string[] = [];
+    const fs = require('fs');
+    const path = require('path');
+    
+    // 1. Fetch Data based on type
+    if (type === 'sales') {
+      const summary = await this.getSalesAnalytics(
+        params.period || 'week',
+        params.branchId,
+        params.startDate ? new Date(params.startDate) : undefined,
+        params.endDate ? new Date(params.endDate) : undefined
+      );
+      data = summary.data.map((item: any) => ({
+        Date: item.date,
+        'POS Revenue': item.posRevenue,
+        'Hotel Revenue': item.hotelRevenue,
+        'Total Revenue': item.revenue,
+        Orders: item.orders,
+        'Average Order Value': item.averageOrderValue
+      }));
+      fields = ['Date', 'POS Revenue', 'Hotel Revenue', 'Total Revenue', 'Orders', 'Average Order Value'];
+    } else if (type === 'inventory') {
+      const report = await this.getInventoryReport(params.companyId, params.branchId);
+      const lowStock = (report.alerts?.lowStock || []).map((i: any) => ({ Status: 'Low Stock', Name: i.name, 'Current Stock': i.currentStock }));
+      const outOfStock = (report.alerts?.outOfStock || []).map((i: any) => ({ Status: 'Out of Stock', Name: i.name, 'Current Stock': 0 }));
+      data = [...lowStock, ...outOfStock];
+      fields = ['Status', 'Name', 'Current Stock'];
+    } else {
+      data = [{ Message: `Export for ${type} is not fully implemented yet.` }];
+      fields = ['Message'];
+    }
+    
+    // 2. Format as CSV
+    const csvRows = [fields.join(',')];
+    data.forEach(row => {
+      const values = fields.map(field => {
+        const val = row[field] !== undefined && row[field] !== null ? row[field] : '';
+        return `"${String(val).replace(/"/g, '""')}"`;
+      });
+      csvRows.push(values.join(','));
+    });
+    const csvString = csvRows.join('\n');
+    
+    // 3. Save to file
+    const uploadsDir = path.join(__dirname, '../../../uploads/reports');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const fileName = `export-${type}-${Date.now()}.csv`;
+    const filePath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(filePath, csvString);
+    
+    return { downloadUrl: `/uploads/reports/${fileName}` };
+  }
 }

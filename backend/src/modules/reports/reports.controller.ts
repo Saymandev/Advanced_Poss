@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
 import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
@@ -243,6 +243,16 @@ export class ReportsController {
       startDate ? new Date(startDate) : undefined,
       endDate ? new Date(endDate) : undefined,
     );
+  }
+
+  @Post('export/:type')
+  @ApiOperation({ summary: 'Export report data to CSV/PDF/Excel' })
+  async exportReport(
+    @Param('type') type: string,
+    @Body('format') format: string,
+    @Body('params') params: any,
+  ) {
+    return this.reportsService.exportReport(type, format, params);
   }
 }
 
