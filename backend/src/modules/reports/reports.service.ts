@@ -11,7 +11,6 @@ import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { PurchaseOrder, PurchaseOrderDocument } from '../purchase-orders/schemas/purchase-order.schema';
 import { Transaction, TransactionCategory, TransactionDocument, TransactionType } from '../transactions/schemas/transaction.schema';
 import { WastageService } from '../wastage/wastage.service';
-import PDFDocument = require('pdfkit');
 @Injectable()
 export class ReportsService {
   constructor(
@@ -1168,7 +1167,9 @@ export class ReportsService {
     }
 
     if (format === 'pdf') {
-      const doc = new PDFDocument({ margin: 30, size: 'A4' });
+      const PDFKit = require('pdfkit');
+      const PDFDocumentConstructor = PDFKit.default || PDFKit;
+      const doc = new PDFDocumentConstructor({ margin: 30, size: 'A4' });
       const fileName = `export-${type}-${Date.now()}.pdf`;
       const filePath = path.join(uploadsDir, fileName);
       
