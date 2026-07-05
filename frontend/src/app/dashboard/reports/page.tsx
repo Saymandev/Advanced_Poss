@@ -600,7 +600,13 @@ export default function ReportsPage() {
         },
       }).unwrap();
       if (result.downloadUrl) {
-        window.open(result.downloadUrl, '_blank');
+        let finalUrl = result.downloadUrl;
+        if (finalUrl.startsWith('/uploads/')) {
+          const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+          const baseUrl = apiBaseUrl.replace('/api/v1', '');
+          finalUrl = `${baseUrl}${finalUrl}`;
+        }
+        window.open(finalUrl, '_blank');
         toast.success(`Report exported as ${format.toUpperCase()}`);
       } else {
         toast.error('Export URL not received from server');
