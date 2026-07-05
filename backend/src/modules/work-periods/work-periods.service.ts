@@ -392,18 +392,9 @@ export class WorkPeriodsService {
       totalByPaymentMethod[pmCode] = (totalByPaymentMethod[pmCode] || 0) - amount;
     });
 
-    // Subtract purchases from payment method balances
-    purchases.forEach((txn: any) => {
-      const amount = Number(txn.amount);
-      const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
-      
-      if (!paymentMethods[pmCode]) {
-        paymentMethods[pmCode] = { count: 0, amount: 0 };
-      }
-      paymentMethods[pmCode].count += 1;
-      paymentMethods[pmCode].amount -= amount;
-      totalByPaymentMethod[pmCode] = (totalByPaymentMethod[pmCode] || 0) - amount;
-    });
+    // NOTE: Purchases (inventory restocking) are NOT subtracted from payment method
+    // sales balances. They are tracked separately as cost-of-goods. The payment methods
+    // breakdown should reflect revenue flow, not net cash position after procurement.
 
     // Get Hotel Transactions for this work period
     const hotelTransactions = await this.transactionModel.find({
@@ -433,7 +424,11 @@ export class WorkPeriodsService {
       manualIncomeTotal,
       manualExpenseTotal,
       purchaseTotal,
-      netSales: (grossSales + hotelRevenue + manualIncomeTotal) - (refundTotal + manualExpenseTotal + purchaseTotal),
+      // netSales = total revenue minus refunds and operational expenses (NOT purchases)
+      // Purchases are inventory/procurement costs shown separately
+      netSales: (grossSales + hotelRevenue + manualIncomeTotal) - (refundTotal + manualExpenseTotal),
+      // netProfit includes purchase deductions for full P&L visibility
+      netProfit: (grossSales + hotelRevenue + manualIncomeTotal) - (refundTotal + manualExpenseTotal + purchaseTotal),
       subtotal,
       vatTotal,
       serviceCharge,
