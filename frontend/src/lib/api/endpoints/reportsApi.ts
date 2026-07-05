@@ -453,7 +453,7 @@ export const reportsApi = apiSlice.injectEndpoints({
       providesTags: ['Report'],
     }),
     exportReport: builder.mutation<{ downloadUrl: string }, {
-      type: 'sales' | 'inventory' | 'customers' | 'staff';
+      type: string;
       format: 'pdf' | 'excel' | 'csv';
       params: any;
     }>({
