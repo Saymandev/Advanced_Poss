@@ -105,12 +105,12 @@ export default function ReportsPage() {
         end.setHours(23, 59, 59, 999);
         break;
       case 'month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        start.setDate(now.getDate() - 30);
         start.setHours(0, 0, 0, 0);
         end.setHours(23, 59, 59, 999);
         break;
       case 'year':
-        start = new Date(now.getFullYear(), 0, 1);
+        start.setDate(now.getDate() - 365);
         start.setHours(0, 0, 0, 0);
         end.setHours(23, 59, 59, 999);
         break;
