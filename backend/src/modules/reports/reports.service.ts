@@ -1168,6 +1168,24 @@ export class ReportsService {
 
     if (format === 'pdf') {
       const PDFKit = require('pdfkit');
+      
+      // Fix Webpack PDFKit font loading by dynamically copying standard fonts to the dist output directory
+      const distDataDir = path.join(process.cwd(), 'dist', 'data');
+      if (!fs.existsSync(distDataDir)) {
+        try {
+          fs.mkdirSync(distDataDir, { recursive: true });
+          const sourceDir = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data');
+          if (fs.existsSync(sourceDir)) {
+            const files = fs.readdirSync(sourceDir);
+            for (const file of files) {
+              fs.copyFileSync(path.join(sourceDir, file), path.join(distDataDir, file));
+            }
+          }
+        } catch (e) {
+          console.error('Error copying PDFKit data:', e);
+        }
+      }
+
       const PDFDocumentConstructor = PDFKit.default || PDFKit;
       const doc = new PDFDocumentConstructor({ margin: 30, size: 'A4' });
       const fileName = `export-${type}-${Date.now()}.pdf`;
