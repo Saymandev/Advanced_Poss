@@ -462,6 +462,9 @@ export const reportsApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: { format, params },
       }),
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
     }),
     getDueSettlements: builder.query<{
       pendingSettlements: number;
