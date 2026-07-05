@@ -582,7 +582,7 @@ export default function ReportsPage() {
     refetchSettlements();
     toast.success('Reports refreshed');
   };
-  const handleExport = async (type: 'sales' | 'inventory' | 'customers' | 'staff', format: 'pdf' | 'excel' | 'csv') => {
+  const handleExport = async (type: string, format: 'pdf' | 'excel' | 'csv') => {
     if (!branchId && !companyId) {
       toast.error('Branch or Company ID is required for export');
       return;
@@ -731,7 +731,7 @@ export default function ReportsPage() {
             Refresh
           </Button>
           <Button
-            onClick={() => handleExport(activeReport === 'sales' ? 'sales' : 'sales', 'pdf')}
+            onClick={() => handleExport(activeReport, 'pdf')}
             variant="secondary"
             disabled={isExporting || isLoading}
             className="w-full sm:w-auto text-sm sm:text-base"

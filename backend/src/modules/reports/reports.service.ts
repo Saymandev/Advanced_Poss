@@ -1099,15 +1099,26 @@ export class ReportsService {
         params.startDate ? new Date(params.startDate) : undefined,
         params.endDate ? new Date(params.endDate) : undefined
       );
-      data = summary.data.map((item: any) => ({
-        Date: item.date,
-        'POS Revenue': item.posRevenue,
-        'Hotel Revenue': item.hotelRevenue,
-        'Total Revenue': item.revenue,
-        Orders: item.orders,
-        'Average Order Value': item.averageOrderValue
-      }));
-      fields = ['Date', 'POS Revenue', 'Hotel Revenue', 'Total Revenue', 'Orders', 'Average Order Value'];
+      let hasHotelRevenue = false;
+      summary.data.forEach((item: any) => {
+        if (item.hotelRevenue > 0) hasHotelRevenue = true;
+      });
+      data = summary.data.map((item: any) => {
+        const row: any = {
+          Date: item.date,
+          'POS Revenue': item.posRevenue,
+        };
+        if (hasHotelRevenue) {
+          row['Hotel Revenue'] = item.hotelRevenue;
+        }
+        row['Total Revenue'] = item.revenue;
+        row['Orders'] = item.orders;
+        row['Average Order Value'] = item.averageOrderValue;
+        return row;
+      });
+      fields = ['Date', 'POS Revenue'];
+      if (hasHotelRevenue) fields.push('Hotel Revenue');
+      fields.push('Total Revenue', 'Orders', 'Average Order Value');
     } else if (type === 'inventory') {
       const report = await this.getInventoryReport(params.companyId, params.branchId);
       const lowStock = (report.alerts?.lowStock || []).map((i: any) => ({ Status: 'Low Stock', Name: i.name, 'Current Stock': i.currentStock }));
