@@ -1129,7 +1129,7 @@ export class ReportsService {
     const csvString = csvRows.join('\n');
     
     // 3. Save to file
-    const uploadsDir = path.join(__dirname, '../../../uploads/reports');
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'reports');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
