@@ -2228,7 +2228,7 @@ export default function OrdersPage() {
                       const filtered = menuItems.filter((item: any) => item.name.toLowerCase().includes(exchangeSearchTerm.toLowerCase()));
                       if (filtered.length > 0) {
                         const item = filtered[0];
-                        const value = item.id || item._id;
+                        const value = item.id || (item as any)._id;
                         const existingIndex = exchangeNewItems.findIndex(i => i.menuItemId === value);
                         if (existingIndex >= 0) {
                           const newItems = [...exchangeNewItems];
@@ -2260,10 +2260,10 @@ export default function OrdersPage() {
                       }
                       return filtered.map((item: any) => (
                         <button
-                          key={item.id || item._id}
+                          key={item.id || (item as any)._id}
                           className="w-full flex justify-between items-center px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700 border-b last:border-b-0 border-gray-100 dark:border-gray-700"
                           onClick={() => {
-                            const value = item.id || item._id;
+                            const value = item.id || (item as any)._id;
                             const existingIndex = exchangeNewItems.findIndex(i => i.menuItemId === value);
                             if (existingIndex >= 0) {
                               const newItems = [...exchangeNewItems];
