@@ -134,6 +134,13 @@ export const reviewsApi = apiSlice.injectEndpoints({
       },
     }),
 
+    getOrderDetailsForReview: builder.query<any, string>({
+      query: (orderId) => `/reviews/order-details/${orderId}`,
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
+    }),
+
     getReviews: builder.query<Review[], { branchId?: string; companyId?: string }>({
       query: ({ branchId, companyId }) => {
         const params = new URLSearchParams();
@@ -229,6 +236,7 @@ export const reviewsApi = apiSlice.injectEndpoints({
 export const {
   useCreateReviewMutation,
   useGetReviewByOrderQuery,
+  useGetOrderDetailsForReviewQuery,
   useGetReviewsQuery,
   useGetMenuItemRatingQuery,
   useGetMenuItemsRatingsMutation,

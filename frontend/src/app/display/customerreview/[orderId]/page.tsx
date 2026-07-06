@@ -3,8 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { useGetPOSOrderQuery } from '@/lib/api/endpoints/posApi';
-import { useCreateReviewMutation, useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
+import { useCreateReviewMutation, useGetOrderDetailsForReviewQuery, useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { CheckCircleIcon, ShoppingBagIcon, StarIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
@@ -15,7 +14,7 @@ export default function CustomerReviewPage() {
   const params = useParams();
   const orderId = params.orderId as string;
 
-  const { data: order, isLoading: isLoadingOrder } = useGetPOSOrderQuery(orderId, {
+  const { data: order, isLoading: isLoadingOrder } = useGetOrderDetailsForReviewQuery(orderId, {
     skip: !orderId,
   });
 

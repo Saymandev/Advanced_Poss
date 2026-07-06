@@ -33,6 +33,13 @@ export class ReviewsController {
     return this.reviewsService.findByOrder(orderId);
   }
 
+  @Public()
+  @Get('order-details/:orderId')
+  @ApiOperation({ summary: 'Get order details for review (public)' })
+  async getOrderDetails(@Param('orderId') orderId: string) {
+    return this.reviewsService.getOrderDetailsForReview(orderId);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

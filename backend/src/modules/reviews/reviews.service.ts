@@ -19,6 +19,23 @@ export class ReviewsService {
   ) {}
 
   /**
+   * Get order details safely for public review page
+   */
+  async getOrderDetailsForReview(orderId: string): Promise<any> {
+    const order = await this.posOrderModel
+      .findById(orderId)
+      .populate('userId', 'firstName lastName name email')
+      .populate('items.menuItemId', 'name')
+      .exec();
+    
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    
+    return order;
+  }
+
+  /**
    * Create a review from order - extracts branch and company info automatically
    */
   async createFromOrder(createReviewDto: CreateReviewDto): Promise<Review> {
