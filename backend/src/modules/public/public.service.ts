@@ -229,7 +229,7 @@ export class PublicService {
         companyId: new Types.ObjectId(orderData.companyId),
         branchId: new Types.ObjectId(orderData.branchId),
         orderNumber,
-        orderType, // Use the mapped orderType (dine-in, takeaway, delivery)
+        type: orderType, // Use the mapped orderType (dine-in, takeaway, delivery)
         tableId: tableId ? new Types.ObjectId(tableId) : undefined,
         tableNumber: orderData.tableNumber, // Store raw table number for reference
         customerId: customerId ? new Types.ObjectId(customerId) : undefined,
