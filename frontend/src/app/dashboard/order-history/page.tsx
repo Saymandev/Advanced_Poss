@@ -241,7 +241,7 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState(urlSearch);
   const [committedSearch, setCommittedSearch] = useState(urlSearch);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'dine-in' | 'takeaway' | 'delivery'>('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
   const [activeQuickRange, setActiveQuickRange] = useState<QuickRange>('last7');
   const [dateRange, setDateRange] = useState(() => computeDateRange('last7'));
   const [currentPage, setCurrentPage] = useState(1);
@@ -365,7 +365,7 @@ export default function OrdersPage() {
     setCurrentPage(1);
   };
 
-  const handleOrderTypeFilterChange = (value: 'all' | 'dine-in' | 'takeaway' | 'delivery') => {
+  const handleOrderTypeFilterChange = (value: string) => {
     setOrderTypeFilter(value);
     setCurrentPage(1);
   };
@@ -1017,6 +1017,8 @@ export default function OrdersPage() {
       'dine-in': { label: 'Dine-In', variant: 'info' },
       takeaway: { label: 'Takeaway', variant: 'secondary' },
       delivery: { label: 'Delivery', variant: 'success' },
+      'counter_sale': { label: 'Counter Sale', variant: 'secondary' },
+      'room_service': { label: 'Room Service', variant: 'info' },
     };
 
     const fallback = { label: type || 'Unknown', variant: 'secondary' as const };
@@ -1135,7 +1137,7 @@ export default function OrdersPage() {
     }
 
     if (orderTypeFilter !== 'all') {
-      filtered = filtered.filter((order) => (order.orderType || 'dine-in') === orderTypeFilter);
+      filtered = filtered.filter((order) => (order.orderType || (companyContext?.businessType === 'retail' ? 'counter_sale' : 'dine-in')) === orderTypeFilter);
     }
 
     if (committedSearch) {
@@ -1230,12 +1232,17 @@ export default function OrdersPage() {
             <Select
               options={[
                 { value: 'all', label: 'All Types' },
-                { value: 'dine-in', label: 'Dine-In' },
-                { value: 'takeaway', label: 'Takeaway' },
-                { value: 'delivery', label: 'Delivery' },
+                ...(companyContext?.businessType === 'retail' ? [
+                  { value: 'counter_sale', label: 'Counter Sale' },
+                  { value: 'delivery', label: 'Delivery' }
+                ] : [
+                  { value: 'dine-in', label: 'Dine-In' },
+                  { value: 'takeaway', label: 'Takeaway' },
+                  { value: 'delivery', label: 'Delivery' }
+                ])
               ]}
               value={orderTypeFilter}
-              onChange={(value) => handleOrderTypeFilterChange(value as 'all' | 'dine-in' | 'takeaway' | 'delivery')}
+              onChange={handleOrderTypeFilterChange}
               placeholder="Filter by type"
             />
             <div className="flex items-center sm:col-span-2 md:col-span-1">
