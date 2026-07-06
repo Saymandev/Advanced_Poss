@@ -296,6 +296,18 @@ export default function OrdersPage() {
     }
   }, [urlSearch, committedSearch]);
 
+  // Debounce search term changes so users don't have to manually click search/clear
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const trimmed = searchTerm.trim();
+      if (trimmed !== committedSearch) {
+        setCommittedSearch(trimmed);
+        setCurrentPage(1);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm, committedSearch]);
+
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
       await updatePOSOrder({ 
