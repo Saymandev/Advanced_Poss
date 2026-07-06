@@ -1245,6 +1245,8 @@ export class POSService {
           quantity: item.quantity || 1,
         }));
         await this.menuItemsService.restoreStockForOrder(stockItems);
+        // Also restore ingredient stock for restaurant inventory
+        await this.restoreIngredientsStock(order.items, order.companyId?.toString() || '', order.branchId?.toString() || '', userId, 'Order Cancelled');
       } catch (stockError) {
         console.error('Failed to restore stock on cancellation:', stockError);
       }
@@ -2085,6 +2087,14 @@ export class POSService {
               type: 'add',
               quantity: refundItem.quantity,
             });
+            // Also restore ingredient stock for restaurant inventory
+            await this.restoreIngredientsStock(
+              [{ menuItemId: refundItem.menuItemId, quantity: refundItem.quantity }],
+              companyId || '',
+              branchId,
+              userId,
+              'Refund Item'
+            );
           } catch (e) {
             console.error('Failed to restore stock for refunded item:', e);
           }
@@ -2102,6 +2112,209 @@ export class POSService {
       { isDamage: false } // We already handled wastage individually
     );
   }
+
+  // Process hybrid exchange for an order (same receipt)
+  async exchangeOrder(
+    orderId: string,
+    dto: import('./dto/exchange-order.dto').ExchangeOrderDto,
+    companyId: string,
+    branchId: string,
+    userId: string,
+  ): Promise<POSOrder> {
+    const order = await this.getOrderById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    let returnedItemsValue = 0;
+    const itemsToRestoreStock: any[] = [];
+    const itemsToWastage: any[] = [];
+
+    // Process Returned Items
+    for (const ret of dto.returnedItems) {
+      const orderItemIndex = order.items.findIndex(i => i.menuItemId?.toString() === ret.menuItemId);
+      if (orderItemIndex === -1) {
+        throw new BadRequestException(`Returned item ${ret.menuItemId} not found in order`);
+      }
+      const orderItem = order.items[orderItemIndex];
+      
+      // Validation
+      if (ret.quantity > orderItem.quantity) {
+        throw new BadRequestException(`Cannot return more quantity than purchased for item ${ret.menuItemId}`);
+      }
+
+      returnedItemsValue += orderItem.price * ret.quantity;
+
+      // Adjust receipt quantities
+      orderItem.quantity -= ret.quantity;
+
+      if (ret.isWastage) {
+        itemsToWastage.push({ ...ret, price: orderItem.price });
+      } else {
+        itemsToRestoreStock.push(ret);
+      }
+    }
+
+    // Process Wastage for returned items
+    if (this.wastageService && companyId && itemsToWastage.length > 0) {
+      for (const waste of itemsToWastage) {
+        try {
+          await this.wastageService.create({
+            menuItemId: waste.menuItemId,
+            quantity: waste.quantity,
+            unit: 'pcs',
+            reason: WastageReason.DAMAGED,
+            unitCost: waste.price,
+            wastageDate: new Date().toISOString(),
+            notes: `Exchange item wastage. Reason: ${dto.reason || 'Damaged'}`,
+          }, companyId, branchId, userId);
+        } catch (e) {
+          console.error('Failed to record wastage for exchanged item:', e);
+        }
+      }
+    }
+
+    // Restore stock for returned items
+    if (itemsToRestoreStock.length > 0) {
+      try {
+        await this.menuItemsService.restoreStockForOrder(itemsToRestoreStock);
+        await this.restoreIngredientsStock(itemsToRestoreStock, companyId, branchId, userId, 'Exchange Return');
+      } catch (e) {
+        console.error('Failed to restore stock for returned items during exchange:', e);
+      }
+    }
+
+    // Process New Items
+    let newItemsValue = 0;
+    const newItemsToAppend: any[] = [];
+    
+    for (const newItem of dto.newItems) {
+      const menuItem = await this.menuItemsService.findOne(newItem.menuItemId);
+      if (!menuItem) {
+        throw new BadRequestException(`New item ${newItem.menuItemId} not found in catalog`);
+      }
+      
+      newItemsValue += menuItem.price * newItem.quantity;
+      
+      // Deduct stock for new item
+      try {
+        await this.menuItemsService.deductStockForOrder([{ menuItemId: newItem.menuItemId, quantity: newItem.quantity }]);
+        // For ingredients, we need to manually deduct
+        if (menuItem.trackInventory && menuItem.ingredients && menuItem.ingredients.length > 0) {
+           for (const ingredient of menuItem.ingredients) {
+             const ingredientIdStr = ingredient.ingredientId._id ? ingredient.ingredientId._id.toString() : ingredient.ingredientId.toString();
+             await this.ingredientsService.removeStock(
+               ingredientIdStr,
+               ingredient.quantity * newItem.quantity
+             );
+           }
+        }
+      } catch (e) {
+        console.error('Failed to deduct stock for new items during exchange:', e);
+      }
+
+      // See if it already exists in order
+      const existingItem = order.items.find(i => i.menuItemId?.toString() === newItem.menuItemId);
+      if (existingItem) {
+        existingItem.quantity += newItem.quantity;
+      } else {
+        newItemsToAppend.push({
+          menuItemId: new Types.ObjectId(newItem.menuItemId),
+          name: menuItem.name,
+          quantity: newItem.quantity,
+          price: menuItem.price,
+        });
+      }
+    }
+
+    // Append entirely new items to the receipt
+    if (newItemsToAppend.length > 0) {
+      order.items.push(...newItemsToAppend);
+    }
+
+    // Cleanup zero-quantity items from receipt
+    order.items = order.items.filter(i => i.quantity > 0);
+
+    // Recalculate Subtotal & Totals
+    const newSubtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // Simple proportion for tax (assuming tax is a flat % applied to all items evenly for POS)
+    // If original order had tax, recalculate based on same rate
+    let taxRate = 0;
+    if (order.subtotal && order.subtotal > 0 && order.taxAmount) {
+      taxRate = order.taxAmount / order.subtotal;
+    }
+    const newTaxAmount = newSubtotal * taxRate;
+    const newTotalAmount = newSubtotal + newTaxAmount - (order.loyaltyDiscount || 0);
+
+    const amountDifference = newTotalAmount - order.totalAmount;
+    
+    // Update Ledger if difference exists
+    if (Math.abs(amountDifference) > 0.01) {
+      if (amountDifference > 0) {
+        // Customer owes money
+        const payMethod = dto.paymentMethod || 'cash';
+        await this.transactionsService.recordTransaction(
+          {
+            paymentMethodId: payMethod,
+            type: TransactionType.IN,
+            category: TransactionCategory.SALE,
+            amount: amountDifference,
+            date: new Date().toISOString(),
+            referenceId: order._id.toString(),
+            referenceModel: 'POSOrder',
+            description: `Exchange balance collection for order ${order.orderNumber}`,
+          },
+          companyId,
+          branchId,
+          userId,
+        );
+        order.paidAmount = (order.paidAmount || 0) + amountDifference;
+      } else {
+        // Store owes money (Refund)
+        const refundAmount = Math.abs(amountDifference);
+        await this.transactionsService.recordTransaction(
+          {
+            paymentMethodId: 'cash', // Default refund method
+            type: TransactionType.OUT,
+            category: TransactionCategory.REFUND,
+            amount: refundAmount,
+            date: new Date().toISOString(),
+            referenceId: order._id.toString(),
+            referenceModel: 'POSOrder',
+            description: `Exchange balance refund for order ${order.orderNumber}. Reason: ${dto.reason || 'Exchange'}`,
+          },
+          companyId,
+          branchId,
+          userId,
+        );
+        order.paidAmount = (order.paidAmount || 0) - refundAmount;
+      }
+    }
+
+    // Save the updated order
+    const updatedOrder = await this.posOrderModel.findByIdAndUpdate(
+      orderId,
+      {
+        items: order.items,
+        subtotal: newSubtotal,
+        taxAmount: newTaxAmount,
+        totalAmount: newTotalAmount,
+        paidAmount: order.paidAmount,
+      },
+      { new: true }
+    ).populate('items.menuItemId').exec();
+
+    // Notify WS
+    try {
+      this.websocketsGateway.notifyOrderStatusChanged(
+        branchId,
+        updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
+      );
+    } catch (wsError) {}
+
+    return updatedOrder;
+  }
+
   // Get order history for a specific table
   async getTableOrderHistory(tableId: string, limit: number = 10): Promise<POSOrder[]> {
     return this.posOrderModel
@@ -2501,6 +2714,55 @@ export class POSService {
     } catch (error) {
       console.error('Error fetching POS menu items:', error);
       return [];
+    }
+  }
+
+  // Helper method to restore ingredient stock (Restaurant inventory)
+  private async restoreIngredientsStock(items: any[], companyId: string, branchId: string, userId: string, reason: string): Promise<void> {
+    try {
+      const ingredientUsages: { ingredientId: string; quantity: number }[] = [];
+      
+      for (const item of items) {
+        try {
+          const menuItemId = item.menuItemId || item.id;
+          if (!menuItemId) continue;
+          
+          const menuItem = await this.menuItemsService.findOne(menuItemId);
+          if (menuItem && menuItem.trackInventory && menuItem.ingredients && menuItem.ingredients.length > 0) {
+            for (const ingredient of menuItem.ingredients) {
+              const ingredientIdStr = ingredient.ingredientId._id 
+                ? ingredient.ingredientId._id.toString() 
+                : ingredient.ingredientId.toString();
+                
+              const existing = ingredientUsages.find(u => u.ingredientId === ingredientIdStr);
+              if (existing) {
+                existing.quantity += ingredient.quantity * (item.quantity || 1);
+              } else {
+                ingredientUsages.push({
+                  ingredientId: ingredientIdStr,
+                  quantity: ingredient.quantity * (item.quantity || 1),
+                });
+              }
+            }
+          }
+        } catch (itemErr) {
+          console.warn(`Could not resolve ingredients for item ${item.menuItemId}:`, itemErr);
+        }
+      }
+
+      for (const usage of ingredientUsages) {
+        try {
+          await this.ingredientsService.adjustStock(
+            usage.ingredientId,
+            { type: 'add', quantity: usage.quantity, reason },
+            userId
+          );
+        } catch (adjErr) {
+          console.error(`Failed to restore ingredient stock ${usage.ingredientId}:`, adjErr);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to restore ingredients stock:', err);
     }
   }
 

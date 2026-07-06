@@ -176,6 +176,17 @@ export class POSController {
     return this.posService.refundItems(orderId, dto, req.user.id, req.user.branchId);
   }
 
+  @Post('orders/:id/exchange')
+  @ApiOperation({ summary: 'Process hybrid exchange for an order (return partial items and select new items)' })
+  async exchangeOrder(
+    @Param('id') orderId: string,
+    @Body() dto: import('./dto/exchange-order.dto').ExchangeOrderDto,
+    @Request() req
+  ) {
+    const companyId = req.user?.companyId || req.user?.company?.id || req.user?.company?._id;
+    return this.posService.exchangeOrder(orderId, dto, companyId, req.user.branchId, req.user.id);
+  }
+
   @Get('tables/:tableId/orders')
   @RequiresFeature(FEATURES.ORDER_MANAGEMENT)
   async getTableOrderHistory(@Param('tableId') tableId: string, @Query('limit') limit: number = 10) {

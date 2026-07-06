@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useProcessPaymentMutation, useRefundOrderMutation, useRefundItemsMutation, useUpdatePOSOrderMutation, usePrintReceiptPDFMutation, usePrintReceiptMutation } from '@/lib/api/endpoints/posApi';
+import { useCancelPOSOrderMutation, useGetPOSOrderQuery, useGetPOSOrdersQuery, useGetPOSSettingsQuery, useProcessPaymentMutation, useRefundOrderMutation, useRefundItemsMutation, useExchangeOrderMutation, useUpdatePOSOrderMutation, usePrintReceiptPDFMutation, usePrintReceiptMutation, useGetPOSMenuItemsQuery } from '@/lib/api/endpoints/posApi';
 import { useGetReviewByOrderQuery } from '@/lib/api/endpoints/reviewsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -26,7 +26,10 @@ import {
   ShoppingCartIcon,
   StarIcon,
   UserIcon,
-  XCircleIcon
+  XCircleIcon,
+  ArrowsRightLeftIcon,
+  PlusCircleIcon,
+  MinusCircleIcon
 } from '@heroicons/react/24/outline';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
@@ -281,6 +284,17 @@ export default function OrdersPage() {
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
   const [collectOrder, setCollectOrder] = useState<any>(null);
   const [collectAmount, setCollectAmount] = useState('');
+  
+  const { data: menuItemsData } = useGetPOSMenuItemsQuery({ branchId: branchId || undefined }, { skip: !branchId });
+  const menuItems = menuItemsData || [];
+  
+  // Exchange States
+  const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
+  const [exchangeOrderMutation, { isLoading: isExchanging }] = useExchangeOrderMutation();
+  const [exchangeReturnedItems, setExchangeReturnedItems] = useState<Array<{ menuItemId: string; name: string; quantity: number; maxQuantity: number; price: number; isWastage: boolean }>>([]);
+  const [exchangeNewItems, setExchangeNewItems] = useState<Array<{ menuItemId: string; name: string; quantity: number; price: number }>>([]);
+  const [exchangeReason, setExchangeReason] = useState('');
+  const [exchangePaymentMethod, setExchangePaymentMethod] = useState('cash');
   
   // Refund States
   const [refundMode, setRefundMode] = useState<'full' | 'itemized'>('full');
@@ -813,6 +827,70 @@ export default function OrdersPage() {
     setIsRefundModalOpen(true);
   };
 
+  const openExchangeModal = (order: Order) => {
+    setSelectedOrder(order);
+    setSelectedOrderId(order.id);
+    setExchangeReason('');
+    setExchangeNewItems([]);
+    setExchangePaymentMethod('cash');
+    
+    if (order.items && order.items.length > 0) {
+      setExchangeReturnedItems(order.items.map((item: any) => ({
+        menuItemId: item.id || item.menuItemId,
+        name: item.name,
+        quantity: 0,
+        maxQuantity: item.quantity,
+        price: item.price,
+        isWastage: false
+      })));
+    } else {
+      setExchangeReturnedItems([]);
+    }
+    
+    setIsExchangeModalOpen(true);
+  };
+
+  const handleExchangeSubmit = async () => {
+    if (!selectedOrder) return;
+    
+    const returnedItemsToProcess = exchangeReturnedItems.filter(i => i.quantity > 0);
+    if (returnedItemsToProcess.length === 0) {
+      toast.error('Please select at least one item to return');
+      return;
+    }
+    if (exchangeNewItems.length === 0) {
+      toast.error('Please add at least one new item to exchange');
+      return;
+    }
+    
+    try {
+      await exchangeOrderMutation({
+        orderId: selectedOrder.id,
+        returnedItems: returnedItemsToProcess.map(i => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity,
+          isWastage: i.isWastage
+        })),
+        newItems: exchangeNewItems.map(i => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity
+        })),
+        paymentMethod: exchangePaymentMethod,
+        reason: exchangeReason || 'Hybrid Exchange'
+      }).unwrap();
+      
+      toast.success('Exchange processed successfully');
+      setIsExchangeModalOpen(false);
+      refetch();
+      if (selectedOrderId === selectedOrder.id) {
+        setIsViewModalOpen(false);
+        setSelectedOrderId('');
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to process exchange');
+    }
+  };
+
   const handleCollectPayment = async () => {
     if (!collectOrder || !collectAmount) return;
     try {
@@ -1286,7 +1364,7 @@ export default function OrdersPage() {
                     <span className="text-sm">{isUpdating ? 'Confirming...' : 'Confirm Order'}</span>
                   </Button>
                 )}
-                {selectedOrder?.status === 'paid' && selectedOrder?.paymentStatus === 'paid' && (
+                {selectedOrder?.paymentStatus === 'paid' && (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -1297,6 +1375,20 @@ export default function OrdersPage() {
                     className="flex items-center justify-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-700 w-full sm:w-auto"
                   >
                     Refund
+                  </Button>
+                )}
+                {selectedOrder?.paymentStatus === 'paid' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setIsViewModalOpen(false);
+                      openExchangeModal(selectedOrder);
+                    }}
+                    className="flex items-center justify-center gap-2 bg-purple-100 hover:bg-purple-200 text-purple-700 w-full sm:w-auto"
+                  >
+                    <ArrowsRightLeftIcon className="w-4 h-4" />
+                    Exchange
                   </Button>
                 )}
                 {selectedOrder?.paymentStatus === 'partial' && (
@@ -2010,6 +2102,281 @@ export default function OrdersPage() {
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               {isRefunding || isRefundingItems ? 'Processing...' : 'Process Refund'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Exchange Modal */}
+      <Modal
+        isOpen={isExchangeModalOpen}
+        onClose={() => {
+          setIsExchangeModalOpen(false);
+          setExchangeReason('');
+          setExchangeNewItems([]);
+        }}
+        title="Exchange Order Items"
+        className="max-w-4xl"
+      >
+        <div className="space-y-6">
+          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+            <h4 className="font-medium text-purple-800 dark:text-purple-400 mb-2">Exchange Information</h4>
+            <div className="text-sm space-y-1 text-purple-700 dark:text-purple-300">
+              <div className="flex justify-between">
+                <span>Order Number:</span>
+                <span className="font-medium">{selectedOrder?.orderNumber}</span>
+              </div>
+              <p className="text-xs mt-2 text-purple-600 dark:text-purple-400">
+                Select items to return and add new items to exchange. Price differences will be calculated automatically.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Side: Return Items */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <MinusCircleIcon className="w-5 h-5 text-red-500" />
+                Items to Return
+              </h3>
+              <div className="max-h-[300px] overflow-y-auto pr-2 border rounded-lg dark:border-gray-700">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2">Item</th>
+                      <th className="px-3 py-2">Qty</th>
+                      <th className="px-3 py-2 text-center" title="Mark as damaged/wastage">Wastage</th>
+                      <th className="px-3 py-2 text-right">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exchangeReturnedItems.map((item, index) => (
+                      <tr key={item.menuItemId} className="border-b dark:border-gray-700">
+                        <td className="px-3 py-2">
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-xs text-gray-500">{formatCurrency(item.price)} each</div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max={item.maxQuantity} 
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const newQty = Math.min(Math.max(0, parseInt(e.target.value) || 0), item.maxQuantity);
+                              const newItems = [...exchangeReturnedItems];
+                              newItems[index].quantity = newQty;
+                              setExchangeReturnedItems(newItems);
+                            }}
+                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-600"
+                          />
+                          <span className="text-xs text-gray-500 ml-1">/ {item.maxQuantity}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <input 
+                            type="checkbox" 
+                            checked={item.isWastage}
+                            onChange={(e) => {
+                              const newItems = [...exchangeReturnedItems];
+                              newItems[index].isWastage = e.target.checked;
+                              setExchangeReturnedItems(newItems);
+                            }}
+                            className="rounded text-primary-600 focus:ring-primary-500"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-red-600 dark:text-red-400">
+                          {formatCurrency(item.price * item.quantity)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-between items-center px-2">
+                <span className="font-semibold text-sm">Return Value:</span>
+                <span className="font-bold text-red-600 dark:text-red-400">
+                  {formatCurrency(exchangeReturnedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0))}
+                </span>
+              </div>
+            </div>
+
+            {/* Right Side: New Items */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <PlusCircleIcon className="w-5 h-5 text-green-500" />
+                New Items
+              </h3>
+              
+              <div className="flex gap-2">
+                <Select
+                  className="flex-1"
+                  options={menuItems.map((item: any) => ({
+                    value: item.id || (item as any)._id,
+                    label: `${item.name} (${formatCurrency(item.price)})`
+                  }))}
+                  onChange={(value) => {
+                    const selectedItem = menuItems.find((i: any) => (i.id || i._id) === value);
+                    if (selectedItem) {
+                      const existingIndex = exchangeNewItems.findIndex(i => i.menuItemId === value);
+                      if (existingIndex >= 0) {
+                        const newItems = [...exchangeNewItems];
+                        newItems[existingIndex].quantity += 1;
+                        setExchangeNewItems(newItems);
+                      } else {
+                        setExchangeNewItems([
+                          ...exchangeNewItems,
+                          {
+                            menuItemId: selectedItem.id || (selectedItem as any)._id,
+                            name: selectedItem.name,
+                            quantity: 1,
+                            price: selectedItem.price
+                          }
+                        ]);
+                      }
+                    }
+                  }}
+                  placeholder="Select item to add..."
+                />
+              </div>
+
+              <div className="max-h-[250px] overflow-y-auto border rounded-lg dark:border-gray-700">
+                {exchangeNewItems.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-gray-500">
+                    No new items selected
+                  </div>
+                ) : (
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-2">Item</th>
+                        <th className="px-3 py-2">Qty</th>
+                        <th className="px-3 py-2 text-right">Price</th>
+                        <th className="px-3 py-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {exchangeNewItems.map((item, index) => (
+                        <tr key={item.menuItemId} className="border-b dark:border-gray-700">
+                          <td className="px-3 py-2 font-medium">{item.name}</td>
+                          <td className="px-3 py-2">
+                            <input 
+                              type="number" 
+                              min="1" 
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const newQty = Math.max(1, parseInt(e.target.value) || 1);
+                                const newItems = [...exchangeNewItems];
+                                newItems[index].quantity = newQty;
+                                setExchangeNewItems(newItems);
+                              }}
+                              className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-600"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-green-600 dark:text-green-400">
+                            {formatCurrency(item.price * item.quantity)}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <button 
+                              onClick={() => {
+                                setExchangeNewItems(exchangeNewItems.filter((_, i) => i !== index));
+                              }}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <XCircleIcon className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div className="flex justify-between items-center px-2">
+                <span className="font-semibold text-sm">New Items Value:</span>
+                <span className="font-bold text-green-600 dark:text-green-400">
+                  {formatCurrency(exchangeNewItems.reduce((acc, item) => acc + (item.price * item.quantity), 0))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border dark:border-gray-700 flex justify-between items-center">
+            {(() => {
+              const returnTotal = exchangeReturnedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+              const newTotal = exchangeNewItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+              const diff = newTotal - returnTotal;
+              return (
+                <>
+                  <div className="space-y-1">
+                    <span className="font-semibold text-gray-900 dark:text-white">Net Difference:</span>
+                    <p className="text-xs text-gray-500">
+                      {diff > 0 
+                        ? 'Customer owes additional payment' 
+                        : diff < 0 
+                          ? 'Customer is owed a refund' 
+                          : 'Even exchange, no payment required'}
+                    </p>
+                  </div>
+                  <div className={`text-xl font-bold ${diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                    {diff > 0 ? '+' : diff < 0 ? '-' : ''}{formatCurrency(Math.abs(diff))}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Payment Method (if applicable) <span className="text-red-500">*</span>
+              </label>
+              <Select
+                options={[
+                  { value: 'cash', label: 'Cash' },
+                  { value: 'card', label: 'Card' },
+                  { value: 'digital_wallet', label: 'Digital Wallet' }
+                ]}
+                value={exchangePaymentMethod}
+                onChange={(val) => setExchangePaymentMethod(val)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Exchange Reason <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="text"
+                placeholder="Reason for exchange..."
+                value={exchangeReason}
+                onChange={(e) => setExchangeReason(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsExchangeModalOpen(false);
+                setExchangeReason('');
+                setExchangeNewItems([]);
+              }}
+              disabled={isExchanging}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleExchangeSubmit}
+              disabled={
+                isExchanging || 
+                exchangeReturnedItems.every(i => i.quantity === 0) || 
+                exchangeNewItems.length === 0 || 
+                !exchangeReason.trim()
+              }
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {isExchanging ? 'Processing...' : 'Process Exchange'}
             </Button>
           </div>
         </div>

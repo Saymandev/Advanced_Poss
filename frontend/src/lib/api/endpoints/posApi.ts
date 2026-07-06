@@ -484,6 +484,22 @@ export const posApi = apiSlice.injectEndpoints({
       invalidatesTags: ['POS'],
     }),
 
+    // Hybrid Exchange Order
+    exchangeOrder: builder.mutation<POSOrder, {
+      orderId: string;
+      returnedItems: Array<{ menuItemId: string; quantity: number; isWastage?: boolean }>;
+      newItems: Array<{ menuItemId: string; quantity: number }>;
+      paymentMethod?: string;
+      reason?: string;
+    }>({
+      query: ({ orderId, ...body }) => ({
+        url: `/pos/orders/${orderId}/exchange`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['POS', 'Payment', 'Transactions' as any],
+    }),
+
     // Get order history for table
     getTableOrderHistory: builder.query<POSOrder[], {
       tableId: string;
@@ -778,6 +794,7 @@ export const {
   useSplitOrderMutation,
   useRefundOrderMutation,
   useRefundItemsMutation,
+  useExchangeOrderMutation,
   useGetTableOrderHistoryQuery,
   usePrintReceiptMutation,
   usePrintReceiptPDFMutation,
