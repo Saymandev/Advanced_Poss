@@ -47,7 +47,8 @@ export default function CheckoutPage() {
     skip: !companySlug,
   });
 
-  const taxRate = ((company?.settings?.taxRate) ?? (settings?.taxRate ?? 10)) / 100;
+  const taxRatePercent = ((company?.settings?.taxRate) ?? (settings?.taxRate ?? 0));
+  const taxRate = taxRatePercent / 100;
   const currency = company?.settings?.currency || settings?.currency || 'USD';
   
   const { 
@@ -735,7 +736,7 @@ export default function CheckoutPage() {
                       <span>{formatCurrency(subtotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                      <span>Tax (10%)</span>
+                      <span>Tax ({taxRatePercent}%)</span>
                       <span>{formatCurrency(tax)}</span>
                     </div>
                     {deliveryFee > 0 && (

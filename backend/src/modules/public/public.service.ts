@@ -122,7 +122,7 @@ export class PublicService {
       const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
 
       // Calculate totals - use company tax settings if available
-      let taxRate = 10;
+      let taxRate = 0;
       try {
         const companySettings = await this.settingsService.getCompanySettings(orderData.companyId);
         if (companySettings) {
@@ -182,7 +182,7 @@ export class PublicService {
         'takeaway': 'takeaway',
         'delivery': 'delivery',
       };
-      let orderType = deliveryTypeMap[orderData.deliveryType] || 'delivery';
+      let orderType = orderData.orderType || deliveryTypeMap[orderData.deliveryType] || 'delivery';
       
       if (orderData.tableNumber && !orderData.tableId) {
         try {
@@ -637,7 +637,7 @@ export class PublicService {
     const taxSetting = (settings as any)?.taxSettings?.[0] || (settings as any)?.taxSetting;
     return {
       currency: (settings as any)?.currency || 'USD',
-      taxRate: taxSetting?.rate ?? 10,
+      taxRate: taxSetting?.rate ?? ((settings as any)?.taxRate ?? 0),
       taxType: taxSetting?.type || 'percentage',
     };
   }

@@ -33,7 +33,8 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
 
   const { data: settings } = useGetCompanySettingsQuery(companySlug, { skip: !companySlug });
-  const taxRate = (settings?.taxRate ?? 10) / 100;
+  const taxRatePercent = settings?.taxRate ?? 0;
+  const taxRate = taxRatePercent / 100;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -242,7 +243,7 @@ export default function CartPage() {
                     <span>{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                    <span>Tax (10%)</span>
+                    <span>Tax ({taxRatePercent}%)</span>
                     <span>{formatCurrency(tax)}</span>
                   </div>
                   <div className="flex justify-between text-sm sm:text-base text-gray-600 dark:text-gray-400">
