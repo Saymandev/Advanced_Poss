@@ -2210,44 +2210,52 @@ export default function OrdersPage() {
                 New Items
               </h3>
               
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 relative">
                 <Input
-                  placeholder="Search item to add..."
+                  placeholder="Search item and click to add..."
                   value={exchangeSearchTerm}
                   onChange={(e) => setExchangeSearchTerm(e.target.value)}
                   className="w-full"
                 />
-                <Select
-                  className="w-full"
-                  options={menuItems
-                    .filter((item: any) => item.name.toLowerCase().includes(exchangeSearchTerm.toLowerCase()))
-                    .map((item: any) => ({
-                      value: item.id || (item as any)._id,
-                      label: `${item.name} (${formatCurrency(item.price)})`
-                  }))}
-                  onChange={(value) => {
-                    const selectedItem = menuItems.find((i: any) => (i.id || i._id) === value);
-                    if (selectedItem) {
-                      const existingIndex = exchangeNewItems.findIndex(i => i.menuItemId === value);
-                      if (existingIndex >= 0) {
-                        const newItems = [...exchangeNewItems];
-                        newItems[existingIndex].quantity += 1;
-                        setExchangeNewItems(newItems);
-                      } else {
-                        setExchangeNewItems([
-                          ...exchangeNewItems,
-                          {
-                            menuItemId: selectedItem.id || (selectedItem as any)._id,
-                            name: selectedItem.name,
-                            quantity: 1,
-                            price: selectedItem.price
-                          }
-                        ]);
+                {exchangeSearchTerm.trim().length > 0 && (
+                  <div className="absolute z-10 w-full mt-11 max-h-60 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
+                    {(() => {
+                      const filtered = menuItems.filter((item: any) => item.name.toLowerCase().includes(exchangeSearchTerm.toLowerCase()));
+                      if (filtered.length === 0) {
+                        return <div className="px-4 py-3 text-sm text-gray-500 text-center">No matching items</div>;
                       }
-                    }
-                  }}
-                  placeholder="Select item to add..."
-                />
+                      return filtered.map((item: any) => (
+                        <button
+                          key={item.id || item._id}
+                          className="w-full flex justify-between items-center px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700 border-b last:border-b-0 border-gray-100 dark:border-gray-700"
+                          onClick={() => {
+                            const value = item.id || item._id;
+                            const existingIndex = exchangeNewItems.findIndex(i => i.menuItemId === value);
+                            if (existingIndex >= 0) {
+                              const newItems = [...exchangeNewItems];
+                              newItems[existingIndex].quantity += 1;
+                              setExchangeNewItems(newItems);
+                            } else {
+                              setExchangeNewItems([
+                                ...exchangeNewItems,
+                                {
+                                  menuItemId: value,
+                                  name: item.name,
+                                  quantity: 1,
+                                  price: item.price
+                                }
+                              ]);
+                            }
+                            setExchangeSearchTerm('');
+                          }}
+                        >
+                          <span className="font-medium text-gray-900 dark:text-white">{item.name}</span>
+                          <span className="text-gray-500 dark:text-gray-400 font-semibold">{formatCurrency(item.price)}</span>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                )}
               </div>
 
               <div className="max-h-[250px] overflow-y-auto border rounded-lg dark:border-gray-700">
