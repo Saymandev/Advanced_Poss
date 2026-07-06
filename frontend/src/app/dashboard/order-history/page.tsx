@@ -1039,7 +1039,7 @@ export default function OrdersPage() {
               <p className="font-medium text-gray-900 dark:text-white">{value}</p>
               {(row as any).isExchanged && (
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                  Exchanged {((row as any).exchangeCount || 0) > 1 ? `(${row.exchangeCount}x)` : ''}
+                  Exchanged {((row as any).exchangeCount || 0) > 1 ? `(${(row as any).exchangeCount}x)` : ''}
                 </span>
               )}
             </div>
