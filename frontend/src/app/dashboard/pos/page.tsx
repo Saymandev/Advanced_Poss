@@ -5106,12 +5106,8 @@ export default function POSPage() {
                 dangerouslySetInnerHTML={{ __html: receiptHTML.html }}
                 className="receipt-preview"
                 style={{
-                  fontFamily: 'Courier New, monospace',
-                  fontSize: '12px',
-                  lineHeight: '1.3',
                   maxWidth: '300px',
                   margin: '0 auto',
-                  color: '#000',
                 }}
               />
             </div>
