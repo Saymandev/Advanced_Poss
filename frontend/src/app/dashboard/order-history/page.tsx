@@ -256,7 +256,7 @@ export default function OrdersPage() {
     branchId,
     search: committedSearch || undefined,
     status: statusFilter !== 'all' ? statusFilter : undefined,
-    orderType: orderTypeFilter !== 'all' ? orderTypeFilter : undefined,
+    orderType: orderTypeFilter !== 'all' ? (orderTypeFilter as 'dine-in' | 'delivery' | 'takeaway' | 'room_service' | 'counter_sale') : undefined,
     startDate: dateRange.start,
     endDate: dateRange.end,
     page: currentPage,
@@ -1407,7 +1407,7 @@ export default function OrdersPage() {
                     Exchange
                   </Button>
                 )}
-                {selectedOrder?.paymentStatus === 'partial' && (
+                {selectedOrder?.paymentStatus !== 'paid' && selectedOrder?.status !== 'cancelled' && (
                   <Button
                     variant="primary"
                     size="sm"

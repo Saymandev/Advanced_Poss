@@ -131,7 +131,7 @@ export const posApi = apiSlice.injectEndpoints({
       endDate?: string;
       page?: number;
       limit?: number;
-      orderType?: 'dine-in' | 'delivery' | 'takeaway' | 'room_service';
+      orderType?: 'dine-in' | 'delivery' | 'takeaway' | 'room_service' | 'counter_sale';
       search?: string;
     }>({
       query: (params) => ({

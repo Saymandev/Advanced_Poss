@@ -9,6 +9,8 @@ export interface PublicCompany {
   website?: string;
   address?: any;
   description?: string;
+  settings?: any;
+  businessType?: string;
 }
 export interface PublicBranch {
   id: string;

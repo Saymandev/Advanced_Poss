@@ -137,8 +137,8 @@ export default function OrderConfirmationPage() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD', // You might want to get this from company settings
-    }).format(amount);
+      currency: company?.settings?.currency || 'USD',
+    }).format(amount || 0);
   };
 
   return (
@@ -174,7 +174,7 @@ export default function OrderConfirmationPage() {
                           {item.quantity}x {item.name}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          {formatCurrency(item.price * item.quantity)}
+                          {formatCurrency((item.price ?? item.unitPrice ?? item.basePrice ?? 0) * item.quantity)}
                         </span>
                       </div>
                     ))}

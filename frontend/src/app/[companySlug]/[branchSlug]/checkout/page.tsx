@@ -47,8 +47,8 @@ export default function CheckoutPage() {
     skip: !companySlug,
   });
 
-  const taxRate = (settings?.taxRate ?? 10) / 100;
-  const currency = settings?.currency || 'USD';
+  const taxRate = ((company?.settings?.taxRate) ?? (settings?.taxRate ?? 10)) / 100;
+  const currency = company?.settings?.currency || settings?.currency || 'USD';
   
   const { 
     data: zones,
@@ -236,6 +236,10 @@ export default function CheckoutPage() {
           lng: formData.lng,
         } : undefined,
         deliveryType: formData.deliveryType,
+        orderType: formData.deliveryType === 'dining' ? 'dine-in' : 
+                   (company?.businessType === 'retail' ? 
+                     (formData.deliveryType === 'delivery' ? 'delivery' : 'counter_sale') : 
+                     (formData.deliveryType === 'delivery' ? 'delivery' : 'takeaway')),
         tableNumber: formData.tableNumber || undefined,
         paymentMethod: formData.paymentMethod,
         specialInstructions: formData.specialInstructions.trim() || undefined,
