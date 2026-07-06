@@ -823,6 +823,12 @@ export class ReceiptService {
         <div class="separator-double" style="margin-top: 15px;">---------------------------------------</div>
 
         <div class="footer text-center">
+            ${receiptData.restaurantWifi ? `
+            <div style="margin-bottom: 10px; padding: 5px; border: 1px dashed #ccc;">
+                <p style="font-size: 0.9em; font-weight: normal;"><strong>WiFi:</strong> ${receiptData.restaurantWifi}</p>
+                ${receiptData.restaurantWifiPassword ? `<p style="font-size: 0.9em; font-weight: normal;"><strong>Password:</strong> ${receiptData.restaurantWifiPassword}</p>` : ''}
+            </div>
+            ` : ''}
             <p>${receiptData.receiptSettings.footer || 'Thank you for your visit!'}</p>
             <br/>
             <p style="font-size: 0.85em; opacity: 0.9; font-weight: normal;">Powered by Raha Pos Solutions</p>
