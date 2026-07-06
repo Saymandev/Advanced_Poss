@@ -372,8 +372,8 @@ export default function OrdersPage() {
       return {
         id: order._id || order.id,
         orderNumber: order.orderNumber,
-        customerName: order.customerInfo?.name || order.customerName || 'Walk-in',
-        customerPhone: order.customerInfo?.phone || order.customerPhone,
+        customerName: order.customerInfo?.name || order.customerName || (order.customerId?.firstName ? `${order.customerId.firstName} ${order.customerId.lastName || ''}`.trim() : null) || 'Walk-in',
+        customerPhone: order.customerInfo?.phone || order.customerPhone || order.customerId?.phone,
         tableNumber:
           order.tableId?.tableNumber ||
           order.tableId?.number ||
@@ -1091,7 +1091,7 @@ export default function OrdersPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Input
-                placeholder="Search orders..."
+                placeholder="Search by Invoice, Name, or Phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(event) => {

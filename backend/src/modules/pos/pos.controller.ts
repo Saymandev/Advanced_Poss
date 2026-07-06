@@ -57,6 +57,7 @@ export class POSController {
     const filtersWithBranch = {
       ...filters,
       branchId: filters.branchId || req.user.branchId,
+      companyId: filters.companyId || req.user.companyId || req.user.company?._id || req.user.company?.id,
     };
     return this.posService.getOrders(filtersWithBranch);
   }

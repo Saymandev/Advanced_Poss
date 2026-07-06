@@ -797,11 +797,30 @@ export class POSService {
       }
     }
     if (filters.search) {
+      let customerIds: Types.ObjectId[] = [];
+      if (filters.companyId) {
+        try {
+          const customers = await this.customersService.search(
+            filters.companyId,
+            filters.search,
+            filters.branchId
+          );
+          customerIds = customers.map(c => (c as any)._id as Types.ObjectId);
+        } catch (error) {
+          console.warn('Could not search customers for POS orders filter', error);
+        }
+      }
+
       query.$or = [
         { orderNumber: { $regex: filters.search, $options: 'i' } },
         { 'customerInfo.name': { $regex: filters.search, $options: 'i' } },
         { 'customerInfo.phone': { $regex: filters.search, $options: 'i' } },
+        { 'customerInfo.email': { $regex: filters.search, $options: 'i' } },
       ];
+
+      if (customerIds.length > 0) {
+        query.$or.push({ customerId: { $in: customerIds } });
+      }
     }
     const page = filters.page || 1;
     const limit = filters.limit || 20;
@@ -814,6 +833,7 @@ export class POSService {
         .populate('tableId', 'tableNumber capacity')
         .populate('userId', 'firstName lastName email')
         .populate('paymentId', 'method amount status transactionId')
+        .populate('customerId', 'firstName lastName phone email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -864,6 +884,23 @@ export class POSService {
           { guestName: { $regex: filters.search, $options: 'i' } },
           { guestPhone: { $regex: filters.search, $options: 'i' } },
         ];
+        
+        if (filters.companyId) {
+            // customerIds is populated in the first search block above if companyId was provided
+            try {
+              const customers = await this.customersService.search(
+                filters.companyId,
+                filters.search,
+                filters.branchId
+              );
+              const pubCustomerIds = customers.map(c => (c as any)._id as Types.ObjectId);
+              if (pubCustomerIds.length > 0) {
+                publicQuery.$or.push({ customerId: { $in: pubCustomerIds } });
+              }
+            } catch (error) {
+              console.warn('Could not search customers for public orders filter', error);
+            }
+        }
       }
 
       const publicOrders = await this.orderModel
