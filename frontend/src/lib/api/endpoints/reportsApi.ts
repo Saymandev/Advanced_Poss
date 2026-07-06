@@ -165,6 +165,24 @@ export interface FinancialSummary {
     net: number;
   }>;
 }
+export interface FraudAuditReport {
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  employees: Array<{
+    employeeId: string;
+    name: string;
+    role: string;
+    totalOrders: number;
+    totalRevenue: number;
+    refundedOrders: number;
+    exchangedOrders: number;
+    refundPercentage: number;
+    exchangePercentage: number;
+    flagged: boolean;
+  }>;
+}
 export const reportsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getDashboard: builder.query<DashboardStats, { branchId?: string; companyId?: string; date?: string }>({
@@ -515,6 +533,25 @@ export const reportsApi = apiSlice.injectEndpoints({
         return data;
       },
     }),
+    getFraudAuditReport: builder.query<FraudAuditReport, { companyId: string; branchId?: string; startDate?: string; endDate?: string }>({
+      query: (params) => {
+        const { companyId, ...queryParams } = params;
+        return {
+          url: `/reports/fraud-audit/${companyId}`,
+          params: queryParams,
+        };
+      },
+      providesTags: ['Report'],
+      transformResponse: (response: any) => {
+        let data = response;
+        if (response && typeof response === 'object' && !Array.isArray(response)) {
+          if ('success' in response && 'data' in response) {
+            data = response.data;
+          }
+        }
+        return data;
+      },
+    }),
   }),
 });
 export const {
@@ -529,5 +566,6 @@ export const {
   useGetPeakHoursQuery,
   useGetDueSettlementsQuery,
   useGetWastageReportQuery,
+  useGetFraudAuditReportQuery,
   useExportReportMutation,
 } = reportsApi;

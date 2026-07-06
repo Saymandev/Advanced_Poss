@@ -245,6 +245,22 @@ export class ReportsController {
     );
   }
 
+  @Get('fraud-audit/:companyId')
+  @ApiOperation({ summary: 'Get fraud audit report (refunds and exchanges per employee)' })
+  getFraudAuditReport(
+    @Param('companyId') companyId: string,
+    @Query('branchId') branchId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getFraudAuditReport(
+      companyId,
+      branchId,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
+  }
+
   @Post('export/:type')
   @ApiOperation({ summary: 'Export report data to CSV/PDF/Excel' })
   async exportReport(

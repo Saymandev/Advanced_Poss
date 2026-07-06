@@ -1257,4 +1257,84 @@ export class ReportsService {
       return { downloadUrl: `/uploads/reports/${fileName}` };
     }
   }
+
+  async getFraudAuditReport(
+    companyId: string,
+    branchId?: string,
+    customStartDate?: Date,
+    customEndDate?: Date,
+  ): Promise<any> {
+    const now = new Date();
+    // Default to last 30 days if no dates provided
+    let startDate = customStartDate;
+    if (!startDate) {
+      const tempDate = new Date();
+      tempDate.setDate(tempDate.getDate() - 30);
+      startDate = tempDate;
+    }
+    const endDate = customEndDate || new Date();
+
+    const matchFilter: any = {
+      companyId: new Types.ObjectId(companyId),
+      createdAt: { $gte: startDate, $lte: endDate },
+    };
+    if (branchId) {
+      matchFilter.branchId = new Types.ObjectId(branchId);
+    }
+
+    const orders = await this.posOrderModel
+      .find(matchFilter)
+      .populate('userId', 'firstName lastName role email phone')
+      .populate('waiterId', 'firstName lastName role email phone')
+      .lean()
+      .exec();
+
+    const employeeStats: Record<string, any> = {};
+
+    orders.forEach((order: any) => {
+      // Prioritize userId (who processed checkout/payment), fallback to waiterId
+      const empId = order.userId?._id?.toString() || order.userId?.id || order.waiterId?._id?.toString() || order.waiterId?.id;
+      if (!empId) return;
+
+      if (!employeeStats[empId]) {
+        employeeStats[empId] = {
+          employeeId: empId,
+          name: order.userId?.firstName ? `${order.userId.firstName} ${order.userId.lastName}`.trim() : (order.waiterId?.firstName ? `${order.waiterId.firstName} ${order.waiterId.lastName}`.trim() : 'Unknown Employee'),
+          role: order.userId?.role || order.waiterId?.role || 'staff',
+          totalOrders: 0,
+          totalRevenue: 0,
+          refundedOrders: 0,
+          exchangedOrders: 0,
+        };
+      }
+
+      employeeStats[empId].totalOrders += 1;
+      employeeStats[empId].totalRevenue += (order.totalAmount || 0);
+
+      if (order.paymentStatus === 'refunded') {
+        employeeStats[empId].refundedOrders += 1;
+      }
+
+      if (order.isExchanged || (order.exchangeCount && order.exchangeCount > 0)) {
+        employeeStats[empId].exchangedOrders += 1;
+      }
+    });
+
+    const result = Object.values(employeeStats).map((emp: any) => {
+      const refundPercentage = emp.totalOrders > 0 ? (emp.refundedOrders / emp.totalOrders) * 100 : 0;
+      const exchangePercentage = emp.totalOrders > 0 ? (emp.exchangedOrders / emp.totalOrders) * 100 : 0;
+
+      return {
+        ...emp,
+        refundPercentage,
+        exchangePercentage,
+        flagged: refundPercentage > 5 || exchangePercentage > 5, // 5% threshold
+      };
+    });
+
+    return {
+      period: { startDate, endDate },
+      employees: result.sort((a: any, b: any) => b.refundPercentage + b.exchangePercentage - (a.refundPercentage + a.exchangePercentage)),
+    };
+  }
 }

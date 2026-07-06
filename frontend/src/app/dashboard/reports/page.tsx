@@ -15,6 +15,7 @@ import {
     useGetSalesAnalyticsQuery,
     useGetTopSellingItemsQuery,
     useGetWastageReportQuery,
+    useGetFraudAuditReportQuery,
 } from '@/lib/api/endpoints/reportsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
@@ -67,7 +68,7 @@ export default function ReportsPage() {
   // Redirect if user doesn't have reports feature (auto-redirects to role-specific dashboard)
   useFeatureRedirect('reports');
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('week');
-  const [activeReport, setActiveReport] = useState<'financial' | 'sales' | 'wastage' | 'food' | 'settlement' | 'inventory' | 'analytics'>('financial');
+  const [activeReport, setActiveReport] = useState<'financial' | 'sales' | 'wastage' | 'food' | 'settlement' | 'inventory' | 'analytics' | 'fraud'>('financial');
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -274,6 +275,21 @@ export default function ReportsPage() {
     endDate,
   }, {
     skip: !companyId || activeReport !== 'analytics',
+    refetchOnMountOrArgChange: true,
+  });
+  // Fraud Audit Query
+  const {
+    data: fraudAuditReport,
+    isLoading: isLoadingFraudAudit,
+    error: fraudAuditError,
+    refetch: refetchFraudAudit
+  } = useGetFraudAuditReportQuery({
+    companyId: companyId as string,
+    branchId: branchId || undefined,
+    startDate,
+    endDate,
+  }, {
+    skip: !companyId || activeReport !== 'fraud',
     refetchOnMountOrArgChange: true,
   });
   const [exportReport, { isLoading: isExporting }] = useExportReportMutation();
@@ -564,14 +580,16 @@ export default function ReportsPage() {
     || isLoadingCategory
     || isLoadingPeakHours
     || isLoadingSettlements
-    || (activeReport === 'financial' && isLoadingFinancialSummary);
+    || (activeReport === 'financial' && isLoadingFinancialSummary)
+    || (activeReport === 'fraud' && isLoadingFraudAudit);
   const hasError = dashboardError
     || salesAnalyticsError
     || topItemsError
     || categoryError
     || peakHoursError
     || settlementsError
-    || (activeReport === 'financial' && financialSummaryError);
+    || (activeReport === 'financial' && financialSummaryError)
+    || (activeReport === 'fraud' && fraudAuditError);
   const handleRefresh = () => {
     refetchDashboard();
     refetchFinancialSummary();
@@ -580,6 +598,7 @@ export default function ReportsPage() {
     refetchCategory();
     refetchPeakHours();
     refetchSettlements();
+    refetchFraudAudit();
     toast.success('Reports refreshed');
   };
   const handleExport = async (type: string, format: 'pdf' | 'excel' | 'csv') => {
@@ -879,6 +898,26 @@ export default function ReportsPage() {
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Trends & customers
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all ${activeReport === 'fraud' ? 'ring-2 ring-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          onClick={() => setActiveReport('fraud')}
+        >
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${activeReport === 'fraud' ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <ExclamationTriangleIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${activeReport === 'fraud' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+              </div>
+              <div className="min-w-0">
+                <h3 className={`text-sm sm:text-base font-semibold ${activeReport === 'fraud' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
+                  Fraud Audit
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  Suspicious activity
                 </p>
               </div>
             </div>
@@ -1936,6 +1975,81 @@ export default function ReportsPage() {
             </Card>
           </div>
         </>
+      )}
+
+      {activeReport === 'fraud' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
+              Employee Fraud Audit Report
+            </CardTitle>
+            <p className="text-sm text-gray-500">
+              Flags employees with a high rate (&gt;5%) of order refunds or exchanges.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {isLoadingFraudAudit ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              </div>
+            ) : fraudAuditReport?.employees?.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 rounded-tl-lg">Employee</th>
+                      <th className="px-6 py-3 text-right">Total Orders</th>
+                      <th className="px-6 py-3 text-right">Refunds</th>
+                      <th className="px-6 py-3 text-right">Refund %</th>
+                      <th className="px-6 py-3 text-right">Exchanges</th>
+                      <th className="px-6 py-3 text-right">Exchange %</th>
+                      <th className="px-6 py-3 text-center rounded-tr-lg">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fraudAuditReport.employees.map((emp) => (
+                      <tr 
+                        key={emp.employeeId}
+                        className={`border-b dark:border-gray-700 ${emp.flagged ? 'bg-red-50 dark:bg-red-900/10' : 'bg-white dark:bg-gray-900'}`}
+                      >
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                          {emp.name}
+                          <div className="text-xs text-gray-500 capitalize">{emp.role}</div>
+                        </td>
+                        <td className="px-6 py-4 text-right font-medium">{emp.totalOrders}</td>
+                        <td className="px-6 py-4 text-right">{emp.refundedOrders}</td>
+                        <td className={`px-6 py-4 text-right font-medium ${emp.refundPercentage > 5 ? 'text-red-600' : 'text-gray-500'}`}>
+                          {emp.refundPercentage.toFixed(1)}%
+                        </td>
+                        <td className="px-6 py-4 text-right">{emp.exchangedOrders}</td>
+                        <td className={`px-6 py-4 text-right font-medium ${emp.exchangePercentage > 5 ? 'text-red-600' : 'text-gray-500'}`}>
+                          {emp.exchangePercentage.toFixed(1)}%
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {emp.flagged ? (
+                            <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">
+                              <ExclamationTriangleIcon className="w-3 h-3" />
+                              Flagged
+                            </span>
+                          ) : (
+                            <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
+                              Normal
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center p-8 text-gray-500">
+                No orders processed in this period.
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
