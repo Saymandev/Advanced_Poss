@@ -2219,9 +2219,36 @@ export default function OrdersPage() {
               
               <div className="flex flex-col gap-2 relative">
                 <Input
-                  placeholder="Search item and click to add..."
+                  placeholder="Search item and press Enter to add..."
                   value={exchangeSearchTerm}
                   onChange={(e) => setExchangeSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && exchangeSearchTerm.trim().length > 0) {
+                      e.preventDefault();
+                      const filtered = menuItems.filter((item: any) => item.name.toLowerCase().includes(exchangeSearchTerm.toLowerCase()));
+                      if (filtered.length > 0) {
+                        const item = filtered[0];
+                        const value = item.id || item._id;
+                        const existingIndex = exchangeNewItems.findIndex(i => i.menuItemId === value);
+                        if (existingIndex >= 0) {
+                          const newItems = [...exchangeNewItems];
+                          newItems[existingIndex].quantity += 1;
+                          setExchangeNewItems(newItems);
+                        } else {
+                          setExchangeNewItems([
+                            ...exchangeNewItems,
+                            {
+                              menuItemId: value,
+                              name: item.name,
+                              quantity: 1,
+                              price: item.price
+                            }
+                          ]);
+                        }
+                        setExchangeSearchTerm('');
+                      }
+                    }
+                  }}
                   className="w-full"
                 />
                 {exchangeSearchTerm.trim().length > 0 && (
