@@ -50,6 +50,7 @@ import { StarIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useGetCustomerByIdQuery } from '@/lib/api/endpoints/customersApi';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 interface CartItem {
   id: string;
@@ -72,6 +73,14 @@ interface PaymentState {
 export default function RetailPOSPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
   const formatCurrency = useFormatCurrency();
+  const router = useRouter();
+
+  // Guard: Protect retail POS from restaurant users
+  useEffect(() => {
+    if (companyContext?.businessType === 'restaurant') {
+      router.replace('/dashboard/pos');
+    }
+  }, [companyContext, router]);
 
   const { isOnline, pendingCount, syncOrders } = useOfflineSyncManager();
   const {

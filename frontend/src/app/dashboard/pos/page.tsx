@@ -81,7 +81,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 const AddressMap = dynamic(() => import('@/components/map/AddressMap'), { ssr: false });
@@ -517,6 +517,14 @@ export default function POSPage() {
   const [reservedTableModal, setReservedTableModal] = useState<{ tableId: string; reservation: any } | null>(null);
 
   const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Guard: Protect restaurant POS from retail users
+  useEffect(() => {
+    if (companyContext?.businessType === 'retail') {
+      router.replace('/dashboard/retail-pos');
+    }
+  }, [companyContext, router]);
 
   // Handle auto-opening order from URL (e.g. from notifications)
   useEffect(() => {
