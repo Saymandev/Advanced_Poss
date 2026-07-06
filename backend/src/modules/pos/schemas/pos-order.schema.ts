@@ -206,6 +206,12 @@ export class POSOrder {
 
   @Prop({ type: Types.ObjectId, ref: 'WorkPeriod' })
   workPeriodId?: Types.ObjectId;
+
+  @Prop({ default: false })
+  isExchanged?: boolean;
+
+  @Prop({ default: 0 })
+  exchangeCount?: number;
 }
 
 export const POSOrderSchema = SchemaFactory.createForClass(POSOrder);

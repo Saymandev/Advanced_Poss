@@ -1035,11 +1035,18 @@ export default function OrdersPage() {
             <ShoppingCartIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-                <p className="font-medium text-gray-900 dark:text-white">{value}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {typeof row.tableNumber === 'number' ? `Table ${row.tableNumber}` : row.tableNumber}
-                </p>
-              </div>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-gray-900 dark:text-white">{value}</p>
+              {(row as any).isExchanged && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
+                  Exchanged {((row as any).exchangeCount || 0) > 1 ? `(${row.exchangeCount}x)` : ''}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {typeof row.tableNumber === 'number' ? `Table ${row.tableNumber}` : row.tableNumber}
+            </p>
+          </div>
         </div>
       ),
     },

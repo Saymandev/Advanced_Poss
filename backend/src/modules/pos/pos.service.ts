@@ -2300,6 +2300,8 @@ export class POSService {
         taxAmount: newTaxAmount,
         totalAmount: newTotalAmount,
         paidAmount: order.paidAmount,
+        isExchanged: true,
+        exchangeCount: ((order as any).exchangeCount || 0) + 1,
       },
       { new: true }
     ).populate('items.menuItemId').exec();
