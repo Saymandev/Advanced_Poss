@@ -295,6 +295,7 @@ export default function OrdersPage() {
   const [exchangeNewItems, setExchangeNewItems] = useState<Array<{ menuItemId: string; name: string; quantity: number; price: number }>>([]);
   const [exchangeReason, setExchangeReason] = useState('');
   const [exchangePaymentMethod, setExchangePaymentMethod] = useState('cash');
+  const [exchangeSearchTerm, setExchangeSearchTerm] = useState('');
   
   // Refund States
   const [refundMode, setRefundMode] = useState<'full' | 'itemized'>('full');
@@ -832,6 +833,7 @@ export default function OrdersPage() {
     setSelectedOrderId(order.id);
     setExchangeReason('');
     setExchangeNewItems([]);
+    setExchangeSearchTerm('');
     setExchangePaymentMethod('cash');
     
     if (order.items && order.items.length > 0) {
@@ -2114,6 +2116,7 @@ export default function OrdersPage() {
           setIsExchangeModalOpen(false);
           setExchangeReason('');
           setExchangeNewItems([]);
+          setExchangeSearchTerm('');
         }}
         title="Exchange Order Items"
         className="max-w-4xl"
@@ -2207,12 +2210,20 @@ export default function OrdersPage() {
                 New Items
               </h3>
               
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
+                <Input
+                  placeholder="Search item to add..."
+                  value={exchangeSearchTerm}
+                  onChange={(e) => setExchangeSearchTerm(e.target.value)}
+                  className="w-full"
+                />
                 <Select
-                  className="flex-1"
-                  options={menuItems.map((item: any) => ({
-                    value: item.id || (item as any)._id,
-                    label: `${item.name} (${formatCurrency(item.price)})`
+                  className="w-full"
+                  options={menuItems
+                    .filter((item: any) => item.name.toLowerCase().includes(exchangeSearchTerm.toLowerCase()))
+                    .map((item: any) => ({
+                      value: item.id || (item as any)._id,
+                      label: `${item.name} (${formatCurrency(item.price)})`
                   }))}
                   onChange={(value) => {
                     const selectedItem = menuItems.find((i: any) => (i.id || i._id) === value);
@@ -2361,6 +2372,7 @@ export default function OrdersPage() {
                 setIsExchangeModalOpen(false);
                 setExchangeReason('');
                 setExchangeNewItems([]);
+                setExchangeSearchTerm('');
               }}
               disabled={isExchanging}
             >
