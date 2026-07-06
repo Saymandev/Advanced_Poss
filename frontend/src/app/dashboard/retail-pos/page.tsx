@@ -1192,7 +1192,20 @@ export default function RetailPOSPage() {
               )}
             </div>
             {receiptHTML?.html ? (
-              <div dangerouslySetInnerHTML={{ __html: receiptHTML.html }} />
+              <div className="border rounded-lg p-4 bg-white">
+                <div 
+                  dangerouslySetInnerHTML={{ __html: receiptHTML.html }}
+                  className="receipt-preview"
+                  style={{
+                    fontFamily: 'Courier New, monospace',
+                    fontSize: '12px',
+                    lineHeight: '1.3',
+                    maxWidth: '300px',
+                    margin: '0 auto',
+                    color: '#000',
+                  }}
+                />
+              </div>
             ) : receiptLoading ? (
               <div className="text-center py-4 text-gray-400">Loading receipt...</div>
             ) : (
