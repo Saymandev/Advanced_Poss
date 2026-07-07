@@ -10,6 +10,7 @@ export interface ComboboxOption {
 }
 
 export interface ComboboxProps {
+  label?: string;
   value: string;
   onChange: (value: string) => void;
   options: ComboboxOption[];
@@ -22,6 +23,7 @@ export interface ComboboxProps {
 }
 
 export function Combobox({
+  label,
   value,
   onChange,
   options,
@@ -152,6 +154,11 @@ export function Combobox({
 
   return (
     <div ref={containerRef} className={cn('relative w-full', className)}>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          {label}
+        </label>
+      )}
       <div className="relative">
         <input
           ref={inputRef}

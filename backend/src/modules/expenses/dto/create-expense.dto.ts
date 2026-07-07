@@ -33,30 +33,10 @@ export class CreateExpenseDto {
   description?: string;
 
   @ApiProperty({
-    enum: [
-      'ingredient',
-      'utility',
-      'rent',
-      'salary',
-      'maintenance',
-      'marketing',
-      'equipment',
-      'transport',
-      'other',
-    ],
-    example: 'rent',
+    example: 'Office Supplies',
   })
-  @IsEnum([
-    'ingredient',
-    'utility',
-    'rent',
-    'salary',
-    'maintenance',
-    'marketing',
-    'equipment',
-    'transport',
-    'other',
-  ])
+  @IsString()
+  @IsNotEmpty()
   category: string;
 
   @ApiProperty({ example: 2500 })

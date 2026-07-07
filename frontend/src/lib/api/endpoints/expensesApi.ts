@@ -6,7 +6,7 @@ export interface Expense {
   title: string;
   description?: string;
   amount: number;
-  category: 'ingredient' | 'utility' | 'rent' | 'salary' | 'maintenance' | 'marketing' | 'equipment' | 'transport' | 'other';
+  category: string;
   paymentMethod: string;
   vendorName?: string;
   vendorPhone?: string;
@@ -34,7 +34,7 @@ export interface CreateExpenseRequest {
   title: string;
   description?: string;
   amount: number;
-  category: 'ingredient' | 'utility' | 'rent' | 'salary' | 'maintenance' | 'marketing' | 'equipment' | 'transport' | 'other';
+  category: string;
   paymentMethod: string;
   vendorName?: string;
   vendorPhone?: string;

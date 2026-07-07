@@ -22,6 +22,9 @@ export interface CreateCategoryRequest {
   color?: string;
   type?: string; // Category type - can be any custom value
   sortOrder?: number;
+  companyId: string;
+  branchId?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateCategoryRequest extends Partial<CreateCategoryRequest> {

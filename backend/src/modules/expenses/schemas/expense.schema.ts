@@ -22,17 +22,6 @@ export class Expense {
 
   @Prop({
     type: String,
-    enum: [
-      'ingredient',
-      'utility',
-      'rent',
-      'salary',
-      'maintenance',
-      'marketing',
-      'equipment',
-      'transport',
-      'other',
-    ],
     required: true,
   })
   category: string;

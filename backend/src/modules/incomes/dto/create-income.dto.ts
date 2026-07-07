@@ -32,22 +32,10 @@ export class CreateIncomeDto {
   description?: string;
 
   @ApiProperty({
-    enum: [
-      'catering',
-      'event',
-      'room-service',
-      'interest',
-      'other',
-    ],
-    example: 'catering',
+    example: 'Catering',
   })
-  @IsEnum([
-    'catering',
-    'event',
-    'room-service',
-    'interest',
-    'other',
-  ])
+  @IsString()
+  @IsNotEmpty()
   category: string;
 
   @ApiProperty({ example: 5000 })

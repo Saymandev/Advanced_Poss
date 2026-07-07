@@ -13,6 +13,8 @@ export enum CategoryType {
   BEVERAGE = 'beverage',
   DESSERT = 'dessert',
   SPECIAL = 'special',
+  INCOME = 'income',
+  EXPENSE = 'expense',
 }
 
 /**
@@ -28,6 +30,8 @@ export const CATEGORY_TYPE_LABELS: Record<CategoryType, string> = {
   [CategoryType.BEVERAGE]: 'Beverage',
   [CategoryType.DESSERT]: 'Dessert',
   [CategoryType.SPECIAL]: 'Special',
+  [CategoryType.INCOME]: 'Income',
+  [CategoryType.EXPENSE]: 'Expense',
 };
 
 /**

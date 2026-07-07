@@ -8,8 +8,10 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { Combobox } from '@/components/ui/Combobox';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { CreateExpenseRequest, Expense, useApproveExpenseMutation, useCreateExpenseMutation, useDeleteExpenseMutation, useGetExpensesQuery, useRejectExpenseMutation, useUpdateExpenseMutation } from '@/lib/api/endpoints/expensesApi';
+import { useGetCategoriesQuery, useCreateCategoryMutation } from '@/lib/api/endpoints/categoriesApi';
 import { useGetPaymentMethodsByCompanyQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -29,17 +31,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-const EXPENSE_CATEGORIES = [
-  { value: 'ingredient', label: 'Ingredients' },
-  { value: 'utility', label: 'Utilities' },
-  { value: 'rent', label: 'Rent' },
-  { value: 'salary', label: 'Salaries' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'equipment', label: 'Equipment' },
-  { value: 'transport', label: 'Transportation' },
-  { value: 'other', label: 'Other' },
-];
+
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -129,6 +121,24 @@ export default function ExpensesPage() {
       label: method.displayName || method.name,
     }));
   }, [paymentMethodsData, branchId]);
+
+  const { data: categoriesData } = useGetCategoriesQuery({
+    companyId: companyId || undefined,
+    branchId: branchId || undefined,
+    type: 'expense'
+  }, { skip: !companyId });
+
+  const [createCategory] = useCreateCategoryMutation();
+
+  const dynamicCategories = useMemo(() => {
+    if (!categoriesData?.categories) return [];
+    return categoriesData.categories
+      .filter((cat: any) => cat.type === 'expense' && cat.isActive !== false)
+      .map((cat: any) => ({
+        value: cat.name,
+        label: cat.name
+      }));
+  }, [categoriesData]);
 
   const [createExpense] = useCreateExpenseMutation();
   const [updateExpense] = useUpdateExpenseMutation();
@@ -251,9 +261,25 @@ export default function ExpensesPage() {
     }
 
     try {
+      const isNewCategory = !dynamicCategories.some(c => c.value === formData.category);
+      if (isNewCategory && formData.category && formData.category !== 'all') {
+        try {
+          await createCategory({
+            name: formData.category,
+            type: 'expense',
+            companyId: user?.companyId || '',
+            branchId: user?.branchId || undefined,
+            isActive: true,
+            sortOrder: 0
+          }).unwrap();
+        } catch (e) {
+          console.error('Failed to auto-create category', e);
+        }
+      }
+
       const payload: CreateExpenseRequest = {
-        companyId: user.companyId,
-        branchId: user.branchId,
+        companyId: user?.companyId || '',
+        branchId: user?.branchId || '',
         createdBy: user.id,
         title: formData.title.trim(),
         description: formData.description?.trim() || undefined,
@@ -288,6 +314,22 @@ export default function ExpensesPage() {
     }
 
     try {
+      const isNewCategory = !dynamicCategories.some(c => c.value === formData.category);
+      if (isNewCategory && formData.category && formData.category !== 'all') {
+        try {
+          await createCategory({
+            name: formData.category,
+            type: 'expense',
+            companyId: user?.companyId || '',
+            branchId: user?.branchId || undefined,
+            isActive: true,
+            sortOrder: 0
+          }).unwrap();
+        } catch (e) {
+          console.error('Failed to auto-create category', e);
+        }
+      }
+
       const payload: Partial<CreateExpenseRequest> = {
         title: formData.title.trim(),
         description: formData.description?.trim() || undefined,
@@ -412,7 +454,7 @@ export default function ExpensesPage() {
   };
 
   const getCategoryLabel = (category: string) => {
-    const cat = EXPENSE_CATEGORIES.find(c => c.value === category);
+    const cat = dynamicCategories.find(c => c.value === category);
     return cat?.label || category;
   };
 
@@ -612,7 +654,7 @@ export default function ExpensesPage() {
       pendingAmount: pendingExpenses.reduce((sum, expense) => sum + expense.amount, 0),
       paid: paidExpenses.length,
       paidAmount: paidExpenses.reduce((sum, expense) => sum + expense.amount, 0),
-      categories: EXPENSE_CATEGORIES.length,
+      categories: dynamicCategories.length,
     };
   }, [data]);
 
@@ -640,8 +682,8 @@ export default function ExpensesPage() {
                   }
 
                   const payload: CreateExpenseRequest = {
-                    companyId: user.companyId,
-                    branchId: user.branchId,
+                    companyId: user?.companyId || '',
+                    branchId: user?.branchId || '',
                     createdBy: user.id,
                     title: (item.title || item.Title || '').trim(),
                     description: (item.description || item.Description || '').trim() || undefined,
@@ -768,7 +810,7 @@ export default function ExpensesPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Categories' },
-                  ...EXPENSE_CATEGORIES,
+                  ...dynamicCategories,
                 ]}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
@@ -891,9 +933,9 @@ export default function ExpensesPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <Select
+              <Combobox
                 label="Category *"
-                options={EXPENSE_CATEGORIES}
+                options={dynamicCategories}
                 value={formData.category}
                 onChange={(value) => {
                   setFormData({ ...formData, category: value as any });
@@ -901,10 +943,14 @@ export default function ExpensesPage() {
                     setFormErrors({ ...formErrors, category: undefined });
                   }
                 }}
-                placeholder="Select expense category"
+                allowCustom={true}
+                placeholder="Select or type expense category"
                 error={formErrors.category}
                 className="text-sm sm:text-base"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Select an existing category or type to create a new one.
+              </p>
             </div>
             <Input
               label="Date *"
@@ -1060,9 +1106,9 @@ export default function ExpensesPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <Select
+              <Combobox
                 label="Category *"
-                options={EXPENSE_CATEGORIES}
+                options={dynamicCategories}
                 value={formData.category}
                 onChange={(value) => {
                   setFormData({ ...formData, category: value as any });
@@ -1070,9 +1116,14 @@ export default function ExpensesPage() {
                     setFormErrors({ ...formErrors, category: undefined });
                   }
                 }}
+                allowCustom={true}
+                placeholder="Select or type expense category"
                 error={formErrors.category}
                 className="text-sm sm:text-base"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Select an existing category or type to create a new one.
+              </p>
             </div>
             <Input
               label="Date *"

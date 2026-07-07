@@ -6,7 +6,7 @@ export interface Income {
   title: string;
   description?: string;
   amount: number;
-  category: 'catering' | 'event' | 'room-service' | 'interest' | 'other';
+  category: string;
   paymentMethod: string;
   invoiceNumber?: string;
   customerName?: string;
@@ -32,7 +32,7 @@ export interface CreateIncomeRequest {
   title: string;
   description?: string;
   amount: number;
-  category: 'catering' | 'event' | 'room-service' | 'interest' | 'other';
+  category: string;
   paymentMethod: string;
   invoiceNumber?: string;
   customerName?: string;

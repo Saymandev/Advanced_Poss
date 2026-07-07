@@ -51,6 +51,7 @@ export default function CategoriesPage() {
     type: DEFAULT_CATEGORY_TYPE,
     isActive: true,
     sortOrder: 0,
+    companyId: '',
   });
   useEffect(() => {
     setMounted(true);
@@ -330,6 +331,7 @@ export default function CategoriesPage() {
       type: type,
       isActive: category.isActive,
       sortOrder: category.sortOrder || 0,
+      companyId: category.companyId || '',
     });
     setIsEditModalOpen(true);
   };
@@ -347,6 +349,7 @@ export default function CategoriesPage() {
       type: DEFAULT_CATEGORY_TYPE,
       isActive: true,
       sortOrder: 0,
+      companyId: '',
     });
   };
   const getStatusBadge = (isActive: boolean) => (

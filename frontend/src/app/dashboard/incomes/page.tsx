@@ -8,6 +8,7 @@ import { ImportButton } from '@/components/ui/ImportButton';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { Combobox } from '@/components/ui/Combobox';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import {
   CreateIncomeRequest,
@@ -19,6 +20,7 @@ import {
   useUpdateIncomeMutation,
 } from '@/lib/api/endpoints/incomesApi';
 import { useGetPaymentMethodsByCompanyQuery } from '@/lib/api/endpoints/paymentMethodsApi';
+import { useGetCategoriesQuery, useCreateCategoryMutation } from '@/lib/api/endpoints/categoriesApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -36,13 +38,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
-const INCOME_CATEGORIES = [
-  { value: 'catering', label: 'Catering Services' },
-  { value: 'event', label: 'Events & Functions' },
-  { value: 'room-service', label: 'Room Service' },
-  { value: 'interest', label: 'Interest Income' },
-  { value: 'other', label: 'Other Income' },
-];
+
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -127,6 +123,24 @@ export default function IncomesPage() {
       label: method.displayName || method.name,
     }));
   }, [paymentMethodsData, branchId]);
+
+  const { data: categoriesData } = useGetCategoriesQuery({
+    companyId: companyId || undefined,
+    branchId: branchId || undefined,
+    type: 'income'
+  }, { skip: !companyId });
+
+  const [createCategory] = useCreateCategoryMutation();
+
+  const dynamicCategories = useMemo(() => {
+    if (!categoriesData?.categories) return [];
+    return categoriesData.categories
+      .filter((cat: any) => cat.type === 'income' && cat.isActive !== false)
+      .map((cat: any) => ({
+        value: cat.name,
+        label: cat.name
+      }));
+  }, [categoriesData]);
 
   const [createIncome] = useCreateIncomeMutation();
   const [updateIncome] = useUpdateIncomeMutation();
@@ -233,9 +247,25 @@ export default function IncomesPage() {
     }
 
     try {
+      const isNewCategory = !dynamicCategories.some(c => c.value === formData.category);
+      if (isNewCategory && formData.category && formData.category !== 'all') {
+        try {
+          await createCategory({
+            name: formData.category,
+            type: 'income',
+            companyId: user?.companyId || '',
+            branchId: user?.branchId || undefined,
+            isActive: true,
+            sortOrder: 0
+          }).unwrap();
+        } catch (e) {
+          console.error('Failed to auto-create category', e);
+        }
+      }
+
       const payload: CreateIncomeRequest = {
-        companyId: user.companyId,
-        branchId: user.branchId,
+        companyId: user?.companyId || '',
+        branchId: user?.branchId || '',
         createdBy: user.id,
         title: formData.title.trim(),
         description: formData.description?.trim() || undefined,
@@ -270,6 +300,22 @@ export default function IncomesPage() {
     }
 
     try {
+      const isNewCategory = !dynamicCategories.some(c => c.value === formData.category);
+      if (isNewCategory && formData.category && formData.category !== 'all') {
+        try {
+          await createCategory({
+            name: formData.category,
+            type: 'income',
+            companyId: user?.companyId || '',
+            branchId: user?.branchId || undefined,
+            isActive: true,
+            sortOrder: 0
+          }).unwrap();
+        } catch (e) {
+          console.error('Failed to auto-create category', e);
+        }
+      }
+
       const payload: Partial<CreateIncomeRequest> = {
         title: formData.title.trim(),
         description: formData.description?.trim() || undefined,
@@ -349,7 +395,7 @@ export default function IncomesPage() {
   };
 
   const getCategoryLabel = (category: string) => {
-    const cat = INCOME_CATEGORIES.find((c) => c.value === category);
+    const cat = dynamicCategories.find((c) => c.value === category);
     return cat?.label || category;
   };
 
@@ -538,8 +584,8 @@ export default function IncomesPage() {
                   }
 
                   const payload: CreateIncomeRequest = {
-                    companyId: user.companyId,
-                    branchId: user.branchId,
+                    companyId: user?.companyId || '',
+                    branchId: user?.branchId || '',
                     createdBy: user.id,
                     title: (item.title || item.Title || '').trim(),
                     description: (item.description || item.Description || '').trim() || undefined,
@@ -667,7 +713,7 @@ export default function IncomesPage() {
               <Select
                 options={[
                   { value: 'all', label: 'All Categories' },
-                  ...INCOME_CATEGORIES,
+                  ...dynamicCategories,
                 ]}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
@@ -761,13 +807,23 @@ export default function IncomesPage() {
               {formErrors.amount && <p className="text-red-500 text-xs mt-1">{formErrors.amount}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category*</label>
-              <Select
-                options={INCOME_CATEGORIES}
+              <Combobox
+                label="Category *"
+                options={dynamicCategories}
                 value={formData.category}
-                onChange={(val) => setFormData({ ...formData, category: val as any })}
+                onChange={(value) => {
+                  setFormData({ ...formData, category: value as any });
+                  if (formErrors.category) {
+                    setFormErrors({ ...formErrors, category: undefined });
+                  }
+                }}
+                allowCustom={true}
+                placeholder="Select or type income category"
                 className="mt-1"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Select an existing category or type to create a new one.
+              </p>
               {formErrors.category && <p className="text-red-500 text-xs mt-1">{formErrors.category}</p>}
             </div>
           </div>
@@ -907,13 +963,23 @@ export default function IncomesPage() {
               {formErrors.amount && <p className="text-red-500 text-xs mt-1">{formErrors.amount}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category*</label>
-              <Select
-                options={INCOME_CATEGORIES}
+              <Combobox
+                label="Category *"
+                options={dynamicCategories}
                 value={formData.category}
-                onChange={(val) => setFormData({ ...formData, category: val as any })}
+                onChange={(value) => {
+                  setFormData({ ...formData, category: value as any });
+                  if (formErrors.category) {
+                    setFormErrors({ ...formErrors, category: undefined });
+                  }
+                }}
+                allowCustom={true}
+                placeholder="Select or type income category"
                 className="mt-1"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Select an existing category or type to create a new one.
+              </p>
               {formErrors.category && <p className="text-red-500 text-xs mt-1">{formErrors.category}</p>}
             </div>
           </div>

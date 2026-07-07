@@ -22,13 +22,6 @@ export class Income {
 
   @Prop({
     type: String,
-    enum: [
-      'catering',
-      'event',
-      'room-service',
-      'interest',
-      'other',
-    ],
     required: true,
   })
   category: string;
