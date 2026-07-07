@@ -444,15 +444,7 @@ export default function SuppliersPage() {
         </div>
       ),
     },
-    {
-      key: 'type',
-      title: 'Type',
-      render: (value: string) => (
-        <Badge variant="secondary" className="capitalize">
-          {value}
-        </Badge>
-      ),
-    },
+
     {
       key: 'address',
       title: 'Location',
@@ -770,17 +762,7 @@ export default function SuppliersPage() {
                 className="text-sm sm:text-base"
               />
             </div>
-            <div className="w-full sm:w-48">
-              <Select
-                options={[
-                  { value: 'all', label: 'All Types' },
-                  ...supplierTypeOptions,
-                ]}
-                value={typeFilter}
-                onChange={setTypeFilter}
-                placeholder="Filter by type"
-              />
-            </div>
+
             <div className="w-full sm:w-48">
               <Select
                 options={[
@@ -852,26 +834,12 @@ export default function SuppliersPage() {
         className="max-w-2xl"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Supplier Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Type *
-              </label>
-              <Combobox
-                value={formData.type || 'food'}
-                onChange={(value: string) => setFormData({ ...formData, type: value.trim() })}
-                options={supplierTypeOptions}
-                placeholder="Select a type or enter custom type..."
-                allowCustom={true}
-              />
-            </div>
-          </div>
+          <Input
+            label="Supplier Name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Description (Optional)
@@ -1153,26 +1121,12 @@ export default function SuppliersPage() {
         className="max-w-4xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Supplier Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Type *
-              </label>
-              <Combobox
-                value={formData.type || 'food'}
-                onChange={(value: string) => setFormData({ ...formData, type: value.trim() })}
-                options={supplierTypeOptions}
-                placeholder="Select a type or enter custom type..."
-                allowCustom={true}
-              />
-            </div>
-          </div>
+          <Input
+            label="Supplier Name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Description (Optional)
@@ -1526,10 +1480,6 @@ export default function SuppliersPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Type</p>
-                <Badge variant="secondary" className="capitalize">{selectedSupplier.type}</Badge>
-              </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Payment Terms</p>
                 <p className="font-medium text-gray-900 dark:text-white">
