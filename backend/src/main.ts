@@ -74,7 +74,10 @@ async function bootstrap() {
             { projection: { customDomain: 1 } }
           ).toArray();
           
-          const origins = companies.map((c: any) => `https://${c.customDomain}`);
+          const origins = companies.flatMap((c: any) => [
+            `https://${c.customDomain}`,
+            `http://${c.customDomain}`
+          ]);
           allowedOriginsCache = new Set(origins);
           lastCacheTime = now;
         }
