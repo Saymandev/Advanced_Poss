@@ -153,7 +153,18 @@ export async function middleware(request: NextRequest) {
           const result = await res.json();
           if (result.success && result.data?.companySlug) {
             const companySlug = result.data.companySlug;
-            // Rewrite URL: e.g., raincyber.com/dhaka -> raincyber.com/raincyber/dhaka internally
+            
+            // If the URL in the browser already contains the company slug (e.g., raincyber.com/rahpos/dhaka)
+            // we should redirect them to the clean URL (raincyber.com/dhaka) to enforce white-labeling
+            // and prevent Next.js from receiving double-slugs (rahpos/rahpos/dhaka)
+            if (pathname.startsWith(`/${companySlug}/`) || pathname === `/${companySlug}`) {
+              const strippedPath = pathname.replace(new RegExp(`^/${companySlug}`), '') || '/';
+              const redirectUrl = request.nextUrl.clone();
+              redirectUrl.pathname = strippedPath;
+              return NextResponse.redirect(redirectUrl);
+            }
+
+            // Rewrite URL internally: e.g., raincyber.com/dhaka -> raincyber.com/rahpos/dhaka internally
             const newUrl = request.nextUrl.clone();
             newUrl.pathname = `/${companySlug}${pathname === '/' ? '' : pathname}`;
             return NextResponse.rewrite(newUrl);
