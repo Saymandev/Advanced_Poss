@@ -606,7 +606,7 @@ export default function SuppliersPage() {
           )}
           {!isLoading && !error && suppliers.length === 0 && companyId && (
             <p className="text-yellow-600 dark:text-yellow-400 text-sm mt-1">
-              No suppliers found for company ID: {companyId}. Click "Add Supplier" to create your first supplier.
+              No suppliers found. Click "Add Supplier" to create your first supplier.
             </p>
           )}
           {!isLoading && !error && suppliers.length === 0 && !companyId && (
