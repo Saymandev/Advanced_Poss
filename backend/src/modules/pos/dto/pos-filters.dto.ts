@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class POSOrderFiltersDto {
   @IsOptional()
@@ -11,11 +11,11 @@ export class POSOrderFiltersDto {
   branchId?: string;
 
   @IsOptional()
-  @IsEnum(['pending', 'paid', 'cancelled'])
+  @IsIn(['pending', 'paid', 'cancelled'])
   status?: string;
 
   @IsOptional()
-  @IsEnum(['dine-in', 'delivery', 'takeaway', 'room_service', 'counter_sale'])
+  @IsIn(['dine-in', 'delivery', 'takeaway', 'room_service', 'counter_sale'])
   orderType?: 'dine-in' | 'delivery' | 'takeaway' | 'room_service' | 'counter_sale';
 
   @IsOptional()
@@ -66,7 +66,7 @@ export class POSStatsFiltersDto {
   endDate?: string;
 
   @IsOptional()
-  @IsEnum(['dine-in', 'delivery', 'takeaway', 'room_service', 'counter_sale'])
+  @IsIn(['dine-in', 'delivery', 'takeaway', 'room_service', 'counter_sale'])
   orderType?: 'dine-in' | 'delivery' | 'takeaway' | 'room_service' | 'counter_sale';
 }
 
