@@ -29,6 +29,13 @@ export class CreateBranchDto {
   @IsString()
   publicUrl?: string;
 
+  @ApiPropertyOptional({
+    example: [{ label: 'Facebook Ad', url: 'https://domain.com/fb' }],
+  })
+  @IsOptional()
+  @IsArray()
+  marketingUrls?: Array<{ label: string; url: string }>;
+
   @ApiPropertyOptional({ example: '+1234567891' })
   @IsOptional()
   @IsString()

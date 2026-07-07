@@ -4,6 +4,7 @@ export interface Branch {
   name: string;
   slug?: string;
   publicUrl?: string;
+  marketingUrls?: Array<{ label: string; url: string }>;
   address: string | {
     street: string;
     city: string;
@@ -59,6 +60,7 @@ export interface CreateBranchRequest {
   closingTime: string;
   timezone: string;
   companyId: string;
+  marketingUrls?: Array<{ label: string; url: string }>;
 }
 export interface UpdateBranchRequest {
   name?: string;
@@ -85,6 +87,7 @@ export interface UpdateBranchRequest {
   }>;
   totalTables?: number;
   totalSeats?: number;
+  marketingUrls?: Array<{ label: string; url: string }>;
 }
 export const branchesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -117,6 +120,7 @@ export const branchesApi = apiSlice.injectEndpoints({
             name: branch.name,
             slug: branch.slug,
             publicUrl: branch.publicUrl,
+            marketingUrls: branch.marketingUrls || [],
             phone: branch.phone,
             email: branch.email,
             address: branch.address,
@@ -158,6 +162,7 @@ export const branchesApi = apiSlice.injectEndpoints({
           name: branch.name,
           slug: branch.slug,
           publicUrl: branch.publicUrl,
+          marketingUrls: branch.marketingUrls || [],
           phone: branch.phone,
           email: branch.email,
           address: branch.address,

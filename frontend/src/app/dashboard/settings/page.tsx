@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
-import { useGetBranchesQuery, useUpdateBranchPublicUrlMutation } from '@/lib/api/endpoints/branchesApi';
+import { useGetBranchesQuery, useUpdateBranchPublicUrlMutation, useUpdateBranchMutation } from '@/lib/api/endpoints/branchesApi';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import {
     useAddCustomDomainMutation,
@@ -229,6 +229,9 @@ export default function SettingsPage() {
   }, [currentBranch, company]);
   // Update branch public URL mutation
   const [updateBranchPublicUrl] = useUpdateBranchPublicUrlMutation();
+  const [updateBranch] = useUpdateBranchMutation();
+  const [newMarketingUrl, setNewMarketingUrl] = useState({ label: '', url: '' });
+  const [isAddingMarketingUrl, setIsAddingMarketingUrl] = useState(false);
   // Helper function to generate public URL from slugs or custom domain
   const generatePublicUrl = (companySlug?: string, branchSlug?: string): string | null => {
     // If custom domain is verified, use it instead of slug-based URLs
@@ -282,6 +285,45 @@ export default function SettingsPage() {
       setEditingBranchUrl(null);
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to update branch URL');
+    }
+  };
+
+  const handleAddMarketingUrl = async () => {
+    if (!currentBranch || !newMarketingUrl.label.trim() || !newMarketingUrl.url.trim()) return;
+    
+    try {
+      const currentMarketingUrls = currentBranch.marketingUrls || [];
+      const updatedMarketingUrls = [...currentMarketingUrls, { label: newMarketingUrl.label.trim(), url: newMarketingUrl.url.trim() }];
+      
+      await updateBranch({ 
+        id: currentBranch.id, 
+        data: { marketingUrls: updatedMarketingUrls } 
+      }).unwrap();
+      
+      toast.success('Marketing URL added successfully!');
+      setNewMarketingUrl({ label: '', url: '' });
+      setIsAddingMarketingUrl(false);
+    } catch (error) {
+      console.error('Error adding marketing URL:', error);
+      toast.error('Failed to add marketing URL');
+    }
+  };
+
+  const handleRemoveMarketingUrl = async (indexToRemove: number) => {
+    if (!currentBranch || !currentBranch.marketingUrls) return;
+    
+    try {
+      const updatedMarketingUrls = currentBranch.marketingUrls.filter((_, index) => index !== indexToRemove);
+      
+      await updateBranch({ 
+        id: currentBranch.id, 
+        data: { marketingUrls: updatedMarketingUrls } 
+      }).unwrap();
+      
+      toast.success('Marketing URL removed');
+    } catch (error) {
+      console.error('Error removing marketing URL:', error);
+      toast.error('Failed to remove marketing URL');
     }
   };
   // Tax Settings
@@ -878,6 +920,107 @@ export default function SettingsPage() {
                     </div>
                   );
                 })()}
+                
+                {/* Marketing URLs Section */}
+                <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <GlobeAltIcon className="w-4 h-4" />
+                    Custom Marketing URLs
+                  </h3>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                    Add custom marketing URLs to track different campaigns (e.g., Facebook Ads, Instagram, Flyers). These can be used in your digital receipts or QR menus.
+                  </p>
+                  
+                  {/* List of existing marketing URLs */}
+                  {currentBranch.marketingUrls && currentBranch.marketingUrls.length > 0 ? (
+                    <div className="space-y-3 mb-4">
+                      {currentBranch.marketingUrls.map((mUrl, index) => (
+                        <div key={index} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-900 dark:text-white mb-1 truncate">{mUrl.label}</p>
+                            <p className="text-xs text-gray-500 font-mono truncate">{mUrl.url}</p>
+                          </div>
+                          <Button
+                            onClick={() => copyPublicUrl(mUrl.url)}
+                            variant="secondary"
+                            size="sm"
+                            title="Copy URL"
+                          >
+                            <ClipboardDocumentIcon className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            onClick={() => handleRemoveMarketingUrl(index)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            title="Remove URL"
+                          >
+                            <XMarkIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400 italic mb-4 p-3 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
+                      No custom marketing URLs added yet.
+                    </div>
+                  )}
+
+                  {/* Add new marketing URL form */}
+                  {isAddingMarketingUrl ? (
+                    <div className="bg-white dark:bg-gray-800 border border-primary-200 dark:border-primary-800 rounded-lg p-4 space-y-3 shadow-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Label / Source</label>
+                          <Input
+                            placeholder="e.g., Facebook Ad Campaign"
+                            value={newMarketingUrl.label}
+                            onChange={(e) => setNewMarketingUrl(prev => ({ ...prev, label: e.target.value }))}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">URL</label>
+                          <Input
+                            placeholder="https://yourdomain.com/fb-promo"
+                            value={newMarketingUrl.url}
+                            onChange={(e) => setNewMarketingUrl(prev => ({ ...prev, url: e.target.value }))}
+                            className="text-sm font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2">
+                        <Button
+                          onClick={() => {
+                            setIsAddingMarketingUrl(false);
+                            setNewMarketingUrl({ label: '', url: '' });
+                          }}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleAddMarketingUrl}
+                          variant="primary"
+                          size="sm"
+                          disabled={!newMarketingUrl.label.trim() || !newMarketingUrl.url.trim()}
+                        >
+                          Save URL
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => setIsAddingMarketingUrl(true)}
+                      variant="secondary"
+                      size="sm"
+                      className="border-dashed"
+                    >
+                      + Add Marketing URL
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}

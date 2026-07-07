@@ -21,6 +21,13 @@ export class Branch {
   @Prop({ trim: true })
   publicUrl?: string;
 
+  // Custom Marketing URLs (e.g., Facebook, Instagram, Flyers)
+  @Prop({
+    type: [{ label: String, url: String }],
+    default: [],
+  })
+  marketingUrls?: Array<{ label: string; url: string }>;
+
   // Contact
   @Prop()
   phone?: string;
