@@ -264,6 +264,7 @@ export const companiesApi = apiSlice.injectEndpoints({
     getCustomDomainInfo: builder.query<CustomDomainInfo, string>({
       query: (companyId) => `/companies/${companyId}/custom-domain`,
       providesTags: ['Company'],
+      transformResponse: (response: any) => response?.data ?? response,
     }),
     addCustomDomain: builder.mutation<Company, { companyId: string; domain: string }>({
       query: ({ companyId, domain }) => ({
