@@ -41,12 +41,13 @@ export class EncryptionInterceptor implements NestInterceptor {
     const request = ctx.getRequest<Request & { url?: string }>();
     const url = (request as any).url || '';
 
-    // Skip encryption for Swagger docs and health endpoints
+    // Skip encryption for Swagger docs and health endpoints, and the domain resolver
     if (
       url.startsWith('/api/docs') ||
       url.startsWith('/docs') ||
       url.startsWith('/health') ||
-      url.startsWith('/api/health')
+      url.startsWith('/api/health') ||
+      url.includes('/public/resolve-domain')
     ) {
       return next.handle();
     }
