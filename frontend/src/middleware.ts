@@ -123,6 +123,25 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // --- Custom Domain White-labeling Logic ---
+  const hostname = request.headers.get('host') || '';
+  // Check if it's the main platform domain (raha.bd, localhost, or IP addresses for testing)
+  const isMainDomain = hostname.includes('raha.bd') || 
+                       hostname.includes('localhost') || 
+                       hostname.includes('127.0.0.1') || 
+                       hostname.match(/^192\.168\./) ||
+                       hostname.match(/^10\./) ||
+                       hostname.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./);
+  
+  // If a user visits the root page of a CUSTOM domain, redirect them straight to the login page
+  // This prevents them from seeing the main SaaS marketing landing page
+  if (!isMainDomain && pathname === '/') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/auth/login';
+    return NextResponse.redirect(url);
+  }
+  // ------------------------------------------
+
   const userInfoCookie = request.cookies.get('user_info');
   const isAuthRoute = pathname.startsWith('/auth/');
   const isHomeRoute = pathname === '/';
