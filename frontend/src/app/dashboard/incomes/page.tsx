@@ -168,14 +168,14 @@ export default function IncomesPage() {
     status: 'pending',
   });
 
-  const resetForm = () => {
+  const resetForm = (savedCategory?: string) => {
     setFormData({
       companyId: user?.companyId || '',
       branchId: user?.branchId || '',
       title: '',
       description: '',
       amount: 0,
-      category: userProfile?.preferences?.lastUsedIncomeCategory || 'other',
+      category: (savedCategory as any) || userProfile?.preferences?.lastUsedIncomeCategory || 'other',
       date: new Date().toISOString().split('T')[0],
       paymentMethod: 'cash',
       invoiceNumber: '',
@@ -196,12 +196,18 @@ export default function IncomesPage() {
         companyId: user.companyId || '',
         branchId: user.branchId || '',
         createdBy: user.id || '',
-        category: prev.category === 'other' && userProfile?.preferences?.lastUsedIncomeCategory
-          ? userProfile.preferences.lastUsedIncomeCategory
-          : prev.category,
       }));
     }
-  }, [user, userProfile]);
+  }, [user]);
+
+  useEffect(() => {
+    if (userProfile?.preferences?.lastUsedIncomeCategory && !isCreateModalOpen && !isEditModalOpen) {
+      setFormData((prev) => ({
+        ...prev,
+        category: userProfile?.preferences?.lastUsedIncomeCategory as any,
+      }));
+    }
+  }, [userProfile, isCreateModalOpen, isEditModalOpen]);
 
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
@@ -295,9 +301,10 @@ export default function IncomesPage() {
         console.error('Failed to save category preference:', err);
       }
 
+      const savedCategory = formData.category;
       toast.success('Income recorded successfully');
       setIsCreateModalOpen(false);
-      resetForm();
+      resetForm(savedCategory);
       refetch();
     } catch (err: any) {
       const errorMessage = err?.data?.message || err?.message || 'Failed to create income';

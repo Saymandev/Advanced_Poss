@@ -167,14 +167,14 @@ export default function ExpensesPage() {
     createdBy: '',
   });
 
-  const resetForm = () => {
+  const resetForm = (savedCategory?: string) => {
     setFormData({
       companyId: user?.companyId || '',
       branchId: user?.branchId || '',
       title: '',
       description: '',
       amount: 0,
-      category: userProfile?.preferences?.lastUsedExpenseCategory || 'other',
+      category: savedCategory || userProfile?.preferences?.lastUsedExpenseCategory || 'other',
       date: new Date().toISOString().split('T')[0],
       paymentMethod: 'cash',
       vendorName: '',
@@ -196,12 +196,18 @@ export default function ExpensesPage() {
         companyId: user.companyId || '',
         branchId: user.branchId || '',
         createdBy: user.id || '',
-        category: prev.category === 'other' && userProfile?.preferences?.lastUsedExpenseCategory
-          ? userProfile.preferences.lastUsedExpenseCategory
-          : prev.category,
       }));
     }
-  }, [user, userProfile]);
+  }, [user]);
+
+  useEffect(() => {
+    if (userProfile?.preferences?.lastUsedExpenseCategory && !isCreateModalOpen && !isEditModalOpen) {
+      setFormData(prev => ({
+        ...prev,
+        category: userProfile?.preferences?.lastUsedExpenseCategory
+      }));
+    }
+  }, [userProfile, isCreateModalOpen, isEditModalOpen]);
 
   // const handleApprove = async (expense: Expense, approved: boolean) => {
   //   try {
@@ -310,9 +316,10 @@ export default function ExpensesPage() {
         console.error('Failed to save category preference:', err);
       }
 
+      const savedCategory = formData.category;
       toast.success('Expense created successfully');
       setIsCreateModalOpen(false);
-      resetForm();
+      resetForm(savedCategory);
     } catch (error: any) {
       const errorMessage = error?.data?.message || error?.message || 'Failed to create expense';
       toast.error(errorMessage);

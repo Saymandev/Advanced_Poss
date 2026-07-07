@@ -172,18 +172,19 @@ export default function SuppliersPage() {
   }, [isCreateModalOpen, isEditModalOpen]);
 
   useEffect(() => {
-    if (userProfile?.preferences?.lastUsedSupplierType) {
+    if (userProfile?.preferences?.lastUsedSupplierType && !isCreateModalOpen && !isEditModalOpen) {
       setFormData((prev: any) => ({
         ...prev,
-        type: prev.type === 'food' ? userProfile?.preferences?.lastUsedSupplierType : prev.type
+        type: userProfile?.preferences?.lastUsedSupplierType
       }));
     }
-  }, [userProfile]);
-  const resetForm = () => {
+  }, [userProfile, isCreateModalOpen, isEditModalOpen]);
+
+  const resetForm = (savedType?: string) => {
     setFormData({
       name: '',
       description: '',
-      type: userProfile?.preferences?.lastUsedSupplierType || 'food',
+      type: savedType || userProfile?.preferences?.lastUsedSupplierType || 'food',
       contactPerson: '',
       email: '',
       phone: '',
@@ -264,9 +265,10 @@ export default function SuppliersPage() {
         console.error('Failed to save supplier type preference:', err);
       }
 
+      const savedType = formData.type;
       toast.success('Supplier created successfully');
       setIsCreateModalOpen(false);
-      resetForm();
+      resetForm(savedType);
       // Manually refetch to ensure the list updates immediately
       // Only refetch if the query is not skipped (companyId exists)
       if (companyId) {
@@ -1610,7 +1612,7 @@ export default function SuppliersPage() {
               </div>
             )}
             {/* Performance Metrics */}
-            {(selectedSupplier.totalOrders || selectedSupplier.totalPurchases || selectedSupplier.onTimeDeliveryRate || selectedSupplier.qualityScore) && (
+            {!!(selectedSupplier.totalOrders || selectedSupplier.totalPurchases || selectedSupplier.onTimeDeliveryRate || selectedSupplier.qualityScore) && (
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Performance Metrics</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -1657,7 +1659,7 @@ export default function SuppliersPage() {
                 </div>
               </div>
             )}
-            {(selectedSupplier.productCategories?.length || selectedSupplier.certifications?.length) && (
+            {!!(selectedSupplier.productCategories?.length || selectedSupplier.certifications?.length) && (
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Categories & Certifications</h4>
                 <div className="space-y-3">
