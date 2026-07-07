@@ -146,7 +146,7 @@ export async function middleware(request: NextRequest) {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
         const res = await fetch(`${apiUrl}/public/resolve-domain?domain=${domainOnly}`, {
-          next: { revalidate: 300 } // Cache for 5 minutes
+          cache: 'no-store'
         });
         
         if (res.ok) {
@@ -157,10 +157,14 @@ export async function middleware(request: NextRequest) {
             const newUrl = request.nextUrl.clone();
             newUrl.pathname = `/${companySlug}${pathname === '/' ? '' : pathname}`;
             return NextResponse.rewrite(newUrl);
+          } else {
+            return new NextResponse(`Middleware Error: API resolved but returned invalid data: ${JSON.stringify(result)}`, { status: 500 });
           }
+        } else {
+          return new NextResponse(`Middleware Error: API returned status ${res.status}`, { status: 500 });
         }
-      } catch (err) {
-        console.error('Failed to resolve custom domain in middleware:', err);
+      } catch (err: any) {
+        return new NextResponse(`Middleware Fetch Error: ${err.message}`, { status: 500 });
       }
     }
 
