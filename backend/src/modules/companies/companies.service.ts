@@ -462,13 +462,25 @@ export class CompaniesService {
     // Generate verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const tokenValue = `domain-verification-${verificationToken}`;
-    // Update company with custom domain
-    company.customDomain = addDomainDto.domain.toLowerCase();
-    company.domainVerified = false;
-    company.domainVerificationToken = tokenValue;
-    company.domainVerifiedAt = undefined;
-    await company.save();
-    return company.toObject();
+    // Update company with custom domain using findByIdAndUpdate to ensure persistence
+    const updatedCompany = await this.companyModel.findByIdAndUpdate(
+      companyId,
+      {
+        $set: {
+          customDomain: addDomainDto.domain.toLowerCase(),
+          domainVerified: false,
+          domainVerificationToken: tokenValue,
+          domainVerifiedAt: null,
+        },
+      },
+      { new: true }
+    );
+    
+    if (!updatedCompany) {
+      throw new NotFoundException('Company not found during update');
+    }
+
+    return updatedCompany.toObject();
   }
   async verifyCustomDomain(companyId: string, verifyDto: VerifyCustomDomainDto): Promise<Company> {
     if (!Types.ObjectId.isValid(companyId)) {
@@ -502,13 +514,27 @@ export class CompaniesService {
     if (!company) {
       throw new NotFoundException('Company not found');
     }
-    // Remove custom domain
-    company.customDomain = undefined;
-    company.domainVerified = false;
-    company.domainVerificationToken = undefined;
-    company.domainVerifiedAt = undefined;
-    await company.save();
-    return company.toObject();
+    // Remove custom domain using findByIdAndUpdate
+    const updatedCompany = await this.companyModel.findByIdAndUpdate(
+      companyId,
+      {
+        $unset: {
+          customDomain: "",
+          domainVerificationToken: "",
+          domainVerifiedAt: ""
+        },
+        $set: {
+          domainVerified: false
+        }
+      },
+      { new: true }
+    );
+    
+    if (!updatedCompany) {
+      throw new NotFoundException('Company not found during update');
+    }
+
+    return updatedCompany.toObject();
   }
   async getCustomDomainInfo(companyId: string) {
     if (!Types.ObjectId.isValid(companyId)) {
