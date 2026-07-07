@@ -23,9 +23,20 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
   const [foundCompanyLogo, setFoundCompanyLogo] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
+  const [brandName, setBrandName] = useState('Raha Pos Solutions');
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      const isMainDomain = host.includes('raha.bd') || host.includes('localhost') || host.match(/^192\.168\./) || host.match(/^10\./);
+      if (!isMainDomain && host) {
+        const domainPart = host.split('.')[0];
+        if (domainPart) {
+          setBrandName(domainPart.charAt(0).toUpperCase() + domainPart.slice(1));
+        }
+      }
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,7 +213,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-gray-500 text-sm mt-8">
-          © {new Date().getFullYear()} Raha Pos Solutions. All rights reserved.
+          © {new Date().getFullYear()} {companyContext?.companyName || brandName}. All rights reserved.
         </p>
       </div>
     </div>
