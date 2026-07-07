@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Supplier, useActivateSupplierMutation, useCreateSupplierMutation, useDeactivateSupplierMutation, useDeleteSupplierMutation, useGetSuppliersQuery, useGetSupplierStatsQuery, useMakeSupplierPreferredMutation, useRemoveSupplierPreferredMutation, useUpdateSupplierMutation } from '@/lib/api/endpoints/suppliersApi';
+import { useGetProfileQuery, useSavePreferencesMutation } from '@/lib/api/endpoints/usersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -78,6 +79,8 @@ export default function SuppliersPage() {
     }
   }, [suppliersResponse, isLoading, error, companyId]);
   const { data: supplierStats } = useGetSupplierStatsQuery(companyId || '', { skip: !companyId });
+  const { data: userProfile } = useGetProfileQuery();
+  const [savePreferences] = useSavePreferencesMutation();
   const [createSupplier, { isLoading: isCreating }] = useCreateSupplierMutation();
   const [updateSupplier, { isLoading: isUpdating }] = useUpdateSupplierMutation();
   const [deleteSupplier] = useDeleteSupplierMutation();
@@ -133,7 +136,7 @@ export default function SuppliersPage() {
   const [formData, setFormData] = useState<any>({
     name: '',
     description: '',
-    type: 'food',
+    type: userProfile?.preferences?.lastUsedSupplierType || 'food',
     contactPerson: '',
     email: '',
     phone: '',
@@ -144,7 +147,7 @@ export default function SuppliersPage() {
       city: '',
       state: '',
       zipCode: '',
-      country: 'USA',
+      country: 'Bangladesh',
     },
     taxId: '',
     registrationNumber: '',
@@ -167,11 +170,20 @@ export default function SuppliersPage() {
       resetForm();
     }
   }, [isCreateModalOpen, isEditModalOpen]);
+
+  useEffect(() => {
+    if (userProfile?.preferences?.lastUsedSupplierType) {
+      setFormData((prev: any) => ({
+        ...prev,
+        type: prev.type === 'food' ? userProfile?.preferences?.lastUsedSupplierType : prev.type
+      }));
+    }
+  }, [userProfile]);
   const resetForm = () => {
     setFormData({
       name: '',
       description: '',
-      type: 'food',
+      type: userProfile?.preferences?.lastUsedSupplierType || 'food',
       contactPerson: '',
       email: '',
       phone: '',
@@ -182,7 +194,7 @@ export default function SuppliersPage() {
         city: '',
         state: '',
         zipCode: '',
-        country: 'USA',
+        country: 'Bangladesh',
       },
       taxId: '',
       registrationNumber: '',
@@ -243,6 +255,15 @@ export default function SuppliersPage() {
         notes: formData.notes || undefined,
         tags: formData.tags || undefined,
       } as any).unwrap();
+
+      try {
+        await savePreferences({
+          lastUsedSupplierType: formData.type
+        }).unwrap();
+      } catch (err) {
+        console.error('Failed to save supplier type preference:', err);
+      }
+
       toast.success('Supplier created successfully');
       setIsCreateModalOpen(false);
       resetForm();
