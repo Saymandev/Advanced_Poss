@@ -1,6 +1,8 @@
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
+import { getConnectionToken } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
@@ -48,18 +50,43 @@ async function bootstrap() {
       },
     },
   }));
+  const connection = app.get<Connection>(getConnectionToken());
+  let allowedOriginsCache = new Set<string>();
+  let lastCacheTime = 0;
+
   // CORS
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: async (origin, callback) => {
       // Allow if request has no origin (like mobile apps or curl) or matches whitelist
       if (!origin || 
           origin === frontendUrl || origin === 'https://raha.bd' ||
           origin === 'http://localhost:3000' || 
           origin.endsWith('.raha.bd')) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+        return callback(null, true);
       }
+
+      // Check dynamic custom domains with an in-memory cache (5 min TTL)
+      try {
+        const now = Date.now();
+        if (now - lastCacheTime > 5 * 60 * 1000) {
+          const companies = await connection.collection('companies').find(
+            { domainVerified: true, customDomain: { $exists: true, $ne: null } },
+            { projection: { customDomain: 1 } }
+          ).toArray();
+          
+          const origins = companies.map((c: any) => `https://${c.customDomain}`);
+          allowedOriginsCache = new Set(origins);
+          lastCacheTime = now;
+        }
+
+        if (allowedOriginsCache.has(origin)) {
+          return callback(null, true);
+        }
+      } catch (err) {
+        console.error('CORS Custom Domain Check Error:', err);
+      }
+
+      callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
