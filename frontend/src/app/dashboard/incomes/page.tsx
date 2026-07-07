@@ -261,7 +261,6 @@ export default function IncomesPage() {
             type: 'income',
             companyId: user?.companyId || '',
             branchId: user?.branchId || undefined,
-            isActive: true,
             sortOrder: 0
           }).unwrap();
         } catch (e) {
@@ -323,7 +322,6 @@ export default function IncomesPage() {
             type: 'income',
             companyId: user?.companyId || '',
             branchId: user?.branchId || undefined,
-            isActive: true,
             sortOrder: 0
           }).unwrap();
         } catch (e) {

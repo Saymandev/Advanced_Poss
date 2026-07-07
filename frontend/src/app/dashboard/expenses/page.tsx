@@ -275,7 +275,6 @@ export default function ExpensesPage() {
             type: 'expense',
             companyId: user?.companyId || '',
             branchId: user?.branchId || undefined,
-            isActive: true,
             sortOrder: 0
           }).unwrap();
         } catch (e) {
@@ -338,7 +337,6 @@ export default function ExpensesPage() {
             type: 'expense',
             companyId: user?.companyId || '',
             branchId: user?.branchId || undefined,
-            isActive: true,
             sortOrder: 0
           }).unwrap();
         } catch (e) {

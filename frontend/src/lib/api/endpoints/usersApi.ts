@@ -83,6 +83,7 @@ export const usersApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: preferences,
       }),
+      invalidatesTags: ['User'],
     }),
     changePassword: builder.mutation<{ message: string }, ChangePasswordRequest>({
       query: (data) => ({
