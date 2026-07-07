@@ -141,6 +141,14 @@ export class CompaniesService {
     // Return company with subscription data (logo should be included automatically)
     return company as any;
   }
+  async findByCustomDomain(domain: string): Promise<Company> {
+    const company = await this.companyModel.findOne({ customDomain: domain.toLowerCase() }).exec();
+    if (!company) {
+      throw new NotFoundException(`Company with custom domain "${domain}" not found`);
+    }
+    return company;
+  }
+
   async findBySlug(slug: string): Promise<Company> {
     // Validate input
     if (!slug || typeof slug !== 'string') {

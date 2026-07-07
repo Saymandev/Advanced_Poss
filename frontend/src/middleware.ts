@@ -125,6 +125,8 @@ export function middleware(request: NextRequest) {
 
   // --- Custom Domain White-labeling Logic ---
   const hostname = request.headers.get('host') || '';
+  const domainOnly = hostname.split(':')[0]; // Remove port if present
+
   // Check if it's the main platform domain (raha.bd, localhost, or IP addresses for testing)
   const isMainDomain = hostname.includes('raha.bd') || 
                        hostname.includes('localhost') || 
@@ -133,12 +135,42 @@ export function middleware(request: NextRequest) {
                        hostname.match(/^10\./) ||
                        hostname.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./);
   
-  // If a user visits the root page of a CUSTOM domain, redirect them straight to the login page
-  // This prevents them from seeing the main SaaS marketing landing page
-  if (!isMainDomain && pathname === '/') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/auth/login';
-    return NextResponse.redirect(url);
+  if (!isMainDomain) {
+    const isGlobalRoute = pathname.startsWith('/dashboard') || 
+                          pathname.startsWith('/auth') || 
+                          pathname.startsWith('/api') || 
+                          pathname.startsWith('/_next') || 
+                          pathname.includes('.');
+
+    if (!isGlobalRoute) {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${apiUrl}/public/resolve-domain?domain=${domainOnly}`, {
+          next: { revalidate: 300 } // Cache for 5 minutes
+        });
+        
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data?.companySlug) {
+            const companySlug = result.data.companySlug;
+            // Rewrite URL: e.g., raincyber.com/dhaka -> raincyber.com/raincyber/dhaka internally
+            const newUrl = request.nextUrl.clone();
+            newUrl.pathname = `/${companySlug}${pathname === '/' ? '' : pathname}`;
+            return NextResponse.rewrite(newUrl);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to resolve custom domain in middleware:', err);
+      }
+    }
+
+    // If a user visits the root page of a CUSTOM domain and resolution didn't rewrite it,
+    // redirect them straight to the login page to prevent showing the main SaaS marketing page.
+    if (pathname === '/') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/login';
+      return NextResponse.redirect(url);
+    }
   }
   // ------------------------------------------
 
