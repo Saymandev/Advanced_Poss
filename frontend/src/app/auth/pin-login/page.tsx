@@ -19,10 +19,13 @@ const getAvatarUrl = (user: any) => {
   if (user?.avatar) {
     return user.avatar;
   }
-  // Fallback to placeholder avatar based on email
-  const email = user?.email || '';
-  const hash = email.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-  return `https://i.pravatar.cc/150?img=${hash % 70}`;
+  
+  // Fallback to placeholder avatar based on name initials
+  const firstName = user?.firstName || '';
+  const lastName = user?.lastName || '';
+  const name = encodeURIComponent(`${firstName} ${lastName}`.trim() || user?.email || 'User');
+  
+  return `https://ui-avatars.com/api/?name=${name}&background=random&color=fff&size=150`;
 };
 
 export default function PinLoginPage() {
