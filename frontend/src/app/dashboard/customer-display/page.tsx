@@ -20,10 +20,14 @@ export default function CustomerDisplayPage() {
 
   useEffect(() => {
     if (branchId && typeof window !== 'undefined') {
-      const url = `${window.location.origin}/display/orders?branchId=${branchId}`;
+      const company = (companyContext as any)?.company;
+      const baseUrl = company?.customDomain && company?.domainVerified 
+        ? `https://${company.customDomain}` 
+        : window.location.origin;
+      const url = `${baseUrl}/display/orders?branchId=${branchId}`;
       setDisplayUrl(url);
     }
-  }, [branchId]);
+  }, [branchId, companyContext]);
 
   const copyToClipboard = () => {
     if (displayUrl) {

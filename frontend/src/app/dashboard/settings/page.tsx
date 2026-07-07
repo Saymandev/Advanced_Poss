@@ -254,6 +254,11 @@ export default function SettingsPage() {
   const companyPublicUrl = generatePublicUrl(company?.slug);
   // Generate branch public URL from slugs if not stored
   const getBranchPublicUrl = (branch: typeof currentBranch): string | null => {
+    // If they have a custom domain verified, FORCE dynamic generation for white-labeling!
+    if (company?.customDomain && company?.domainVerified) {
+       return generatePublicUrl(company.slug, branch?.slug);
+    }
+    
     if (branch?.publicUrl) {
       return branch.publicUrl;
     }
@@ -1068,7 +1073,7 @@ export default function SettingsPage() {
                           ) : (
                             <div className="mt-2">
                               {(() => {
-                                const branchUrl = branch.publicUrl || generatePublicUrl(company?.slug, branch.slug);
+                                const branchUrl = (company?.customDomain && company?.domainVerified) ? generatePublicUrl(company?.slug, branch.slug) : (branch.publicUrl || generatePublicUrl(company?.slug, branch.slug));
                                 return branchUrl ? (
                                   <div className="flex items-center gap-2">
                                     <code className="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded flex-1 font-mono">
