@@ -33,6 +33,27 @@ export class PublicController {
     private readonly bookingsService: BookingsService,
   ) {}
   @Public()
+  @Get('resolve-domain')
+  @ApiOperation({ summary: 'Resolve custom domain to company slug' })
+  async resolveCustomDomain(@Query('domain') domain: string) {
+    if (!domain) {
+      throw new BadRequestException('Domain query parameter is required');
+    }
+    try {
+      const company = await this.companiesService.findByCustomDomain(domain);
+      return {
+        success: true,
+        data: {
+          companySlug: (company as any).slug,
+          domainVerified: (company as any).domainVerified
+        }
+      };
+    } catch (error) {
+      throw new NotFoundException('No company found for this domain');
+    }
+  }
+
+  @Public()
   @Get('companies/:slug')
   @ApiOperation({ summary: 'Get company by slug (public)' })
   async getCompanyBySlug(@Param('slug') slug: string) {
