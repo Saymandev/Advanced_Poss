@@ -2942,7 +2942,23 @@ export class POSService {
       isPublic: false,
     }));
 
-    const standardizedPublic = publicOrders.map(order => ({
+    // Filter out public orders that have already been promoted to POS orders
+    const publicOrderIds = publicOrders.map(o => (o as any)._id.toString());
+    let promotedIds = new Set<string>();
+    
+    if (publicOrderIds.length > 0) {
+      const promotedPOSOrders = await this.posOrderModel
+        .find({ externalOrderId: { $in: publicOrderIds } })
+        .select('externalOrderId')
+        .lean()
+        .exec();
+        
+      promotedIds = new Set(promotedPOSOrders.map(p => p.externalOrderId));
+    }
+
+    const standardizedPublic = publicOrders
+      .filter(order => !promotedIds.has((order as any)._id.toString()))
+      .map(order => ({
       ...order,
       id: (order as any)._id || (order as any).id,
       isPublic: true,
