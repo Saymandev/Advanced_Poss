@@ -21,6 +21,7 @@ import {
 } from '@/lib/api/endpoints/incomesApi';
 import { useGetPaymentMethodsByCompanyQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import { useGetCategoriesQuery, useCreateCategoryMutation } from '@/lib/api/endpoints/categoriesApi';
+import { useGetProfileQuery, useSavePreferencesMutation } from '@/lib/api/endpoints/usersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -143,6 +144,8 @@ export default function IncomesPage() {
   }, [categoriesData]);
 
   const [createIncome] = useCreateIncomeMutation();
+  const { data: userProfile } = useGetProfileQuery();
+  const [savePreferences] = useSavePreferencesMutation();
   const [updateIncome] = useUpdateIncomeMutation();
   const [deleteIncome] = useDeleteIncomeMutation();
   const [markIncomeAsReceived, { isLoading: isMarkingReceived }] = useMarkIncomeAsReceivedMutation();
@@ -172,7 +175,7 @@ export default function IncomesPage() {
       title: '',
       description: '',
       amount: 0,
-      category: 'other',
+      category: userProfile?.preferences?.lastUsedIncomeCategory || 'other',
       date: new Date().toISOString().split('T')[0],
       paymentMethod: 'cash',
       invoiceNumber: '',
@@ -193,9 +196,12 @@ export default function IncomesPage() {
         companyId: user.companyId || '',
         branchId: user.branchId || '',
         createdBy: user.id || '',
+        category: prev.category === 'other' && userProfile?.preferences?.lastUsedIncomeCategory
+          ? userProfile.preferences.lastUsedIncomeCategory
+          : prev.category,
       }));
     }
-  }, [user]);
+  }, [user, userProfile]);
 
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
@@ -281,6 +287,15 @@ export default function IncomesPage() {
       };
 
       await createIncome(payload).unwrap();
+      
+      try {
+        await savePreferences({
+          lastUsedIncomeCategory: formData.category
+        }).unwrap();
+      } catch (err) {
+        console.error('Failed to save category preference:', err);
+      }
+
       toast.success('Income recorded successfully');
       setIsCreateModalOpen(false);
       resetForm();

@@ -13,6 +13,7 @@ import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
 import { CreateExpenseRequest, Expense, useApproveExpenseMutation, useCreateExpenseMutation, useDeleteExpenseMutation, useGetExpensesQuery, useRejectExpenseMutation, useUpdateExpenseMutation } from '@/lib/api/endpoints/expensesApi';
 import { useGetCategoriesQuery, useCreateCategoryMutation } from '@/lib/api/endpoints/categoriesApi';
 import { useGetPaymentMethodsByCompanyQuery } from '@/lib/api/endpoints/paymentMethodsApi';
+import { useGetProfileQuery, useSavePreferencesMutation } from '@/lib/api/endpoints/usersApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import {
@@ -141,6 +142,8 @@ export default function ExpensesPage() {
   }, [categoriesData]);
 
   const [createExpense] = useCreateExpenseMutation();
+  const { data: userProfile } = useGetProfileQuery();
+  const [savePreferences] = useSavePreferencesMutation();
   const [updateExpense] = useUpdateExpenseMutation();
   const [approveExpense, { isLoading: isApproving }] = useApproveExpenseMutation();
   const [rejectExpense, { isLoading: isRejecting }] = useRejectExpenseMutation();
@@ -171,7 +174,7 @@ export default function ExpensesPage() {
       title: '',
       description: '',
       amount: 0,
-      category: 'other',
+      category: userProfile?.preferences?.lastUsedExpenseCategory || 'other',
       date: new Date().toISOString().split('T')[0],
       paymentMethod: 'cash',
       vendorName: '',
@@ -193,9 +196,12 @@ export default function ExpensesPage() {
         companyId: user.companyId || '',
         branchId: user.branchId || '',
         createdBy: user.id || '',
+        category: prev.category === 'other' && userProfile?.preferences?.lastUsedExpenseCategory
+          ? userProfile.preferences.lastUsedExpenseCategory
+          : prev.category,
       }));
     }
-  }, [user]);
+  }, [user, userProfile]);
 
   // const handleApprove = async (expense: Expense, approved: boolean) => {
   //   try {
@@ -295,6 +301,16 @@ export default function ExpensesPage() {
       };
 
       await createExpense(payload).unwrap();
+      
+      // Save the last used category to database preferences
+      try {
+        await savePreferences({
+          lastUsedExpenseCategory: formData.category
+        }).unwrap();
+      } catch (err) {
+        console.error('Failed to save category preference:', err);
+      }
+
       toast.success('Expense created successfully');
       setIsCreateModalOpen(false);
       resetForm();

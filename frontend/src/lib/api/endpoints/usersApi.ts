@@ -30,6 +30,7 @@ export interface User {
     id: string;
     name: string;
   };
+  preferences?: Record<string, any>;
 }
 
 export interface UpdateProfileRequest {
