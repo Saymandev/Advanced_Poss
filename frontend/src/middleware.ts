@@ -116,7 +116,7 @@ function getRoleDashboardPath(role: string): string {
   return mapping[role?.toLowerCase()] || '/dashboard';
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (ALWAYS_ALLOWED.has(pathname)) {
