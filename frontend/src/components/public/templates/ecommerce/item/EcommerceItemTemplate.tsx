@@ -72,11 +72,9 @@ export default function EcommerceItemTemplate() {
         const res = await fetch(url, { cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
-          let decryptedData = json.data;
-          if (json.data && json.data.encrypted) {
-            decryptedData = await decryptData(json);
-          }
-          setProductReviews(Array.isArray(decryptedData) ? decryptedData : []);
+          const decryptedJson = await decryptData(json);
+          const finalData = decryptedJson?.data || [];
+          setProductReviews(Array.isArray(finalData) ? finalData : []);
         } else {
           setProductReviews([]);
         }
