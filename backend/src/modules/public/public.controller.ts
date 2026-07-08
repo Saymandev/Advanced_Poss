@@ -18,6 +18,7 @@ import { CompaniesService } from '../companies/companies.service';
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { RoomsService } from '../rooms/rooms.service';
+import { ReviewsService } from '../reviews/reviews.service';
 import { PublicService } from './public.service';
 @ApiTags('Public')
 @Controller('public')
@@ -30,6 +31,7 @@ export class PublicController {
     private readonly zonesService: DeliveryZonesService,
     private readonly publicService: PublicService,
     private readonly roomsService: RoomsService,
+    private readonly reviewsService: ReviewsService,
     private readonly bookingsService: BookingsService,
   ) {}
   @Public()
