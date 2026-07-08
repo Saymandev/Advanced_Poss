@@ -666,7 +666,9 @@ export class WorkPeriodsService {
         <div class="row indent"><span>- Refunds:</span> <span>${formatCurrency(summary.refundTotal)}</span></div>
         ${!isRetail ? `<div class="row indent"><span>+ Hotel Revenue:</span> <span>${formatCurrency(summary.hotelRevenue)}</span></div>` : ''}
         <div class="row indent"><span>+ Manual Income:</span> <span>${formatCurrency(summary.manualIncomeTotal || 0)}</span></div>
+        <div class="row indent"><span>+ Exchange Collections:</span> <span>${formatCurrency(summary.exchangeIncomeTotal || 0)}</span></div>
         <div class="row indent"><span>- Manual Expenses:</span> <span>${formatCurrency(summary.manualExpenseTotal || 0)}</span></div>
+        <div class="row indent"><span>- Exchange Refunds:</span> <span>${formatCurrency(summary.exchangeRefundTotal || 0)}</span></div>
         <div class="row indent"><span>- Purchases:</span> <span>${formatCurrency(summary.purchaseTotal || 0)}</span></div>
         <div class="row bold mt-2"><span class="meta-label">Net Revenue:</span> <span>${formatCurrency(summary.netSales)}</span></div>
         
