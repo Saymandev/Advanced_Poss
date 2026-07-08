@@ -263,11 +263,11 @@ export default function EcommerceShopTemplate() {
               {filteredProducts.map((product: any) => (
                 <div key={product.id} className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 flex flex-col group">
                   <div 
-                    className="aspect-w-4 aspect-h-3 bg-gray-100 dark:bg-gray-700 cursor-pointer overflow-hidden"
+                    className="w-full h-48 md:h-64 bg-gray-100 dark:bg-gray-700 cursor-pointer overflow-hidden flex items-center justify-center"
                     onClick={() => router.push(`/${companySlug}/${branchSlug}/item/${product.id || product._id}`)}
                   >
                     {(product.images?.[0] || product.image) ? (
-                      <img src={(product.images?.[0] || product.image)} alt={product.name} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+                      <img src={(product.images?.[0] || product.image)} alt={product.name} className="w-full h-full object-contain bg-white dark:bg-gray-800 group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800 group-hover:scale-105 transition-transform duration-500">
                         No Image

@@ -360,6 +360,45 @@ export class PublicController {
     };
   }
   @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/products/:productId/reviews')
+  @ApiOperation({ summary: 'Get single product reviews (public)' })
+  async getProductReviews(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Param('productId') productId: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    const branchId = (branch as any)._id?.toString() || (branch as any).id;
+    
+    const product = await this.menuItemsService.findOne(productId);
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+    
+    // Verify product belongs to this branch
+    const productBranchId = (product as any).branchId?.toString() || (product as any).branchId;
+    if (productBranchId !== branchId) {
+      throw new NotFoundException('Product not found in this branch');
+    }
+    
+    try {
+      const reviews = await this.reviewsService.getItemReviews(productId, branchId, companyId);
+      return {
+        success: true,
+        data: reviews,
+      };
+    } catch (e) {
+      console.error('Failed to fetch reviews:', e);
+      return {
+        success: true,
+        data: [],
+      };
+    }
+  }
+
+  @Public()
   @Get('companies/:companySlug/branches/:branchSlug/products/:productId')
   @ApiOperation({ summary: 'Get single product details (public)' })
   async getProduct(
