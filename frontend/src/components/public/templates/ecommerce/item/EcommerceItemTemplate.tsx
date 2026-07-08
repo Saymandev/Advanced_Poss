@@ -43,7 +43,8 @@ export default function EcommerceItemTemplate() {
       try {
         const saved = localStorage.getItem(`cart_${companySlug}_${branchSlug}`);
         if (saved) {
-          const cart = JSON.parse(saved);
+          let cart = JSON.parse(saved);
+          if (!Array.isArray(cart)) cart = [];
           setCartCount(cart.reduce((sum: number, item: any) => sum + item.quantity, 0));
         }
       } catch (error) {}
@@ -70,7 +71,7 @@ export default function EcommerceItemTemplate() {
         const res = await fetch(url);
         if (res.ok) {
           const json = await res.json();
-          setProductReviews(json.data || []);
+          setProductReviews(Array.isArray(json.data) ? json.data : []);
         } else {
           setProductReviews([]);
         }
@@ -87,7 +88,8 @@ export default function EcommerceItemTemplate() {
     if (!product) return;
     try {
       const saved = localStorage.getItem(`cart_${companySlug}_${branchSlug}`);
-      let cart: CartItem[] = saved ? JSON.parse(saved) : [];
+      const parsed = saved ? JSON.parse(saved) : [];
+      let cart: CartItem[] = Array.isArray(parsed) ? parsed : [];
       const uniqueId = `${product.id || (product as any)._id}`;
       
       const existing = cart.find(item => item.uniqueId === uniqueId);

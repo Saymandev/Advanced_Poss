@@ -139,7 +139,7 @@ export default function EcommerceShopTemplate() {
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
-        setProductReviews(json.data || []);
+        setProductReviews(Array.isArray(json.data) ? json.data : []);
       } else {
         setProductReviews([]);
       }
