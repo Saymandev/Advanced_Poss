@@ -138,6 +138,7 @@ export async function middleware(request: NextRequest) {
   if (!isMainDomain) {
     const isGlobalRoute = pathname.startsWith('/dashboard') || 
                           pathname.startsWith('/auth') || 
+                          pathname.startsWith('/display') || 
                           pathname.startsWith('/api') || 
                           pathname.startsWith('/_next') || 
                           pathname.includes('.');
