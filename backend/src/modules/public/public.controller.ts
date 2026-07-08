@@ -267,9 +267,35 @@ export class PublicController {
     } as any);
     // Extract menuItems array from the result object
     // menuItemsService.findAll returns { menuItems: [], total, page, limit }
-    let rawMenuItems = Array.isArray(menuItemsResult)
+        let rawMenuItems = Array.isArray(menuItemsResult)
       ? menuItemsResult
       : (menuItemsResult as any)?.menuItems || [];
+
+    // Attach review ratings to menu items
+    if (rawMenuItems.length > 0) {
+      try {
+        const menuItemIds = rawMenuItems.map((item: any) => item._id?.toString() || item.id);
+        const ratingsMap = await this.reviewsService.getMenuItemsRatings(menuItemIds, branchId, companyId);
+        
+        rawMenuItems = rawMenuItems.map((item: any) => {
+          const itemId = item._id?.toString() || item.id;
+          const ratingData = ratingsMap[itemId];
+          
+          if (ratingData) {
+            const plainItem = item.toObject ? item.toObject() : { ...item };
+            return {
+              ...plainItem,
+              averageRating: ratingData.averageRating,
+              reviewCount: ratingData.totalReviews,
+            };
+          }
+          return item;
+        });
+      } catch (e) {
+        console.error('Failed to attach reviews to public menu items:', e);
+      }
+    }
+
     // Filter by menu type if provided
     // Make this flexible by checking actual category types in the database
     if (menuType && menuType !== 'full') {

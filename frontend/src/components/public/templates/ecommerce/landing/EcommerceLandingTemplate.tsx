@@ -63,24 +63,81 @@ export default function EcommerceLandingTemplate() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gray-900 text-white">
-        {/* Abstract Background Elements */}
-        <div className="absolute inset-0 z-0">
-           <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/30 blur-[100px]"></div>
-           <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/30 blur-[100px]"></div>
-        </div>
+      <section className="relative overflow-hidden bg-gray-900 text-white h-[600px] md:h-[700px] flex items-center justify-center">
+        {/* Slider Backgrounds */}
+        {gallery.length > 0 ? (
+          gallery.map((img: any, index: number) => (
+            <div
+              key={index}
+              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
+              style={{
+                backgroundImage: `url(${img.url})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              }}
+            >
+              <div className="absolute inset-0 bg-gray-900/60 dark:bg-gray-900/80"></div>
+            </div>
+          ))
+        ) : (
+          <div 
+            className="absolute inset-0"
+            style={{
+              backgroundImage: company.logo ? `url(${company.logo})` : undefined,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
+            }}
+          >
+            <div className={`absolute inset-0 ${company.logo ? 'bg-gray-900/80 dark:bg-gray-900/90' : 'bg-gray-900'}`}>
+              <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/30 blur-[100px]"></div>
+              <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/30 blur-[100px]"></div>
+            </div>
+          </div>
+        )}
+
+        {/* Hero Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 flex flex-col items-center text-center">
-          <h2 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-indigo-200">
-            Welcome to <br /> {company.name}
-          </h2>
-          <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mb-10 leading-relaxed font-light">
-            {company.description || 'Experience premium quality products delivered right to your door. Select a store location below to start shopping.'}
-          </p>
-          <div className="flex gap-4">
+          {gallery.length > 0 && gallery[currentSlide]?.caption ? (
+            <h2 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-tight text-white animate-fade-in-up">
+              {gallery[currentSlide].caption}
+            </h2>
+          ) : (
+            <h2 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-tight text-white animate-fade-in-up">
+              Welcome to <br /> <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-indigo-200">{company.name}</span>
+            </h2>
+          )}
+          
+          {gallery.length > 0 && gallery[currentSlide]?.description ? (
+            <p className="text-lg md:text-xl lg:text-2xl text-gray-200 max-w-3xl mb-10 leading-relaxed font-light animate-fade-in-up animation-delay-200">
+              {gallery[currentSlide].description}
+            </p>
+          ) : (
+            <p className="text-lg md:text-xl lg:text-2xl text-gray-300 max-w-3xl mb-10 leading-relaxed font-light animate-fade-in-up animation-delay-200">
+              {company.description || 'Experience premium quality products delivered right to your door. Select a store location below to start shopping.'}
+            </p>
+          )}
+          
+          <div className="flex gap-4 animate-fade-in-up animation-delay-400">
              <a href="#locations" className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-semibold text-lg transition-all duration-300 shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] transform hover:-translate-y-1">
                Start Shopping
              </a>
           </div>
+
+          {/* Slider Indicators */}
+          {gallery.length > 1 && (
+            <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-2">
+              {gallery.map((_: any, index: number) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${index === currentSlide ? 'bg-white w-8' : 'bg-white/50 hover:bg-white/80'}`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

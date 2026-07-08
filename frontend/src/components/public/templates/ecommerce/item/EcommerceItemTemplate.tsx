@@ -161,11 +161,11 @@ export default function EcommerceItemTemplate() {
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl overflow-hidden mb-12">
           <div className="flex flex-col md:flex-row">
             {/* Product Image Gallery */}
-            <div className="md:w-1/2 p-8 lg:p-12 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center min-h-[400px]">
+            <div className="md:w-1/2 p-6 lg:p-12 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center min-h-[300px] md:min-h-[400px]">
               {primaryImage ? (
-                <img src={primaryImage} alt={product.name} className="max-w-full h-auto rounded-2xl shadow-2xl object-cover aspect-square" />
+                <img src={primaryImage} alt={product.name} className="max-w-full h-auto rounded-2xl shadow-xl object-contain max-h-[400px] md:max-h-[500px] w-full" />
               ) : (
-                <div className="w-full aspect-square flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-2xl shadow-inner">
+                <div className="w-full h-64 md:h-full flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-2xl shadow-inner">
                   No Image Available
                 </div>
               )}

@@ -208,7 +208,7 @@ export default function EcommerceShopTemplate() {
         </div>
       </header>
 
-      <div className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex gap-8">
+      <div className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
         {/* Sidebar Categories */}
         <aside className="hidden lg:block w-64 flex-shrink-0">
           <div className="sticky top-28 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
