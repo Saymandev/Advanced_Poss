@@ -361,6 +361,54 @@ export class ReviewsService {
     };
   }
 
+  // Get detailed reviews for a specific menu item (includes comments and customer info)
+  async getItemReviews(menuItemId: string, branchId?: string, companyId?: string): Promise<any[]> {
+    const query: any = {
+      'itemReviews.menuItemId': new Types.ObjectId(menuItemId),
+      isPublished: true, // Only show published reviews publicly
+    };
+
+    if (branchId) {
+      query.branchId = new Types.ObjectId(branchId);
+    }
+
+    if (companyId) {
+      query.companyId = new Types.ObjectId(companyId);
+    }
+
+    const reviews = await this.reviewModel
+      .find(query)
+      .sort({ createdAt: -1 }) // Newest first
+      .limit(50) // Limit to 50 reviews to prevent huge payloads
+      .lean()
+      .exec();
+    
+    const extractedReviews: any[] = [];
+    
+    reviews.forEach((review) => {
+      if (review.itemReviews && Array.isArray(review.itemReviews)) {
+        const itemReview = review.itemReviews.find((ir: any) => {
+          const itemId = ir.menuItemId?.toString() || ir.menuItemId;
+          return itemId === menuItemId;
+        });
+
+        if (itemReview) {
+          extractedReviews.push({
+            _id: review._id,
+            rating: itemReview.rating,
+            comment: itemReview.comment,
+            customerName: review.customerName || 'Guest Customer',
+            createdAt: (review as any).createdAt,
+            overallRating: review.overallRating,
+            response: review.response, // Show owner response if it exists
+          });
+        }
+      }
+    });
+
+    return extractedReviews;
+  }
+
   // Get ratings summary for multiple menu items
   async getMenuItemsRatings(menuItemIds: string[], branchId?: string, companyId?: string): Promise<Record<string, { averageRating: number; totalReviews: number }>> {
     const query: any = {

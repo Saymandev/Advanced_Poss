@@ -122,6 +122,7 @@ export class Company {
       timezone: String,
       dateFormat: String,
       language: { type: String, default: 'en' },
+      template: { type: String, enum: ['default', 'ecommerce'], default: 'ecommerce' },
       taxRate: Number,
       taxName: String,
       features: {
@@ -139,6 +140,7 @@ export class Company {
     timezone?: string;
     dateFormat?: string;
     language: string;
+    template?: string;
     taxRate?: number;
     taxName?: string;
     features: {

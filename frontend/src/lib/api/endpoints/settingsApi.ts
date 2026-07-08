@@ -66,6 +66,7 @@ export interface CompanySettings {
   dateFormat: string;
   timeFormat: '12h' | '24h';
   language: string;
+  template?: string;
   theme: 'light' | 'dark' | 'auto';
   notifications: {
     email: boolean;

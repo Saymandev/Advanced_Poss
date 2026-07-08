@@ -11,6 +11,7 @@ import { GalleryModule } from '../gallery/gallery.module';
 import { MenuItemsModule } from '../menu-items/menu-items.module';
 import { OrdersModule } from '../orders/orders.module';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
+import { ReviewsModule } from '../reviews/reviews.module';
 import { RoomsModule } from '../rooms/rooms.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
@@ -43,6 +44,7 @@ import { ContactForm, ContactFormSchema } from './schemas/contact-form.schema';
     forwardRef(() => SubscriptionsModule), // For subscription limit validation
     forwardRef(() => RoomsModule), // For public room browsing
     forwardRef(() => BookingsModule), // For public bookings
+    forwardRef(() => ReviewsModule),
     SettingsModule,
     TablesModule,
   ],

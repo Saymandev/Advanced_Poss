@@ -13,6 +13,7 @@ import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/schemas/order.schema';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SettingsService } from '../settings/settings.service';
+import { ReviewsService } from '../reviews/reviews.service';
 import { SystemFeedbackService } from '../system-feedback/system-feedback.service';
 import { TablesService } from '../tables/tables.service';
 import { UsersService } from '../users/users.service';
@@ -42,6 +43,7 @@ export class PublicService {
     private settingsService: SettingsService,
     private branchesService: BranchesService,
     private tablesService: TablesService,
+    private reviewsService: ReviewsService,
   ) {}
 
   async createOrder(orderData: any) {
@@ -358,6 +360,21 @@ export class PublicService {
       };
     } catch (error: any) {
       throw new BadRequestException(error.message || 'Failed to create order');
+    }
+  }
+
+  async getProductReviews(companyId: string, branchId: string, productId: string) {
+    try {
+      const reviews = await this.reviewsService.getItemReviews(productId, branchId, companyId);
+      return {
+        success: true,
+        data: reviews,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to get product reviews',
+      };
     }
   }
 

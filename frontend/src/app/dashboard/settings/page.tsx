@@ -1559,6 +1559,31 @@ export default function SettingsPage() {
                   disabled={!companyId}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Storefront Template
+                </label>
+                <Select
+                  options={[
+                    { value: 'default', label: 'Default Restaurant Theme' },
+                    { value: 'ecommerce', label: 'Modern E-commerce Theme' },
+                  ]}
+                  value={companySettings?.template || 'ecommerce'}
+                  onChange={async (value) => {
+                    try {
+                      await updateCompanySettings({
+                        companyId,
+                        data: { template: value }
+                      }).unwrap();
+                      toast.success('Storefront template updated successfully');
+                      await refetchCompanySettings();
+                    } catch (error: any) {
+                      toast.error(error.data?.message || 'Failed to update template');
+                    }
+                  }}
+                  disabled={!companyId}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
