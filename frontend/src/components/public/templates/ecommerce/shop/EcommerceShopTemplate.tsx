@@ -7,7 +7,7 @@ import { useGetBranchMenuQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpo
 import { ShoppingCartIcon, MagnifyingGlassIcon, PlusIcon, MinusIcon, XMarkIcon, StarIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { formatCurrency } from '@/lib/utils';
-
+import { decryptData } from '@/lib/utils/crypto';
 import toast from 'react-hot-toast';
 
 interface CartItem {
@@ -139,7 +139,11 @@ export default function EcommerceShopTemplate() {
       const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
-        setProductReviews(Array.isArray(json.data) ? json.data : []);
+        let decryptedData = json.data;
+        if (json.data && json.data.encrypted) {
+          decryptedData = await decryptData(json);
+        }
+        setProductReviews(Array.isArray(decryptedData) ? decryptedData : []);
       } else {
         setProductReviews([]);
       }
