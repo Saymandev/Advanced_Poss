@@ -362,9 +362,24 @@ export class WorkPeriodsService {
       category: TransactionCategory.PURCHASE,
     }).populate('paymentMethodId', 'name code').lean();
 
+    // Exchange transactions bypassed POSPayment and went straight to Transaction
+    const exchangeIncomes = await this.transactionModel.find({
+      workPeriodId: new Types.ObjectId(workPeriodId),
+      category: TransactionCategory.SALE,
+      description: { $regex: /Exchange balance collection/i },
+    }).populate('paymentMethodId', 'name code').lean();
+
+    const exchangeRefunds = await this.transactionModel.find({
+      workPeriodId: new Types.ObjectId(workPeriodId),
+      category: TransactionCategory.REFUND,
+      description: { $regex: /Exchange balance refund/i },
+    }).populate('paymentMethodId', 'name code').lean();
+
     const manualIncomeTotal = manualIncomes.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
     const manualExpenseTotal = manualExpenses.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
     const purchaseTotal = purchases.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
+    const exchangeIncomeTotal = exchangeIncomes.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
+    const exchangeRefundTotal = exchangeRefunds.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
 
     // Add manual incomes to payment method balances
     manualIncomes.forEach((txn: any) => {
@@ -392,6 +407,32 @@ export class WorkPeriodsService {
       totalByPaymentMethod[pmCode] = (totalByPaymentMethod[pmCode] || 0) - amount;
     });
 
+    // Add exchange incomes to payment method balances
+    exchangeIncomes.forEach((txn: any) => {
+      const amount = Number(txn.amount);
+      const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
+      
+      if (!paymentMethods[pmCode]) {
+        paymentMethods[pmCode] = { count: 0, amount: 0 };
+      }
+      paymentMethods[pmCode].count += 1;
+      paymentMethods[pmCode].amount += amount;
+      totalByPaymentMethod[pmCode] = (totalByPaymentMethod[pmCode] || 0) + amount;
+    });
+
+    // Subtract exchange refunds from payment method balances
+    exchangeRefunds.forEach((txn: any) => {
+      const amount = Number(txn.amount);
+      const pmCode = (txn.paymentMethodId as any)?.code || 'cash';
+      
+      if (!paymentMethods[pmCode]) {
+        paymentMethods[pmCode] = { count: 0, amount: 0 };
+      }
+      paymentMethods[pmCode].count += 1;
+      paymentMethods[pmCode].amount -= amount;
+      totalByPaymentMethod[pmCode] = (totalByPaymentMethod[pmCode] || 0) - amount;
+    });
+
     // NOTE: Purchases (inventory restocking) are NOT subtracted from payment method
     // sales balances. They are tracked separately as cost-of-goods. The payment methods
     // breakdown should reflect revenue flow, not net cash position after procurement.
@@ -404,7 +445,7 @@ export class WorkPeriodsService {
 
     const hotelRevenue = hotelTransactions.reduce((sum, trx: any) => sum + Number(trx.amount || 0), 0);
 
-    const totalIncomePool = grossSales + hotelRevenue + manualIncomeTotal;
+    const totalIncomePool = grossSales + hotelRevenue + manualIncomeTotal + exchangeIncomeTotal;
 
     // Format payment methods
     const paymentMethodsArray = Object.entries(paymentMethods).map(([method, data]) => {
@@ -424,11 +465,13 @@ export class WorkPeriodsService {
       manualIncomeTotal,
       manualExpenseTotal,
       purchaseTotal,
+      exchangeIncomeTotal,
+      exchangeRefundTotal,
       // netSales = total revenue minus refunds and operational expenses (NOT purchases)
       // Purchases are inventory/procurement costs shown separately
-      netSales: (grossSales + hotelRevenue + manualIncomeTotal) - (refundTotal + manualExpenseTotal),
+      netSales: (grossSales + hotelRevenue + manualIncomeTotal + exchangeIncomeTotal) - (refundTotal + manualExpenseTotal + exchangeRefundTotal),
       // netProfit includes purchase deductions for full P&L visibility
-      netProfit: (grossSales + hotelRevenue + manualIncomeTotal) - (refundTotal + manualExpenseTotal + purchaseTotal),
+      netProfit: (grossSales + hotelRevenue + manualIncomeTotal + exchangeIncomeTotal) - (refundTotal + manualExpenseTotal + purchaseTotal + exchangeRefundTotal),
       subtotal,
       vatTotal,
       serviceCharge,

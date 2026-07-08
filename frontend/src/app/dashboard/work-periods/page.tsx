@@ -1091,9 +1091,21 @@ export default function WorkPeriodsPage() {
                         </td>
                       </tr>
                       <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Exchange Collections</td>
+                        <td className="px-4 py-2 text-right font-semibold text-green-600 dark:text-green-400">
+                          {isLoadingSalesSummary ? 'Loading...' : `+${formatCurrency(salesSummary?.exchangeIncomeTotal || 0)}`}
+                        </td>
+                      </tr>
+                      <tr>
                         <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Manual Expenses</td>
                         <td className="px-4 py-2 text-right font-semibold text-red-600 dark:text-red-400">
                           {isLoadingSalesSummary ? 'Loading...' : `-${formatCurrency(salesSummary?.manualExpenseTotal || 0)}`}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400">Exchange Refunds</td>
+                        <td className="px-4 py-2 text-right font-semibold text-red-600 dark:text-red-400">
+                          {isLoadingSalesSummary ? 'Loading...' : `-${formatCurrency(salesSummary?.exchangeRefundTotal || 0)}`}
                         </td>
                       </tr>
                       <tr>
