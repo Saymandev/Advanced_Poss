@@ -136,7 +136,7 @@ export default function EcommerceShopTemplate() {
       baseUrl = baseUrl.replace(/\/api\/v1$/, '');
       const url = `${baseUrl}/api/v1/public/companies/${companySlug}/branches/${branchSlug}/products/${productId}/reviews`;
       
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         setProductReviews(Array.isArray(json.data) ? json.data : []);
