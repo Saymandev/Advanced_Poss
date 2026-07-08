@@ -413,6 +413,7 @@ export class ReviewsService {
   async getMenuItemsRatings(menuItemIds: string[], branchId?: string, companyId?: string): Promise<Record<string, { averageRating: number; totalReviews: number }>> {
     const query: any = {
       'itemReviews.menuItemId': { $in: menuItemIds.map(id => new Types.ObjectId(id)) },
+      isPublished: true, // Only include published reviews
     };
 
     if (branchId) {
