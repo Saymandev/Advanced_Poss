@@ -33,7 +33,10 @@ export interface PublicMenuItem {
   name: string;
   description?: string;
   price: number;
+  image?: string;
   images?: string[];
+  averageRating?: number;
+  reviewCount?: number;
   category?: any;
   isAvailable: boolean;
   preparationTime?: number;

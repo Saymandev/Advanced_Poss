@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
-import { useGetCompanyBySlugQuery, useGetCompanyBranchesQuery } from '@/lib/api/endpoints/publicApi';
+import { useGetCompanyBySlugQuery, useGetCompanyBranchesQuery, useGetCompanyGalleryQuery } from '@/lib/api/endpoints/publicApi';
 import Link from 'next/link';
 import { MapPinIcon, ClockIcon, PhoneIcon } from '@heroicons/react/24/outline';
 
@@ -13,6 +13,16 @@ export default function EcommerceLandingTemplate() {
 
   const { data: company, isLoading: companyLoading } = useGetCompanyBySlugQuery(companySlug, { skip: !companySlug });
   const { data: branches = [], isLoading: branchesLoading } = useGetCompanyBranchesQuery(companySlug, { skip: !companySlug });
+  const { data: gallery = [] } = useGetCompanyGalleryQuery(companySlug, { skip: !companySlug });
+  const [currentSlide, setCurrentSlide] = React.useState(0);
+
+  React.useEffect(() => {
+    if (gallery.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % gallery.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [gallery.length]);
 
   if (companyLoading || branchesLoading) {
     return (

@@ -7,7 +7,7 @@ import { useGetBranchMenuQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpo
 import { ShoppingCartIcon, MagnifyingGlassIcon, PlusIcon, MinusIcon, XMarkIcon, StarIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { formatCurrency } from '@/lib/utils';
-import { Modal } from '@/components/ui/Modal';
+
 import toast from 'react-hot-toast';
 
 interface CartItem {
@@ -78,7 +78,7 @@ export default function EcommerceShopTemplate() {
     if (activeCategory !== 'all') {
       items = items.filter((item: any) => {
         const catId = item.categoryId?._id || item.categoryId?.id || item.categoryId;
-        return catId === activeCategory;
+        return String(catId) === String(activeCategory);
       });
     }
 
@@ -105,7 +105,7 @@ export default function EcommerceShopTemplate() {
         name: product.name,
         price: product.price,
         quantity: 1,
-        image: product.image
+        image: (product.images?.[0] || product.image)
       }];
     });
     toast.success(`Added ${product.name} to cart`);
@@ -215,11 +215,11 @@ export default function EcommerceShopTemplate() {
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 px-3">Categories</h3>
             <ul className="space-y-1">
               {categories.map((cat: any) => (
-                <li key={cat.id}>
+                <li key={cat.id || cat._id}>
                   <button
-                    onClick={() => setActiveCategory(cat.id)}
+                    onClick={() => setActiveCategory(cat.id || cat._id)}
                     className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                      activeCategory === cat.id
+                      activeCategory === (cat.id || cat._id)
                         ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white'
                     }`}
@@ -238,9 +238,9 @@ export default function EcommerceShopTemplate() {
             {categories.map((cat: any) => (
               <button
                 key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
+                onClick={() => setActiveCategory(cat.id || cat._id)}
                 className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                  activeCategory === cat.id
+                  activeCategory === (cat.id || cat._id)
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                 }`}
@@ -264,10 +264,10 @@ export default function EcommerceShopTemplate() {
                 <div key={product.id} className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 flex flex-col group">
                   <div 
                     className="aspect-w-4 aspect-h-3 bg-gray-100 dark:bg-gray-700 cursor-pointer overflow-hidden"
-                    onClick={() => openProductDetail(product)}
+                    onClick={() => router.push(`/${companySlug}/${branchSlug}/item/${product.id || product._id}`)}
                   >
-                    {product.image ? (
-                      <img src={product.image} alt={product.name} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+                    {(product.images?.[0] || product.image) ? (
+                      <img src={(product.images?.[0] || product.image)} alt={product.name} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800 group-hover:scale-105 transition-transform duration-500">
                         No Image
@@ -278,7 +278,7 @@ export default function EcommerceShopTemplate() {
                     <div className="flex justify-between items-start mb-2">
                       <h3 
                         className="font-bold text-gray-900 dark:text-white text-lg line-clamp-1 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
-                        onClick={() => openProductDetail(product)}
+                        onClick={() => router.push(`/${companySlug}/${branchSlug}/item/${product.id || product._id}`)}
                       >
                         {product.name}
                       </h3>
@@ -294,9 +294,14 @@ export default function EcommerceShopTemplate() {
                     )}
                     
                     {/* View Details / Reviews Hook */}
-                    <div className="flex items-center gap-1 mb-4 text-xs font-medium text-amber-500 cursor-pointer hover:text-amber-600" onClick={() => openProductDetail(product)}>
-                      <StarIconSolid className="w-4 h-4" />
-                      <span>Reviews & Details</span>
+                    <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => router.push(`/${companySlug}/${branchSlug}/item/${product.id || product._id}`)}>
+                      <div className="flex items-center text-amber-500">
+                        <StarIconSolid className="w-4 h-4" />
+                        <span className="text-sm font-bold ml-1">{product.averageRating ? product.averageRating.toFixed(1) : 'New'}</span>
+                      </div>
+                      <span className="text-xs font-medium text-gray-400 hover:text-indigo-500 transition-colors">
+                        ({product.reviewCount || 0} reviews) • View Details
+                      </span>
                     </div>
 
                     <button
@@ -387,113 +392,7 @@ export default function EcommerceShopTemplate() {
         </div>
       )}
 
-      {/* Product Detail & Review Modal */}
-      <Modal isOpen={!!selectedProduct} onClose={() => setSelectedProduct(null)} size="2xl">
-        {selectedProduct && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row h-full max-h-[85vh]">
-             {/* Left side - Product info & Image */}
-             <div className="md:w-1/2 bg-gray-50 dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 flex flex-col">
-               <div className="w-full h-64 md:h-auto md:flex-1 relative">
-                 {selectedProduct.image ? (
-                   <img src={selectedProduct.image} alt={selectedProduct.name} className="absolute inset-0 w-full h-full object-cover" />
-                 ) : (
-                   <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-800">
-                     No Image Available
-                   </div>
-                 )}
-               </div>
-               <div className="p-6 md:p-8 shrink-0">
-                 <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">{selectedProduct.name}</h2>
-                 <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">
-                   {formatCurrency(selectedProduct.price, company?.settings?.currency)}
-                 </p>
-                 <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-                   {selectedProduct.description || 'No description available for this product.'}
-                 </p>
-                 <button
-                    onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
-                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] flex items-center justify-center gap-2"
-                 >
-                    <PlusIcon className="w-5 h-5" /> Add to Cart
-                 </button>
-               </div>
-             </div>
-
-             {/* Right side - Reviews */}
-             <div className="md:w-1/2 flex flex-col h-full max-h-[50vh] md:max-h-none overflow-y-auto bg-white dark:bg-gray-900 custom-scrollbar">
-                <div className="p-6 md:p-8">
-                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 sticky top-0 bg-white dark:bg-gray-900 py-2 border-b border-gray-100 dark:border-gray-800 z-10 flex items-center gap-2">
-                     <StarIconSolid className="w-6 h-6 text-amber-500" /> Customer Reviews
-                   </h3>
-                   
-                   {reviewsLoading ? (
-                     <div className="flex justify-center items-center h-32">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                     </div>
-                   ) : productReviews.length === 0 ? (
-                     <div className="text-center py-12 px-4">
-                        <StarIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                        <p className="text-gray-500 dark:text-gray-400 font-medium">No reviews yet.</p>
-                        <p className="text-sm text-gray-400 mt-1">Be the first to order and review this product!</p>
-                     </div>
-                   ) : (
-                     <div className="space-y-6 pb-6">
-                        {/* Overall Rating Summary */}
-                        <div className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-4 flex items-center gap-4 mb-8">
-                           <div className="text-4xl font-black text-amber-600 dark:text-amber-500">
-                             {(productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length).toFixed(1)}
-                           </div>
-                           <div>
-                              <div className="flex items-center text-amber-500 mb-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <StarIconSolid key={i} className="w-4 h-4" />
-                                ))}
-                              </div>
-                              <p className="text-sm font-medium text-amber-800 dark:text-amber-600">Based on {productReviews.length} reviews</p>
-                           </div>
-                        </div>
-
-                        {productReviews.map((review, idx) => (
-                           <div key={idx} className="border-b border-gray-100 dark:border-gray-800 last:border-0 pb-6 last:pb-0">
-                              <div className="flex justify-between items-start mb-2">
-                                 <div className="flex items-center gap-2">
-                                    <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-700 dark:text-indigo-400 font-bold text-sm">
-                                      {review.customerName?.charAt(0) || 'U'}
-                                    </div>
-                                    <div>
-                                       <span className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
-                                          {review.customerName || 'Anonymous'}
-                                          <CheckBadgeIcon className="w-4 h-4 text-emerald-500" title="Verified Purchase" />
-                                       </span>
-                                       <div className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</div>
-                                    </div>
-                                 </div>
-                                 <div className="flex text-amber-500">
-                                   {[...Array(5)].map((_, i) => (
-                                     <StarIconSolid key={i} className={`w-4 h-4 ${i < review.rating ? 'text-amber-500' : 'text-gray-200 dark:text-gray-700'}`} />
-                                   ))}
-                                 </div>
-                              </div>
-                              {review.comment && (
-                                <p className="text-gray-600 dark:text-gray-300 text-sm mt-3 leading-relaxed ml-10 italic">
-                                  "{review.comment}"
-                                </p>
-                              )}
-                              {review.response && (
-                                <div className="mt-3 ml-10 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm border border-gray-100 dark:border-gray-800">
-                                  <div className="font-bold text-gray-900 dark:text-white mb-1">Owner Response:</div>
-                                  <div className="text-gray-600 dark:text-gray-400">{review.response}</div>
-                                </div>
-                              )}
-                           </div>
-                        ))}
-                     </div>
-                   )}
-                </div>
-             </div>
-          </div>
-        )}
-      </Modal>
+      
     </div>
   );
 }
