@@ -379,7 +379,7 @@ export class PublicController {
     
     // Verify product belongs to this branch
     const productBranchId = (product as any).branchId?.toString() || (product as any).branchId;
-    if (productBranchId !== branchId) {
+    if (productBranchId && branchId && productBranchId !== branchId) {
       throw new NotFoundException('Product not found in this branch');
     }
     
