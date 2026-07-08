@@ -267,7 +267,7 @@ export default function EcommerceShopTemplate() {
                     onClick={() => router.push(`/${companySlug}/${branchSlug}/item/${product.id || product._id}`)}
                   >
                     {(product.images?.[0] || product.image) ? (
-                      <img src={(product.images?.[0] || product.image)} alt={product.name} className="w-full h-full object-contain bg-white dark:bg-gray-800 group-hover:scale-105 transition-transform duration-500" />
+                      <img src={(product.images?.[0] || product.image)} alt={product.name} className="w-full h-full object-cover bg-white dark:bg-gray-800 group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800 group-hover:scale-105 transition-transform duration-500">
                         No Image

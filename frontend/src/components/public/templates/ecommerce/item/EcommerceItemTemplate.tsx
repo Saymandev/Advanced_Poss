@@ -165,7 +165,7 @@ export default function EcommerceItemTemplate() {
             {/* Product Image Gallery */}
             <div className="md:w-1/2 p-6 lg:p-12 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center min-h-[300px] md:min-h-[400px]">
               {primaryImage ? (
-                <img src={primaryImage} alt={product.name} className="max-w-full h-auto rounded-2xl shadow-xl object-contain max-h-[400px] md:max-h-[500px] w-full" />
+                <img src={primaryImage} alt={product.name} className="w-full h-full object-cover rounded-2xl shadow-xl max-h-[400px] md:max-h-[500px]" />
               ) : (
                 <div className="w-full h-64 md:h-full flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-2xl shadow-inner">
                   No Image Available
