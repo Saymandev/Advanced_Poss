@@ -235,8 +235,8 @@ export default function EcommerceShopTemplate() {
         </aside>
 
         {/* Mobile Categories (Horizontal Scroll) */}
-        <div className="lg:hidden w-full overflow-x-auto pb-4 mb-4 hide-scrollbar -mx-4 px-4 sticky top-20 bg-gray-50 dark:bg-gray-900 z-30 pt-4">
-          <div className="flex gap-2">
+        <div className="lg:hidden w-full overflow-x-auto pb-4 mb-4 hide-scrollbar sticky top-20 bg-gray-50 dark:bg-gray-900 z-30 pt-4">
+          <div className="flex gap-2 px-4 w-max">
             {categories.map((cat: any) => (
               <button
                 key={cat.id}
@@ -250,6 +250,8 @@ export default function EcommerceShopTemplate() {
                 {cat.name}
               </button>
             ))}
+            {/* Spacer for right padding in overflow */}
+            <div className="w-1 flex-shrink-0"></div>
           </div>
         </div>
 
