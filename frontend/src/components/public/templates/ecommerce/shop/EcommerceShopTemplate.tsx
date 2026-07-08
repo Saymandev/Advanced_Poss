@@ -1,10 +1,10 @@
  /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useGetBranchMenuQuery, useGetCompanyBySlugQuery } from '@/lib/api/endpoints/publicApi';
-import { ShoppingCartIcon, MagnifyingGlassIcon, PlusIcon, MinusIcon, XMarkIcon, StarIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
+import { ShoppingCartIcon, MagnifyingGlassIcon, PlusIcon, MinusIcon, XMarkIcon, StarIcon, CheckBadgeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { formatCurrency } from '@/lib/utils';
 import { decryptData } from '@/lib/utils/crypto';
@@ -45,6 +45,31 @@ export default function EcommerceShopTemplate() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [productReviews, setProductReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  // Mobile Category Scroll State
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true); // Default true until checked
+
+  const checkScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth);
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, [menuData?.categories]);
+
+  const scrollBy = (amount: number) => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
 
   // Load cart from local storage
   useEffect(() => {
@@ -235,24 +260,53 @@ export default function EcommerceShopTemplate() {
         </aside>
 
         {/* Mobile Categories (Horizontal Scroll) */}
-        <div className="lg:hidden w-full overflow-x-auto pb-4 mb-4 hide-scrollbar sticky top-20 bg-gray-50 dark:bg-gray-900 z-30 pt-4">
-          <div className="flex gap-2 px-4 w-max">
-            {categories.map((cat: any, index: number) => (
-              <button
-                key={cat.id || cat._id || `cat-${index}`}
-                onClick={() => setActiveCategory(cat.id || cat._id)}
-                className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                  activeCategory === (cat.id || cat._id)
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-                }`}
+        <div className="lg:hidden relative w-full pb-4 mb-4 sticky top-20 bg-gray-50 dark:bg-gray-900 z-30 pt-4">
+          
+          {canScrollLeft && (
+            <div className="absolute left-0 top-4 bottom-4 w-12 bg-gradient-to-r from-gray-50 dark:from-gray-900 to-transparent flex items-center justify-start z-10">
+              <button 
+                onClick={() => scrollBy(-150)}
+                className="w-8 h-8 rounded-full bg-white dark:bg-gray-800 shadow-md border border-gray-100 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-indigo-600 ml-1"
               >
-                {cat.name}
+                <ChevronLeftIcon className="w-4 h-4" />
               </button>
-            ))}
-            {/* Spacer for right padding in overflow */}
-            <div className="w-1 flex-shrink-0"></div>
+            </div>
+          )}
+
+          <div 
+            ref={scrollContainerRef}
+            onScroll={checkScroll}
+            className="w-full overflow-x-auto hide-scrollbar"
+          >
+            <div className="flex gap-2 px-4 w-max">
+              {categories.map((cat: any, index: number) => (
+                <button
+                  key={cat.id || cat._id || `cat-${index}`}
+                  onClick={() => setActiveCategory(cat.id || cat._id)}
+                  className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all ${
+                    activeCategory === (cat.id || cat._id)
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+              {/* Spacer for right padding in overflow */}
+              <div className="w-1 flex-shrink-0"></div>
+            </div>
           </div>
+
+          {canScrollRight && (
+            <div className="absolute right-0 top-4 bottom-4 w-12 bg-gradient-to-l from-gray-50 dark:from-gray-900 to-transparent flex items-center justify-end z-10">
+              <button 
+                onClick={() => scrollBy(150)}
+                className="w-8 h-8 rounded-full bg-white dark:bg-gray-800 shadow-md border border-gray-100 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-indigo-600 mr-1"
+              >
+                <ChevronRightIcon className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Product Grid */}
