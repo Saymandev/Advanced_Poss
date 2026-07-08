@@ -155,7 +155,7 @@ function OrderItemRating({ orderId, menuItemId }: { orderId: string; menuItemId:
 }
 
 // Component to display overall review for an order
-function OrderReview({ orderId }: { orderId: string }) {
+function OrderReview({ orderId, isRetail }: { orderId: string, isRetail?: boolean }) {
   const { data: review } = useGetReviewByOrderQuery(orderId, { skip: !orderId });
   
   if (!review) {
@@ -184,7 +184,7 @@ function OrderReview({ orderId }: { orderId: string }) {
       </div>
       {review.waiterRating && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 dark:text-gray-400">Waiter:</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">{isRetail ? 'Staff:' : 'Waiter:'}</span>
           <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((star) => (
               <StarIcon
@@ -204,7 +204,7 @@ function OrderReview({ orderId }: { orderId: string }) {
       )}
       {review.foodRating && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 dark:text-gray-400">Food:</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">{isRetail ? 'Product:' : 'Food:'}</span>
           <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((star) => (
               <StarIcon
@@ -233,6 +233,7 @@ export default function OrdersPage() {
   const { hasFeature } = useRolePermissions();
   const canAccessPOS = hasFeature('order-management');
   const urlSearch = searchParams.get('search') || '';
+  const isRetail = companyContext?.businessType === 'retail';
   
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
@@ -612,7 +613,7 @@ export default function OrdersPage() {
               <span>${(order.orderType || 'Dine-In').toUpperCase()}</span>
             </div>
             <div class="info-row">
-              <span>Waiter:</span>
+              <span>${isRetail ? 'Staff:' : 'Waiter:'}</span>
               <span>${order.waiterName || 'N/A'}</span>
             </div>
             <div class="info-row">
@@ -1520,7 +1521,7 @@ export default function OrdersPage() {
                   </div>
                   {companyContext?.businessType !== 'retail' && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">Waiter Name:</span>
+                      <span className="text-gray-600 dark:text-gray-400">{isRetail ? 'Staff Name:' : 'Waiter Name:'}</span>
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                           <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -1769,7 +1770,7 @@ export default function OrdersPage() {
                           <OrderItemRating orderId={selectedOrder?.id || ''} menuItemId={item.id} />
                         </td>
                         <td className="py-3 px-4">
-                          <OrderReview orderId={selectedOrder?.id || ''} />
+                          <OrderReview orderId={selectedOrder?.id || ''} isRetail={isRetail} />
                         </td>
                       </tr>
                     ))}

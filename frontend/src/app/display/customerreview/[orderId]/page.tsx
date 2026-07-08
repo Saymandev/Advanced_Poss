@@ -277,13 +277,15 @@ export default function CustomerReviewPage() {
                       ? `${(order as any).userId.firstName} ${(order as any).userId.lastName}` 
                       : (order as any).userId?.firstName) || 
                     'N/A';
+                    
+  const isRetail = order?.companyId?.businessType === 'retail' || order?.orderType === 'retail';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-600 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center text-white">
-          <h1 className="text-4xl font-bold mb-2">🍽️ Review Your Order</h1>
+          <h1 className="text-4xl font-bold mb-2">{isRetail ? '🛍️' : '🍽️'} Review Your Order</h1>
           <p className="text-xl text-primary-100">
             Order #{order.orderNumber}
           </p>
@@ -439,12 +441,12 @@ export default function CustomerReviewPage() {
                 </div>
               </div>
 
-              {/* Waiter Rating */}
+              {/* Waiter Rating / Sales Staff Rating */}
               {waiterName !== 'N/A' && (
                 <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Waiter Service</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{isRetail ? 'Sales Staff / Cashier' : 'Waiter Service'}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         {waiterName}
                       </p>
@@ -457,13 +459,13 @@ export default function CustomerReviewPage() {
                 </div>
               )}
 
-              {/* Food Rating */}
+              {/* Food Rating / Product Quality */}
               <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Food Quality *</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{isRetail ? 'Product Quality *' : 'Food Quality *'}</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      How was the food?
+                      {isRetail ? 'How were the products?' : 'How was the food?'}
                     </p>
                   </div>
                   <StarRating

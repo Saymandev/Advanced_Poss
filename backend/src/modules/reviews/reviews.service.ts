@@ -26,6 +26,7 @@ export class ReviewsService {
       .findById(orderId)
       .populate('userId', 'firstName lastName name email')
       .populate('items.menuItemId', 'name')
+      .populate('companyId', 'businessType')
       .exec();
     
     if (!order) {
