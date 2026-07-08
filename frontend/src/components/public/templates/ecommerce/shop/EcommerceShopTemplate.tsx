@@ -237,9 +237,9 @@ export default function EcommerceShopTemplate() {
         {/* Mobile Categories (Horizontal Scroll) */}
         <div className="lg:hidden w-full overflow-x-auto pb-4 mb-4 hide-scrollbar sticky top-20 bg-gray-50 dark:bg-gray-900 z-30 pt-4">
           <div className="flex gap-2 px-4 w-max">
-            {categories.map((cat: any) => (
+            {categories.map((cat: any, index: number) => (
               <button
-                key={cat.id}
+                key={cat.id || cat._id || `cat-${index}`}
                 onClick={() => setActiveCategory(cat.id || cat._id)}
                 className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all ${
                   activeCategory === (cat.id || cat._id)
