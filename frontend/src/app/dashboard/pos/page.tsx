@@ -4209,10 +4209,10 @@ export default function POSPage() {
       />
       {/* Header */}
       <div className="bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 px-4 py-2 shadow-sm z-30">
-        <div className="flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 overflow-x-auto no-scrollbar">
+        <div className="flex items-start sm:items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-wrap">
             {/* Mode Selection Dropdown */}
-            <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-900 rounded-lg px-2 h-9 border border-gray-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-900 rounded-lg px-2 h-9 border border-gray-200 dark:border-slate-800 shrink-0">
               <ActiveOrderIcon className="h-4 w-4 text-sky-500" />
               <select
                 value={orderType}
@@ -4229,7 +4229,7 @@ export default function POSPage() {
 
             {/* Contextual Selectors */}
             {requiresTable && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <TableCellsIcon className="h-4 w-4 text-slate-400" />
                 <select
                   value={selectedTable}
@@ -4253,7 +4253,7 @@ export default function POSPage() {
             )}
 
             {requiresRoomService && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <HomeModernIcon className="h-4 w-4 text-slate-400" />
                 <select
                   value={roomServiceBookingId}
