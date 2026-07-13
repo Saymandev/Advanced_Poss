@@ -2990,46 +2990,26 @@ export default function POSPage() {
   };
   const renderOrderingWorkspace = () => (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-      {/* Mobile/Tablet Lockdown Banner */}
-      <div className="lg:hidden fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center space-y-6">
-        <div className="w-20 h-20 bg-rose-500/20 rounded-full flex items-center justify-center">
-          <ComputerDesktopIcon className="h-10 w-10 text-rose-500" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black text-white uppercase tracking-tight">Desktop Only Terminal</h2>
-          <p className="text-slate-400 text-sm max-w-xs mx-auto leading-relaxed">
-            This POS interface is optimized for high-speed desktop use only. Please access this terminal from a PC to process orders.
-          </p>
-        </div>
-        <Button 
-          variant="secondary" 
-          onClick={() => window.location.href = '/dashboard'}
-          className="bg-slate-900 border-slate-800 text-slate-300 hover:text-white"
-        >
-          Return to Dashboard
-        </Button>
-      </div>
-
-      <div className="bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 px-4 py-2 z-20">
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5">
+      <div className="bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 px-2 sm:px-4 py-2 z-20">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap overflow-x-auto no-scrollbar py-0.5">
           {/* Search Section */}
-          <div className="flex-[2] min-w-[240px] relative group">
+          <div className="flex-1 min-w-[140px] sm:min-w-[240px] sm:flex-[2] relative group order-1">
             <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" />
             <Input
-              placeholder='Try "Pizza", "Latte" or scan...'
+              placeholder='Search or scan...'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 bg-gray-50 dark:bg-slate-900 border-none rounded-xl text-xs font-bold placeholder:text-slate-500 focus:ring-2 focus:ring-sky-500/20 transition-all"
+              className="pl-9 h-9 sm:h-10 bg-gray-50 dark:bg-slate-900 border-none rounded-xl text-xs font-bold placeholder:text-slate-500 focus:ring-2 focus:ring-sky-500/20 transition-all"
             />
           </div>
 
           {/* Category Section */}
-          <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-900 rounded-xl px-3 h-10 border border-transparent hover:border-gray-200 dark:hover:border-slate-800 transition-all">
-            <UserGroupIcon className="h-4 w-4 text-slate-500" />
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-900 rounded-xl px-2 sm:px-3 h-9 sm:h-10 border border-transparent hover:border-gray-200 dark:hover:border-slate-800 transition-all order-2">
+            <UserGroupIcon className="h-4 w-4 text-slate-500 hidden sm:block" />
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer"
+              className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer max-w-[80px] sm:max-w-none"
             >
               <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">All Items</option>
               {categories.map((cat: any) => (
@@ -3039,13 +3019,13 @@ export default function POSPage() {
           </div>
 
           {/* Reset & Calc */}
-          <div className="flex items-center gap-1.5 border-l border-gray-100 dark:border-slate-900 pl-3">
+          <div className="flex items-center gap-1.5 order-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={resetFilters}
               disabled={selectedCategory === 'all' && !searchQuery}
-              className="h-10 w-10 p-0 rounded-xl bg-gray-50 dark:bg-slate-900 hover:text-rose-500 disabled:opacity-30"
+              className="h-9 sm:h-10 w-9 sm:w-10 p-0 rounded-xl bg-gray-50 dark:bg-slate-900 hover:text-rose-500 disabled:opacity-30"
               title="Reset Filters"
             >
               <FunnelIcon className="h-4 w-4" />
@@ -3054,18 +3034,16 @@ export default function POSPage() {
               variant="ghost"
               size="sm"
               onClick={() => setIsCalculatorOpen(true)}
-              className="h-10 w-10 p-0 rounded-xl bg-gray-50 dark:bg-slate-900 hover:text-sky-500"
+              className="h-9 sm:h-10 w-9 sm:w-10 p-0 rounded-xl bg-gray-50 dark:bg-slate-900 hover:text-sky-500 hidden sm:flex"
               title="Calculator (F5)"
             >
               <CurrencyDollarIcon className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="flex-1" />
-
-          {/* Mode Toggle & Checkout */}
-          <div className="flex items-center gap-2 border-l border-gray-100 dark:border-slate-900 pl-3">
-            <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-900 rounded-xl px-2 h-10 border border-transparent">
+          {/* Mode Toggle & Checkout - moves to end */}
+          <div className="flex items-center gap-2 ml-auto order-4">
+            <div className="hidden sm:flex items-center gap-2 bg-gray-50 dark:bg-slate-900 rounded-xl px-2 h-9 sm:h-10 border border-transparent">
               <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500 hidden xl:inline">
                 {paymentMode === 'pay-first' ? 'Pay First' : 'Pay Later'}
               </span>
@@ -3082,10 +3060,10 @@ export default function POSPage() {
               variant="primary"
               onClick={() => setIsPaymentModalOpen(true)}
                 disabled={checkoutBlocked || (orderType !== 'room-booking' && orderType !== 'room-service' && cart.length === 0)}
-              className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black uppercase tracking-widest gap-2 shadow-lg shadow-emerald-600/10 transition-all active:scale-95 border-none"
+              className="h-9 sm:h-10 px-3 sm:px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black uppercase tracking-widest gap-1.5 sm:gap-2 shadow-lg shadow-emerald-600/10 transition-all active:scale-95 border-none"
             >
               <CreditCardIcon className="h-4 w-4" />
-              Checkout
+              <span className="hidden sm:inline">Checkout</span>
             </Button>
           </div>
         </div>
@@ -3484,22 +3462,28 @@ export default function POSPage() {
       );
     }
     return (
-      <aside className={cn(
-        "flex flex-col h-full bg-white dark:bg-slate-950/95 transition-all duration-300 ease-in-out overflow-hidden shadow-2xl z-40",
-        "fixed inset-y-0 right-0 w-[90%] sm:w-[400px] xl:relative xl:w-[450px] xl:translate-x-0 border-l border-gray-200 dark:border-slate-800",
-        isCartSidebarCollapsed ? "translate-x-full xl:hidden" : "translate-x-0"
-      )}>
-        {/* Add a close button for mobile when expanded */}
-        <div className="xl:hidden absolute top-4 right-4 z-50">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setIsCartSidebarCollapsed(true)}
-            className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800"
-          >
-            <ChevronRightIcon className="h-4 w-4" />
-          </Button>
-        </div>
+      <>
+        {/* Mobile backdrop overlay */}
+        <div
+          className="xl:hidden fixed inset-0 bg-black/50 z-30 transition-opacity duration-300"
+          onClick={() => setIsCartSidebarCollapsed(true)}
+        />
+        <aside className={cn(
+          "flex flex-col h-full bg-white dark:bg-slate-950/95 transition-all duration-300 ease-in-out overflow-hidden shadow-2xl z-40",
+          "fixed inset-y-0 right-0 w-[85%] sm:w-[400px] xl:relative xl:w-[450px] xl:translate-x-0 border-l border-gray-200 dark:border-slate-800",
+          isCartSidebarCollapsed ? "translate-x-full xl:hidden" : "translate-x-0"
+        )}>
+          {/* Add a close button for mobile when expanded */}
+          <div className="xl:hidden absolute top-4 right-4 z-50">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsCartSidebarCollapsed(true)}
+              className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800"
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+            </Button>
+          </div>
         {/* Compact Header & Tab Navigation */}
         <div className="flex items-center gap-1 p-1.5 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 z-10">
           <Button
@@ -4003,6 +3987,7 @@ export default function POSPage() {
           </div>
         </div>
       </aside>
+      </>
     );
   };
 
@@ -4224,8 +4209,8 @@ export default function POSPage() {
       />
       {/* Header */}
       <div className="bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 px-4 py-2 shadow-sm z-30">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 overflow-x-auto no-scrollbar">
             {/* Mode Selection Dropdown */}
             <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-900 rounded-lg px-2 h-9 border border-gray-200 dark:border-slate-800">
               <ActiveOrderIcon className="h-4 w-4 text-sky-500" />
@@ -4298,26 +4283,26 @@ export default function POSPage() {
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             <Button
               size="sm"
               variant={isQueueModalOpen ? 'primary' : 'secondary'}
               onClick={() => setIsQueueModalOpen(true)}
-              className="h-9 gap-2 text-[10px] font-black uppercase tracking-widest px-4 rounded-lg border-none bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 whitespace-nowrap"
+              className="h-9 gap-1.5 sm:gap-2 text-[10px] font-black uppercase tracking-widest px-2 sm:px-4 rounded-lg border-none bg-sky-500/10 text-sky-500 hover:bg-sky-500/20 whitespace-nowrap"
             >
               <ClipboardDocumentListIcon className="h-4 w-4" />
-              Orders ({shortcuts.toggleQueue})
+              <span className="hidden sm:inline">Orders ({shortcuts.toggleQueue})</span>
             </Button>
 
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setShowKeyboardShortcuts(true)}
-              className="h-9 w-auto px-3 gap-1.5 rounded-lg bg-gray-50 dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500"
+              className="h-9 w-9 sm:w-auto px-0 sm:px-3 gap-1.5 rounded-lg bg-gray-50 dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500 hidden sm:flex"
               title="Keyboard Shortcuts (Ctrl+/)"
             >
               <span className="text-sm">⌨</span>
-              Shortcuts
+              <span className="hidden md:inline">Shortcuts</span>
             </Button>
 
             <Button
@@ -4325,12 +4310,12 @@ export default function POSPage() {
               variant="secondary"
               onClick={() => setIsCartSidebarCollapsed(false)}
               className={cn(
-                "h-9 px-4 gap-2 text-[10px] font-black uppercase tracking-widest rounded-lg border-none bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-all",
-                !isCartSidebarCollapsed && "hidden"
+                "h-9 px-2 sm:px-4 gap-1.5 sm:gap-2 text-[10px] font-black uppercase tracking-widest rounded-lg border-none bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-all",
+                !isCartSidebarCollapsed && "hidden xl:hidden"
               )}
             >
               <ShoppingCartIcon className="h-4 w-4" />
-              Cart ({cart.length})
+              <span className="hidden sm:inline">Cart</span> ({cart.length})
             </Button>
 
             <Button
@@ -4368,6 +4353,21 @@ export default function POSPage() {
         </div>
         {renderCartSidebar()}
       </div>
+
+      {/* Mobile floating cart button */}
+      {isOrderingActive && isCartSidebarCollapsed && (
+        <button
+          onClick={() => setIsCartSidebarCollapsed(false)}
+          className="xl:hidden fixed bottom-4 right-4 z-50 bg-emerald-600 text-white rounded-full w-14 h-14 shadow-lg shadow-emerald-900/30 flex items-center justify-center hover:bg-emerald-500 active:scale-95 transition-all"
+        >
+          <ShoppingCartIcon className="h-6 w-6" />
+          {cart.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center">
+              {cart.length}
+            </span>
+          )}
+        </button>
+      )}
       {renderQueueModal()}
       {/* Order Cart Modal */}
       {/* Refund Modal */}
