@@ -8,6 +8,7 @@ import { SubscriptionFeatureGuard } from '../../common/guards/subscription-featu
 import { CreateDigitalReceiptDto } from './dto/create-digital-receipt.dto';
 import { DigitalReceiptFilterDto } from './dto/digital-receipt-filter.dto';
 import { EmailDigitalReceiptDto } from './dto/email-digital-receipt.dto';
+import { SmsDigitalReceiptDto } from './dto/sms-digital-receipt.dto';
 import { DigitalReceiptsService } from './digital-receipts.service';
 
 @ApiTags('Digital Receipts')
@@ -53,6 +54,15 @@ export class DigitalReceiptsController {
     @Body() emailDto: EmailDigitalReceiptDto,
   ) {
     return this.digitalReceiptsService.emailReceipt(id, emailDto);
+  }
+
+  @Post(':id/sms')
+  @ApiOperation({ summary: 'SMS a digital receipt to a customer' })
+  async smsReceipt(
+    @Param('id') id: string,
+    @Body() smsDto: SmsDigitalReceiptDto,
+  ) {
+    return this.digitalReceiptsService.smsReceipt(id, smsDto);
   }
 }
 

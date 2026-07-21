@@ -31,6 +31,9 @@ export class DigitalReceipt {
   @Prop()
   customerEmail?: string;
 
+  @Prop()
+  customerPhone?: string;
+
   @Prop({ required: true, type: Types.ObjectId, ref: 'Branch' })
   branchId: Types.ObjectId;
 
@@ -72,9 +75,30 @@ export class DigitalReceipt {
 
   @Prop()
   emailedTo?: string;
+
+  @Prop({ default: false })
+  smsed: boolean;
+
+  @Prop()
+  smsedAt?: Date;
+
+  @Prop()
+  smsedTo?: string;
 }
 
 export const DigitalReceiptSchema = SchemaFactory.createForClass(DigitalReceipt);
+
+// Remove MongoDB internal fields when converting to JSON
+DigitalReceiptSchema.set('toJSON', {
+  virtuals: true,
+  transform: (_, ret) => {
+    const result = ret as any;
+    result.id = result._id;
+    delete result._id;
+    delete result.__v;
+    return result;
+  },
+});
 
 // Indexes
 DigitalReceiptSchema.index({ receiptNumber: 1 });

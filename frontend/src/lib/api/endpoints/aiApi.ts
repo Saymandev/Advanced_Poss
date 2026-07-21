@@ -100,6 +100,7 @@ export interface DigitalReceipt {
   orderId: string;
   customerId?: string;
   customerEmail?: string;
+  customerPhone?: string;
   receiptNumber: string;
   items: Array<{
     name: string;
@@ -120,6 +121,8 @@ export interface DigitalReceipt {
     code: string;
     expiryDate: string;
   }>;
+  emailed?: boolean;
+  smsed?: boolean;
   createdAt: string;
 }
 
@@ -360,6 +363,14 @@ export const aiApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['DigitalReceipt'],
     }),
+    smsDigitalReceipt: builder.mutation<{ success: boolean; messageId?: string }, { receiptId: string; phone: string }>({
+      query: ({ receiptId, phone }) => ({
+        url: `/digital-receipts/${receiptId}/sms`,
+        method: 'POST',
+        body: { phone },
+      }),
+      invalidatesTags: ['DigitalReceipt'],
+    }),
 
     // Delivery Integration
     getDeliveryIntegrations: builder.query<DeliveryIntegration[], { branchId?: string }>({
@@ -413,6 +424,7 @@ export const {
   useGenerateDigitalReceiptMutation,
   useGetDigitalReceiptsQuery,
   useEmailDigitalReceiptMutation,
+  useSmsDigitalReceiptMutation,
   useGetDeliveryIntegrationsQuery,
   useCreateDeliveryIntegrationMutation,
   useUpdateDeliveryIntegrationMutation,

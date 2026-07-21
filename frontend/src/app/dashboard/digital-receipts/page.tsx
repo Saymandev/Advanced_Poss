@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useFeatureRedirect } from '@/hooks/useFeatureRedirect';
-import { DigitalReceipt, useEmailDigitalReceiptMutation, useGenerateDigitalReceiptMutation, useGetDigitalReceiptsQuery } from '@/lib/api/endpoints/aiApi';
+import { DigitalReceipt, useEmailDigitalReceiptMutation, useGenerateDigitalReceiptMutation, useGetDigitalReceiptsQuery, useSmsDigitalReceiptMutation } from '@/lib/api/endpoints/aiApi';
 import { useGetPOSOrdersQuery } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -20,6 +20,7 @@ import {
     ReceiptRefundIcon,
     ShoppingCartIcon,
     UserIcon,
+    DevicePhoneMobileIcon,
 } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -31,6 +32,7 @@ export default function DigitalReceiptsPage() {
   useFeatureRedirect('digital-receipts');
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<DigitalReceipt | null>(null);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +50,7 @@ export default function DigitalReceiptsPage() {
   const [formErrors, setFormErrors] = useState<{
     generate?: { orderId?: string; customerEmail?: string };
     email?: { email?: string };
+    sms?: { phone?: string };
   }>({});
 
   // Query parameters
@@ -79,9 +82,14 @@ export default function DigitalReceiptsPage() {
 
   const [generateReceipt, { isLoading: isGenerating }] = useGenerateDigitalReceiptMutation();
   const [emailReceipt, { isLoading: isEmailing }] = useEmailDigitalReceiptMutation();
+  const [smsReceipt, { isLoading: isSmsing }] = useSmsDigitalReceiptMutation();
 
   const [emailForm, setEmailForm] = useState({
     email: '',
+  });
+
+  const [smsForm, setSmsForm] = useState({
+    phone: '',
   });
 
   const [generateForm, setGenerateForm] = useState({
@@ -92,6 +100,11 @@ export default function DigitalReceiptsPage() {
   const resetEmailForm = () => {
     setEmailForm({ email: '' });
     setFormErrors(prev => ({ ...prev, email: {} }));
+  };
+
+  const resetSmsForm = () => {
+    setSmsForm({ phone: '' });
+    setFormErrors(prev => ({ ...prev, sms: {} }));
   };
 
   const resetGenerateForm = () => {
@@ -130,6 +143,19 @@ export default function DigitalReceiptsPage() {
     }
 
     setFormErrors(prev => ({ ...prev, email: errors }));
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateSmsForm = (): boolean => {
+    const errors: { phone?: string } = {};
+
+    if (!smsForm.phone.trim()) {
+      errors.phone = 'Phone number is required';
+    } else if (smsForm.phone.replace(/[^0-9+]/g, '').length < 10) {
+      errors.phone = 'Please enter a valid phone number';
+    }
+
+    setFormErrors(prev => ({ ...prev, sms: errors }));
     return Object.keys(errors).length === 0;
   };
 
@@ -236,6 +262,47 @@ export default function DigitalReceiptsPage() {
     }
   };
 
+  const handleSmsReceipt = async () => {
+    if (!selectedReceipt) {
+      toast.error('No receipt selected');
+      return;
+    }
+
+    if (!validateSmsForm()) {
+      const firstError = Object.values(formErrors.sms || {})[0];
+      if (firstError) {
+        toast.error(firstError);
+      }
+      return;
+    }
+
+    try {
+      await smsReceipt({
+        receiptId: selectedReceipt.id,
+        phone: smsForm.phone.trim(),
+      }).unwrap();
+
+      toast.success('Receipt sent via SMS successfully');
+      setIsSmsModalOpen(false);
+      resetSmsForm();
+      setSelectedReceipt(null);
+      setTimeout(() => {
+        refetch();
+      }, 500);
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || error?.message || 'Failed to send receipt SMS';
+      toast.error(errorMessage);
+
+      // Set field-specific errors if available
+      if (error?.data?.errors) {
+        setFormErrors(prev => ({
+          ...prev,
+          sms: error.data.errors,
+        }));
+      }
+    }
+  };
+
   const openViewModal = (receipt: DigitalReceipt) => {
     setSelectedReceipt(receipt);
     setIsViewModalOpen(true);
@@ -245,6 +312,12 @@ export default function DigitalReceiptsPage() {
     setSelectedReceipt(receipt);
     setEmailForm({ email: receipt.customerEmail || '' });
     setIsEmailModalOpen(true);
+  };
+
+  const openSmsModal = (receipt: DigitalReceipt) => {
+    setSelectedReceipt(receipt);
+    setSmsForm({ phone: receipt.customerPhone || '' });
+    setIsSmsModalOpen(true);
   };
 
   const getPaymentMethodBadge = (method: string) => {
@@ -364,6 +437,15 @@ export default function DigitalReceiptsPage() {
           >
             <EnvelopeIcon className="w-4 h-4" />
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openSmsModal(row)}
+            className="text-emerald-600 hover:text-emerald-700"
+            title="SMS Receipt"
+          >
+            <DevicePhoneMobileIcon className="w-4 h-4" />
+          </Button>
         </div>
       ),
     },
@@ -402,7 +484,7 @@ export default function DigitalReceiptsPage() {
       </head>
       <body>
         <div class="header">
-          <h2>RESTOGO Management System</h2>
+          <h2>${(companyContext as any)?.name || 'Restaurant Management System'}</h2>
           <p>Receipt #${receipt.receiptNumber}</p>
           <p>${formatDateTime(receipt.createdAt)}</p>
         </div>
@@ -849,6 +931,60 @@ export default function DigitalReceiptsPage() {
             </Button>
             <Button onClick={handleEmailReceipt} disabled={isEmailing} className="w-full sm:w-auto text-sm sm:text-base">
               {isEmailing ? 'Sending...' : 'Send Email'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* SMS Receipt Modal */}
+      <Modal
+        isOpen={isSmsModalOpen}
+        onClose={() => {
+          setIsSmsModalOpen(false);
+          resetSmsForm();
+          setSelectedReceipt(null);
+        }}
+        title="SMS Digital Receipt"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Send receipt <span className="font-semibold">{selectedReceipt?.receiptNumber}</span> via SMS to the customer.
+          </p>
+
+          <Input
+            label="Phone Number *"
+            type="tel"
+            value={smsForm.phone}
+            onChange={(e) => {
+              setSmsForm({ ...smsForm, phone: e.target.value });
+              if (formErrors.sms?.phone) {
+                setFormErrors(prev => ({
+                  ...prev,
+                  sms: { ...prev.sms, phone: undefined },
+                }));
+              }
+            }}
+            placeholder="e.g. +8801XXXXXXXXX"
+            required
+            error={formErrors.sms?.phone}
+          />
+
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsSmsModalOpen(false);
+                resetSmsForm();
+                setSelectedReceipt(null);
+              }}
+              disabled={isSmsing}
+              className="w-full sm:w-auto text-sm sm:text-base"
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSmsReceipt} disabled={isSmsing} className="w-full sm:w-auto text-sm sm:text-base">
+              {isSmsing ? 'Sending...' : 'Send SMS'}
             </Button>
           </div>
         </div>

@@ -153,7 +153,7 @@ export class SmsService {
 
         const data = await response.json().catch(() => ({}));
         const status = data?.response_code || data?.status || response.status;
-        if (status === 200 || status === '200' || status === 'SUCCESS' || data?.success) {
+        if (status === 200 || status === '200' || status === 202 || status === '202' || status === 'SUCCESS' || data?.success) {
           this.logger.log(`SMS sent successfully to ${cleanedNumber} via bulksmsbd`);
           return true;
         }

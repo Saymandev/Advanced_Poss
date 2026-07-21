@@ -2,12 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EmailService } from '../../common/services/email.service';
+import { SmsService } from '../../common/services/sms.service';
 import { CustomersService } from '../customers/customers.service';
 import { ReceiptService } from '../pos/receipt.service';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
 import { CreateDigitalReceiptDto } from './dto/create-digital-receipt.dto';
 import { DigitalReceiptFilterDto } from './dto/digital-receipt-filter.dto';
 import { EmailDigitalReceiptDto } from './dto/email-digital-receipt.dto';
+import { SmsDigitalReceiptDto } from './dto/sms-digital-receipt.dto';
 import { DigitalReceipt, DigitalReceiptDocument } from './schemas/digital-receipt.schema';
 
 @Injectable()
@@ -20,6 +22,7 @@ export class DigitalReceiptsService {
     private receiptService: ReceiptService,
     private customersService: CustomersService,
     private emailService: EmailService,
+    private smsService: SmsService,
   ) {}
 
   async generateReceiptNumber(branchId: string): Promise<string> {
@@ -113,12 +116,16 @@ export class DigitalReceiptsService {
     // Get customer info
     let customerId: Types.ObjectId | undefined;
     const customerEmail = createDto.customerEmail || order.customerInfo?.email;
+    let customerPhone = order.customerInfo?.phone;
 
-    if (customerEmail) {
+    if (customerEmail || customerPhone) {
       try {
-        const customer = await this.customersService.findByEmail(companyId, customerEmail);
+        const customer = await this.customersService.findByEmail(companyId, customerEmail || '');
         if (customer) {
           customerId = (customer as any)._id || (customer as any).id;
+          if (!customerPhone && (customer as any).phone) {
+            customerPhone = (customer as any).phone;
+          }
         }
       } catch (error) {
         // Customer not found, continue without customerId
@@ -147,6 +154,7 @@ export class DigitalReceiptsService {
       orderId: new Types.ObjectId(createDto.orderId),
       customerId: customerId ? new Types.ObjectId(customerId) : undefined,
       customerEmail,
+      customerPhone,
       branchId: new Types.ObjectId(branchId),
       companyId: new Types.ObjectId(companyId),
       items: receiptItems,
@@ -254,6 +262,50 @@ export class DigitalReceiptsService {
       return {
         success: false,
         message: `Failed to send receipt email. Please check email configuration.`,
+      };
+    }
+  }
+
+  async smsReceipt(
+    receiptId: string,
+    smsDto: SmsDigitalReceiptDto,
+  ): Promise<{ success: boolean; message?: string }> {
+    const receipt = await this.digitalReceiptModel.findById(receiptId).exec();
+
+    if (!receipt) {
+      throw new NotFoundException('Digital receipt not found');
+    }
+
+    // Format SMS message
+    const orderDate = new Date((receipt as any).createdAt).toLocaleDateString('en-GB');
+    const message = `Raha POS Receipt
+Order #${receipt.receiptNumber}
+Items: ${receipt.items.length}
+Total: ৳${receipt.total.toFixed(2)}
+Date: ${orderDate}
+Thank you for your visit!`;
+
+    // Send SMS
+    const smsSent = await this.smsService.sendSms(
+      smsDto.phone,
+      message,
+    );
+
+    // Mark as smsed regardless of success (to track attempts)
+    receipt.smsed = smsSent;
+    receipt.smsedAt = new Date();
+    receipt.smsedTo = smsDto.phone;
+    await receipt.save();
+
+    if (smsSent) {
+      return {
+        success: true,
+        message: `Receipt sent successfully via SMS to ${smsDto.phone}`,
+      };
+    } else {
+      return {
+        success: false,
+        message: `Failed to send receipt SMS. Please check SMS configuration.`,
       };
     }
   }
