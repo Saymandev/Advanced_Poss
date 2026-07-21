@@ -360,7 +360,7 @@ export class AuthController {
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset' })
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(forgotPasswordDto.email);
+    return this.authService.forgotPassword(forgotPasswordDto.email, forgotPasswordDto.method);
   }
 
   @Public()

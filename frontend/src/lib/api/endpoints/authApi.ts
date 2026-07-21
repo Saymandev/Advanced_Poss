@@ -135,6 +135,16 @@ export interface CompanyOwnerRegisterRequest {
   pin: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+  method?: 'email' | 'sms';
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     findCompany: builder.mutation<FindCompanyResponse, FindCompanyRequest>({
@@ -261,6 +271,20 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'GET',
       }),
     }),
+    forgotPassword: builder.mutation<{ message: string }, ForgotPasswordRequest>({
+      query: (data) => ({
+        url: '/auth/forgot-password',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    resetPassword: builder.mutation<{ message: string }, ResetPasswordRequest>({
+      query: (data) => ({
+        url: '/auth/reset-password',
+        method: 'POST',
+        body: data,
+      }),
+    }),
   }),
 });
 
@@ -277,5 +301,7 @@ export const {
   useDisable2FAMutation,
   useVerifyPinMutation,
   useVerifyEmailMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
 } = authApi;
 

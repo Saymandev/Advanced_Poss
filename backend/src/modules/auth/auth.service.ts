@@ -11,6 +11,7 @@ import { Types } from 'mongoose';
 import * as crypto from 'crypto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { EmailService } from '../../common/services/email.service';
+import { SmsService } from '../../common/services/sms.service';
 import { GeneratorUtil } from '../../common/utils/generator.util';
 import { PasswordUtil } from '../../common/utils/password.util';
 import { BranchesService } from '../branches/branches.service';
@@ -47,6 +48,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    private smsService: SmsService,
     private twoFactorService: TwoFactorService,
     private superAdminNotificationsService: SuperAdminNotificationsService,
     private rolePermissionsService: RolePermissionsService,
@@ -765,15 +767,16 @@ export class AuthService {
     return { message: 'Email verified successfully' };
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(email: string, method: 'email' | 'sms' = 'email') {
     const user = await this.usersService.findByEmail(email);
 
     if (!user) {
       // Don't reveal if email exists
-      return { message: 'If the email exists, a reset link has been sent' };
+      return { message: `If the email exists, a reset code has been sent via ${method}` };
     }
 
-    const resetToken = GeneratorUtil.generateToken();
+    // Generate a 6-digit OTP code for both Email and SMS (easier to type)
+    const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
     const resetExpires = new Date(Date.now() + 3600000); // 1 hour
 
     await this.usersService.update(user.id, {
@@ -781,19 +784,42 @@ export class AuthService {
       resetPasswordExpires: resetExpires,
     } as any);
 
-    // Send reset email
-    const resetUrl = `${process.env.FRONTEND_URL || ''}/auth/reset-password?token=${resetToken}`;
-    const html = `
-      <h2>Password Reset Request</h2>
-      <p>You requested a password reset. Click the link below to set a new password:</p>
-      <p><a href="${resetUrl}">${resetUrl}</a></p>
-      <p>This link expires in 1 hour.</p>
-      <p>If you did not request this, please ignore this email.</p>
-    `;
-    await this.emailService.sendEmail(user.email, 'Reset Your Password', html);
+    if (method === 'sms') {
+      if (!user.phone) {
+        throw new BadRequestException('No phone number registered with this account.');
+      }
+      
+      const message = `Raha POS: Your password reset code is ${resetToken}. This code expires in 1 hour.`;
+      
+      try {
+        await this.smsService.sendSms(user.phone, message);
+        this.logger.log(`Password reset SMS sent to ${user.phone}`);
+      } catch (error) {
+        this.logger.error(`Failed to send reset SMS to ${user.phone}: ${error?.message || error}`);
+        throw new BadRequestException('Failed to send SMS. Please try again or use email.');
+      }
+    } else {
+      // Send reset email
+      const resetUrl = `${process.env.FRONTEND_URL || ''}/auth/reset-password?token=${resetToken}`;
+      const html = `
+        <h2>Password Reset Request</h2>
+        <p>You requested a password reset. Your 6-digit reset code is:</p>
+        <h3 style="background-color: #f4f4f4; padding: 10px; display: inline-block; letter-spacing: 2px;">${resetToken}</h3>
+        <p>You can also click the link below to set a new password:</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>This code and link expire in 1 hour.</p>
+        <p>If you did not request this, please ignore this email.</p>
+      `;
+      try {
+        await this.emailService.sendEmail(user.email, 'Reset Your Password - Raha POS', html);
+        this.logger.log(`Password reset email sent to ${user.email}`);
+      } catch (error) {
+        this.logger.error(`Failed to send reset email to ${user.email}: ${error?.message || error}`);
+      }
+    }
 
     return {
-      message: 'If the email exists, a reset link has been sent',
+      message: `If the email exists, a reset code has been sent via ${method}`,
     };
   }
 

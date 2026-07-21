@@ -4,12 +4,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { EmailService } from '../../common/services/email.service';
+import { SmsService } from '../../common/services/sms.service';
 import { BranchesModule } from '../branches/branches.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { LoginActivityModule } from '../login-activity/login-activity.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RolePermissionsModule } from '../role-permissions/role-permissions.module';
 import { SettingsModule } from '../settings/settings.module';
+import { SystemSettings, SystemSettingsSchema } from '../settings/schemas/system-settings.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../subscriptions/schemas/subscription-plan.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
@@ -35,6 +37,7 @@ import { TwoFactorService } from './two-factor.service';
     PassportModule,
     MongooseModule.forFeature([
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
+      { name: SystemSettings.name, schema: SystemSettingsSchema },
     ]),
     RolePermissionsModule,
     JwtModule.registerAsync({
@@ -49,7 +52,7 @@ import { TwoFactorService } from './two-factor.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, TwoFactorService, JwtStrategy, LocalStrategy, EmailService],
+  providers: [AuthService, TwoFactorService, JwtStrategy, LocalStrategy, EmailService, SmsService],
   exports: [AuthService, TwoFactorService],
 })
 export class AuthModule { }

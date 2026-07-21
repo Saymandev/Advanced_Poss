@@ -185,7 +185,13 @@ export default function LoginPage() {
 
            
 
-            <div className="text-center  border-gray-700/50">
+            <div className="text-center  border-gray-700/50 space-y-3">
+              <p className="text-gray-400 text-sm">
+                Forgot your password?{' '}
+                <Link href="/auth/forgot-password" className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
+                  Reset it here
+                </Link>
+              </p>
               <p className="text-gray-400 text-sm">
                 Don't have an account?{' '}
                 <Link href="/auth/register" className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
