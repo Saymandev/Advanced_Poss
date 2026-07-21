@@ -6,13 +6,9 @@ export class ResetPasswordDto {
   @IsString()
   token: string;
 
-  @ApiProperty({ example: 'NewSecurePass123!' })
+  @ApiProperty({ example: '1234 or NewSecurePass123!' })
   @IsString()
-  @MinLength(8)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
-    message:
-      'Password must contain uppercase, lowercase, number and special character',
-  })
+  @MinLength(4, { message: 'Password or PIN must be at least 4 characters long' })
   newPassword: string;
 }
 
