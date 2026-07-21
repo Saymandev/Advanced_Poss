@@ -800,7 +800,7 @@ export class AuthService {
       }
     } else {
       // Send reset email
-      const frontendUrl = process.env.FRONTEND_URL || (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',')[0] : 'https://pos.liberalit.net');
+      const frontendUrl = process.env.FRONTEND_URL || (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',')[0] : 'https://raha.bd');
       const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
       const html = `
         <h2>Password Reset Request</h2>

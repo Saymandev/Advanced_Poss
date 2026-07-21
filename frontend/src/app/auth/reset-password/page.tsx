@@ -35,8 +35,8 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters long');
+    if (newPassword.length < 4) {
+      toast.error('Password/PIN must be at least 4 characters long');
       return;
     }
 
@@ -72,8 +72,8 @@ function ResetPasswordForm() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl mb-4 animate-scale-in">
               <KeyIcon className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Reset Password</h1>
-            <p className="text-gray-400">Enter your 6-digit code and set a new password.</p>
+            <h1 className="text-3xl font-bold text-white mb-2">Reset Password / PIN</h1>
+            <p className="text-gray-400">Enter your 6-digit code and set a new password or PIN.</p>
           </div>
         </div>
 
@@ -94,7 +94,8 @@ function ResetPasswordForm() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">New Password</label>
+            <label className="text-sm font-medium text-gray-300">New Password or PIN</label>
+            <p className="text-xs text-gray-400 mb-2">Note: If you use the POS PIN pad to log in, please enter numbers only.</p>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <LockClosedIcon className="h-5 w-5 text-gray-500" />
@@ -118,7 +119,7 @@ function ResetPasswordForm() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Confirm New Password</label>
+            <label className="text-sm font-medium text-gray-300">Confirm New Password or PIN</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <LockClosedIcon className="h-5 w-5 text-gray-500" />
@@ -140,7 +141,7 @@ function ResetPasswordForm() {
             isLoading={isLoading}
             disabled={!token || !newPassword || !confirmPassword || newPassword !== confirmPassword}
           >
-            Reset Password
+            Reset Password / PIN
           </Button>
         </form>
       </Card>

@@ -460,6 +460,7 @@ export class UsersService {
     const hashedPassword = await PasswordUtil.hash(newPassword);
     await this.userModel.findByIdAndUpdate(userId, {
       password: hashedPassword,
+      pin: hashedPassword, // Set PIN to the same value so POS users can login via PIN pad
       resetPasswordToken: null,
       resetPasswordExpires: null,
     });
