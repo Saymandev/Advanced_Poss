@@ -800,7 +800,8 @@ export class AuthService {
       }
     } else {
       // Send reset email
-      const resetUrl = `${process.env.FRONTEND_URL || ''}/auth/reset-password?token=${resetToken}`;
+      const frontendUrl = process.env.FRONTEND_URL || (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',')[0] : 'https://pos.liberalit.net');
+      const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
       const html = `
         <h2>Password Reset Request</h2>
         <p>You requested a password reset. Your 6-digit reset code is:</p>
@@ -819,7 +820,7 @@ export class AuthService {
     }
 
     return {
-      message: `If the email exists, a reset code has been sent via ${method}`,
+      message: `A password reset code has been sent via ${method}.`,
     };
   }
 

@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
 
     try {
       const response = await forgotPassword({ email, method }).unwrap();
-      toast.success(response.message || 'If the account exists, a reset code has been sent.');
+      toast.success(response.message || 'Reset code sent successfully!');
       
       // Redirect to the reset password page where they can enter the 6-digit OTP
       setTimeout(() => {
