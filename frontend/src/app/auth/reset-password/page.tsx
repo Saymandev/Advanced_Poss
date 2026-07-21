@@ -7,10 +7,10 @@ import { useResetPasswordMutation } from '@/lib/api/endpoints/authApi';
 import { LockClosedIcon, KeyIcon, ArrowLeftIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tokenFromUrl = searchParams.get('token');
@@ -59,6 +59,97 @@ export default function ResetPasswordPage() {
   };
 
   return (
+    <div className="w-full max-w-md relative z-10">
+      <Link href="/auth/forgot-password" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors group">
+        <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        <span>Back</span>
+      </Link>
+
+      <Card className="backdrop-blur-xl bg-gray-800/50 border border-gray-700/50 shadow-2xl overflow-hidden">
+        <div className="relative p-8 pb-0">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500"></div>
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl mb-4 animate-scale-in">
+              <KeyIcon className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Reset Password</h1>
+            <p className="text-gray-400">Enter your 6-digit code and set a new password.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-300">6-Digit Reset Code</label>
+            <div className="relative">
+              <Input
+                type="text"
+                value={token}
+                onChange={(e) => setToken(e.target.value.replace(/\\s+/g, ''))}
+                placeholder="123456"
+                className="h-14 text-center text-2xl tracking-widest bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-600 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all font-mono font-bold"
+                maxLength={6}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-300">New Password</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <LockClosedIcon className="h-5 w-5 text-gray-500" />
+              </div>
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                className="pl-11 pr-11 h-12 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white transition-colors"
+              >
+                {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-300">Confirm New Password</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <LockClosedIcon className="h-5 w-5 text-gray-500" />
+              </div>
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="pl-11 h-12 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+                required
+              />
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 shadow-lg hover:shadow-xl hover:shadow-primary-500/50 transition-all duration-300 hover:scale-[1.02]"
+            isLoading={isLoading}
+            disabled={!token || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+          >
+            Reset Password
+          </Button>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Image & Effects matching login page */}
       <div
@@ -73,92 +164,9 @@ export default function ResetPasswordPage() {
       <div className="absolute top-20 left-20 w-72 h-72 bg-primary-500/10 rounded-full blur-3xl animate-bounce-slow"></div>
       <div className="absolute bottom-20 right-20 w-96 h-96 bg-secondary-500/10 rounded-full blur-3xl animate-bounce-slow" style={{ animationDelay: '2s' }}></div>
 
-      <div className="w-full max-w-md relative z-10">
-        <Link href="/auth/forgot-password" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors group">
-          <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span>Back</span>
-        </Link>
-
-        <Card className="backdrop-blur-xl bg-gray-800/50 border border-gray-700/50 shadow-2xl overflow-hidden">
-          <div className="relative p-8 pb-0">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500"></div>
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl mb-4 animate-scale-in">
-                <KeyIcon className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-2">Reset Password</h1>
-              <p className="text-gray-400">Enter your 6-digit code and set a new password.</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">6-Digit Reset Code</label>
-              <div className="relative">
-                <Input
-                  type="text"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value.replace(/\s+/g, ''))}
-                  placeholder="123456"
-                  className="h-14 text-center text-2xl tracking-widest bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-600 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all font-mono font-bold"
-                  maxLength={6}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">New Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <LockClosedIcon className="h-5 w-5 text-gray-500" />
-                </div>
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-11 pr-11 h-12 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white transition-colors"
-                >
-                  {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Confirm New Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <LockClosedIcon className="h-5 w-5 text-gray-500" />
-                </div>
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-11 h-12 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 shadow-lg hover:shadow-xl hover:shadow-primary-500/50 transition-all duration-300 hover:scale-[1.02]"
-              isLoading={isLoading}
-              disabled={!token || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-            >
-              Reset Password
-            </Button>
-          </form>
-        </Card>
-      </div>
+      <Suspense fallback={<div className="text-white z-10">Loading...</div>}>
+        <ResetPasswordForm />
+      </Suspense>
     </div>
   );
 }
