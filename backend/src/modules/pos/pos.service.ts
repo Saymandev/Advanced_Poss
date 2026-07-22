@@ -399,44 +399,51 @@ export class POSService {
           if (!createOrderDto.bookingId) {
             throw new BadRequestException('bookingId is required for room service orders');
           }
-          await this.bookingsService.applyAdditionalCharge(
-            createOrderDto.bookingId,
-            savedOrder.totalAmount,
-            'room_service',
-            `Room service order ${savedOrder.orderNumber}`,
-            savedOrder.status === 'paid', // Only mark as already paid if the POS order itself is paid
-          );
-          
-          // Automatically mark the POS order as paid if it was charged to room
-          if (savedOrder.status !== 'paid') {
-            const paymentData = {
-              orderId: savedOrder._id,
-              amount: savedOrder.totalAmount,
-              method: 'room_charge',
-              status: 'completed',
-              transactionId: `ROOM-CHARGE-${savedOrder.orderNumber}-${Date.now()}`,
-              processedBy: new Types.ObjectId(creatorUserId),
-              processedAt: new Date(),
-              branchId: new Types.ObjectId(branchId),
-              workPeriodId: activeWorkPeriod ? activeWorkPeriod._id : undefined,
-              paymentDetails: {
-                bookingId: createOrderDto.bookingId,
-                roomNumber: createOrderDto.roomNumber,
-              },
-            };
-            const payment = new this.posPaymentModel(paymentData);
-            const savedPayment = await payment.save();
 
-            await this.posOrderModel.findByIdAndUpdate(savedOrder._id, {
-              status: 'paid',
-              paymentMethod: 'room_charge',
-              paymentId: savedPayment._id,
-              completedAt: new Date(),
-            }).exec();
+          // Only apply folio charge and auto-mark as paid if the order has a valid total amount.
+          // Orders with totalAmount <= 0 should remain pending until a valid amount is set.
+          if (savedOrder.totalAmount > 0) {
+            await this.bookingsService.applyAdditionalCharge(
+              createOrderDto.bookingId,
+              savedOrder.totalAmount,
+              'room_service',
+              `Room service order ${savedOrder.orderNumber}`,
+              savedOrder.status === 'paid', // Only mark as already paid if the POS order itself is paid
+            );
             
-            savedOrder.status = 'paid';
-            savedOrder.paymentMethod = 'room_charge';
-            (savedOrder as any).paymentId = savedPayment._id;
+            // Automatically mark the POS order as paid if it was charged to room
+            if (savedOrder.status !== 'paid') {
+              const paymentData = {
+                orderId: savedOrder._id,
+                amount: savedOrder.totalAmount,
+                method: 'room_charge',
+                status: 'completed',
+                transactionId: `ROOM-CHARGE-${savedOrder.orderNumber}-${Date.now()}`,
+                processedBy: new Types.ObjectId(creatorUserId),
+                processedAt: new Date(),
+                branchId: new Types.ObjectId(branchId),
+                workPeriodId: activeWorkPeriod ? activeWorkPeriod._id : undefined,
+                paymentDetails: {
+                  bookingId: createOrderDto.bookingId,
+                  roomNumber: createOrderDto.roomNumber,
+                },
+              };
+              const payment = new this.posPaymentModel(paymentData);
+              const savedPayment = await payment.save();
+
+              await this.posOrderModel.findByIdAndUpdate(savedOrder._id, {
+                status: 'paid',
+                paymentMethod: 'room_charge',
+                paymentId: savedPayment._id,
+                completedAt: new Date(),
+              }).exec();
+              
+              savedOrder.status = 'paid';
+              savedOrder.paymentMethod = 'room_charge';
+              (savedOrder as any).paymentId = savedPayment._id;
+            }
+          } else {
+            console.warn(`⚠️ [POS] Room service order ${savedOrder.orderNumber} has totalAmount of ${savedOrder.totalAmount}. Skipping folio charge and auto-paid. Order will remain as '${savedOrder.status}'.`);
           }
         }
         // Update table status if dine-in order
