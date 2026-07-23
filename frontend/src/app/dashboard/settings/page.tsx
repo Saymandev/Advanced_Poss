@@ -1307,6 +1307,75 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Company Favicon Upload */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PhotoIcon className="w-5 h-5" />
+                Company Favicon
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start gap-4">
+                {faviconPreview && (
+                  <div className="relative">
+                    {faviconPreview.startsWith('data:') || faviconPreview.startsWith('http') ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={faviconPreview}
+                        alt="Company Favicon"
+                        className="w-16 h-16 object-contain border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 p-2"
+                      />
+                    ) : (
+                      <Image
+                        src={faviconPreview}
+                        alt="Company Favicon"
+                        width={64}
+                        height={64}
+                        className="object-contain border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 p-2"
+                      />
+                    )}
+                    <button
+                      onClick={() => {
+                        setFaviconFile(null);
+                        setFaviconPreview(null);
+                      }}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                      type="button"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Upload Favicon
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/x-icon,image/vnd.microsoft.icon"
+                      onChange={handleFaviconUpload}
+                      className="block w-full text-sm text-gray-500 dark:text-gray-400
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-lg file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100
+                        dark:file:bg-blue-900 dark:file:text-blue-300
+                        dark:hover:file:bg-blue-800
+                        cursor-pointer"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Square image, ideally 32x32 or 64x64. Formats: ICO, PNG, WebP. Max size: 2MB
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
