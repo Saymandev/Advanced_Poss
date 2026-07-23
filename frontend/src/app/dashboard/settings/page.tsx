@@ -15,6 +15,7 @@ import {
     useGetCustomDomainInfoQuery,
     useRemoveCustomDomainMutation,
     useUploadCompanyLogoMutation,
+  useUploadCompanyFaviconMutation,
     useVerifyCustomDomainMutation,
     useUpdateCompanyMutation,
 } from '@/lib/api/endpoints/companiesApi';
@@ -121,7 +122,9 @@ export default function SettingsPage() {
   });
   const [editingBranchUrl, setEditingBranchUrl] = useState<{ branchId: string; url: string } | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // General Settings
   const { data: companySettings, refetch: refetchCompanySettings } = useGetCompanySettingsQuery(
@@ -146,6 +149,7 @@ export default function SettingsPage() {
 
   const [updateCompanySettings] = useUpdateCompanySettingsMutation();
   const [uploadCompanyLogo, { isLoading: isUploadingLogo }] = useUploadCompanyLogoMutation();
+  const [uploadCompanyFavicon, { isLoading: isUploadingFavicon }] = useUploadCompanyFaviconMutation();
   const [updateCompany, { isLoading: isUpdatingCompany }] = useUpdateCompanyMutation();
   const [companyName, setCompanyName] = useState('');
   // Get categories for dynamic tax appliesTo options

@@ -261,6 +261,18 @@ export const companiesApi = apiSlice.injectEndpoints({
       },
       invalidatesTags: ['Company'],
     }),
+    uploadCompanyFavicon: builder.mutation<{ faviconUrl: string }, File>({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append('favicon', file);
+        return {
+          url: '/company/upload-favicon',
+          method: 'POST',
+          body: formData,
+        };
+      },
+      invalidatesTags: ['Company'],
+    }),
     getCustomDomainInfo: builder.query<CustomDomainInfo, string>({
       query: (companyId) => `/companies/${companyId}/custom-domain`,
       providesTags: ['Company'],
@@ -304,6 +316,7 @@ export const {
   useActivateCompanyMutation,
   useDeleteCompanyMutation,
   useUploadCompanyLogoMutation,
+  useUploadCompanyFaviconMutation,
   useGetCustomDomainInfoQuery,
   useAddCustomDomainMutation,
   useVerifyCustomDomainMutation,

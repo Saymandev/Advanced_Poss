@@ -108,15 +108,70 @@ export class CompanyService {
       return { logoUrl: uploadResult.secure_url };
     } catch (error) {
       console.error('Cloudinary upload error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        error,
       });
-      throw new Error(
-        `Failed to upload logo to Cloudinary: ${error.message || 'Unknown error'}`,
-      );
+      throw new Error(`Failed to upload logo: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  async uploadFavicon(companyId: string, file: Express.Multer.File) {
+    if (!file) {
+      throw new Error('No file uploaded');
+    }
+
+    const company = await this.companyModel.findById(companyId).exec();
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    const cloudName = this.configService.get<string>('cloudinary.cloudName');
+    const apiKey = this.configService.get<string>('cloudinary.apiKey');
+    const apiSecret = this.configService.get<string>('cloudinary.apiSecret');
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new Error('Cloudinary is not configured.');
+    }
+
+    if (company.favicon) {
+      try {
+        const publicId = this.cloudinaryService.extractPublicId(company.favicon);
+        if (publicId) {
+          await this.cloudinaryService.deleteImage(publicId);
+        }
+      } catch (error) {
+        console.warn('Failed to delete old favicon from Cloudinary:', error);
+      }
+    }
+
+    try {
+      if (!file.buffer) {
+        throw new Error('File buffer is missing.');
+      }
+
+      const uploadResult = await this.cloudinaryService.uploadImage(
+        file.buffer,
+        'company-favicons',
+        `company-${companyId}-favicon`
+      );
+
+      if (!uploadResult || !uploadResult.secure_url) {
+        throw new Error('Cloudinary upload failed: No secure URL returned');
+      }
+
+      await this.companyModel.findByIdAndUpdate(
+        companyId,
+        { favicon: uploadResult.secure_url },
+        { new: true },
+      ).exec();
+
+      return { faviconUrl: uploadResult.secure_url };
+    } catch (error) {
+      console.error('Cloudinary upload error details:', error);
+      throw new Error(`Failed to upload favicon`);
+    }
+  }
+
   async generateQRCode(companyId: string) {
     const company = await this.companyModel.findById(companyId).exec();
     if (!company) {

@@ -20,6 +20,9 @@ export class Company {
   @Prop()
   logo?: string;
 
+  @Prop()
+  favicon?: string;
+
   // Contact
   @Prop({ required: true, lowercase: true })
   email: string;

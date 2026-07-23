@@ -25,16 +25,30 @@ export default function LoginPage() {
   const [logoError, setLogoError] = useState(false);
   const [brandName, setBrandName] = useState('Raha Pos Solutions');
 
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
+
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
       const host = window.location.hostname;
+      const domainOnly = host.split(':')[0];
       const isMainDomain = host.includes('raha.bd') || host.includes('localhost') || host.match(/^192\.168\./) || host.match(/^10\./);
       if (!isMainDomain && host) {
-        const domainPart = host.split('.')[0];
-        if (domainPart) {
-          setBrandName(domainPart.charAt(0).toUpperCase() + domainPart.slice(1));
-        }
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        fetch(`${apiUrl}/public/resolve-domain?domain=${domainOnly}`)
+          .then(res => res.json())
+          .then(result => {
+            if (result.success && result.data) {
+              if (result.data.name) setBrandName(result.data.name);
+              if (result.data.logo) setCustomLogo(result.data.logo);
+            }
+          })
+          .catch(() => {
+            const domainPart = host.split('.')[0];
+            if (domainPart) {
+              setBrandName(domainPart.charAt(0).toUpperCase() + domainPart.slice(1));
+            }
+          });
       }
     }
   }, []);
@@ -122,11 +136,11 @@ export default function LoginPage() {
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500"></div>
             
             <div className="text-center">
-              {(foundCompanyLogo || companyContext?.logoUrl) && !logoError ? (
+              {(foundCompanyLogo || customLogo || companyContext?.logoUrl) && !logoError ? (
                 <div className="inline-flex items-center justify-center mb-4 animate-scale-in">
                   <img
-                    src={foundCompanyLogo || companyContext?.logoUrl}
-                    alt={companyContext?.companyName || 'Company Logo'}
+                    src={foundCompanyLogo || customLogo || companyContext?.logoUrl}
+                    alt={companyContext?.companyName || brandName || 'Company Logo'}
                     className="h-16 w-16 rounded-2xl object-cover border-2 border-primary-500/50 shadow-lg"
                     onError={() => {
                       setLogoError(true);
@@ -139,7 +153,7 @@ export default function LoginPage() {
                 </div>
               )}
               <h1 className="text-3xl font-bold text-white mb-2">
-                {companyContext?.companyName ? `Welcome to ${companyContext.companyName}` : 'Welcome Back'}
+                {companyContext?.companyName ? `Welcome to ${companyContext.companyName}` : (brandName !== 'Raha Pos Solutions' ? `Welcome to ${brandName}` : 'Welcome Back')}
               </h1>
               <p className="text-gray-400">Enter your company email to continue</p>
             </div>

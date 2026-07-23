@@ -62,6 +62,21 @@ export class CompanyController {
     return this.companyService.uploadLogo(companyId, file);
   }
 
+  @Post('upload-favicon')
+  @ApiOperation({ summary: 'Upload company favicon' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('favicon'))
+  uploadFavicon(
+    @CurrentUser('companyId') companyId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user?: any,
+  ) {
+    if (user?.role !== UserRole.MANAGER && user?.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Managers and Owners can upload favicon');
+    }
+    return this.companyService.uploadFavicon(companyId, file);
+  }
+
   @Get('qr-code')
   @ApiOperation({ summary: 'Get QR code for online ordering' })
   getQRCode(@CurrentUser('companyId') companyId: string) {

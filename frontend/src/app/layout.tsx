@@ -9,10 +9,12 @@ import { headers } from 'next/headers';
 
 export async function generateMetadata(): Promise<Metadata> {
   let appName = 'Raha Pos Solutions';
+  let faviconUrl = 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png';
   
   try {
     const headersList = headers();
     const host = headersList.get('host') || '';
+    const domainOnly = host.split(':')[0];
     const isMainDomain = host.includes('raha.bd') || 
                          host.includes('localhost') || 
                          host.includes('127.0.0.1') || 
@@ -21,9 +23,22 @@ export async function generateMetadata(): Promise<Metadata> {
                          host.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./);
 
     if (!isMainDomain && host) {
-      const domainPart = host.split('.')[0];
-      if (domainPart) {
-        appName = domainPart.charAt(0).toUpperCase() + domainPart.slice(1);
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${apiUrl}/public/resolve-domain?domain=${domainOnly}`, { cache: 'no-store' });
+        if (res.ok) {
+           const result = await res.json();
+           if (result.success && result.data) {
+             appName = result.data.name || appName;
+             faviconUrl = result.data.favicon || faviconUrl;
+           }
+        }
+      } catch (e) {
+        // Fallback
+        const domainPart = host.split('.')[0];
+        if (domainPart) {
+          appName = domainPart.charAt(0).toUpperCase() + domainPart.slice(1);
+        }
       }
     }
   } catch (error) {
@@ -37,11 +52,11 @@ export async function generateMetadata(): Promise<Metadata> {
     manifest: '/manifest.json',
     icons: {
       icon: [
-        { url: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png', type: 'image/png', sizes: '32x32' },
-        { url: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png', type: 'image/png', sizes: '64x64' },
+        { url: faviconUrl, type: 'image/png', sizes: '32x32' },
+        { url: faviconUrl, type: 'image/png', sizes: '64x64' },
       ],
-      shortcut: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png',
-      apple: 'https://res.cloudinary.com/dy9yjhmex/image/upload/v1767085414/restogo-favicon_waa61k.png',
+      shortcut: faviconUrl,
+      apple: faviconUrl,
     },
   };
 }

@@ -44,6 +44,14 @@ export const companyApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Company'],
     }),
+    uploadCompanyFavicon: builder.mutation<{ faviconUrl: string }, FormData>({
+      query: (formData) => ({
+        url: '/company/upload-favicon',
+        method: 'POST',
+        body: formData,
+      }),
+      invalidatesTags: ['Company'],
+    }),
     getCompanyQRCode: builder.query<CompanyQRCode, void>({
       query: () => '/company/qr-code',
       providesTags: ['Company'],
@@ -59,6 +67,7 @@ export const {
   useGetCompanySettingsQuery,
   useUpdateCompanySettingsMutation,
   useUploadCompanyLogoMutation,
+  useUploadCompanyFaviconMutation,
   useGetCompanyQRCodeQuery,
   useGetCompanyOnlineUrlQuery,
 } = companyApi;

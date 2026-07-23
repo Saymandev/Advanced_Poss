@@ -33,6 +33,11 @@ export class CreateCompanyDto {
   @IsString()
   logo?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  favicon?: string;
+
   @ApiProperty({ example: 'contact@deliciousbites.com' })
   @IsEmail()
   email: string;
