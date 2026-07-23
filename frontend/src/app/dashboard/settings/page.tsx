@@ -607,6 +607,48 @@ export default function SettingsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company?.logo]);
+
+  const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/x-icon', 'image/vnd.microsoft.icon'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please select a valid image file');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Favicon file size must be less than 2MB');
+      return;
+    }
+
+    setFaviconFile(file);
+    setFaviconPreview(URL.createObjectURL(file));
+
+    try {
+      const result = await uploadCompanyFavicon(file).unwrap();
+      if (result.faviconUrl) {
+        setFaviconPreview(result.faviconUrl);
+        toast.success('Favicon uploaded successfully');
+        if (companyContext) {
+          dispatch(setCompanyContext({ ...companyContext, favicon: result.faviconUrl }));
+        }
+      }
+      setTimeout(async () => {
+        try {
+          await refetchCompany();
+        } catch (err) {
+          console.error(err);
+        }
+      }, 1000);
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || error?.message || 'Failed to upload favicon';
+      toast.error(errorMessage);
+      setFaviconPreview(null);
+      setFaviconFile(null);
+    }
+  };
+
   const handleLogoUpload = async () => {
     if (!logoFile) {
       toast.error('Please select a logo file');

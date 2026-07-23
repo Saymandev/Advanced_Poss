@@ -9,6 +9,7 @@ export interface Company {
   website?: string;
   description?: string;
   logo?: string;
+  favicon?: string;
   address: {
     street: string;
     city: string;
