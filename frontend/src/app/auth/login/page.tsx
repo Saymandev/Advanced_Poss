@@ -199,36 +199,40 @@ export default function LoginPage() {
 
            
 
-            <div className="text-center  border-gray-700/50 space-y-3">
-              <p className="text-gray-400 text-sm">
-                Forgot your password?{' '}
-                <Link href="/auth/forgot-password" className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
-                  Reset it here
-                </Link>
-              </p>
-              <p className="text-gray-400 text-sm">
-                Don't have an account?{' '}
-                <Link href="/auth/register" className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
-                  Register your restaurant
-                </Link>
-              </p>
-            </div>
+            {brandName === 'Raha Pos Solutions' && (
+              <div className="text-center border-gray-700/50 space-y-3">
+                <p className="text-gray-400 text-sm">
+                  Forgot your password?{' '}
+                  <Link href="/auth/forgot-password" className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
+                    Reset it here
+                  </Link>
+                </p>
+                <p className="text-gray-400 text-sm">
+                  Don't have an account?{' '}
+                  <Link href="/auth/register" className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
+                    Register your restaurant
+                  </Link>
+                </p>
+              </div>
+            )}
           </form>
 
           {/* Demo request hint */}
-          <div className="px-8 pb-6">
-            <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-400">
-                Need a Demo?{' '}
-                <Link 
-                  href="/contact?subject=Request a Demo" 
-                  className="text-primary-400 hover:text-primary-300 font-semibold transition-colors decoration-dotted underline underline-offset-4"
-                >
-                  Contact us
-                </Link>
-              </p>
+          {brandName === 'Raha Pos Solutions' && (
+            <div className="px-8 pb-6">
+              <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-4 text-center">
+                <p className="text-sm text-gray-400">
+                  Need a Demo?{' '}
+                  <Link 
+                    href="/contact?subject=Request a Demo" 
+                    className="text-primary-400 hover:text-primary-300 font-semibold transition-colors decoration-dotted underline underline-offset-4"
+                  >
+                    Contact us
+                  </Link>
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </Card>
 
         {/* Footer */}
