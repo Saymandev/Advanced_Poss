@@ -66,6 +66,9 @@ export class Company {
   logo?: string;
 
   @Prop()
+  favicon?: string;
+
+  @Prop()
   onlineOrderingUrl?: string;
 
   @Prop()

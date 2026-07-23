@@ -18,7 +18,27 @@ import { CompaniesService } from '../companies/companies.service';
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { RoomsService } from '../rooms/rooms.service';
+import { ReviewsService } from '../reviews/reviews.service';
+import { PublicService } from './public.service';
+
+@ApiTags('Public')
+@Controller('public')
+export class PublicController {
+  constructor(
+    private readonly companiesService: CompaniesService,
+    private readonly branchesService: BranchesService,
+    private readonly menuItemsService: MenuItemsService,
+    private readonly categoriesService: CategoriesService,
+    private readonly zonesService: DeliveryZonesService,
+    private readonly publicService: PublicService,
+    private readonly roomsService: RoomsService,
+    private readonly reviewsService: ReviewsService,
+    private readonly bookingsService: BookingsService,
+  ) {}
+
   @Public()
+  @Get('resolve-domain')
+  @ApiOperation({ summary: 'Resolve custom domain to company slug' })
   async resolveCustomDomain(@Query('domain') domain: string) {
     if (!domain) {
       throw new BadRequestException('Domain query parameter is required');
