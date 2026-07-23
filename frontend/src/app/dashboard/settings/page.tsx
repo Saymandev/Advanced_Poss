@@ -608,6 +608,21 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company?.logo]);
 
+  // Favicon effect
+  useEffect(() => {
+    if (company?.favicon) {
+      let faviconUrl = company.favicon;
+      if (faviconUrl.startsWith('/uploads/')) {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        const baseUrl = apiBaseUrl.replace('/api/v1', '');
+        faviconUrl = `${baseUrl}${faviconUrl}`;
+      }
+      setFaviconPreview(faviconUrl);
+    } else {
+      setFaviconPreview(null);
+    }
+  }, [company?.favicon]);
+
   const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
