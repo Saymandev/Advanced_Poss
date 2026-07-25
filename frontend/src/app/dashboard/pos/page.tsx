@@ -3978,10 +3978,43 @@ export default function POSPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col items-center justify-center py-20 opacity-20 text-slate-500 select-none">
-                <UserGroupIcon className="h-20 w-20 mb-4" />
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-center">Loyalty status and<br/>history will load here</p>
-              </div>
+              {selectedCustomer && (
+                <div className="rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 p-3 text-white shadow-md relative overflow-hidden group mt-4 mx-4 mb-4">
+                  <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-white/10 blur-xl group-hover:bg-white/20 transition-all duration-500" />
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <StarIcon className={cn("h-4 w-4", 
+                          selectedCustomer.tier === 'platinum' ? 'text-cyan-300' : 
+                          selectedCustomer.tier === 'gold' ? 'text-yellow-300' : 
+                          selectedCustomer.tier === 'silver' ? 'text-gray-300' : 'text-orange-300'
+                        )} />
+                        <span className="font-bold text-sm capitalize">{selectedCustomer.tier || 'Bronze'}</span>
+                      </div>
+                      <span className="text-xs font-black bg-black/20 px-2 py-0.5 rounded-full">
+                        {selectedCustomer.loyaltyPoints?.toLocaleString() || 0} pts
+                      </span>
+                    </div>
+                    {loyaltyRedemption.pointsRedeemed > 0 && (
+                      <div className="flex justify-between items-center bg-black/20 rounded-lg p-2 mt-2 backdrop-blur-sm">
+                        <div>
+                          <p className="text-[10px] text-white/80">Redeem {loyaltyRedemption.pointsRedeemed} pts</p>
+                          <p className="text-xs font-bold text-emerald-300">Save {formatCurrency(loyaltyRedemption.discount)}</p>
+                        </div>
+                        <button
+                          onClick={() => setUseLoyaltyPoints(!useLoyaltyPoints)}
+                          className={cn(
+                            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                            useLoyaltyPoints ? 'bg-emerald-400' : 'bg-white/20'
+                          )}
+                        >
+                          <span className={cn("pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out", useLoyaltyPoints ? 'translate-x-4' : 'translate-x-0')} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
