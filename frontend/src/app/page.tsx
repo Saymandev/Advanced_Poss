@@ -48,20 +48,20 @@ const HeroImageSlider = ({ industry }: { industry: IndustryType }) => {
   const images = useMemo(() => {
     if (industry === 'retail') {
       return [
-        'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=1920&q=80', // Boutique
-        'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1920&q=80', // Retail Store
-        'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80', // POS checkout
-        'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=1920&q=80', // Supermarket
+        '/images/hero/boutique.jpg', // Boutique
+        '/images/hero/retail-store.jpg', // Retail Store
+        '/images/hero/pos-checkout.jpg', // POS checkout
+        '/images/hero/supermarket.jpg', // Supermarket
 
       ];
     }
     return [
-      'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1920&q=80', // Hotel
-      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1920&q=80', // Cafe
-      'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=1920&q=80', // Bakery
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80', // Restaurant
-      'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=1920&q=80', // Bar
-      'https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=1920&q=80', // Food Truck
+      '/images/hero/hotel.jpg', // Hotel
+      '/images/hero/cafe.jpg', // Cafe
+      '/images/hero/bakery.jpg', // Bakery
+      '/images/hero/restaurant.jpg', // Restaurant
+      '/images/hero/bar.jpg', // Bar
+      '/images/hero/food-truck.jpg', // Food Truck
     ];
   }, [industry]);
 
