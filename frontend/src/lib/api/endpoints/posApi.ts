@@ -365,6 +365,7 @@ export const posApi = apiSlice.injectEndpoints({
       selections?: any[];
       addons?: any[];
       trackInventory?: boolean;
+      ingredients?: any[];
     }>, {
       branchId?: string;
       categoryId?: string;
