@@ -60,6 +60,8 @@ const nextConfig = {
               "font-src 'self' data:",
               // Allow connections to same origin, HTTPS, WebSockets, and API URL
               `connect-src ${connectSrc}`,
+              // Allow embedding external video players
+              "frame-src 'self' https://www.youtube.com https://drive.google.com https://player.vimeo.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
