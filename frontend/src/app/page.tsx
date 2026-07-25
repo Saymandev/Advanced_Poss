@@ -1426,6 +1426,7 @@ export default function LandingPage() {
         videoUrl={activeVideo?.url || demoVideoUrl}
         videoTitle={activeVideo?.title}
         videoDescription={activeVideo?.description}
+        videos={demoVideos}
       />
     </div>
   );
