@@ -166,6 +166,11 @@ export interface SystemSettings {
   };
   landingPage?: {
     demoVideoUrl?: string;
+    demoVideos?: {
+      title: string;
+      description: string;
+      url: string;
+    }[];
   };
   createdAt?: string;
   updatedAt?: string;
