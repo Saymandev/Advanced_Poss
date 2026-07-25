@@ -164,6 +164,9 @@ export interface SystemSettings {
     openrouterModel: string;
     enabled: boolean;
   };
+  landingPage?: {
+    demoVideoUrl?: string;
+  };
   createdAt?: string;
   updatedAt?: string;
 }

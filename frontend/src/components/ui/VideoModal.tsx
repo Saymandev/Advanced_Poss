@@ -20,15 +20,33 @@ export function VideoModal({ isOpen, onClose, videoUrl }: VideoModalProps) {
 
   if (!isOpen || !mounted) return null;
 
-  // Helper function to handle Google Drive URLs automatically
+  // Helper function to handle Google Drive and YouTube URLs automatically
   const getEmbedUrl = (url: string) => {
+    // Handle Google Drive
     if (url.includes('drive.google.com/file/d/')) {
-      // Extract the file ID and force the /preview endpoint
       const match = url.match(/file\/d\/([a-zA-Z0-9_-]+)/);
       if (match && match[1]) {
         return `https://drive.google.com/file/d/${match[1]}/preview`;
       }
     }
+    
+    // Handle YouTube (Watch links, short links, and playlists)
+    if (url.includes('youtube.com/') || url.includes('youtu.be/')) {
+      // Check if it's a playlist
+      if (url.includes('list=')) {
+        const listMatch = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+        if (listMatch && listMatch[1]) {
+          return `https://www.youtube.com/embed/videoseries?list=${listMatch[1]}&autoplay=1`;
+        }
+      }
+      
+      // Check for standard watch link or short link
+      const videoMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+      if (videoMatch && videoMatch[1]) {
+        return `https://www.youtube.com/embed/${videoMatch[1]}?autoplay=1`;
+      }
+    }
+
     return url;
   };
 
