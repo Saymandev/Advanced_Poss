@@ -233,6 +233,7 @@ const getHexColor = (twClass: string) => {
 
 export default function LandingPage() {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [planType, setPlanType] = useState<'restaurant' | 'retail'>('restaurant');
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
