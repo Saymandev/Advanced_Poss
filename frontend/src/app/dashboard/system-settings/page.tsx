@@ -171,6 +171,7 @@ export default function SystemSettingsPage() {
     { id: 'backup', label: 'Backup', icon: CloudArrowDownIcon },
     { id: 'features', label: 'Features', icon: CheckCircleIcon },
     { id: 'ai', label: 'AI Settings', icon: CpuChipIcon },
+    { id: 'landingPage', label: 'Landing Page', icon: DevicePhoneMobileIcon },
   ];
 
   return (
