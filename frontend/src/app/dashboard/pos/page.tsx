@@ -1461,6 +1461,54 @@ export default function POSPage() {
     appendCartItem(cartItem);
     setModifierEditor(null);
   }, [appendCartItem, buildCartItemFromMenuItem, modifierEditor]);
+  const checkIngredientStock = useCallback((menuItem: any, requestedTotalQtyForThisItem: number, currentCartItemId: string | null = null) => {
+    if (!menuItem?.trackInventory) return true;
+    
+    // For direct retail items
+    if (!menuItem.ingredients || menuItem.ingredients.length === 0) {
+      if (menuItem.stock != null && requestedTotalQtyForThisItem > menuItem.stock) {
+        toast.error(`Cannot add more. Only ${menuItem.stock} items available in stock.`);
+        return false;
+      }
+      return true;
+    }
+
+    // For recipe items with shared ingredients
+    for (const ing of menuItem.ingredients) {
+      const ingredientId = ing.ingredientId;
+      const requiredPerItem = ing.requiredQuantity || 1;
+      const availableStock = ing.currentStock || 0;
+
+      let totalUsage = 0;
+      for (const cItem of cart) {
+        // Skip the item we are currently updating to avoid double counting
+        if (currentCartItemId && cItem.id === currentCartItemId) continue;
+        
+        // Skip if this cart item is the exact same menu item we are adding (if we are passing total qty for it)
+        // Wait, in addToCart we calculate currentCartQty + 1 and pass it as requestedTotalQtyForThisItem.
+        // So we must skip existing cart items that match the menuItemId if we are doing a generic add without cartItemId?
+        // Let's make it simpler: totalUsage just counts OTHER menu items, and we add requestedTotalQtyForThisItem.
+        if (!currentCartItemId && cItem.menuItemId === (menuItem.id || menuItem._id)) continue;
+        
+        const cMenuItem = menuItemsArray.find((m: any) => (m.id || m._id) === cItem.menuItemId);
+        if (cMenuItem && cMenuItem.ingredients) {
+          const cIng = cMenuItem.ingredients.find((i: any) => i.ingredientId === ingredientId);
+          if (cIng) {
+            totalUsage += (cIng.requiredQuantity || 1) * cItem.quantity;
+          }
+        }
+      }
+
+      totalUsage += requiredPerItem * requestedTotalQtyForThisItem;
+
+      if (totalUsage > availableStock) {
+        toast.error(`Cannot add item: Insufficient stock for ${ing.name || 'ingredient'}`);
+        return false;
+      }
+    }
+    return true;
+  }, [cart, menuItemsArray]);
+
   // Cart functions
   const addToCart = useCallback((menuItem: any) => {
     const outOfStock = menuItem.isOutOfStock || (menuItem.trackInventory && menuItem.stock != null && menuItem.stock <= 0);
@@ -1469,14 +1517,13 @@ export default function POSPage() {
       return;
     }
     
-    // Check if adding one more would exceed stock
-    if (menuItem.trackInventory && menuItem.stock != null) {
+    // Check if adding one more would exceed stock dynamically across cart
+    if (menuItem.trackInventory) {
       const currentCartQty = cart
         .filter(item => item.menuItemId === (menuItem.id || menuItem._id))
         .reduce((sum, item) => sum + item.quantity, 0);
         
-      if (currentCartQty + 1 > menuItem.stock) {
-        toast.error(`Cannot add more. Only ${menuItem.stock} items available in stock.`);
+      if (!checkIngredientStock(menuItem, currentCartQty + 1)) {
         return;
       }
     }
@@ -1494,24 +1541,22 @@ export default function POSPage() {
     }
     const cartItem = buildCartItemFromMenuItem(menuItem, { quantity: 1 });
     appendCartItem(cartItem);
-  }, [appendCartItem, buildCartItemFromMenuItem, getDefaultModifierConfig, hasMenuItemModifiers, cart]);
+  }, [appendCartItem, buildCartItemFromMenuItem, getDefaultModifierConfig, hasMenuItemModifiers, cart, checkIngredientStock]);
   
   const updateQuantity = (itemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(itemId);
     } else {
-      // Check stock limit before updating
+      // Check stock limit before updating dynamically
       const cartItem = cart.find(item => item.id === itemId);
       if (cartItem) {
         const menuItem = menuItemsArray.find((mi: any) => (mi.id || mi._id) === cartItem.menuItemId);
-        if (menuItem?.trackInventory && menuItem?.stock != null) {
-          // Calculate total quantity of this menu item across all cart items (in case of different modifiers)
-          const otherItemsQty = cart
+        if (menuItem?.trackInventory) {
+          const otherSameItemsQty = cart
             .filter(item => item.menuItemId === cartItem.menuItemId && item.id !== itemId)
             .reduce((sum, item) => sum + item.quantity, 0);
             
-          if (quantity + otherItemsQty > menuItem.stock) {
-            toast.error(`Cannot increase quantity. Only ${menuItem.stock} items available in stock.`);
+          if (!checkIngredientStock(menuItem, quantity + otherSameItemsQty, itemId)) {
             return;
           }
         }

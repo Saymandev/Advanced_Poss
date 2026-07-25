@@ -2718,6 +2718,13 @@ export class POSService {
           addons: itemObj.addons || [],
           requiresKitchen: itemObj.requiresKitchen !== false,
           trackInventory: itemObj.trackInventory === true,
+          ingredients: Array.isArray(itemObj.ingredients) ? itemObj.ingredients.map((ing: any) => ({
+            ingredientId: ing?.ingredientId?._id?.toString() || ing?.ingredientId?.toString(),
+            name: ing?.ingredientId?.name,
+            unit: ing?.ingredientId?.unit,
+            currentStock: ing?.ingredientId?.currentStock || 0,
+            requiredQuantity: ing?.quantity || 1,
+          })) : [],
         };
       });
     } catch (error) {
