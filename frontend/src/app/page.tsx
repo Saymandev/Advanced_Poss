@@ -873,28 +873,6 @@ export default function LandingPage() {
             <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Choose the perfect plan for your business. Start free, upgrade anytime.
             </p>
-            {retailPlans.length > 0 && (
-              <div className="mt-8 inline-flex bg-gray-100 dark:bg-gray-800/80 p-1.5 rounded-full shadow-inner border border-gray-200 dark:border-gray-700 relative">
-                <button
-                  onClick={() => setPlanType('restaurant')}
-                  className={`relative flex items-center justify-center gap-2 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${planType === 'restaurant'
-                    ? 'bg-primary-600 text-white shadow-lg transform scale-105'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
-                    }`}
-                >
-                  <span className="text-lg">🍽️</span> Restaurant
-                </button>
-                <button
-                  onClick={() => setPlanType('retail')}
-                  className={`relative flex items-center justify-center gap-2 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${planType === 'retail'
-                    ? 'bg-primary-600 text-white shadow-lg transform scale-105'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
-                    }`}
-                >
-                  <span className="text-lg">🛒</span> Retail
-                </button>
-              </div>
-            )}
           </div>
 
           {isLoadingPlans ? (
