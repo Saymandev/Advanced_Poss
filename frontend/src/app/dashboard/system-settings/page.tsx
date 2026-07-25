@@ -869,7 +869,7 @@ export default function SystemSettingsPage() {
                   <span>Demo Videos</span>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => {
                       const currentVideos = formData.landingPage?.demoVideos || [];
