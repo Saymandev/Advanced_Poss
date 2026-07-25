@@ -8,7 +8,7 @@ export interface MenuItem {
   category: string;
   isAvailable: boolean;
   imageUrl?: string;
-  ingredients?: string[];
+  ingredients?: any[];
   allergens?: string[];
   preparationTime?: number;
   calories?: number;
