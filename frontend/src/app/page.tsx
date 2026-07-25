@@ -43,15 +43,16 @@ const HeroImageSlider = ({ industry }: { industry: IndustryType }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
-  
+
   // High-quality Unsplash images based on industry
   const images = useMemo(() => {
     if (industry === 'retail') {
       return [
+        'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=1920&q=80', // Boutique
         'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1920&q=80', // Retail Store
         'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80', // POS checkout
         'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=1920&q=80', // Supermarket
-        'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=1920&q=80', // Boutique
+
       ];
     }
     return [
@@ -95,7 +96,7 @@ const HeroImageSlider = ({ industry }: { industry: IndustryType }) => {
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
@@ -109,7 +110,7 @@ const HeroImageSlider = ({ industry }: { industry: IndustryType }) => {
   };
 
   return (
-    <div 
+    <div
       className="absolute inset-0 z-0 overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -120,9 +121,8 @@ const HeroImageSlider = ({ industry }: { industry: IndustryType }) => {
         {images.map((image, index) => (
           <div
             key={index}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-              index === currentIndex ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentIndex ? 'opacity-100' : 'opacity-0'
+              }`}
           >
             {/* Enhanced gradient overlay for better text readability */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/80 z-10"></div>
@@ -158,11 +158,10 @@ const HeroImageSlider = ({ industry }: { industry: IndustryType }) => {
           <button
             key={index}
             onClick={() => goToSlide(index)}
-            className={`h-1.5 md:h-2 rounded-full transition-all duration-300 ${
-              index === currentIndex
-                ? 'w-6 md:w-8 bg-white shadow-lg'
-                : 'w-1.5 md:w-2 bg-white/60 hover:bg-white/80'
-            }`}
+            className={`h-1.5 md:h-2 rounded-full transition-all duration-300 ${index === currentIndex
+              ? 'w-6 md:w-8 bg-white shadow-lg'
+              : 'w-1.5 md:w-2 bg-white/60 hover:bg-white/80'
+              }`}
             aria-label={`Go to slide ${index + 1}`}
           />
         ))}
@@ -245,25 +244,25 @@ export default function LandingPage() {
   const { data: statsData, isLoading: isLoadingStats } = useGetPublicStatsQuery();
   const { data: testimonialsData = [], isLoading: isLoadingTestimonials } = useGetPublicTestimonialsQuery({ limit: 3 });
   const { data: systemSettingsResponse } = useGetPublicSystemSettingsQuery();
-  
+
   const demoVideoUrl = systemSettingsResponse?.data?.landingPage?.demoVideoUrl || '';
-  
+
   // Get available plans from API - handle both array and object responses
   const plans = useMemo(() => {
     if (!plansData) return [];
     // Handle different response structures
     if (Array.isArray(plansData)) return plansData;
-    
+
     // Check for nested data structures: data.data or data.plans
     const nestedData = (plansData as any)?.data;
     if (Array.isArray(nestedData)) return nestedData;
     if (Array.isArray(nestedData?.data)) return nestedData.data;
     if (Array.isArray(nestedData?.plans)) return nestedData.plans;
-    
+
     // Fallback to direct plans property
     return (plansData as any)?.plans || [];
   }, [plansData]);
-  
+
   const activePlans = useMemo(() => {
     return plans.filter((plan: any) => plan.isActive !== false).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }, [plans]);
@@ -278,123 +277,123 @@ export default function LandingPage() {
   }, [activeIndustry]);
 
   const displayPlans = planType === 'retail' ? retailPlans : restaurantPlans;
-  
+
   // Dynamic features based on selected industry
   const features = useMemo(() => {
     if (activeIndustry === 'retail') {
       return [
-        { 
-          key: 'inventory', 
-          icon: ChartBarIcon, 
-          title: 'Smart Stock & Inventory', 
-          description: 'Track stock across multiple warehouses in real-time. Receive low stock alerts and automatically generate purchase orders for suppliers.', 
-          gradient: 'from-green-500 to-emerald-500' 
+        {
+          key: 'inventory',
+          icon: ChartBarIcon,
+          title: 'Smart Stock & Inventory',
+          description: 'Track stock across multiple warehouses in real-time. Receive low stock alerts and automatically generate purchase orders for suppliers.',
+          gradient: 'from-green-500 to-emerald-500'
         },
-        { 
-          key: 'barcode-scanning', 
-          icon: DevicePhoneMobileIcon, 
-          title: 'Barcode Scanning & Labels', 
-          description: 'Speed up checkout with instant barcode scanning. Generate and print your own custom barcode labels for products without them.', 
-          gradient: 'from-indigo-500 to-blue-500' 
+        {
+          key: 'barcode-scanning',
+          icon: DevicePhoneMobileIcon,
+          title: 'Barcode Scanning & Labels',
+          description: 'Speed up checkout with instant barcode scanning. Generate and print your own custom barcode labels for products without them.',
+          gradient: 'from-indigo-500 to-blue-500'
         },
-        { 
-          key: 'multi-branch', 
-          icon: UserGroupIcon, 
-          title: 'Multi-Store Management', 
-          description: 'Control all your retail branches from a single master dashboard. Transfer stock between stores and compare branch performance.', 
-          gradient: 'from-purple-500 to-pink-500' 
+        {
+          key: 'multi-branch',
+          icon: UserGroupIcon,
+          title: 'Multi-Store Management',
+          description: 'Control all your retail branches from a single master dashboard. Transfer stock between stores and compare branch performance.',
+          gradient: 'from-purple-500 to-pink-500'
         },
-        { 
-          key: 'offline-sync', 
-          icon: CloudArrowUpIcon, 
-          title: 'Unbreakable Offline Sync', 
-          description: 'Keep processing sales and printing receipts even if the internet goes down. Data syncs automatically when you reconnect.', 
-          gradient: 'from-blue-500 to-cyan-500' 
+        {
+          key: 'offline-sync',
+          icon: CloudArrowUpIcon,
+          title: 'Unbreakable Offline Sync',
+          description: 'Keep processing sales and printing receipts even if the internet goes down. Data syncs automatically when you reconnect.',
+          gradient: 'from-blue-500 to-cyan-500'
         },
-        { 
-          key: 'accounting', 
-          icon: ChartBarIcon, 
-          title: 'Accounting & Ledgers', 
-          description: 'Track daily expenses, supplier payouts, and overall cash flow directly inside your dashboard. No more messy spreadsheets.', 
-          gradient: 'from-teal-500 to-emerald-500' 
+        {
+          key: 'accounting',
+          icon: ChartBarIcon,
+          title: 'Accounting & Ledgers',
+          description: 'Track daily expenses, supplier payouts, and overall cash flow directly inside your dashboard. No more messy spreadsheets.',
+          gradient: 'from-teal-500 to-emerald-500'
         },
-        { 
-          key: 'loyalty', 
-          icon: SparklesIcon, 
-          title: 'Customer Loyalty & SMS', 
-          description: 'Build a massive customer database. Reward repeat shoppers with points and send targeted SMS marketing campaigns.', 
-          gradient: 'from-yellow-500 to-orange-500' 
+        {
+          key: 'loyalty',
+          icon: SparklesIcon,
+          title: 'Customer Loyalty & SMS',
+          description: 'Build a massive customer database. Reward repeat shoppers with points and send targeted SMS marketing campaigns.',
+          gradient: 'from-yellow-500 to-orange-500'
         },
       ];
     }
 
     return [
-      { 
-        key: 'offline-sync', 
-        icon: CloudArrowUpIcon, 
-        title: 'Unbreakable Offline Sync', 
-        description: 'Keep taking orders and printing receipts without internet. Raha automatically syncs your data the second you are back online.', 
-        gradient: 'from-blue-500 to-cyan-500' 
+      {
+        key: 'offline-sync',
+        icon: CloudArrowUpIcon,
+        title: 'Unbreakable Offline Sync',
+        description: 'Keep taking orders and printing receipts without internet. Raha automatically syncs your data the second you are back online.',
+        gradient: 'from-blue-500 to-cyan-500'
       },
-      { 
-        key: 'hotel-management', 
-        icon: GlobeAltIcon, 
-        title: 'Hotel & Room Management', 
-        description: 'Manage room bookings, guest check-ins, and seamlessly route restaurant or bar charges directly to the final room bill.', 
-        gradient: 'from-indigo-500 to-blue-500' 
+      {
+        key: 'hotel-management',
+        icon: GlobeAltIcon,
+        title: 'Hotel & Room Management',
+        description: 'Manage room bookings, guest check-ins, and seamlessly route restaurant or bar charges directly to the final room bill.',
+        gradient: 'from-indigo-500 to-blue-500'
       },
-      { 
-        key: 'inventory', 
-        icon: ChartBarIcon, 
-        title: 'Inventory & Recipe Costing', 
-        description: 'Track ingredients down to the exact gram. Stop food theft, monitor wastage, and see your true profit margins in real time.', 
-        gradient: 'from-green-500 to-emerald-500' 
+      {
+        key: 'inventory',
+        icon: ChartBarIcon,
+        title: 'Inventory & Recipe Costing',
+        description: 'Track ingredients down to the exact gram. Stop food theft, monitor wastage, and see your true profit margins in real time.',
+        gradient: 'from-green-500 to-emerald-500'
       },
-      { 
-        key: 'kds', 
-        icon: BellAlertIcon, 
-        title: 'Seamless Kitchen Sync (KDS)', 
-        description: 'Fire orders instantly from the waiter\'s device straight to the kitchen. Eliminate lost paper tickets and speed up service.', 
-        gradient: 'from-orange-500 to-red-500' 
+      {
+        key: 'kds',
+        icon: BellAlertIcon,
+        title: 'Seamless Kitchen Sync (KDS)',
+        description: 'Fire orders instantly from the waiter\'s device straight to the kitchen. Eliminate lost paper tickets and speed up service.',
+        gradient: 'from-orange-500 to-red-500'
       },
-      { 
-        key: 'multi-branch', 
-        icon: UserGroupIcon, 
-        title: 'Multi Branch & Franchise Management', 
-        description: 'Control multiple restaurant or hotel locations from a single master dashboard. Compare branch performance instantly.', 
-        gradient: 'from-purple-500 to-pink-500' 
+      {
+        key: 'multi-branch',
+        icon: UserGroupIcon,
+        title: 'Multi Branch & Franchise Management',
+        description: 'Control multiple restaurant or hotel locations from a single master dashboard. Compare branch performance instantly.',
+        gradient: 'from-purple-500 to-pink-500'
       },
-      { 
-        key: 'delivery', 
-        icon: DevicePhoneMobileIcon, 
-        title: 'Delivery & Takeaway Hub', 
-        description: 'Manage dine in, takeaway, and delivery orders effortlessly from a single, organized screen at the front counter.', 
-        gradient: 'from-rose-500 to-pink-500' 
+      {
+        key: 'delivery',
+        icon: DevicePhoneMobileIcon,
+        title: 'Delivery & Takeaway Hub',
+        description: 'Manage dine in, takeaway, and delivery orders effortlessly from a single, organized screen at the front counter.',
+        gradient: 'from-rose-500 to-pink-500'
       },
-      { 
-        key: 'accounting', 
-        icon: ChartBarIcon, 
-        title: 'Accounting & Ledgers', 
-        description: 'Ditch the messy spreadsheets. Track daily expenses, supplier payouts, and overall cash flow directly inside your dashboard.', 
-        gradient: 'from-teal-500 to-emerald-500' 
+      {
+        key: 'accounting',
+        icon: ChartBarIcon,
+        title: 'Accounting & Ledgers',
+        description: 'Ditch the messy spreadsheets. Track daily expenses, supplier payouts, and overall cash flow directly inside your dashboard.',
+        gradient: 'from-teal-500 to-emerald-500'
       },
-      { 
-        key: 'marketing', 
-        icon: SparklesIcon, 
-        title: 'SMS & Email Marketing', 
-        description: 'Turn first time visitors into regulars. Bring your best customers back with automated, targeted promotional campaigns.', 
-        gradient: 'from-yellow-500 to-orange-500' 
+      {
+        key: 'marketing',
+        icon: SparklesIcon,
+        title: 'SMS & Email Marketing',
+        description: 'Turn first time visitors into regulars. Bring your best customers back with automated, targeted promotional campaigns.',
+        gradient: 'from-yellow-500 to-orange-500'
       },
-      { 
-        key: 'staff', 
-        icon: ShieldCheckIcon, 
-        title: 'Staff & Shift Tracking', 
-        description: 'Monitor employee attendance, manage daily shifts, and secure your entire system with strict role-based access limits.', 
-        gradient: 'from-violet-500 to-purple-500' 
+      {
+        key: 'staff',
+        icon: ShieldCheckIcon,
+        title: 'Staff & Shift Tracking',
+        description: 'Monitor employee attendance, manage daily shifts, and secure your entire system with strict role-based access limits.',
+        gradient: 'from-violet-500 to-purple-500'
       },
     ];
   }, [activeIndustry]);
-  
+
   // Smart Data Reversion Logic
   const isRealDataReady = useMemo(() => {
     return (statsData?.activeCompanies || 0) >= REVERSION_THRESHOLD;
@@ -453,21 +452,21 @@ export default function LandingPage() {
     if (!testimonialsData || testimonialsData.length === 0) {
       return [];
     }
-    
+
     return testimonialsData.map((feedback: any) => {
       const user = feedback.userId || {};
       const company = feedback.companyId || {};
       const firstName = user.firstName || '';
       const lastName = user.lastName || '';
-      const name = feedback.isAnonymous 
-        ? 'Anonymous' 
+      const name = feedback.isAnonymous
+        ? 'Anonymous'
         : `${firstName} ${lastName}`.trim() || 'Customer';
-      
+
       return {
         name,
         role: company.name ? `${company.name} Owner` : 'Restaurant Owner',
-        image: feedback.isAnonymous 
-          ? 'https://i.pravatar.cc/150?img=0' 
+        image: feedback.isAnonymous
+          ? 'https://i.pravatar.cc/150?img=0'
           : `https://i.pravatar.cc/150?img=${Math.abs(name.charCodeAt(0)) % 10}`,
         content: feedback.message || feedback.title || 'Great experience!',
         rating: feedback.rating || 5,
@@ -485,7 +484,7 @@ export default function LandingPage() {
     // Show 3 at once, circular
     const result = [];
     for (let i = 0; i < 3; i++) {
-        result.push(testimonials[(testimonialIndex + i) % testimonials.length]);
+      result.push(testimonials[(testimonialIndex + i) % testimonials.length]);
     }
     return result;
   }, [testimonialIndex, testimonials]);
@@ -493,7 +492,7 @@ export default function LandingPage() {
   const nextTestimonial = () => setTestimonialIndex((prev) => (prev + 1) % testimonials.length);
   const prevTestimonial = () => setTestimonialIndex((prev) => (prev - 1 + testimonials.length) % testimonials.length);
 
-  
+
   // Get active companies count for badge
   const activeCompaniesCount = useMemo(() => {
     if (isRealDataReady) return statsData?.activeCompanies || 0;
@@ -504,7 +503,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     setMounted(true);
-    
+
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
@@ -525,7 +524,7 @@ export default function LandingPage() {
       <section className="relative pt-20 sm:pt-24 pb-16 sm:pb-22 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center">
         {/* Image Slider Background */}
         <HeroImageSlider industry={activeIndustry} />
-        
+
         <div className="max-w-7xl mx-auto w-full relative z-10">
           <div className="text-center">
             {/* Badge */}
@@ -542,7 +541,7 @@ export default function LandingPage() {
               <span className="block mb-2 sm:mb-4 text-3xl sm:text-4xl md:text-5xl opacity-90 font-medium tracking-tight animate-fade-in">Built for Every Type of</span>
               <span className="block leading-[1.1]">
                 <span className="inline-block bg-gradient-to-r from-yellow-200 via-orange-300 to-yellow-200 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient animate-reveal-up animate-title-glow px-1" style={{ animationDelay: '200ms' }}>
-                  {activeIndustry === 'retail' ? 'Retail Store' : 'Restaurant'}
+                  {activeIndustry === 'retail' ? 'Retail' : 'Restaurant'}
                 </span>
                 <span className="inline-block mx-2 sm:mx-3 text-white/80 font-light italic text-2xl sm:text-3xl md:text-4xl lg:text-5xl lg:align-middle animate-ampersand animate-fade-in" style={{ animationDelay: '400ms' }}>&</span>
                 <span className="inline-block bg-gradient-to-r from-orange-300 via-yellow-200 to-orange-300 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient animate-reveal-up animate-title-glow px-1" style={{ animationDelay: '600ms' }}>
@@ -552,8 +551,8 @@ export default function LandingPage() {
               </span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl text-white/95 mb-8 sm:mb-12 max-w-4xl mx-auto leading-relaxed font-light drop-shadow-lg px-4">
-              {activeIndustry === 'retail' 
-                ? 'Whether you run a busy corner shop or a multi-location supermarket, Raha adapts to your workflow.' 
+              {activeIndustry === 'retail'
+                ? 'Whether you run a busy corner shop or a multi-location supermarket, Raha adapts to your workflow.'
                 : 'Whether you run a busy corner cafe or a multi room resort, Raha adapts to your workflow.'}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
@@ -564,9 +563,9 @@ export default function LandingPage() {
                 </Button>
               </Link>
               <div className="group w-full sm:w-auto">
-                <Button 
-                  size="lg" 
-                  variant="secondary" 
+                <Button
+                  size="lg"
+                  variant="secondary"
                   onClick={() => setIsVideoModalOpen(true)}
                   className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 border-2 border-white/30 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white hover:border-white/50 transition-all duration-300"
                 >
@@ -615,7 +614,7 @@ export default function LandingPage() {
         {/* Background decoration */}
         <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-[500px] h-[500px] bg-primary-200/20 dark:bg-primary-900/10 rounded-full blur-[120px] pointer-events-none animate-slow-drift"></div>
         <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-secondary-200/20 dark:bg-secondary-900/10 rounded-full blur-[120px] pointer-events-none animate-slow-drift" style={{ animationDelay: '-5s' }}></div>
-        
+
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-20">
             <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full bg-primary-100 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 animate-fade-in">
@@ -666,11 +665,11 @@ export default function LandingPage() {
                           <stop offset="100%" stopColor={getHexColor(feature.gradient.split(' ')[1] || feature.gradient.split(' ')[2] || 'blue-500')} />
                         </linearGradient>
                       </defs>
-                      <path 
+                      <path
                         d="M 6,100 L 94,100 Q 100,100 100,94 L 100,6 Q 100,0 94,0 L 6,0 Q 0,0 0,6 L 0,94 Q 0,100 6,100 Z"
                         pathLength="1000"
                         className="border-trace-path"
-                        style={{ 
+                        style={{
                           stroke: `url(#gradient-${feature.key || index})`,
                           animationDelay: `${index * -1.2}s`
                         } as any}
@@ -679,9 +678,9 @@ export default function LandingPage() {
 
                     {/* Gradient overlay on hover */}
                     <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity duration-500`}></div>
-                    
+
                     {/* Icon */}
-                    <motion.div 
+                    <motion.div
                       whileHover={{ scale: 1.15, rotate: 8, y: -5 }}
                       transition={{ type: "spring", stiffness: 400, damping: 12 }}
                       className={`relative w-16 h-16 bg-gradient-to-br ${feature.gradient} rounded-2xl flex items-center justify-center mb-6 shadow-xl z-20`}
@@ -689,7 +688,7 @@ export default function LandingPage() {
                       <feature.icon className="w-8 h-8 text-white animate-soft-float" />
                       <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} rounded-2xl blur-xl opacity-40 group-hover:opacity-60 transition-opacity`}></div>
                     </motion.div>
-                    
+
                     {/* Content */}
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                       {feature.title}
@@ -697,12 +696,12 @@ export default function LandingPage() {
                     <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm md:text-base">
                       {feature.description}
                     </p>
-                    
+
                     {/* Decorative element */}
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   </div>
                 </div>
-            ))}
+              ))}
             </div>
           )}
         </div>
@@ -809,25 +808,25 @@ export default function LandingPage() {
                         <stop offset="100%" stopColor={getHexColor(item.gradient.split(' ')[1])} />
                       </linearGradient>
                     </defs>
-                    <path 
+                    <path
                       d="M 6,100 L 94,100 Q 100,100 100,94 L 100,6 Q 100,0 94,0 L 6,0 Q 0,0 0,6 L 0,94 Q 0,100 6,100 Z"
                       pathLength="1000"
                       className="border-trace-path"
-                      style={{ 
+                      style={{
                         stroke: `url(#gradient-serve-${index})`,
                         animationDelay: `${index * -1.5}s`
                       } as any}
                     />
                   </svg>
 
-                  <motion.div 
+                  <motion.div
                     whileHover={{ scale: 1.1, rotate: 5, y: -4 }}
                     transition={{ type: "spring", stiffness: 400, damping: 12 }}
                     className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center mb-6 shadow-lg z-20`}
                   >
                     <item.icon className="w-7 h-7 text-white" />
                   </motion.div>
-                  
+
                   {item.isComingSoon && (
                     <div className="absolute top-4 right-4 z-10">
                       <span className="bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-indigo-200 dark:border-indigo-800">
@@ -859,7 +858,7 @@ export default function LandingPage() {
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary-200 dark:bg-primary-900/30 rounded-full filter blur-3xl opacity-20"></div>
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary-200 dark:bg-secondary-900/30 rounded-full filter blur-3xl opacity-20"></div>
         </div>
-        
+
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-20">
             <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full bg-secondary-100 dark:bg-secondary-900/30 border border-secondary-200 dark:border-secondary-800">
@@ -878,21 +877,19 @@ export default function LandingPage() {
               <div className="mt-8 inline-flex bg-gray-100 dark:bg-gray-800/80 p-1.5 rounded-full shadow-inner border border-gray-200 dark:border-gray-700 relative">
                 <button
                   onClick={() => setPlanType('restaurant')}
-                  className={`relative flex items-center justify-center gap-2 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${
-                    planType === 'restaurant'
-                      ? 'bg-primary-600 text-white shadow-lg transform scale-105'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
-                  }`}
+                  className={`relative flex items-center justify-center gap-2 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${planType === 'restaurant'
+                    ? 'bg-primary-600 text-white shadow-lg transform scale-105'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                    }`}
                 >
                   <span className="text-lg">🍽️</span> Restaurant
                 </button>
                 <button
                   onClick={() => setPlanType('retail')}
-                  className={`relative flex items-center justify-center gap-2 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${
-                    planType === 'retail'
-                      ? 'bg-primary-600 text-white shadow-lg transform scale-105'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
-                  }`}
+                  className={`relative flex items-center justify-center gap-2 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${planType === 'retail'
+                    ? 'bg-primary-600 text-white shadow-lg transform scale-105'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                    }`}
                 >
                   <span className="text-lg">🛒</span> Retail
                 </button>
@@ -916,27 +913,26 @@ export default function LandingPage() {
             <div className={`grid grid-cols-1 ${displayPlans.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'} ${displayPlans.length >= 2 ? 'lg:grid-cols-3' : ''} gap-6 max-w-7xl mx-auto items-start`}>
               {displayPlans.map((plan: any, index: number) => {
                 const isPopular = plan.isPopular || index === 1;
-                
+
                 // Use featureNames from backend (mapped from enabledFeatureKeys selected in super admin)
                 // This shows the actual feature names like "Dashboard", "Reports", "Staff Management"
                 const featureList: string[] = plan.featureNames && plan.featureNames.length > 0
                   ? plan.featureNames
                   : (plan.featureList && plan.featureList.length > 0 ? plan.featureList : []);
-                
+
                 return (
                   <div
                     key={plan.id}
-                    className={`relative rounded-3xl shadow-2xl p-6 sm:p-8 lg:p-10 transition-all duration-300 border-2 ${
-                      isPopular
-                        ? 'border-primary-400 bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900 scale-105'
-                        : 'border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-700'
-                    } group flex flex-col min-h-0`}
+                    className={`relative rounded-3xl shadow-2xl p-6 sm:p-8 lg:p-10 transition-all duration-300 border-2 ${isPopular
+                      ? 'border-primary-400 bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900 scale-105'
+                      : 'border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-700'
+                      } group flex flex-col min-h-0`}
                   >
                     {/* Background gradient for popular plan */}
                     {isPopular && (
                       <div className="absolute inset-0 bg-gradient-to-br from-primary-900/20 via-secondary-900/20 to-primary-900/20 opacity-50 pointer-events-none rounded-3xl"></div>
                     )}
-                    
+
                     {/* Popular badge */}
                     {isPopular && (
                       <div className="absolute -top-4 right-6 z-10">
@@ -951,20 +947,19 @@ export default function LandingPage() {
                       <h3 className={`text-2xl font-bold mb-2 ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
                         {(plan.displayName || plan.name).toUpperCase()}
                       </h3>
-                      
+
                       {/* Feature count badge if using enabledFeatureKeys */}
                       {plan.enabledFeatureKeys && plan.enabledFeatureKeys.length > 0 && (
                         <div className="mb-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            isPopular 
-                              ? 'bg-white/20 text-white' 
-                              : 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300'
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isPopular
+                            ? 'bg-white/20 text-white'
+                            : 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300'
+                            }`}>
                             {plan.enabledFeatureKeys.length} Features Included
                           </span>
                         </div>
                       )}
-                      
+
                       <div className="">
                         <div className={`text-4xl font-bold ${isPopular ? 'text-white' : 'text-primary-600 dark:text-primary-400'}`}>
                           {plan.price === 0 ? (
@@ -977,11 +972,10 @@ export default function LandingPage() {
                           )}
                         </div>
                         {plan.trialPeriod && plan.trialPeriod > 0 && (
-                          <div className={`text-sm font-semibold mt-2 ${
-                            isPopular ? 'text-yellow-300' : 'text-primary-600 dark:text-primary-400'
-                          }`}>
-                            {plan.trialPeriod === 168 
-                              ? '✓ 7 Days Free Trial' 
+                          <div className={`text-sm font-semibold mt-2 ${isPopular ? 'text-yellow-300' : 'text-primary-600 dark:text-primary-400'
+                            }`}>
+                            {plan.trialPeriod === 168
+                              ? '✓ 7 Days Free Trial'
                               : `${Math.round(plan.trialPeriod / 24)} Days Free Trial`}
                           </div>
                         )}
@@ -998,7 +992,7 @@ export default function LandingPage() {
                       </div>
                     </div>
 
-                    
+
 
                     <div className="space-y-3 mb-4 relative z-10">
                       {featureList.length > 0 ? (
@@ -1035,7 +1029,7 @@ export default function LandingPage() {
                               const bLower = b.toLowerCase();
                               const aIdx = priorityList.findIndex(p => aLower.includes(p));
                               const bIdx = priorityList.findIndex(p => bLower.includes(p));
-                              
+
                               if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
                               if (aIdx !== -1) return -1;
                               if (bIdx !== -1) return 1;
@@ -1043,9 +1037,8 @@ export default function LandingPage() {
                             });
                           })().map((feature, idx) => (
                             <div key={idx} className="flex items-start gap-2">
-                              <CheckCircleIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                                isPopular ? 'text-white' : 'text-green-500'
-                              }`} />
+                              <CheckCircleIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isPopular ? 'text-white' : 'text-green-500'
+                                }`} />
                               <span className={`text-sm ${isPopular ? 'text-gray-200' : 'text-gray-600 dark:text-gray-300'}`}>
                                 {feature}
                               </span>
@@ -1065,7 +1058,7 @@ export default function LandingPage() {
                         <h4 className={`font-semibold text-sm mb-3 ${isPopular ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
                           Plan Limits
                         </h4>
-                        
+
                         {/* Resource Limits */}
                         <div className="space-y-2">
                           {plan.limits.maxTables !== undefined && (
@@ -1211,21 +1204,20 @@ export default function LandingPage() {
                     <div className='mt-auto pt-6 pb-2 relative z-10'>
                       <Link href="/auth/register" >
                         <button
-                          className={`w-full py-3 rounded-lg font-semibold transition-all relative z-10 ${
-                            isPopular
-                              ? 'bg-red-600 text-white hover:bg-red-700'
-                              : 'bg-white text-gray-900 hover:bg-gray-100 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600'
-                          }`}
+                          className={`w-full py-3 rounded-lg font-semibold transition-all relative z-10 ${isPopular
+                            ? 'bg-red-600 text-white hover:bg-red-700'
+                            : 'bg-white text-gray-900 hover:bg-gray-100 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600'
+                            }`}
                         >
                           Get Started
                         </button>
                       </Link>
                     </div>
-                   
+
                   </div>
                 );
               })}
-              
+
               {/* Custom Plan Card */}
               <div className="relative rounded-3xl shadow-2xl p-6 sm:p-8 lg:p-10 transition-all duration-500 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 backdrop-blur-xl hover:shadow-2xl hover:-translate-y-2 hover:border-primary-300 dark:hover:border-primary-700 group flex flex-col items-center justify-center min-h-[500px]">
                 <div className="text-center">
@@ -1259,7 +1251,7 @@ export default function LandingPage() {
           <div className="absolute top-1/2 left-0 w-96 h-96 bg-yellow-200 dark:bg-yellow-900/20 rounded-full filter blur-3xl opacity-10"></div>
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-pink-200 dark:bg-pink-900/20 rounded-full filter blur-3xl opacity-10"></div>
         </div>
-        
+
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-20">
             <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800">
@@ -1305,11 +1297,11 @@ export default function LandingPage() {
                   >
                     {/* Gradient overlay */}
                     <div className="absolute inset-0 bg-gradient-to-br from-primary-50/50 via-transparent to-secondary-50/50 dark:from-primary-900/10 dark:to-secondary-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                    
+
                     <div className="relative z-10">
                       {/* Quote icon */}
                       <div className="absolute -top-2 -left-2 text-6xl text-primary-200 dark:text-primary-900/30 font-serif opacity-50">"</div>
-                      
+
                       {/* Rating stars */}
                       <div className="flex items-center mb-6 gap-1">
                         {[...Array(testimonial.rating)].map((_, i) => (
@@ -1319,12 +1311,12 @@ export default function LandingPage() {
                           />
                         ))}
                       </div>
-                      
+
                       {/* Testimonial content */}
                       <p className="text-gray-700 dark:text-gray-300 mb-8 italic text-lg leading-relaxed relative z-10">
                         "{testimonial.content}"
                       </p>
-                      
+
                       {/* Author info */}
                       <div className="flex items-center gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
                         <div className="relative">
@@ -1358,15 +1350,15 @@ export default function LandingPage() {
                   <ChevronLeftIcon className="w-6 h-6 text-gray-600 dark:text-gray-300" />
                 </button>
                 <div className="flex items-center gap-2">
-                   {testimonials.map((_, i) => (
-                     <div 
+                  {testimonials.map((_, i) => (
+                    <div
                       key={i}
                       className={cn(
                         "h-2 rounded-full transition-all duration-300",
                         i === testimonialIndex ? "w-8 bg-primary-500" : "w-2 bg-gray-300 dark:bg-gray-700"
                       )}
-                     />
-                   ))}
+                    />
+                  ))}
                 </div>
                 <button
                   onClick={nextTestimonial}
@@ -1390,14 +1382,14 @@ export default function LandingPage() {
         {/* Animated background */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-secondary-600 to-primary-600"></div>
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSIxLjUiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-20"></div>
-        
+
         <div className="max-w-5xl mx-auto text-center relative z-10">
           <div className="bg-white/10 dark:bg-white/5 backdrop-blur-2xl rounded-3xl p-12 md:p-16 shadow-2xl border border-white/20">
             <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full bg-white/20 backdrop-blur-sm border border-white/30">
               <SparklesIcon className="w-4 h-4 text-white" />
               <span className="text-sm font-semibold text-white">Join Us Today</span>
             </div>
-            
+
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 leading-tight">
               Ready to modernize your operations?
             </h2>
@@ -1412,7 +1404,7 @@ export default function LandingPage() {
                 </Button>
               </Link>
             </div>
-            
+
             {/* Trust indicators */}
             <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-white/80 text-sm">
               <div className="flex items-center gap-2">
@@ -1436,9 +1428,9 @@ export default function LandingPage() {
       <Footer />
 
       {/* Video Modal */}
-      <VideoModal 
-        isOpen={isVideoModalOpen} 
-        onClose={() => setIsVideoModalOpen(false)} 
+      <VideoModal
+        isOpen={isVideoModalOpen}
+        onClose={() => setIsVideoModalOpen(false)}
         videoUrl={demoVideoUrl}
       />
     </div>
