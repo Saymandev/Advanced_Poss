@@ -229,6 +229,18 @@ export class SystemSettings {
     deepseekBaseUrl: string;
     enabled: boolean;
   };
+
+  @Prop({
+    type: {
+      demoVideoUrl: { type: String, default: '' },
+    },
+    default: {
+      demoVideoUrl: '',
+    },
+  })
+  landingPage: {
+    demoVideoUrl: string;
+  };
 }
 
 export const SystemSettingsSchema = SchemaFactory.createForClass(SystemSettings);

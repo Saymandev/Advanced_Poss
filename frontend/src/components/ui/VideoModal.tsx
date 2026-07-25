@@ -20,7 +20,20 @@ export function VideoModal({ isOpen, onClose, videoUrl }: VideoModalProps) {
 
   if (!isOpen || !mounted) return null;
 
-  const embedUrl = videoUrl || 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1';
+  // Helper function to handle Google Drive URLs automatically
+  const getEmbedUrl = (url: string) => {
+    if (url.includes('drive.google.com/file/d/')) {
+      // Extract the file ID and force the /preview endpoint
+      const match = url.match(/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return `https://drive.google.com/file/d/${match[1]}/preview`;
+      }
+    }
+    return url;
+  };
+
+  const defaultPlaceholder = 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1';
+  const embedUrl = getEmbedUrl(videoUrl || defaultPlaceholder);
 
   const modalContent = (
     <div className="fixed inset-0 overflow-y-auto animate-fade-in" style={{ zIndex: 9999 }}>

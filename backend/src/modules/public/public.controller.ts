@@ -37,6 +37,16 @@ export class PublicController {
   ) {}
 
   @Public()
+  @Get('system-settings')
+  @ApiOperation({ summary: 'Get public system settings' })
+  async getPublicSystemSettings() {
+    return {
+      success: true,
+      data: await this.publicService.getPublicSystemSettings(),
+    };
+  }
+
+  @Public()
   @Get('resolve-domain')
   @ApiOperation({ summary: 'Resolve custom domain to company slug' })
   async resolveCustomDomain(@Query('domain') domain: string) {

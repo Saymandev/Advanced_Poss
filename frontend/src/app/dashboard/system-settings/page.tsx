@@ -58,7 +58,7 @@ export default function SystemSettingsPage() {
   }, [user, router]);
 
   const [activeTab, setActiveTab] = useState<
-    'maintenance' | 'defaults' | 'security' | 'email' | 'sms' | 'backup' | 'features' | 'ai'
+    'maintenance' | 'defaults' | 'security' | 'email' | 'sms' | 'backup' | 'features' | 'ai' | 'landingPage'
   >('maintenance');
 
   const { data: systemSettings, isLoading, refetch } = useGetSystemSettingsQuery(undefined, {

@@ -45,6 +45,22 @@ export class PublicService {
     private tablesService: TablesService,
     private reviewsService: ReviewsService,
   ) {}
+  async getPublicSystemSettings() {
+    try {
+      const settings = await this.settingsService.getSystemSettings();
+      return {
+        maintenanceMode: settings?.maintenanceMode,
+        maintenanceMessage: settings?.maintenanceMessage,
+        landingPage: settings?.landingPage || { demoVideoUrl: '' },
+      };
+    } catch (error) {
+      return {
+        maintenanceMode: false,
+        landingPage: { demoVideoUrl: '' },
+      };
+    }
+  }
+
 
   async createOrder(orderData: any) {
     // Check subscription limits for public ordering

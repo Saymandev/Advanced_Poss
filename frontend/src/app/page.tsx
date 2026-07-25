@@ -8,6 +8,7 @@ import { VideoModal } from '@/components/ui/VideoModal';
 import { Navbar } from '@/components/ui/Navbar';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { useGetPublicStatsQuery, useGetPublicTestimonialsQuery } from '@/lib/api/endpoints/systemFeedbackApi';
+import { useGetPublicSystemSettingsQuery } from '@/lib/api/endpoints/publicApi';
 import { cn } from '@/lib/utils';
 import {
   AcademicCapIcon,
@@ -231,6 +232,9 @@ export default function LandingPage() {
   const { data: plansData, isLoading: isLoadingPlans } = useGetSubscriptionPlansQuery({});
   const { data: statsData, isLoading: isLoadingStats } = useGetPublicStatsQuery();
   const { data: testimonialsData = [], isLoading: isLoadingTestimonials } = useGetPublicTestimonialsQuery({ limit: 3 });
+  const { data: systemSettingsResponse } = useGetPublicSystemSettingsQuery();
+  
+  const demoVideoUrl = systemSettingsResponse?.data?.landingPage?.demoVideoUrl || '';
   
   // Get available plans from API - handle both array and object responses
   const plans = useMemo(() => {
@@ -1338,6 +1342,7 @@ export default function LandingPage() {
       <VideoModal 
         isOpen={isVideoModalOpen} 
         onClose={() => setIsVideoModalOpen(false)} 
+        videoUrl={demoVideoUrl}
       />
     </div>
   );

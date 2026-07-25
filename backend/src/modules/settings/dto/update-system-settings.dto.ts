@@ -112,5 +112,12 @@ export class UpdateSystemSettingsDto {
     deepseekBaseUrl?: string;
     enabled?: boolean;
   };
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  landingPage?: {
+    demoVideoUrl?: string;
+  };
 }
 

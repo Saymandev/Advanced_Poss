@@ -131,6 +131,12 @@ export interface PublicBooking {
 }
 export const publicApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
+    getPublicSystemSettings: builder.query<{ success: boolean; data: any }, void>({
+      query: () => '/public/system-settings',
+    }),
+    resolveCustomDomain: builder.query<{ success: boolean; data: any }, string>({
+      query: (domain) => `/public/resolve-domain?domain=${encodeURIComponent(domain)}`,
+    }),
     getCompanyBySlug: builder.query<PublicCompany, string>({
       query: (slug) => `/public/companies/${slug}`,
       transformResponse: (response: any) => {
@@ -440,6 +446,8 @@ export const {
   useGetCompanyBySlugQuery,
   useGetBusinessCategoriesQuery,
   useGetCompanySettingsQuery,
+  useResolveCustomDomainQuery,
+  useGetPublicSystemSettingsQuery,
   useGetCompanyBranchesQuery,
   useGetBranchBySlugQuery,
   useGetBranchMenuByIdQuery,
