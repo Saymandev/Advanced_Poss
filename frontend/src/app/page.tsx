@@ -272,7 +272,12 @@ export default function LandingPage() {
   const retailPlans = useMemo(() => activePlans.filter((p: any) => p.name?.includes('retail')), [activePlans]);
 
   const { activeIndustry } = useIndustry();
-  const displayPlans = activeIndustry === 'retail' ? retailPlans : restaurantPlans;
+
+  useEffect(() => {
+    setPlanType(activeIndustry);
+  }, [activeIndustry]);
+
+  const displayPlans = planType === 'retail' ? retailPlans : restaurantPlans;
   
   // Dynamic features based on selected industry
   const features = useMemo(() => {
@@ -721,12 +726,43 @@ export default function LandingPage() {
               </span>
             </h2>
             <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              Tailored POS solutions optimized for the unique workflows of every hospitality sector.
+              Tailored POS solutions optimized for the unique workflows of every {activeIndustry === 'retail' ? 'retail' : 'hospitality'} sector.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
+            {(activeIndustry === 'retail' ? [
+              {
+                title: 'Supermarkets & Grocery',
+                description: 'Manage thousands of SKUs, track expiry dates, and speed up checkout lines.',
+                icon: BuildingStorefrontIcon,
+                gradient: 'from-orange-500 to-red-500'
+              },
+              {
+                title: 'Fashion & Apparel',
+                description: 'Handle variants like size and color, run seasonal promotions, and manage returns.',
+                icon: SparklesIcon,
+                gradient: 'from-yellow-500 to-orange-500'
+              },
+              {
+                title: 'Electronics & Gadgets',
+                description: 'Track serial numbers, manage warranties, and bundle products for upsells.',
+                icon: DevicePhoneMobileIcon,
+                gradient: 'from-blue-500 to-indigo-500'
+              },
+              {
+                title: 'Pharmacies & Health',
+                description: 'Batch tracking, expiry management, and compliance with ease.',
+                icon: ShieldCheckIcon,
+                gradient: 'from-emerald-500 to-teal-500'
+              },
+              {
+                title: 'Pop-up Shops & Kiosks',
+                description: 'Mobile-friendly POS for quick sales anywhere, anytime with offline sync.',
+                icon: BoltIcon,
+                gradient: 'from-purple-500 to-pink-500'
+              }
+            ] : [
               {
                 title: 'Restaurants & Fine Dining',
                 description: 'Master your table turnover, recipe costing, and kitchen communication.',
@@ -758,7 +794,7 @@ export default function LandingPage() {
                 gradient: 'from-purple-500 to-pink-500',
                 isComingSoon: true
               }
-            ].map((item, index) => (
+            ]).map((item, index) => (
               <div
                 key={index}
                 className="group relative"
@@ -839,26 +875,26 @@ export default function LandingPage() {
               Choose the perfect plan for your business. Start free, upgrade anytime.
             </p>
             {retailPlans.length > 0 && (
-              <div className="mt-8 inline-flex bg-gray-200 dark:bg-gray-800 rounded-full p-1">
+              <div className="mt-8 inline-flex bg-gray-100 dark:bg-gray-800/80 p-1.5 rounded-full shadow-inner border border-gray-200 dark:border-gray-700 relative">
                 <button
                   onClick={() => setPlanType('restaurant')}
-                  className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                  className={`relative flex items-center justify-center gap-2 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${
                     planType === 'restaurant'
-                      ? 'bg-white dark:bg-gray-700 text-primary-600 shadow'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-primary-600 text-white shadow-lg transform scale-105'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
                   }`}
                 >
-                  🍽️ Restaurant
+                  <span className="text-lg">🍽️</span> Restaurant
                 </button>
                 <button
                   onClick={() => setPlanType('retail')}
-                  className={`flex-1 rounded-full py-2.5 px-4 text-sm font-semibold transition-all ${
+                  className={`relative flex items-center justify-center gap-2 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${
                     planType === 'retail'
-                      ? 'bg-white dark:bg-gray-700 text-primary-600 shadow'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-primary-600 text-white shadow-lg transform scale-105'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
                   }`}
                 >
-                  🛒 Retail
+                  <span className="text-lg">🛒</span> Retail
                 </button>
               </div>
             )}

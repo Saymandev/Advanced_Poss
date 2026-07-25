@@ -43,8 +43,8 @@ export function Navbar({ transparent = false }: NavbarProps) {
   return (
     <nav className={navbarClasses}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-14">
-          <Link href="/" className="flex items-center space-x-3 group cursor-pointer w-1/3">
+        <div className="flex flex-wrap md:flex-nowrap justify-between items-center py-2 md:py-0 md:h-14 gap-y-3">
+          <Link href="/" className="flex items-center space-x-3 group cursor-pointer w-1/2 md:w-1/3">
             <div className="relative flex items-center">
               <img
                 src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
@@ -55,7 +55,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
           </Link>
 
           {/* Global Industry Switcher */}
-          <div className="hidden md:flex justify-center w-1/3">
+          <div className="flex justify-center w-full md:w-1/3 order-last md:order-none">
             <div className={cn(
               "flex items-center rounded-full p-1 border transition-colors shadow-inner",
               (isScrolled || !transparent) ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700" : "bg-black/20 border-white/20 backdrop-blur-md"
@@ -99,7 +99,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
           </div>
 
           {/* Mobile menu - simplified for now */}
-          <div className="md:hidden flex items-center space-x-2">
+          <div className="md:hidden flex items-center justify-end space-x-2 w-1/2">
             <Link href="/auth/login">
               <Button variant="ghost" size="sm" className={textClasses}>
                 Login
