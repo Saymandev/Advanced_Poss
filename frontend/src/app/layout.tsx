@@ -46,8 +46,13 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: appName,
-    description: `${appName} – modern restaurant management system for bars, cafes, restaurants and Hotels`,
+    title: {
+      default: `${appName} - Best POS for Restaurant & Retail`,
+      template: `%s | ${appName}`
+    },
+    description: `Leading Point of Sale (POS) and management system for restaurants, cafes, hotels, supermarkets, and retail businesses. Streamline operations with ${appName}.`,
+    keywords: ['Restaurant POS', 'Retail POS', 'Supermarket POS software', 'Cafe Management System', 'Hotel POS', 'Cloud POS', 'Inventory Management', 'Billing Software', 'Raha POS'],
+    authors: [{ name: appName }],
     applicationName: appName,
     manifest: '/manifest.json',
     icons: {
@@ -57,6 +62,39 @@ export async function generateMetadata(): Promise<Metadata> {
       ],
       shortcut: faviconUrl,
       apple: faviconUrl,
+    },
+    openGraph: {
+      type: 'website',
+      locale: 'en_US',
+      url: 'https://raha.bd',
+      title: `${appName} - Best POS for Restaurant & Retail`,
+      description: `Leading Point of Sale (POS) and management system for restaurants, cafes, hotels, supermarkets, and retail businesses. Streamline your operations today.`,
+      siteName: appName,
+      images: [
+        {
+          url: faviconUrl,
+          width: 800,
+          height: 600,
+          alt: `${appName} Logo`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${appName} - Best POS for Restaurant & Retail`,
+      description: `Leading Point of Sale (POS) system for restaurants, cafes, hotels, supermarkets, and retail businesses.`,
+      images: [faviconUrl],
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
     },
   };
 }
