@@ -540,11 +540,11 @@ export default function LandingPage() {
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-extrabold text-white mb-4 sm:mb-6 leading-tight drop-shadow-2xl px-2">
               <span className="block mb-2 sm:mb-4 text-3xl sm:text-4xl md:text-5xl opacity-90 font-medium tracking-tight animate-fade-in">Built for Every Type of</span>
               <span className="block leading-[1.1]">
-                <span className="inline-block align-middle bg-gradient-to-r from-yellow-200 via-orange-300 to-yellow-200 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient animate-reveal-up animate-title-glow px-1" style={{ animationDelay: '200ms' }}>
+                <span className="inline-block bg-gradient-to-r from-yellow-200 via-orange-300 to-yellow-200 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient animate-reveal-up animate-title-glow px-1" style={{ animationDelay: '200ms' }}>
                   {activeIndustry === 'retail' ? 'Retail' : 'Restaurant'}
                 </span>
-                <span className="inline-block align-middle mx-2 sm:mx-3 text-white/80 font-light italic text-2xl sm:text-3xl md:text-4xl lg:text-5xl animate-ampersand animate-fade-in relative -top-[0.05em]" style={{ animationDelay: '400ms' }}>&</span>
-                <span className="inline-block align-middle bg-gradient-to-r from-orange-300 via-yellow-200 to-orange-300 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient animate-reveal-up animate-title-glow px-1" style={{ animationDelay: '600ms' }}>
+                <span className="inline-block mx-2 sm:mx-3 text-white/80 font-light italic text-2xl sm:text-3xl md:text-4xl lg:text-5xl lg:align-middle animate-ampersand animate-fade-in" style={{ animationDelay: '400ms' }}>&</span>
+                <span className="inline-block bg-gradient-to-r from-orange-300 via-yellow-200 to-orange-300 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient animate-reveal-up animate-title-glow px-1" style={{ animationDelay: '600ms' }}>
                   {activeIndustry === 'retail' ? 'Supermarket' : 'Hospitality'}
                 </span>
                 <span className="block mt-1 sm:mt-2 text-4xl sm:text-5xl md:text-6xl lg:text-7xl animate-fade-in" style={{ animationDelay: '800ms' }}>Business</span>
