@@ -195,13 +195,21 @@ export async function middleware(request: NextRequest) {
   const isHomeRoute = pathname === '/';
   const isDashboardRoute = pathname.startsWith('/dashboard');
 
-  if (isAuthRoute || isHomeRoute) {
+  const PUBLIC_ROUTES = ['/about', '/contact', '/terms', '/privacy', '/refund', '/security', '/eula', '/help-center', '/blog'];
+  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'));
+
+  if (isAuthRoute || isHomeRoute || isPublicRoute) {
     if (userInfoCookie?.value) {
       try {
         const parsedInfo = JSON.parse(decodeURIComponent(userInfoCookie.value));
         const url = request.nextUrl.clone();
-        url.pathname = getRoleDashboardPath(parsedInfo.role);
-        return NextResponse.redirect(url);
+        
+        // If authenticated user visits public route, don't force redirect to dashboard
+        // unless they are explicitly on the auth or home page.
+        if (isAuthRoute || isHomeRoute) {
+          url.pathname = getRoleDashboardPath(parsedInfo.role);
+          return NextResponse.redirect(url);
+        }
       } catch {
         // Fall back to continuing if cookie is invalid
       }

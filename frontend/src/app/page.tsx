@@ -4,6 +4,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { Footer } from '@/components/ui/Footer';
+import { VideoModal } from '@/components/ui/VideoModal';
 import { Navbar } from '@/components/ui/Navbar';
 import { useGetSubscriptionPlansQuery } from '@/lib/api/endpoints/subscriptionsApi';
 import { useGetPublicStatsQuery, useGetPublicTestimonialsQuery } from '@/lib/api/endpoints/systemFeedbackApi';
@@ -219,6 +220,7 @@ const getHexColor = (twClass: string) => {
 };
 
 export default function LandingPage() {
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -491,12 +493,17 @@ export default function LandingPage() {
                   <ArrowRightIcon className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Link href="/auth/login" className="group w-full sm:w-auto">
-                <Button size="lg" variant="secondary" className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 border-2 border-white/30 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white hover:border-white/50 transition-all duration-300">
+              <div className="group w-full sm:w-auto">
+                <Button 
+                  size="lg" 
+                  variant="secondary" 
+                  onClick={() => setIsVideoModalOpen(true)}
+                  className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 border-2 border-white/30 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white hover:border-white/50 transition-all duration-300"
+                >
                   <PlayIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Watch Demo
                 </Button>
-              </Link>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-12 sm:mt-16 md:mt-24 px-4">
@@ -1326,6 +1333,12 @@ export default function LandingPage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Video Modal */}
+      <VideoModal 
+        isOpen={isVideoModalOpen} 
+        onClose={() => setIsVideoModalOpen(false)} 
+      />
     </div>
   );
 }
