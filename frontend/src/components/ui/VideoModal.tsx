@@ -77,14 +77,24 @@ export function VideoModal({ isOpen, onClose, videoUrl }: VideoModalProps) {
 
           {/* Video Container (16:9 aspect ratio) */}
           <div className="relative w-full pt-[56.25%] bg-black">
-            <iframe
-              className="absolute inset-0 w-full h-full"
-              src={embedUrl}
-              title="Product Demo"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            ></iframe>
+            {embedUrl.endsWith('.mp4') || embedUrl.endsWith('.webm') || embedUrl.startsWith('/') ? (
+              <video
+                className="absolute inset-0 w-full h-full"
+                src={embedUrl}
+                controls
+                autoPlay
+                playsInline
+              />
+            ) : (
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src={embedUrl}
+                title="Product Demo"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
+            )}
           </div>
         </div>
       </div>
