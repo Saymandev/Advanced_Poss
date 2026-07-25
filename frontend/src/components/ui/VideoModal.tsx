@@ -91,7 +91,7 @@ export function VideoModal({ isOpen, onClose, videoUrl, videoTitle, videoDescrip
         <div
           className={cn(
             "relative transform overflow-hidden rounded-2xl bg-black text-left align-middle shadow-[0_0_50px_rgba(255,255,255,0.1)] border border-white/10 transition-all sm:my-8 w-full animate-scale-in flex flex-col md:flex-row",
-            hasPlaylist ? "max-w-6xl md:h-[80vh]" : "max-w-5xl"
+            hasPlaylist ? "max-w-6xl" : "max-w-5xl"
           )}
         >
           {/* Close Button */}
@@ -103,7 +103,7 @@ export function VideoModal({ isOpen, onClose, videoUrl, videoTitle, videoDescrip
           </button>
 
           {/* Main Video Area */}
-          <div className={cn("flex flex-col bg-black overflow-y-auto", hasPlaylist ? "w-full md:w-2/3 lg:w-3/4 border-r border-white/10" : "w-full")}>
+          <div className={cn("flex flex-col bg-black", hasPlaylist ? "w-full md:w-2/3 lg:w-3/4" : "w-full")}>
             <div className="relative w-full pt-[56.25%] bg-black shrink-0">
               {embedUrl.endsWith('.mp4') || embedUrl.endsWith('.webm') || embedUrl.startsWith('/') ? (
                 <video
@@ -136,32 +136,34 @@ export function VideoModal({ isOpen, onClose, videoUrl, videoTitle, videoDescrip
 
           {/* Playlist Sidebar */}
           {hasPlaylist && (
-            <div className="w-full md:w-1/3 lg:w-1/4 bg-gray-900 overflow-y-auto border-t md:border-t-0 border-white/10 flex flex-col h-64 md:h-auto">
-              <div className="p-4 border-b border-white/10 bg-black sticky top-0 z-10">
-                <h4 className="text-white font-semibold">More Videos</h4>
-              </div>
-              <div className="flex flex-col p-2 gap-2">
-                {videos.map((vid, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveVideoIndex(idx)}
-                    className={cn(
-                      "text-left p-3 rounded-xl transition-all flex flex-col gap-1",
-                      activeVideoIndex === idx 
-                        ? "bg-white/10 border border-white/20" 
-                        : "hover:bg-white/5 border border-transparent"
-                    )}
-                  >
-                    <span className={cn("font-medium text-sm line-clamp-2", activeVideoIndex === idx ? "text-white" : "text-gray-300")}>
-                      {vid.title || `Demo Video ${idx + 1}`}
-                    </span>
-                    {vid.description && (
-                      <span className="text-xs text-gray-500 line-clamp-2">
-                        {vid.description}
+            <div className="w-full md:w-1/3 lg:w-1/4 bg-gray-900 border-t md:border-t-0 md:border-l border-white/10 relative">
+              <div className="md:absolute md:inset-0 overflow-y-auto flex flex-col h-64 md:h-full">
+                <div className="p-4 border-b border-white/10 bg-black sticky top-0 z-10 shrink-0">
+                  <h4 className="text-white font-semibold">More Videos</h4>
+                </div>
+                <div className="flex flex-col p-2 gap-2">
+                  {videos.map((vid, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveVideoIndex(idx)}
+                      className={cn(
+                        "text-left p-3 rounded-xl transition-all flex flex-col gap-1",
+                        activeVideoIndex === idx 
+                          ? "bg-white/10 border border-white/20" 
+                          : "hover:bg-white/5 border border-transparent"
+                      )}
+                    >
+                      <span className={cn("font-medium text-sm line-clamp-2", activeVideoIndex === idx ? "text-white" : "text-gray-300")}>
+                        {vid.title || `Demo Video ${idx + 1}`}
                       </span>
-                    )}
-                  </button>
-                ))}
+                      {vid.description && (
+                        <span className="text-xs text-gray-500 line-clamp-2">
+                          {vid.description}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
