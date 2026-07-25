@@ -1411,52 +1411,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Video Gallery Section */}
-      {demoVideos.length > 0 && (
-        <section className="py-24 bg-gray-50 dark:bg-gray-900" id="videos">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-                See Raha POS in Action
-              </h2>
-              <p className="text-lg text-gray-600 dark:text-gray-400">
-                Watch our product demonstrations to see how easy it is to manage your business.
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {demoVideos.map((video: any, idx: number) => (
-                <div 
-                  key={idx}
-                  className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all cursor-pointer group"
-                  onClick={() => {
-                    setActiveVideo(video);
-                    setIsVideoModalOpen(true);
-                  }}
-                >
-                  <div className="relative aspect-video bg-black flex items-center justify-center">
-                    {/* Placeholder thumbnail */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary-900 to-black opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center group-hover:scale-110 transition-transform z-10">
-                      <div className="w-0 h-0 border-t-8 border-t-transparent border-l-[14px] border-l-white border-b-8 border-b-transparent ml-1"></div>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                      {video.title || `Demo Video ${idx + 1}`}
-                    </h3>
-                    {video.description && (
-                      <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-3">
-                        {video.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Footer */}
       <Footer />
