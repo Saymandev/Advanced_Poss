@@ -858,6 +858,30 @@ export default function SystemSettingsPage() {
           </div>
         )}
 
+        {/* Landing Page Settings */}
+        {activeTab === 'landingPage' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Landing Page Configuration</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Input
+                    label="Demo Video URL"
+                    value={formData.landingPage?.demoVideoUrl || ''}
+                    onChange={(e) => updateField('landingPage.demoVideoUrl', e.target.value)}
+                    placeholder="https://drive.google.com/file/d/..."
+                  />
+                  <p className="text-xs text-gray-500">
+                    Enter a YouTube embed URL or a Google Drive share link for the "Watch Demo" video.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Save Button */}
         {(
           <div className="flex justify-end">
