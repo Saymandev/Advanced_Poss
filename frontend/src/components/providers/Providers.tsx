@@ -58,6 +58,8 @@ function ClientOnlyToaster() {
   );
 }
 
+import { IndustryProvider } from '@/contexts/IndustryContext';
+
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <Provider store={store}>
@@ -65,8 +67,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <AuthRestorer>
           <CurrencyProvider>
             <SocketProvider>
-              {children}
-              <ClientOnlyToaster />
+              <IndustryProvider>
+                {children}
+                <ClientOnlyToaster />
+              </IndustryProvider>
             </SocketProvider>
           </CurrencyProvider>
         </AuthRestorer>

@@ -5,12 +5,15 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { useIndustry } from '@/contexts/IndustryContext';
+
 interface NavbarProps {
   transparent?: boolean;
 }
 
 export function Navbar({ transparent = false }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
+  const { activeIndustry, setActiveIndustry } = useIndustry();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -41,7 +44,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
     <nav className={navbarClasses}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14">
-          <Link href="/" className="flex items-center space-x-3 group cursor-pointer">
+          <Link href="/" className="flex items-center space-x-3 group cursor-pointer w-1/3">
             <div className="relative flex items-center">
               <img
                 src="https://res.cloudinary.com/dy9yjhmex/image/upload/v1772008704/restogo-logo_yxebls.png"
@@ -51,7 +54,38 @@ export function Navbar({ transparent = false }: NavbarProps) {
             </div>
           </Link>
 
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Global Industry Switcher */}
+          <div className="hidden md:flex justify-center w-1/3">
+            <div className={cn(
+              "flex items-center rounded-full p-1 border transition-colors shadow-inner",
+              (isScrolled || !transparent) ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700" : "bg-black/20 border-white/20 backdrop-blur-md"
+            )}>
+              <button
+                onClick={() => setActiveIndustry('restaurant')}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300",
+                  activeIndustry === 'restaurant'
+                    ? (isScrolled || !transparent) ? "bg-white dark:bg-gray-700 text-primary-600 shadow-sm" : "bg-white/90 text-primary-600 shadow-sm"
+                    : (isScrolled || !transparent) ? "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100" : "text-white/70 hover:text-white"
+                )}
+              >
+                🍽️ Restaurant
+              </button>
+              <button
+                onClick={() => setActiveIndustry('retail')}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300",
+                  activeIndustry === 'retail'
+                    ? (isScrolled || !transparent) ? "bg-white dark:bg-gray-700 text-primary-600 shadow-sm" : "bg-white/90 text-primary-600 shadow-sm"
+                    : (isScrolled || !transparent) ? "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100" : "text-white/70 hover:text-white"
+                )}
+              >
+                🛍️ Retail
+              </button>
+            </div>
+          </div>
+
+          <div className="hidden md:flex items-center justify-end space-x-4 w-1/3">
             <Link href="/auth/login">
               <Button variant="ghost" className={textClasses}>
                 Login

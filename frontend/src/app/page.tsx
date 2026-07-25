@@ -36,22 +36,33 @@ import {
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { useIndustry, IndustryType } from '@/contexts/IndustryContext';
 
 // Hero Image Slider Component
-const HeroImageSlider = () => {
+const HeroImageSlider = ({ industry }: { industry: IndustryType }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   
-  // Gorgeous restaurant images - using high-quality Unsplash images
-  const images = [
-    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1920&q=80', // Hotel
-    'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1920&q=80', // Cafe
-    'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=1920&q=80', // Bakery
-    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80', // Restaurant
-    'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=1920&q=80', // Bar
-    'https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=1920&q=80', // Food Truck
-  ];
+  // High-quality Unsplash images based on industry
+  const images = useMemo(() => {
+    if (industry === 'retail') {
+      return [
+        'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1920&q=80', // Retail Store
+        'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80', // POS checkout
+        'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=1920&q=80', // Supermarket
+        'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=1920&q=80', // Boutique
+      ];
+    }
+    return [
+      'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1920&q=80', // Hotel
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1920&q=80', // Cafe
+      'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=1920&q=80', // Bakery
+      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80', // Restaurant
+      'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=1920&q=80', // Bar
+      'https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=1920&q=80', // Food Truck
+    ];
+  }, [industry]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -259,11 +270,58 @@ export default function LandingPage() {
   const restaurantPlans = useMemo(() => activePlans.filter((p: any) => !p.name?.includes('retail')), [activePlans]);
   const retailPlans = useMemo(() => activePlans.filter((p: any) => p.name?.includes('retail')), [activePlans]);
 
-  const [planType, setPlanType] = useState<'restaurant' | 'retail'>('restaurant');
-  const displayPlans = planType === 'retail' ? retailPlans : restaurantPlans;
+  const { activeIndustry } = useIndustry();
+  const displayPlans = activeIndustry === 'retail' ? retailPlans : restaurantPlans;
   
-  // Hardcoded features for the landing page marketing
+  // Dynamic features based on selected industry
   const features = useMemo(() => {
+    if (activeIndustry === 'retail') {
+      return [
+        { 
+          key: 'inventory', 
+          icon: ChartBarIcon, 
+          title: 'Smart Stock & Inventory', 
+          description: 'Track stock across multiple warehouses in real-time. Receive low stock alerts and automatically generate purchase orders for suppliers.', 
+          gradient: 'from-green-500 to-emerald-500' 
+        },
+        { 
+          key: 'barcode-scanning', 
+          icon: DevicePhoneMobileIcon, 
+          title: 'Barcode Scanning & Labels', 
+          description: 'Speed up checkout with instant barcode scanning. Generate and print your own custom barcode labels for products without them.', 
+          gradient: 'from-indigo-500 to-blue-500' 
+        },
+        { 
+          key: 'multi-branch', 
+          icon: UserGroupIcon, 
+          title: 'Multi-Store Management', 
+          description: 'Control all your retail branches from a single master dashboard. Transfer stock between stores and compare branch performance.', 
+          gradient: 'from-purple-500 to-pink-500' 
+        },
+        { 
+          key: 'offline-sync', 
+          icon: CloudArrowUpIcon, 
+          title: 'Unbreakable Offline Sync', 
+          description: 'Keep processing sales and printing receipts even if the internet goes down. Data syncs automatically when you reconnect.', 
+          gradient: 'from-blue-500 to-cyan-500' 
+        },
+        { 
+          key: 'accounting', 
+          icon: ChartBarIcon, 
+          title: 'Accounting & Ledgers', 
+          description: 'Track daily expenses, supplier payouts, and overall cash flow directly inside your dashboard. No more messy spreadsheets.', 
+          gradient: 'from-teal-500 to-emerald-500' 
+        },
+        { 
+          key: 'loyalty', 
+          icon: SparklesIcon, 
+          title: 'Customer Loyalty & SMS', 
+          description: 'Build a massive customer database. Reward repeat shoppers with points and send targeted SMS marketing campaigns.', 
+          gradient: 'from-yellow-500 to-orange-500' 
+        },
+      ];
+    }
+
     return [
       { 
         key: 'offline-sync', 
@@ -329,7 +387,7 @@ export default function LandingPage() {
         gradient: 'from-violet-500 to-purple-500' 
       },
     ];
-  }, []);
+  }, [activeIndustry]);
   
   // Smart Data Reversion Logic
   const isRealDataReady = useMemo(() => {
@@ -460,7 +518,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="relative pt-20 sm:pt-24 pb-16 sm:pb-22 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center">
         {/* Image Slider Background */}
-        <HeroImageSlider />
+        <HeroImageSlider industry={activeIndustry} />
         
         <div className="max-w-7xl mx-auto w-full relative z-10">
           <div className="text-center">
@@ -478,17 +536,19 @@ export default function LandingPage() {
               <span className="block mb-2 sm:mb-4 text-3xl sm:text-4xl md:text-5xl opacity-90 font-medium tracking-tight animate-fade-in">Built for Every Type of</span>
               <span className="block leading-[1.1]">
                 <span className="inline-block bg-gradient-to-r from-yellow-200 via-orange-300 to-yellow-200 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient animate-reveal-up animate-title-glow px-1" style={{ animationDelay: '200ms' }}>
-                  Restaurant
+                  {activeIndustry === 'retail' ? 'Retail Store' : 'Restaurant'}
                 </span>
                 <span className="inline-block mx-2 sm:mx-3 text-white/80 font-light italic text-2xl sm:text-3xl md:text-4xl lg:text-5xl lg:align-middle animate-ampersand animate-fade-in" style={{ animationDelay: '400ms' }}>&</span>
                 <span className="inline-block bg-gradient-to-r from-orange-300 via-yellow-200 to-orange-300 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient animate-reveal-up animate-title-glow px-1" style={{ animationDelay: '600ms' }}>
-                  Hospitality
+                  {activeIndustry === 'retail' ? 'Supermarket' : 'Hospitality'}
                 </span>
                 <span className="block mt-1 sm:mt-2 text-4xl sm:text-5xl md:text-6xl lg:text-7xl animate-fade-in" style={{ animationDelay: '800ms' }}>Business</span>
               </span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl text-white/95 mb-8 sm:mb-12 max-w-4xl mx-auto leading-relaxed font-light drop-shadow-lg px-4">
-              Whether you run a busy corner cafe or a multi room resort Raha adapts to your workflow.
+              {activeIndustry === 'retail' 
+                ? 'Whether you run a busy corner shop or a multi-location supermarket, Raha adapts to your workflow.' 
+                : 'Whether you run a busy corner cafe or a multi room resort, Raha adapts to your workflow.'}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
               <Link href="/contact" className="group w-full sm:w-auto">
