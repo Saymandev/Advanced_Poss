@@ -233,13 +233,24 @@ export class SystemSettings {
   @Prop({
     type: {
       demoVideoUrl: { type: String, default: '' },
+      demoVideos: [{
+        title: { type: String, default: '' },
+        description: { type: String, default: '' },
+        url: { type: String, default: '' }
+      }],
     },
     default: {
       demoVideoUrl: '',
+      demoVideos: [],
     },
   })
   landingPage: {
     demoVideoUrl: string;
+    demoVideos: {
+      title: string;
+      description: string;
+      url: string;
+    }[];
   };
 }
 

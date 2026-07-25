@@ -9,9 +9,11 @@ interface VideoModalProps {
   isOpen: boolean;
   onClose: () => void;
   videoUrl?: string; // Optional custom URL
+  videoTitle?: string;
+  videoDescription?: string;
 }
 
-export function VideoModal({ isOpen, onClose, videoUrl }: VideoModalProps) {
+export function VideoModal({ isOpen, onClose, videoUrl, videoTitle, videoDescription }: VideoModalProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -96,6 +98,14 @@ export function VideoModal({ isOpen, onClose, videoUrl }: VideoModalProps) {
               ></iframe>
             )}
           </div>
+          
+          {/* Title and Description */}
+          {(videoTitle || videoDescription) && (
+            <div className="p-6 bg-black/95 border-t border-white/10">
+              {videoTitle && <h3 className="text-xl font-bold text-white mb-2">{videoTitle}</h3>}
+              {videoDescription && <p className="text-gray-300 text-sm leading-relaxed">{videoDescription}</p>}
+            </div>
+          )}
         </div>
       </div>
     </div>

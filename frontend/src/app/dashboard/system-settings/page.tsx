@@ -21,6 +21,8 @@ import {
   LockClosedIcon,
   ShieldCheckIcon,
   CpuChipIcon,
+  PlusIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -863,20 +865,83 @@ export default function SystemSettingsPage() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Landing Page Configuration</CardTitle>
+                <CardTitle className="flex justify-between items-center">
+                  <span>Demo Videos</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentVideos = formData.landingPage?.demoVideos || [];
+                      updateField('landingPage.demoVideos', [
+                        ...currentVideos,
+                        { title: '', description: '', url: '' },
+                      ]);
+                    }}
+                  >
+                    <PlusIcon className="w-4 h-4 mr-2" />
+                    Add Video
+                  </Button>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Input
-                    label="Demo Video URL"
-                    value={formData.landingPage?.demoVideoUrl || ''}
-                    onChange={(e) => updateField('landingPage.demoVideoUrl', e.target.value)}
-                    placeholder="https://drive.google.com/file/d/..."
-                  />
-                  <p className="text-xs text-gray-500">
-                    Enter a YouTube embed URL or a Google Drive share link for the "Watch Demo" video.
-                  </p>
-                </div>
+                {(formData.landingPage?.demoVideos || []).map((video, index) => (
+                  <div key={index} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800/50 space-y-4 relative group">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newVideos = [...(formData.landingPage?.demoVideos || [])];
+                        newVideos.splice(index, 1);
+                        updateField('landingPage.demoVideos', newVideos);
+                      }}
+                      className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
+                      title="Remove Video"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                    
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Video #{index + 1}</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        label="Video Title"
+                        value={video.title}
+                        onChange={(e) => {
+                          const newVideos = [...(formData.landingPage?.demoVideos || [])];
+                          newVideos[index] = { ...newVideos[index], title: e.target.value };
+                          updateField('landingPage.demoVideos', newVideos);
+                        }}
+                        placeholder="e.g. System Overview"
+                      />
+                      <Input
+                        label="Video URL"
+                        value={video.url}
+                        onChange={(e) => {
+                          const newVideos = [...(formData.landingPage?.demoVideos || [])];
+                          newVideos[index] = { ...newVideos[index], url: e.target.value };
+                          updateField('landingPage.demoVideos', newVideos);
+                        }}
+                        placeholder="e.g. /demo.mp4 or YouTube link"
+                      />
+                    </div>
+                    <Input
+                      label="Short Description"
+                      value={video.description}
+                      onChange={(e) => {
+                        const newVideos = [...(formData.landingPage?.demoVideos || [])];
+                        newVideos[index] = { ...newVideos[index], description: e.target.value };
+                        updateField('landingPage.demoVideos', newVideos);
+                      }}
+                      placeholder="Brief description of what this video shows"
+                    />
+                  </div>
+                ))}
+                
+                {(!formData.landingPage?.demoVideos || formData.landingPage.demoVideos.length === 0) && (
+                  <div className="text-center py-8 text-gray-500">
+                    No videos added yet. Click "Add Video" to get started.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

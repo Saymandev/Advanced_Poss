@@ -118,6 +118,11 @@ export class UpdateSystemSettingsDto {
   @IsObject()
   landingPage?: {
     demoVideoUrl?: string;
+    demoVideos?: {
+      title?: string;
+      description?: string;
+      url?: string;
+    }[];
   };
 }
 
