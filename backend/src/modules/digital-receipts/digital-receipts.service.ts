@@ -237,14 +237,41 @@ export class DigitalReceiptsService {
       orderId = String(receipt.orderId);
     }
 
+    const receiptData = await this.receiptService.generateReceiptData(orderId);
     const receiptHtml = await this.receiptService.generateReceiptHTML(orderId);
 
-    // Send email with receipt
-    const subject = `Receipt ${receipt.receiptNumber} - ${receipt.receiptNumber}`;
+    const companyName = receiptData.restaurantName || 'Raha POS';
+    const logoUrl = receiptData.receiptSettings?.logoUrl;
+    const publicUrl = receiptData.publicUrl;
+
+    const subject = `Receipt ${receipt.receiptNumber} from ${companyName}`;
+    
+    // Wrap the raw POS receipt in a proper email layout with logo and public portal link
+    const emailHtmlTemplate = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; text-align: center; background-color: #f9fafb;">
+        <div style="background-color: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          ${logoUrl ? `<img src="${logoUrl}" alt="${companyName}" style="max-height: 80px; margin-bottom: 20px; object-fit: contain;" />` : `<h2 style="color: #111827; margin-bottom: 20px;">${companyName}</h2>`}
+          
+          <p style="color: #4b5563; margin-bottom: 30px;">Thank you for your visit! Here is your digital receipt.</p>
+          
+          <div style="display: inline-block; text-align: left; background: white; padding: 15px; border: 1px dashed #d1d5db; border-radius: 8px; margin-bottom: 30px; width: 100%; max-width: 400px; box-sizing: border-box;">
+            ${receiptHtml}
+          </div>
+
+          ${publicUrl ? `
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #f3f4f6;">
+            <p style="color: #4b5563; margin-bottom: 15px; font-weight: 500;">Want to order again?</p>
+            <a href="${publicUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; text-transform: uppercase; font-size: 14px; letter-spacing: 0.5px;">Order from our Public Portal</a>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
     const emailSent = await this.emailService.sendEmail(
       emailDto.email,
       subject,
-      receiptHtml,
+      emailHtmlTemplate,
     );
 
     // Mark as emailed regardless of success (to track attempts)
@@ -276,14 +303,38 @@ export class DigitalReceiptsService {
       throw new NotFoundException('Digital receipt not found');
     }
 
+    // Fetch receipt data for company info and public URL
+    let orderId: string;
+    if (receipt.orderId instanceof Types.ObjectId) {
+      orderId = receipt.orderId.toString();
+    } else if (typeof receipt.orderId === 'object' && receipt.orderId !== null) {
+      orderId = (receipt.orderId as any)._id?.toString() || (receipt.orderId as any).toString();
+    } else {
+      orderId = String(receipt.orderId);
+    }
+    
+    let companyName = 'Raha POS';
+    let publicUrl = null;
+    try {
+      const receiptData = await this.receiptService.generateReceiptData(orderId);
+      companyName = receiptData.restaurantName || companyName;
+      publicUrl = receiptData.publicUrl;
+    } catch (e) {
+      console.warn('Could not fetch full receipt data for SMS, using defaults');
+    }
+
     // Format SMS message
     const orderDate = new Date((receipt as any).createdAt).toLocaleDateString('en-GB');
-    const message = `Raha POS Receipt
+    let message = `${companyName} Receipt
 Order #${receipt.receiptNumber}
 Items: ${receipt.items.length}
 Total: ৳${receipt.total.toFixed(2)}
 Date: ${orderDate}
 Thank you for your visit!`;
+
+    if (publicUrl) {
+      message += `\nOrder again: ${publicUrl}`;
+    }
 
     // Send SMS
     const smsSent = await this.smsService.sendSms(
