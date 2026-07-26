@@ -505,6 +505,7 @@ export class ReceiptService {
       dueAmount: Math.max(0, actualTotal - ((order as any).amountReceived || (order.paymentId as any)?.amountReceived || 0)),
       createdAt: (order as any)?.createdAt || new Date(),
       completedAt: (order as any)?.completedAt || undefined,
+      companyName: company?.name || companySettings?.companyName || 'Raha POS',
       // Restaurant info
       restaurantName: restaurantName,
       restaurantAddress: restaurantAddress,

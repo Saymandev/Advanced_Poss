@@ -521,6 +521,8 @@ export class EmailService {
     items: Array<{ name: string; quantity: number; price: number }>,
     loyaltyPointsUsed?: number,
     loyaltyDiscount?: number,
+    logoUrl?: string,
+    publicUrl?: string,
   ): Promise<boolean> {
     const subject = `Order Confirmation - ${orderNumber} from ${companyName}`;
     const currency = '৳'; // BDT symbol
@@ -540,6 +542,9 @@ export class EmailService {
         <p style="margin: 5px 0 0 0;">You redeemed ${loyaltyPointsUsed} points for ${currency}${loyaltyDiscount.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} discount.</p>
       </div>
     ` : '';
+    
+    const logoHtml = logoUrl ? `<img src="${logoUrl}" alt="${companyName} Logo" style="max-height: 60px; margin-bottom: 15px;" />` : '';
+    const publicUrlHtml = publicUrl ? `<div style="text-align: center; margin-top: 20px;"><a href="${publicUrl}" style="background-color: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">View Digital Receipt / Review Us</a></div>` : '';
 
     const html = `
       <!DOCTYPE html>
@@ -551,6 +556,7 @@ export class EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          ${logoHtml}
           <h1 style="color: white; margin: 0;">Order Confirmed!</h1>
           <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0 0; font-size: 18px;">${companyName}</p>
         </div>
@@ -577,14 +583,13 @@ export class EmailService {
               </tbody>
             </table>
             
-            ${loyaltySection}
-            
-            <div style="text-align: right; margin-top: 20px; padding-top: 15px; border-top: 2px solid #ddd;">
-              <p style="font-size: 18px; font-weight: bold; margin: 0;">
-                Total: ${currency}${formattedTotal}
-              </p>
+            <div style="text-align: right; font-size: 18px; margin-top: 20px;">
+              <strong>Total: ${currency}${formattedTotal}</strong>
             </div>
           </div>
+          
+          ${loyaltySection}
+          ${publicUrlHtml}
           
           <p style="margin-top: 30px;">We'll notify you once your order is ready!</p>
           

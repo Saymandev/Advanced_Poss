@@ -672,7 +672,9 @@ export class POSService {
           if (customer || createOrderDto.customerInfo) {
             try {
               const receiptData = await this.receiptService.generateReceiptData(savedOrder._id.toString());
-              const companyName = receiptData.restaurantName || 'Raha POS';
+              const companyName = (receiptData as any).companyName || receiptData.restaurantName || 'Raha POS';
+              const publicUrl = receiptData.publicUrl || '';
+              const logoUrl = receiptData.receiptSettings?.logoUrl || '';
               
               const customerEmail = customer?.email || createOrderDto.customerInfo?.email;
               const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : createOrderDto.customerInfo?.name || 'Customer';
@@ -692,10 +694,12 @@ export class POSService {
                   orderItems,
                   loyaltyPointsRedeemed || undefined,
                   loyaltyDiscount || undefined,
+                  logoUrl,
+                  publicUrl,
                 );
               }
               if (customerPhone) {
-                const smsMessage = `Thank you for your order from ${companyName}! Order #${savedOrder.orderNumber} has been confirmed.${loyaltyPointsRedeemed > 0 ? ` You redeemed ${loyaltyPointsRedeemed} points for ${loyaltyDiscount} TK discount.` : ''} Total: ${savedOrder.totalAmount} TK.`;
+                const smsMessage = `Thank you for your order from ${companyName}! Order #${savedOrder.orderNumber} has been confirmed.${loyaltyPointsRedeemed > 0 ? ` You redeemed ${loyaltyPointsRedeemed} points for ${loyaltyDiscount} TK discount.` : ''} Total: ${savedOrder.totalAmount} TK.${publicUrl ? ` View your receipt or review us: ${publicUrl}` : ''}`;
                 await this.smsService.sendSms(customerPhone, smsMessage);
               }
             } catch (notificationError) {
@@ -1452,7 +1456,9 @@ export class POSService {
     if (customer || order.customerInfo) {
       try {
         const receiptData = await this.receiptService.generateReceiptData(order._id.toString());
-        const companyName = receiptData.restaurantName || 'Raha POS';
+        const companyName = (receiptData as any).companyName || receiptData.restaurantName || 'Raha POS';
+        const publicUrl = receiptData.publicUrl || '';
+        const logoUrl = receiptData.receiptSettings?.logoUrl || '';
 
         const customerEmail = customer?.email || order.customerInfo?.email;
         const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : order.customerInfo?.name || 'Customer';
@@ -1472,10 +1478,12 @@ export class POSService {
             orderItems,
             order.loyaltyPointsRedeemed || undefined,
             order.loyaltyDiscount || undefined,
+            logoUrl,
+            publicUrl,
           );
         }
         if (customerPhone) {
-          const smsMessage = `Thank you for your order from ${companyName}! Order #${order.orderNumber} has been confirmed.${order.loyaltyPointsRedeemed ? ` You redeemed ${order.loyaltyPointsRedeemed} points for ${order.loyaltyDiscount || 0} TK discount.` : ''} Total: ${order.totalAmount} TK.`;
+          const smsMessage = `Thank you for your order from ${companyName}! Order #${order.orderNumber} has been confirmed.${order.loyaltyPointsRedeemed ? ` You redeemed ${order.loyaltyPointsRedeemed} points for ${order.loyaltyDiscount || 0} TK discount.` : ''} Total: ${order.totalAmount} TK.${publicUrl ? ` View your receipt or review us: ${publicUrl}` : ''}`;
           await this.smsService.sendSms(customerPhone, smsMessage);
         }
       } catch (notificationError) {
