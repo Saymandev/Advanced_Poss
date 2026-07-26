@@ -671,6 +671,9 @@ export class POSService {
           // Send purchase confirmation notification
           if (customer || createOrderDto.customerInfo) {
             try {
+              const receiptData = await this.receiptService.generateReceiptData(savedOrder._id.toString());
+              const companyName = receiptData.restaurantName || 'Raha POS';
+              
               const customerEmail = customer?.email || createOrderDto.customerInfo?.email;
               const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : createOrderDto.customerInfo?.name || 'Customer';
               const customerPhone = customer?.phone || createOrderDto.customerInfo?.phone;
@@ -683,6 +686,7 @@ export class POSService {
                 await this.emailService.sendPurchaseConfirmation(
                   customerEmail,
                   customerName,
+                  companyName,
                   savedOrder.orderNumber,
                   savedOrder.totalAmount,
                   orderItems,
@@ -691,7 +695,7 @@ export class POSService {
                 );
               }
               if (customerPhone) {
-                const smsMessage = `Thank you for your order! Order #${savedOrder.orderNumber} has been confirmed.${loyaltyPointsRedeemed > 0 ? ` You redeemed ${loyaltyPointsRedeemed} points for ${loyaltyDiscount} TK discount.` : ''} Total: ${savedOrder.totalAmount} TK.`;
+                const smsMessage = `Thank you for your order from ${companyName}! Order #${savedOrder.orderNumber} has been confirmed.${loyaltyPointsRedeemed > 0 ? ` You redeemed ${loyaltyPointsRedeemed} points for ${loyaltyDiscount} TK discount.` : ''} Total: ${savedOrder.totalAmount} TK.`;
                 await this.smsService.sendSms(customerPhone, smsMessage);
               }
             } catch (notificationError) {
@@ -1447,6 +1451,9 @@ export class POSService {
     // Send purchase confirmation notification
     if (customer || order.customerInfo) {
       try {
+        const receiptData = await this.receiptService.generateReceiptData(order._id.toString());
+        const companyName = receiptData.restaurantName || 'Raha POS';
+
         const customerEmail = customer?.email || order.customerInfo?.email;
         const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : order.customerInfo?.name || 'Customer';
         const customerPhone = customer?.phone || order.customerInfo?.phone;
@@ -1459,17 +1466,18 @@ export class POSService {
           await this.emailService.sendPurchaseConfirmation(
             customerEmail,
             customerName,
+            companyName,
             order.orderNumber,
             order.totalAmount,
             orderItems,
             order.loyaltyPointsRedeemed || undefined,
             order.loyaltyDiscount || undefined,
           );
-          }
+        }
         if (customerPhone) {
-          const smsMessage = `Thank you for your order! Order #${order.orderNumber} has been confirmed.${order.loyaltyPointsRedeemed ? ` You redeemed ${order.loyaltyPointsRedeemed} points for ${order.loyaltyDiscount || 0} TK discount.` : ''} Total: ${order.totalAmount} TK.`;
+          const smsMessage = `Thank you for your order from ${companyName}! Order #${order.orderNumber} has been confirmed.${order.loyaltyPointsRedeemed ? ` You redeemed ${order.loyaltyPointsRedeemed} points for ${order.loyaltyDiscount || 0} TK discount.` : ''} Total: ${order.totalAmount} TK.`;
           await this.smsService.sendSms(customerPhone, smsMessage);
-          }
+        }
       } catch (notificationError) {
         console.error('❌ Failed to send purchase notifications:', notificationError);
       }

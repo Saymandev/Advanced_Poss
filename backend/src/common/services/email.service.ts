@@ -515,13 +515,14 @@ export class EmailService {
   async sendPurchaseConfirmation(
     email: string,
     customerName: string,
+    companyName: string,
     orderNumber: string,
     orderTotal: number,
     items: Array<{ name: string; quantity: number; price: number }>,
     loyaltyPointsUsed?: number,
     loyaltyDiscount?: number,
   ): Promise<boolean> {
-    const subject = `Order Confirmation - ${orderNumber}`;
+    const subject = `Order Confirmation - ${orderNumber} from ${companyName}`;
     const currency = '৳'; // BDT symbol
     const formattedTotal = orderTotal.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -551,12 +552,13 @@ export class EmailService {
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
           <h1 style="color: white; margin: 0;">Order Confirmed!</h1>
+          <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0 0; font-size: 18px;">${companyName}</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #ddd;">
           <p>Dear ${customerName},</p>
           
-          <p>Thank you for your order! We've received your order and it's being prepared.</p>
+          <p>Thank you for your order from <strong>${companyName}</strong>! We've received your order and it's being prepared.</p>
           
           <div style="background: #fff; padding: 20px; border-radius: 5px; margin: 20px 0;">
             <h2 style="margin-top: 0; color: #667eea;">Order Details</h2>
