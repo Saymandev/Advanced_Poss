@@ -463,7 +463,7 @@ export class SubscriptionsService {
       // Set plan or enabledFeatures based on subscription type
       if (isFeatureBased) {
         subscriptionData.enabledFeatures = enabledFeatures;
-        // Don't set plan for feature-based subscriptions
+        subscriptionData.plan = SubscriptionPlan.CUSTOM;
       } else {
         // Use the validated plan variable, not the DTO string
         if (!plan) {

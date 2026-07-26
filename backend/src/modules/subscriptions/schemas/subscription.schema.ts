@@ -11,6 +11,7 @@ export enum SubscriptionPlan {
   ENTERPRISE = 'enterprise',
   RETAIL_STARTER = 'retail_starter',
   RETAIL_PRO = 'retail_pro',
+  CUSTOM = 'custom',
 }
 
 export enum SubscriptionStatus {
