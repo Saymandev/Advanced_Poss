@@ -523,6 +523,7 @@ export class EmailService {
     loyaltyDiscount?: number,
     logoUrl?: string,
     publicUrl?: string,
+    orderReviewUrl?: string,
   ): Promise<boolean> {
     const subject = `Order Confirmation - ${orderNumber} from ${companyName}`;
     const currency = '৳'; // BDT symbol
@@ -544,7 +545,8 @@ export class EmailService {
     ` : '';
     
     const logoHtml = logoUrl ? `<img src="${logoUrl}" alt="${companyName} Logo" style="max-height: 60px; margin-bottom: 15px;" />` : '';
-    const publicUrlHtml = publicUrl ? `<div style="text-align: center; margin-top: 20px;"><a href="${publicUrl}" style="background-color: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">View Digital Receipt / Review Us</a></div>` : '';
+    const publicUrlHtml = publicUrl ? `<div style="text-align: center; margin-top: 20px;"><a href="${publicUrl}" style="background-color: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">View Digital Receipt / Public Portal</a></div>` : '';
+    const orderReviewUrlHtml = orderReviewUrl ? `<div style="text-align: center; margin-top: 15px;"><a href="${orderReviewUrl}" style="background-color: #f3f4f6; color: #4b5563; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; border: 1px solid #d1d5db; display: inline-block;">Leave a Review for this Order</a></div>` : '';
 
     const html = `
       <!DOCTYPE html>
@@ -590,6 +592,7 @@ export class EmailService {
           
           ${loyaltySection}
           ${publicUrlHtml}
+          ${orderReviewUrlHtml}
           
           <p style="margin-top: 30px;">We'll notify you once your order is ready!</p>
           

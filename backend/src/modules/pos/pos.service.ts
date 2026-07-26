@@ -172,11 +172,12 @@ export class POSService {
             loyaltyPointsRedeemed = 0;
             loyaltyDiscount = 0;
           } else {
-             // Basic validation: 2000 points = 20 TK
-             const POINTS_PER_DISCOUNT = 2000;
-             const DISCOUNT_AMOUNT = 20;
-             const expectedDiscount = Math.floor(loyaltyPointsRedeemed / POINTS_PER_DISCOUNT) * DISCOUNT_AMOUNT;
-             if (loyaltyDiscount > expectedDiscount) {
+             const companySettings = await this.settingsService.getCompanySettings(companyId);
+             const pointsPerCurrency = companySettings?.loyaltyPointsPerCurrency || 100;
+             const expectedDiscount = Math.floor(loyaltyPointsRedeemed / pointsPerCurrency);
+             
+             // Allow a small margin of error (e.g. 1 unit) due to floating point or frontend rounding
+             if (loyaltyDiscount > expectedDiscount + 1) {
                console.warn(`Requested loyalty discount ${loyaltyDiscount} exceeds expected ${expectedDiscount}. Adjusting.`);
                loyaltyDiscount = expectedDiscount;
              }
@@ -674,6 +675,7 @@ export class POSService {
               const receiptData = await this.receiptService.generateReceiptData(savedOrder._id.toString());
               const companyName = (receiptData as any).companyName || receiptData.restaurantName || 'Raha POS';
               const publicUrl = receiptData.publicUrl || '';
+              const orderReviewUrl = receiptData.orderReviewUrl || '';
               const logoUrl = receiptData.receiptSettings?.logoUrl || '';
               
               const customerEmail = customer?.email || createOrderDto.customerInfo?.email;
@@ -696,6 +698,7 @@ export class POSService {
                   loyaltyDiscount || undefined,
                   logoUrl,
                   publicUrl,
+                  orderReviewUrl,
                 );
               }
               if (customerPhone) {
@@ -1458,6 +1461,7 @@ export class POSService {
         const receiptData = await this.receiptService.generateReceiptData(order._id.toString());
         const companyName = (receiptData as any).companyName || receiptData.restaurantName || 'Raha POS';
         const publicUrl = receiptData.publicUrl || '';
+        const orderReviewUrl = receiptData.orderReviewUrl || '';
         const logoUrl = receiptData.receiptSettings?.logoUrl || '';
 
         const customerEmail = customer?.email || order.customerInfo?.email;
@@ -1480,6 +1484,7 @@ export class POSService {
             order.loyaltyDiscount || undefined,
             logoUrl,
             publicUrl,
+            orderReviewUrl,
           );
         }
         if (customerPhone) {
