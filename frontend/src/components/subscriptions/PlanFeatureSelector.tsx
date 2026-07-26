@@ -142,12 +142,21 @@ export function PlanFeatureSelector({ selectedFeatures, onChange }: PlanFeatureS
               {isExpanded && (
                 <CardContent className="pt-0">
                   <div className="space-y-3 pl-7">
-                    {features.map((feature) => (
+                    {features.map((feature: any) => (
                       <Checkbox
                         key={feature.key}
                         checked={selectedFeatures.includes(feature.key)}
                         onChange={() => toggleFeature(feature.key)}
-                        label={feature.name}
+                        label={
+                          <div>
+                            <div className="font-medium">{feature.name}</div>
+                            {feature.description && (
+                              <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 font-normal">
+                                {feature.description}
+                              </div>
+                            )}
+                          </div>
+                        }
                         className="cursor-pointer"
                       />
                     ))}

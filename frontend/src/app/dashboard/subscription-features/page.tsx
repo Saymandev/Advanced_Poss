@@ -278,7 +278,18 @@ export default function SubscriptionFeaturesPage() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  const newName = e.target.value;
+                  if (!editingFeature) {
+                    setFormData({ 
+                      ...formData, 
+                      name: newName, 
+                      key: newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') 
+                    });
+                  } else {
+                    setFormData({ ...formData, name: newName });
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 required
                 placeholder="e.g., POS System"
