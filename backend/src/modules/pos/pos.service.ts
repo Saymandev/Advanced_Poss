@@ -2319,7 +2319,9 @@ export class POSService {
         branchId,
         updatedOrder.toObject ? updatedOrder.toObject() : updatedOrder,
       );
-    } catch (wsError) {}
+    } catch (wsError) {
+      console.error('WebSocket notification failed during exchange:', wsError);
+    }
 
     return updatedOrder;
   }
