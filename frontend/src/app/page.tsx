@@ -203,7 +203,7 @@ const featureMapping: Record<string, { icon: any; title: string; description: st
   'branches': { icon: GlobeAltIcon, title: 'Multi-Branch', description: 'Manage multiple branches from one dashboard', gradient: 'from-violet-500 to-purple-500' },
   'notifications': { icon: BellAlertIcon, title: 'Smart Notifications', description: 'Stay updated with real-time alerts and notifications', gradient: 'from-indigo-500 to-blue-500' },
 };
-const REVERSION_THRESHOLD = 20;
+
 
 // Helper to get hex color from tailwind class
 const getHexColor = (twClass: string) => {
@@ -396,10 +396,7 @@ export default function LandingPage() {
     ];
   }, [activeIndustry]);
 
-  // Smart Data Reversion Logic
-  const isRealDataReady = useMemo(() => {
-    return (statsData?.activeCompanies || 0) >= REVERSION_THRESHOLD;
-  }, [statsData]);
+
 
   // Hardcoded testimonials for local relevance
   const mockTestimonials = useMemo(() => {
@@ -476,10 +473,10 @@ export default function LandingPage() {
     });
   }, [testimonialsData]);
 
-  // Use real data if threshold met, else mock data
+  // Use real testimonials if available, otherwise fall back to mock data
   const testimonials = useMemo(() => {
-    return isRealDataReady && realTestimonials.length > 0 ? realTestimonials : mockTestimonials;
-  }, [isRealDataReady, realTestimonials, mockTestimonials]);
+    return realTestimonials.length > 0 ? realTestimonials : mockTestimonials;
+  }, [realTestimonials, mockTestimonials]);
 
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const visibleTestimonials = useMemo(() => {
@@ -497,9 +494,8 @@ export default function LandingPage() {
 
   // Get active companies count for badge
   const activeCompaniesCount = useMemo(() => {
-    if (isRealDataReady) return statsData?.activeCompanies || 0;
-    return 30; // Marketing value
-  }, [isRealDataReady, statsData]);
+    return statsData?.activeCompanies || 0;
+  }, [statsData]);
   const [mounted, setMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -589,7 +585,7 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
                   <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-primary-400 to-secondary-400 bg-clip-text text-transparent mb-2 sm:mb-3">
-                    {isRealDataReady ? statsData?.activeCompanies : '30+'}
+                    {statsData?.activeCompanies || 0}
                   </div>
                   <div className="text-white/80 font-medium text-sm sm:text-base md:text-lg">Active Businesses</div>
                 </div>
@@ -598,7 +594,7 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-gradient-to-br from-secondary-500/10 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
                   <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-secondary-400 to-primary-400 bg-clip-text text-transparent mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 justify-center">
-                    {isRealDataReady ? (statsData?.averageRating?.toFixed(1) || '5.0') : '5.0'}
+                    {statsData?.averageRating?.toFixed(1) || '0.0'}
                     <StarIcon className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-500 fill-yellow-500" />
                   </div>
                   <div className="text-white/80 font-medium text-sm sm:text-base md:text-lg">Average Rating</div>
@@ -608,7 +604,7 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
                   <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2 sm:mb-3">
-                    {isRealDataReady ? (statsData?.totalCustomers || '0') : '29'}
+                    {statsData?.totalCustomers || 0}
                   </div>
                   <div className="text-white/80 font-medium text-sm sm:text-base md:text-lg">Happy Clients</div>
                 </div>
