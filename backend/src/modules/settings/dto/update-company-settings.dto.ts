@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsMongoId, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsMongoId, IsNotEmpty, IsObject, IsOptional, IsString, IsNumber, Min } from 'class-validator';
 
 export class UpdateCompanySettingsDto {
   @ApiPropertyOptional({ example: 'USD' })
@@ -56,6 +56,12 @@ export class UpdateCompanySettingsDto {
     reports?: boolean;
     analytics?: boolean;
   };
+
+  @ApiPropertyOptional({ example: 100 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  loyaltyPointsPerCurrency?: number;
 
   @ApiPropertyOptional({
     example: {

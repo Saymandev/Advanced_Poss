@@ -126,6 +126,8 @@ export default function SettingsPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [loyaltyRate, setLoyaltyRate] = useState<number>(100);
+
   // General Settings
   const { data: companySettings, refetch: refetchCompanySettings } = useGetCompanySettingsQuery(
     companyId, 
@@ -145,7 +147,10 @@ export default function SettingsPage() {
         logoUrl: companySettings.receiptSettings.logoUrl || '',
       });
     }
-  }, [companySettings?.receiptSettings]);
+    if (companySettings?.loyaltyPointsPerCurrency) {
+      setLoyaltyRate(companySettings.loyaltyPointsPerCurrency);
+    }
+  }, [companySettings]);
 
   const [updateCompanySettings] = useUpdateCompanySettingsMutation();
   const [uploadCompanyLogo, { isLoading: isUploadingLogo }] = useUploadCompanyLogoMutation();
@@ -1638,6 +1643,38 @@ export default function SettingsPage() {
                   disabled={!companyId}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Loyalty Points Exchange Rate
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={loyaltyRate}
+                    onChange={(e) => setLoyaltyRate(parseInt(e.target.value) || 1)}
+                    onBlur={async () => {
+                      if (!loyaltyRate || loyaltyRate < 1) return;
+                      // Only save if changed
+                      if (loyaltyRate !== companySettings?.loyaltyPointsPerCurrency) {
+                        try {
+                          await updateCompanySettings({
+                            companyId,
+                            data: { loyaltyPointsPerCurrency: loyaltyRate }
+                          }).unwrap();
+                          toast.success('Loyalty exchange rate updated');
+                          await refetchCompanySettings();
+                        } catch (error: any) {
+                          toast.error(error.data?.message || 'Failed to update rate');
+                        }
+                      }
+                    }}
+                    disabled={!companyId}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">E.g., 100 means 100 points = 1 {companySettings?.currency || 'BDT'} discount</p>
+              </div>
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Date Format

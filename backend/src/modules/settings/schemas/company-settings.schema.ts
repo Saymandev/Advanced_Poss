@@ -65,6 +65,9 @@ export class CompanySettings {
     analytics: boolean;
   };
 
+  @Prop({ type: Number, default: 100 })
+  loyaltyPointsPerCurrency: number;
+
   @Prop({
     type: {
       header: { type: String, default: 'Welcome to Our Restaurant' },

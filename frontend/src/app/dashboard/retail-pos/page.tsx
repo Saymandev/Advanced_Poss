@@ -24,6 +24,7 @@ import {
 import { useGetCustomersQuery, useLazySearchCustomersQuery, useCreateCustomerMutation } from '@/lib/api/endpoints/customersApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMethodsApi';
+import { useGetCompanySettingsQuery } from '@/lib/api/endpoints/settingsApi';
 import { useAppSelector } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
 import {
@@ -72,6 +73,10 @@ interface PaymentState {
 
 export default function RetailPOSPage() {
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  const { data: companySettings } = useGetCompanySettingsQuery(
+    companyContext?.companyId || user?.companyId || '', 
+    { skip: !(companyContext?.companyId || user?.companyId) }
+  );
   const formatCurrency = useFormatCurrency();
   const router = useRouter();
 
@@ -415,7 +420,7 @@ export default function RetailPOSPage() {
     if (!selectedCustomer || !selectedCustomerId) {
       return { pointsRedeemed: 0, discount: 0 };
     }
-    const POINTS_PER_BDT = 100; // 100 points = 1 TK discount
+    const POINTS_PER_BDT = companySettings?.loyaltyPointsPerCurrency || 100; // Configurable exchange rate
     const availablePoints = selectedCustomer.loyaltyPoints || 0;
     
     // Allow redemption for any amount > 0
@@ -433,7 +438,7 @@ export default function RetailPOSPage() {
     const pointsRedeemed = Math.ceil(discount * POINTS_PER_BDT);
     
     return { pointsRedeemed, discount };
-  }, [selectedCustomer, selectedCustomerId, cartSubtotal]);
+  }, [selectedCustomer, selectedCustomerId, cartSubtotal, companySettings?.loyaltyPointsPerCurrency]);
 
   const loyaltyDiscount = useLoyaltyPoints ? (loyaltyRedemption.discount || 0) : 0;
 

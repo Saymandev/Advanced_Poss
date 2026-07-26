@@ -40,6 +40,7 @@ import { useSavePreferencesMutation } from '@/lib/api/endpoints/usersApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
 import { useOfflineSyncManager } from '@/lib/hooks/useOfflineSyncManager';
 import { usePOSOfflinePrefetcher } from '@/lib/hooks/usePOSOfflinePrefetcher';
+import { useGetCompanySettingsQuery } from '@/lib/api/endpoints/settingsApi';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
@@ -249,6 +250,11 @@ const generateClientId = () => {
 export default function POSPage() {
   const dispatch = useAppDispatch();
   const { user, companyContext } = useAppSelector((state) => state.auth);
+  
+  const { data: companySettings } = useGetCompanySettingsQuery(
+    companyContext?.companyId || user?.companyId || '', 
+    { skip: !(companyContext?.companyId || user?.companyId) }
+  );
   const { isOnline, pendingCount, syncOrders } = useOfflineSyncManager();
   // Enterprise offline prefetcher — downloads all POS data to IndexedDB when online
   const {
@@ -356,7 +362,7 @@ export default function POSPage() {
     if (!selectedCustomer || !selectedCustomerId) {
       return { pointsRedeemed: 0, discount: 0 };
     }
-    const POINTS_PER_BDT = 100; // 100 points = 1 TK discount
+    const POINTS_PER_BDT = companySettings?.loyaltyPointsPerCurrency || 100; // Configurable exchange rate
     const availablePoints = selectedCustomer.loyaltyPoints || 0;
     
     // Allow redemption for any amount > 0
@@ -374,7 +380,7 @@ export default function POSPage() {
     const pointsRedeemed = Math.ceil(discount * POINTS_PER_BDT);
     
     return { pointsRedeemed, discount };
-  }, [selectedCustomer, selectedCustomerId, cartSubtotal]);
+  }, [selectedCustomer, selectedCustomerId, cartSubtotal, companySettings?.loyaltyPointsPerCurrency]);
   const [deliveryDetails, setDeliveryDetails] = useState<DeliveryDetailsState>(() => {
     if (typeof window !== 'undefined') {
       // Use encrypted storage with 24-hour TTL for delivery PII
