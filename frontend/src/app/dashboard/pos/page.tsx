@@ -1072,6 +1072,7 @@ export default function POSPage() {
     loyaltyRedemption.discount,
     orderType,
     roomBookingTotal,
+    useLoyaltyPoints,
   ]);
   // Initialize payment method when payment methods load
   useEffect(() => {
@@ -2154,6 +2155,7 @@ export default function POSPage() {
     paymentMode,
     roomServiceBookingId,
     roomServiceBookings,
+    useLoyaltyPoints,
   ]);
   const handlePayment = async () => {
     if (isProcessingPayment) return;
