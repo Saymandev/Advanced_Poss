@@ -10,6 +10,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { Combobox } from '@/components/ui/Combobox';
 import { useGetCompaniesQuery, useGetCompanyByIdQuery } from '@/lib/api/endpoints/companiesApi';
 import { useCreateCheckoutSessionMutation } from '@/lib/api/endpoints/paymentsApi';
 import {
@@ -710,6 +711,13 @@ export default function SubscriptionsPage() {
     if (Array.isArray(companiesData)) return companiesData;
     return companiesData.companies || [];
   }, [companiesData]);
+
+  const companyOptions = useMemo(() => {
+    return companies.map((c: any) => ({
+      value: c._id || c.id,
+      label: `${c.name} (${c.email})`
+    }));
+  }, [companies]);
   // Real-time trial countdown
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -2368,19 +2376,12 @@ export default function SubscriptionsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Select Company
               </label>
-              <select
+              <Combobox
                 value={selectedCompanyForSubscription}
-                onChange={(e) => setSelectedCompanyForSubscription(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                required
-              >
-                <option value="">-- Select a company --</option>
-                {companies.map((company: any) => (
-                  <option key={company._id || company.id} value={company._id || company.id}>
-                    {company.name} ({company.email})
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedCompanyForSubscription(val)}
+                options={companyOptions}
+                placeholder="-- Search or select a company --"
+              />
             </div>
             {selectedCompanyForSubscription && (
               <>
@@ -3388,18 +3389,12 @@ export default function SubscriptionsPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Select Company
                   </label>
-                  <select
+                  <Combobox
                     value={selectedCompanyForSubscription || companyId}
-                    onChange={(e) => setSelectedCompanyForSubscription(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  >
-                    <option value="">Select a company...</option>
-                    {companies?.map((company: any) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedCompanyForSubscription(val)}
+                    options={companyOptions}
+                    placeholder="-- Search or select a company --"
+                  />
                 </div>
               </div>
             )}
@@ -3535,19 +3530,12 @@ export default function SubscriptionsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Select Company
               </label>
-              <select
+              <Combobox
                 value={selectedCompanyForSubscription}
-                onChange={(e) => setSelectedCompanyForSubscription(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                required
-              >
-                <option value="">-- Select a company --</option>
-                {companies.map((company: any) => (
-                  <option key={company._id || company.id} value={company._id || company.id}>
-                    {company.name} ({company.email})
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedCompanyForSubscription(val)}
+                options={companyOptions}
+                placeholder="-- Search or select a company --"
+              />
             </div>
             {selectedCompanyForSubscription && (
               <>
