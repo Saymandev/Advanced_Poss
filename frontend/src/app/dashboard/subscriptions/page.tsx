@@ -916,6 +916,7 @@ export default function SubscriptionsPage() {
           billingCycle: featureBillingCycle,
           email: targetCompanyEmail,
           companyName: targetCompanyName,
+          overrideActive: true,
         }).unwrap();
         toast.success('Feature-based subscription created successfully!');
         setIsFeatureSubscriptionModalOpen(false);
