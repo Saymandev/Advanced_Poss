@@ -2382,6 +2382,7 @@ export default function SubscriptionsPage() {
                 onChange={(val) => setSelectedCompanyForSubscription(val)}
                 options={companyOptions}
                 placeholder="-- Search or select a company --"
+                allowCustom={false}
               />
             </div>
             {selectedCompanyForSubscription && (
@@ -3395,6 +3396,7 @@ export default function SubscriptionsPage() {
                     onChange={(val) => setSelectedCompanyForSubscription(val)}
                     options={companyOptions}
                     placeholder="-- Search or select a company --"
+                    allowCustom={false}
                   />
                 </div>
               </div>
@@ -3536,6 +3538,7 @@ export default function SubscriptionsPage() {
                 onChange={(val) => setSelectedCompanyForSubscription(val)}
                 options={companyOptions}
                 placeholder="-- Search or select a company --"
+                allowCustom={false}
               />
             </div>
             {selectedCompanyForSubscription && (
