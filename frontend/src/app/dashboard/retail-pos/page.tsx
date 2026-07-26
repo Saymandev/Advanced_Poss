@@ -415,22 +415,24 @@ export default function RetailPOSPage() {
     if (!selectedCustomer || !selectedCustomerId) {
       return { pointsRedeemed: 0, discount: 0 };
     }
-    const MIN_ORDER_AMOUNT = 1000;
-    const POINTS_PER_DISCOUNT = 2000;
-    const DISCOUNT_AMOUNT = 20;
+    const POINTS_PER_BDT = 100; // 100 points = 1 TK discount
     const availablePoints = selectedCustomer.loyaltyPoints || 0;
-    if (cartSubtotal < MIN_ORDER_AMOUNT) {
+    
+    // Allow redemption for any amount > 0
+    if (cartSubtotal <= 0 || availablePoints <= 0) {
       return { pointsRedeemed: 0, discount: 0 };
     }
-    const discountBlocks = Math.floor(availablePoints / POINTS_PER_DISCOUNT);
-    if (discountBlocks > 0) {
-      const maxDiscount = discountBlocks * DISCOUNT_AMOUNT;
-      const discount = Math.min(maxDiscount, cartSubtotal);
-      const blocksToRedeem = Math.floor(discount / DISCOUNT_AMOUNT);
-      const pointsRedeemed = blocksToRedeem * POINTS_PER_DISCOUNT;
-      return { pointsRedeemed, discount };
-    }
-    return { pointsRedeemed: 0, discount: 0 };
+
+    // Calculate maximum possible discount from points
+    const maxPossibleDiscount = availablePoints / POINTS_PER_BDT;
+    
+    // Discount cannot exceed cart subtotal
+    const discount = Math.min(maxPossibleDiscount, cartSubtotal);
+    
+    // Calculate exact points to redeem
+    const pointsRedeemed = Math.ceil(discount * POINTS_PER_BDT);
+    
+    return { pointsRedeemed, discount };
   }, [selectedCustomer, selectedCustomerId, cartSubtotal]);
 
   const loyaltyDiscount = useLoyaltyPoints ? (loyaltyRedemption.discount || 0) : 0;

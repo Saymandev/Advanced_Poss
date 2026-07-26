@@ -356,27 +356,24 @@ export default function POSPage() {
     if (!selectedCustomer || !selectedCustomerId) {
       return { pointsRedeemed: 0, discount: 0 };
     }
-    const MIN_ORDER_AMOUNT = 1000; // Minimum order amount in TK
-    const POINTS_PER_DISCOUNT = 2000; // 2000 points = 20 TK discount
-    const DISCOUNT_AMOUNT = 20; // 20 TK discount per 2000 points
+    const POINTS_PER_BDT = 100; // 100 points = 1 TK discount
     const availablePoints = selectedCustomer.loyaltyPoints || 0;
-    // Check if order meets minimum amount requirement
-    if (cartSubtotal < MIN_ORDER_AMOUNT) {
+    
+    // Allow redemption for any amount > 0
+    if (cartSubtotal <= 0 || availablePoints <= 0) {
       return { pointsRedeemed: 0, discount: 0 };
     }
-    // Calculate how many discount blocks can be applied
-    const discountBlocks = Math.floor(availablePoints / POINTS_PER_DISCOUNT);
-    if (discountBlocks > 0) {
-      // Apply maximum discount blocks (can be limited by order total)
-      const maxDiscount = discountBlocks * DISCOUNT_AMOUNT;
-      // Discount cannot exceed cart subtotal
-      const discount = Math.min(maxDiscount, cartSubtotal);
-      // Calculate points to redeem (in full blocks of 2000)
-      const blocksToRedeem = Math.floor(discount / DISCOUNT_AMOUNT);
-      const pointsRedeemed = blocksToRedeem * POINTS_PER_DISCOUNT;
-      return { pointsRedeemed, discount };
-    }
-    return { pointsRedeemed: 0, discount: 0 };
+
+    // Calculate maximum possible discount from points
+    const maxPossibleDiscount = availablePoints / POINTS_PER_BDT;
+    
+    // Discount cannot exceed cart subtotal
+    const discount = Math.min(maxPossibleDiscount, cartSubtotal);
+    
+    // Calculate exact points to redeem
+    const pointsRedeemed = Math.ceil(discount * POINTS_PER_BDT);
+    
+    return { pointsRedeemed, discount };
   }, [selectedCustomer, selectedCustomerId, cartSubtotal]);
   const [deliveryDetails, setDeliveryDetails] = useState<DeliveryDetailsState>(() => {
     if (typeof window !== 'undefined') {
