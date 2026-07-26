@@ -342,8 +342,7 @@ export class SubscriptionsService {
           // Update existing subscription instead of creating new one
           if (isFeatureBased) {
             existingSubscription.enabledFeatures = enabledFeatures;
-            // Clear plan when using feature-based subscription
-            existingSubscription.plan = undefined;
+            existingSubscription.plan = SubscriptionPlan.CUSTOM as any;
           } else {
             // Use the validated plan variable, not the DTO string
             if (!plan) {
@@ -703,7 +702,7 @@ export class SubscriptionsService {
       subscription.enabledFeatures = updateData.enabledFeatures;
       // If switching to feature-based, clear plan
       if (updateData.enabledFeatures.length > 0) {
-        subscription.plan = undefined;
+        subscription.plan = SubscriptionPlan.CUSTOM as any;
       }
     }
     if (updateData.limits !== undefined) {
