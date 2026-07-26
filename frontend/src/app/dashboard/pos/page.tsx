@@ -42,7 +42,7 @@ import { useOfflineSyncManager } from '@/lib/hooks/useOfflineSyncManager';
 import { usePOSOfflinePrefetcher } from '@/lib/hooks/usePOSOfflinePrefetcher';
 import { useGetCompanySettingsQuery } from '@/lib/api/endpoints/settingsApi';
 import { useSocket } from '@/lib/hooks/useSocket';
-import { useAppDispatch, useAppSelector } from '@/lib/store';
+import { useAppDispatch, useAppSelector, RootState } from '@/lib/store';
 import { cn, formatDateTime } from '@/lib/utils';
 import { getEncryptedItemWithTTL, removeEncryptedItem, setEncryptedItemWithTTL } from '@/lib/utils/storage-encryption';
 import {
@@ -249,7 +249,7 @@ const generateClientId = () => {
 };
 export default function POSPage() {
   const dispatch = useAppDispatch();
-  const { user, companyContext } = useAppSelector((state) => state.auth);
+  const { user, companyContext } = useAppSelector((state: RootState) => state.auth);
   
   const { data: companySettings } = useGetCompanySettingsQuery(
     companyContext?.companyId || user?.companyId || '', 

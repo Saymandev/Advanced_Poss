@@ -79,6 +79,7 @@ export interface CompanySettings {
     reports: boolean;
     analytics: boolean;
   };
+  loyaltyPointsPerCurrency?: number;
   receiptSettings?: {
     header?: string;
     footer?: string;
