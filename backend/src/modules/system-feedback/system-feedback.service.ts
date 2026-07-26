@@ -100,7 +100,7 @@ export class SystemFeedbackService {
       .sort({ rating: -1, createdAt: -1 })
       .limit(limit)
       .populate('userId', 'firstName lastName')
-      .populate('companyId', 'name')
+      .populate('companyId', 'name logo')
       .exec();
   }
 

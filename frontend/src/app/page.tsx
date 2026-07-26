@@ -461,12 +461,16 @@ export default function LandingPage() {
         ? 'Anonymous'
         : `${firstName} ${lastName}`.trim() || 'Customer';
 
+      // Use company logo if available, otherwise fall back to generated avatar
+      const companyLogo = company.logo || '';
+      const fallbackAvatar = feedback.isAnonymous
+        ? 'https://i.pravatar.cc/150?img=0'
+        : `https://i.pravatar.cc/150?img=${Math.abs(name.charCodeAt(0)) % 10}`;
+
       return {
         name,
         role: company.name ? `${company.name} Owner` : 'Restaurant Owner',
-        image: feedback.isAnonymous
-          ? 'https://i.pravatar.cc/150?img=0'
-          : `https://i.pravatar.cc/150?img=${Math.abs(name.charCodeAt(0)) % 10}`,
+        image: companyLogo || fallbackAvatar,
         content: feedback.message || feedback.title || 'Great experience!',
         rating: feedback.rating || 5,
       };
