@@ -16,6 +16,7 @@ import { formatCurrency } from '@/lib/utils';
 import { PencilIcon, PlusIcon, SparklesIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { ALL_FEATURES, FEATURE_CATEGORIES } from '@/utils/features.constants';
 
 export default function SubscriptionFeaturesPage() {
   const { user } = useAppSelector((state) => state.auth);
@@ -258,18 +259,20 @@ export default function SubscriptionFeaturesPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Feature Key *
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.key}
-                onChange={(e) => setFormData({ ...formData, key: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+                onChange={(e) => setFormData({ ...formData, key: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 required
                 disabled={!!editingFeature}
-                placeholder="e.g., pos, inventory"
-              />
-              {editingFeature && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Key cannot be changed after creation</p>
-              )}
+              >
+                <option value="">Select a Feature Key...</option>
+                {ALL_FEATURES.map((feature) => (
+                  <option key={feature} value={feature}>
+                    {feature}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -278,18 +281,7 @@ export default function SubscriptionFeaturesPage() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => {
-                  const newName = e.target.value;
-                  if (!editingFeature) {
-                    setFormData({ 
-                      ...formData, 
-                      name: newName, 
-                      key: newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') 
-                    });
-                  } else {
-                    setFormData({ ...formData, name: newName });
-                  }
-                }}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 required
                 placeholder="e.g., POS System"
@@ -315,14 +307,22 @@ export default function SubscriptionFeaturesPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Category *
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 required
-                placeholder="e.g., Orders, Inventory"
-              />
+              >
+                <option value="">Select Category...</option>
+                {Object.keys(FEATURE_CATEGORIES).map((cat) => {
+                  const label = cat.split('_').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+                  return (
+                    <option key={cat} value={label}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
