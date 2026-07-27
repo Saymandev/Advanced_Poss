@@ -114,7 +114,7 @@ export class POSOrder {
   @Prop({ required: true })
   totalAmount: number;
 
-  @Prop({ required: true, enum: ['pending', 'paid', 'cancelled'] })
+  @Prop({ required: true, enum: ['pending', 'confirmed', 'preparing', 'ready', 'served', 'paid', 'completed', 'cancelled'] })
   status: string;
 
   @Prop({
