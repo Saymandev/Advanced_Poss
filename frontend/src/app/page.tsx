@@ -522,7 +522,7 @@ export default function LandingPage() {
       <Navbar transparent />
 
       {/* Hero Section */}
-      <section className="relative pt-20 sm:pt-24 pb-16 sm:pb-22 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center">
+      <section className="relative pt-36 sm:pt-32 md:pt-24 pb-16 sm:pb-22 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center">
         {/* Image Slider Background */}
         <HeroImageSlider industry={activeIndustry} />
 
