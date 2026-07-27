@@ -34,6 +34,7 @@ const ROLE_OPTIONS = [
   { value: 'chef', label: 'Chef' },
   { value: 'waiter', label: 'Waiter' },
   { value: 'cashier', label: 'Cashier' },
+  { value: 'driver', label: 'Driver / Rider' },
 ];
 
 export default function StaffPage() {
@@ -44,7 +45,7 @@ export default function StaffPage() {
     if (!isRetail) return ROLE_OPTIONS;
 
     // Filter out restaurant-specific roles for retail businesses
-    return ROLE_OPTIONS.filter(role => ['admin', 'manager', 'cashier', 'staff'].includes(role.value));
+    return ROLE_OPTIONS.filter(role => ['admin', 'manager', 'cashier', 'staff', 'driver'].includes(role.value));
   }, [isRetail]);
   
   // Redirect if user doesn't have staff-management feature (auto-redirects to role-specific dashboard)
@@ -426,6 +427,7 @@ export default function StaffPage() {
       'waiter': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
       'cashier': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
       'owner': 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+      'driver': 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
     };
     return colors[role.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
   };
