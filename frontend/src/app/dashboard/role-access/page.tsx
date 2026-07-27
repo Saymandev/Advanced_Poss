@@ -68,7 +68,7 @@ const DEFAULT_ROLE_FEATURES: Record<string, string[] | 'all'> = {
     'expenses', 'income', 'work-periods', 'notifications',
   ],
   [UserRole.DRIVER]: [
-    'dashboard', 'delivery-management', 'rider-dashboard', 'notifications',
+    'delivery-management', 'rider-dashboard', 'notifications',
   ],
 };
 

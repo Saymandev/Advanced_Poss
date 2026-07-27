@@ -40,7 +40,7 @@ const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     'expenses', 'income', 'work-periods', 'notifications',
   ],
   driver: [
-    'dashboard', 'delivery-management', 'rider-dashboard', 'notifications',
+    'delivery-management', 'rider-dashboard', 'notifications',
   ],
   super_admin: [],
 };
