@@ -35,6 +35,7 @@ import {
 } from '@/lib/api/endpoints/posApi';
 import { useGetRoomsQuery } from '@/lib/api/endpoints/roomsApi';
 import { useGetStaffQuery } from '@/lib/api/endpoints/staffApi';
+import { useUpdateOrderStatusMutation } from '@/lib/api/endpoints/ordersApi';
 import { useUpdateTableStatusMutation } from '@/lib/api/endpoints/tablesApi';
 import { useSavePreferencesMutation } from '@/lib/api/endpoints/usersApi';
 import { useGetCurrentWorkPeriodQuery } from '@/lib/api/endpoints/workPeriodsApi';
