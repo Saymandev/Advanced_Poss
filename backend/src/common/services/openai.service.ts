@@ -101,6 +101,15 @@ export class OpenAIService {
       last90Days: number;
       trend: 'increasing' | 'decreasing' | 'stable';
     };
+    areaData?: {
+      city: string;
+      state?: string;
+      country: string;
+    };
+    ingredientCostData?: {
+      totalCost: number;
+      ingredients: { name: string; cost: number }[];
+    };
   }): Promise<{
     recommendation: 'increase_price' | 'decrease_price' | 'maintain_price' | 'remove_item' | 'add_item';
     suggestedPrice: number;
@@ -136,6 +145,15 @@ Performance Metrics:
 - Profit Margin: ${context.profitMargin.toFixed(1)}%
 ${context.salesData ? `- Sales Trend (last 30 days): ${context.salesData.trend}` : ''}
 
+Location Data (Area Demographics):
+- City: ${context.areaData?.city || 'Unknown'}
+- State/Region: ${context.areaData?.state || 'Unknown'}
+- Country: ${context.areaData?.country || 'Unknown'}
+
+Ingredient Analysis:
+- Total Estimated Ingredient Cost: $${context.ingredientCostData?.totalCost.toFixed(2) || 'N/A'}
+- Major Ingredients: ${context.ingredientCostData?.ingredients.map(i => `${i.name} ($${i.cost.toFixed(2)})`).join(', ') || 'N/A'}
+
 Please provide a JSON response with the following structure:
 {
   "recommendation": "increase_price" | "decrease_price" | "maintain_price" | "remove_item",
@@ -154,7 +172,8 @@ Guidelines:
 - If demand is low (<3) and price is above average, consider decreasing price
 - If no sales for 60+ days, recommend removing the item
 - If item is new (never sold), suggest promotional pricing (10-15% discount)
-- Ensure profit margins remain healthy (>20% preferred)
+- Ensure profit margins remain healthy (>20% preferred) using the Total Estimated Ingredient Cost.
+- Consider local market demographics for the provided Location Data when suggesting prices.
 - Be realistic with expected impact numbers
 
 Return ONLY valid JSON, no additional text.`;

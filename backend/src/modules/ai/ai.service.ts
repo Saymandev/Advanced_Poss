@@ -9,6 +9,8 @@ import { Customer, CustomerDocument } from '../customers/schemas/customer.schema
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { POSOrder, POSOrderDocument } from '../pos/schemas/pos-order.schema';
+import { Branch, BranchDocument } from '../branches/schemas/branch.schema';
+import { Ingredient, IngredientDocument } from '../ingredients/schemas/ingredient.schema';
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -17,6 +19,8 @@ export class AiService {
     @InjectModel(POSOrder.name) private posOrderModel: Model<POSOrderDocument>,
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
+    @InjectModel(Branch.name) private branchModel: Model<BranchDocument>,
+    @InjectModel(Ingredient.name) private ingredientModel: Model<IngredientDocument>,
     private readonly settingsService: SettingsService,
     private openAIService: OpenAIService,
     private deepSeekService: DeepSeekService,
@@ -778,6 +782,12 @@ export class AiService {
     // Build menu items query - match menu-items service logic
     // Include both branch-specific items and company-wide items (branchId: null)
     const branchIdObj = new Types.ObjectId(branchId);
+    const branchData = await this.branchModel.findById(branchIdObj).lean();
+    const areaData = {
+      city: branchData?.address?.city || 'Unknown',
+      state: branchData?.address?.state || 'Unknown',
+      country: branchData?.address?.country || 'Unknown',
+    };
     const companyIdObj = new Types.ObjectId(companyId);
 
     let menuItems = await this.menuItemModel.find({
@@ -788,6 +798,7 @@ export class AiService {
       ],
     })
       .populate('categoryId', 'name type')
+      .populate('ingredients.ingredientId', 'name unitCost')
       .lean();
 
     // Filter out unavailable items
@@ -848,6 +859,28 @@ export class AiService {
       const itemId = menuItem._id.toString();
       const itemOrderData = orderDataMap.get(itemId);
       const currentPrice = menuItem.price || 0;
+      
+      // Calculate ingredient costs
+      let totalCost = 0;
+      const parsedIngredients = [];
+      if (menuItem.ingredients && Array.isArray(menuItem.ingredients)) {
+        for (const ing of menuItem.ingredients) {
+          if (ing.ingredientId && (ing.ingredientId as any).name) {
+            const iData = ing.ingredientId as any;
+            const cost = (iData.unitCost || 0) * (ing.quantity || 0);
+            totalCost += cost;
+            parsedIngredients.push({ name: iData.name, cost });
+          }
+        }
+      }
+      const ingredientCostData = {
+        totalCost,
+        ingredients: parsedIngredients
+      };
+      
+      // Calculate profit margin using ingredient cost if available, else fallback
+      const estimatedCost = totalCost > 0 ? totalCost : currentPrice * 0.3;
+
       const totalQuantity = itemOrderData?.totalQuantity || 0;
       const totalRevenue = itemOrderData?.totalRevenue || 0;
       const orderCount = itemOrderData?.orderCount || 0;
@@ -867,8 +900,7 @@ export class AiService {
         (totalQuantity / 20) + // Base on total quantity
         (orderCount / 10) // Base on order count
       ));
-      // Calculate profit margin (simplified - assuming 30% cost)
-      const estimatedCost = currentPrice * 0.3;
+      // Calculate profit margin
       const profitMargin = currentPrice > 0 ? ((currentPrice - estimatedCost) / currentPrice) * 100 : 0;
       // Determine recommendation - Try OpenAI first, fallback to rule-based
       let recommendation: 'increase_price' | 'decrease_price' | 'maintain_price' | 'remove_item' | 'add_item' = 'maintain_price';
@@ -937,6 +969,8 @@ export class AiService {
               last90Days: sales90Days,
               trend,
             },
+            areaData,
+            ingredientCostData,
           });
           if (aiRecommendation) {
             this.logger.log(`✅ Using AI recommendation for ${menuItem.name}`);
@@ -1051,6 +1085,12 @@ export class AiService {
     startDate.setDate(startDate.getDate() - 90); // Last 90 days (matched with menu optimization)
     // Get menu items - match the same logic as menu-items service
     const branchIdObj = new Types.ObjectId(branchId);
+    const branchData = await this.branchModel.findById(branchIdObj).lean();
+    const areaData = {
+      city: branchData?.address?.city || 'Unknown',
+      state: branchData?.address?.state || 'Unknown',
+      country: branchData?.address?.country || 'Unknown',
+    };
     let menuItems = await this.menuItemModel.find({
       $or: [
         { branchId: branchIdObj },
@@ -1059,6 +1099,7 @@ export class AiService {
       ],
     })
       .populate('categoryId', 'name type')
+      .populate('ingredients.ingredientId', 'name unitCost')
       .lean();
     // Filter out unavailable items
     menuItems = menuItems.filter((item: any) => item.isAvailable !== false);

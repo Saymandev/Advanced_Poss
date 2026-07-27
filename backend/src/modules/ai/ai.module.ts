@@ -11,6 +11,8 @@ import { POSOrder, POSOrderSchema } from '../pos/schemas/pos-order.schema';
 import { SubscriptionPlansModule } from '../subscriptions/subscription-plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { SettingsModule } from '../settings/settings.module';
+import { Branch, BranchSchema } from '../branches/schemas/branch.schema';
+import { Ingredient, IngredientSchema } from '../ingredients/schemas/ingredient.schema';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { AnalyticsService } from './analytics.service';
@@ -22,6 +24,8 @@ import { AnalyticsService } from './analytics.service';
       { name: POSOrder.name, schema: POSOrderSchema },
       { name: MenuItem.name, schema: MenuItemSchema },
       { name: Customer.name, schema: CustomerSchema },
+      { name: Branch.name, schema: BranchSchema },
+      { name: Ingredient.name, schema: IngredientSchema },
     ]),
     CategoriesModule,
     forwardRef(() => SubscriptionPlansModule), // Required for SubscriptionFeatureGuard

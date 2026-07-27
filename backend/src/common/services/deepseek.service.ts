@@ -64,6 +64,15 @@ export class DeepSeekService {
       last90Days: number;
       trend: 'increasing' | 'decreasing' | 'stable';
     };
+    areaData?: {
+      city: string;
+      state?: string;
+      country: string;
+    };
+    ingredientCostData?: {
+      totalCost: number;
+      ingredients: { name: string; cost: number }[];
+    };
   }): Promise<{
     recommendation: 'increase_price' | 'decrease_price' | 'maintain_price' | 'remove_item' | 'add_item';
     suggestedPrice: number;
@@ -97,6 +106,15 @@ Performance Metrics:
 - Average Price in Category: $${context.avgPrice.toFixed(2)}
 - Profit Margin: ${context.profitMargin.toFixed(1)}%
 ${context.salesData ? `- Sales Trend (last 30 days): ${context.salesData.trend}` : ''}
+
+Location Data (Area Demographics):
+- City: ${context.areaData?.city || 'Unknown'}
+- State/Region: ${context.areaData?.state || 'Unknown'}
+- Country: ${context.areaData?.country || 'Unknown'}
+
+Ingredient Analysis:
+- Total Estimated Ingredient Cost: $${context.ingredientCostData?.totalCost.toFixed(2) || 'N/A'}
+- Major Ingredients: ${context.ingredientCostData?.ingredients.map(i => `${i.name} ($${i.cost.toFixed(2)})`).join(', ') || 'N/A'}
 
 Please provide a JSON response with the following structure:
 {
