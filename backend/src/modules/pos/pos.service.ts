@@ -673,7 +673,7 @@ export class POSService {
           if (customer || createOrderDto.customerInfo) {
             try {
               const receiptData = await this.receiptService.generateReceiptData(savedOrder._id.toString());
-              const companyName = (receiptData as any).companyName || receiptData.restaurantName || 'Raha POS';
+              const companyName = receiptData.restaurantName || (receiptData as any).companyName || 'Raha POS';
               const publicUrl = receiptData.publicUrl || '';
               const orderReviewUrl = receiptData.orderReviewUrl || '';
               const logoUrl = receiptData.receiptSettings?.logoUrl || '';
@@ -1459,7 +1459,7 @@ export class POSService {
     if (customer || order.customerInfo) {
       try {
         const receiptData = await this.receiptService.generateReceiptData(order._id.toString());
-        const companyName = (receiptData as any).companyName || receiptData.restaurantName || 'Raha POS';
+        const companyName = receiptData.restaurantName || (receiptData as any).companyName || 'Raha POS';
         const publicUrl = receiptData.publicUrl || '';
         const orderReviewUrl = receiptData.orderReviewUrl || '';
         const logoUrl = receiptData.receiptSettings?.logoUrl || '';
@@ -3094,6 +3094,22 @@ export class POSService {
       });
     } catch (wsError) {
       console.warn('Failed to emit driver assignment WebSocket event:', wsError);
+    }
+
+    // Send SMS notification to driver
+    const driverPhone = (driver as any).phone;
+    if (driverPhone) {
+      try {
+        const baseUrl =
+          process.env.APP_URL ||
+          process.env.FRONTEND_URL ||
+          'http://localhost:3000';
+        const riderUrl = `${baseUrl.replace(/\/$/, '')}/dashboard/rider/${orderId}`;
+        const smsMessage = `You have been assigned to deliver Order #${order.orderNumber}. Open Rider App: ${riderUrl}`;
+        await this.smsService.sendSms(driverPhone, smsMessage);
+      } catch (smsError) {
+        console.warn('Failed to send driver assignment SMS:', smsError);
+      }
     }
 
     return updatedOrder;

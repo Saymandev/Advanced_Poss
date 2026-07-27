@@ -263,8 +263,12 @@ export class ReceiptService {
                 this.configService.get<string>('frontend.url') ||
                 process.env.FRONTEND_URL ||
                 'http://localhost:3000';
-              // Use company landing page URL so customers can select branch
-              publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
+              // Use company landing page URL so customers can select branch, or branch URL if available
+              if (branch.slug) {
+                publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}/${branch.slug}`;
+              } else {
+                publicUrl = `${baseUrl.replace(/\/$/, '')}/${company.slug}`;
+              }
             }
           } catch (companyError) {
             console.error('Error fetching company for logo / subscription:', {

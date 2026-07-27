@@ -4034,7 +4034,13 @@ export default function POSPage() {
             {orderSummary.discount > 0 && (
               <div className="flex justify-between text-[9px] font-bold text-emerald-500">
                 <span>Discount</span>
-                <span>-{formatCurrency(orderSummary.discount)}</span>
+                <span>-{formatCurrency(orderSummary.discount - (useLoyaltyPoints ? (loyaltyRedemption.discount || 0) : 0))}</span>
+              </div>
+            )}
+            {useLoyaltyPoints && loyaltyRedemption.discount > 0 && (
+              <div className="flex justify-between text-[9px] font-bold text-emerald-500">
+                <span>Loyalty Discount</span>
+                <span>-{formatCurrency(loyaltyRedemption.discount)}</span>
               </div>
             )}
             <div className="flex justify-between text-[9px] font-medium text-slate-500">

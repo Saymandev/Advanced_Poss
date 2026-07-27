@@ -6,5 +6,6 @@ export enum UserRole {
   COOK = 'cook',
   WAITER = 'waiter',
   CASHIER = 'cashier',
+  DRIVER = 'driver',
 }
 

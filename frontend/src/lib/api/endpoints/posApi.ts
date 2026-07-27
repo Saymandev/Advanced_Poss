@@ -291,7 +291,19 @@ export const posApi = apiSlice.injectEndpoints({
       invalidatesTags: ['POS'],
     }),
 
-getWaiterActiveOrdersCount: builder.query<Record<string, number>, void>({
+
+    // Assign driver
+    assignDriver: builder.mutation<any, { orderId: string; driverId: string }>({
+      query: ({ orderId, driverId }) => ({
+        url: `/pos/orders/${orderId}/assign-driver`,
+        method: 'POST',
+        body: { driverId },
+      }),
+      invalidatesTags: ['POS'],
+    }),
+
+
+    getWaiterActiveOrdersCount: builder.query<Record<string, number>, void>({
       query: () => ({
         url: '/pos/waiters/active-orders',
       }),
@@ -855,4 +867,5 @@ export const {
   useUpdateRiderLocationMutation,
   useUpdateRiderInfoMutation,
   useSetDeliveryLocationsMutation,
+  useAssignDriverMutation,
 } = posApi;

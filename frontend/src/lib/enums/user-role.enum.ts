@@ -6,6 +6,7 @@ export enum UserRole {
   COOK = 'cook',
   WAITER = 'waiter',
   CASHIER = 'cashier',
+  DRIVER = 'driver',
 }
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
@@ -16,6 +17,7 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.COOK]: 'Cook',
   [UserRole.WAITER]: 'Waiter',
   [UserRole.CASHIER]: 'Cashier',
+  [UserRole.DRIVER]: 'Driver',
 };
 
 export const USER_ROLE_DESCRIPTIONS: Record<UserRole, string> = {
@@ -26,4 +28,5 @@ export const USER_ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   [UserRole.COOK]: 'Food preparation and kitchen operations',
   [UserRole.WAITER]: 'Table service and order taking',
   [UserRole.CASHIER]: 'Point of sale and payment processing',
+  [UserRole.DRIVER]: 'Delivery and order transportation',
 };
