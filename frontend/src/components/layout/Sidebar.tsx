@@ -63,6 +63,13 @@ const navigation: NavigationItem[] = [
     roles: ['owner', 'manager', 'chef', 'waiter', 'cashier'],
   },
   {
+    name: 'Driver Dashboard',
+    href: '/dashboard/rider',
+    icon: TruckIcon,
+    requiredFeature: 'delivery-management',
+    roles: ['driver'],
+  },
+  {
     name: 'POS System',
     href: '/dashboard/pos',
     icon: ShoppingBagIcon,
@@ -107,6 +114,7 @@ const navigation: NavigationItem[] = [
     href: '/dashboard/deliveries',
     icon: TruckIcon,
     requiredFeature: 'delivery-management',
+    roles: ['owner', 'manager', 'waiter', 'cashier'], // Hide from driver, they have their own dashboard
   },
   {
     name: 'Menu',
