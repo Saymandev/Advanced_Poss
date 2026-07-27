@@ -29,9 +29,9 @@ export const FEATURES = {
   CATEGORIES: 'categories',
   QR_MENUS: 'qr-menus',
 
-  // Orders & Tables
   ORDER_MANAGEMENT: 'order-management',
   DELIVERY_MANAGEMENT: 'delivery-management',
+  RIDER_DASHBOARD: 'rider-dashboard',
   TABLE_MANAGEMENT: 'table-management',
   KITCHEN_DISPLAY: 'kitchen-display',
   CUSTOMER_DISPLAY: 'customer-display',

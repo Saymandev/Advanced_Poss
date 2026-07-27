@@ -7,11 +7,11 @@ import { FEATURES } from '../../../common/constants/features.constants';
 
 /**
  * Map of legacy feature keys to new feature keys
- */
 export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
   pos: [
     FEATURES.ORDER_MANAGEMENT,
     FEATURES.DELIVERY_MANAGEMENT,
+    FEATURES.RIDER_DASHBOARD,
     FEATURES.TABLE_MANAGEMENT,
     FEATURES.KITCHEN_DISPLAY,
     FEATURES.CUSTOMER_DISPLAY,
@@ -166,6 +166,7 @@ export function getFeaturesByCategory() {
       { key: FEATURES.POS_SETTINGS, name: 'Point of Sale Settings' },
       { key: FEATURES.DIGITAL_RECEIPTS, name: 'Digital Receipt System' },
       { key: FEATURES.DELIVERY_MANAGEMENT, name: 'Delivery Management' },
+      { key: FEATURES.RIDER_DASHBOARD, name: 'Driver Dashboard' },
     ],
     Inventory: [
       { key: FEATURES.INVENTORY, name: 'Inventory Management' },

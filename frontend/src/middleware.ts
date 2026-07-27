@@ -40,7 +40,7 @@ const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     'expenses', 'income', 'work-periods', 'notifications',
   ],
   driver: [
-    'dashboard', 'delivery-management', 'notifications',
+    'dashboard', 'delivery-management', 'rider-dashboard', 'notifications',
   ],
   super_admin: [],
 };
@@ -53,7 +53,7 @@ const ROUTE_FEATURE_MAP: Record<string, string[]> = {
   '/dashboard/orders': ['order-management'],
   '/dashboard/tables': ['table-management'],
   '/dashboard/deliveries': ['delivery-management'],
-  '/dashboard/rider': ['delivery-management'],
+  '/dashboard/rider': ['rider-dashboard'],
   '/dashboard/customers': ['customer-management'],
   '/dashboard/customer-display': ['customer-display', 'order-management'],
   '/dashboard/kitchen': ['kitchen-display'],
