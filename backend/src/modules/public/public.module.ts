@@ -19,6 +19,7 @@ import { SystemFeedbackModule } from '../system-feedback/system-feedback.module'
 import { UsersModule } from '../users/users.module';
 import { TablesModule } from '../tables/tables.module';
 import { WebsocketsModule } from '../websockets/websockets.module';
+import { POSModule } from '../pos/pos.module';
 import { PublicController } from './public.controller';
 import { PublicService } from './public.service';
 import { ContactForm, ContactFormSchema } from './schemas/contact-form.schema';
@@ -47,6 +48,7 @@ import { ContactForm, ContactFormSchema } from './schemas/contact-form.schema';
     forwardRef(() => ReviewsModule),
     SettingsModule,
     TablesModule,
+    forwardRef(() => POSModule),
   ],
   controllers: [PublicController],
   providers: [PublicService],

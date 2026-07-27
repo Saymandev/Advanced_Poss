@@ -255,7 +255,43 @@ export const posApi = apiSlice.injectEndpoints({
     }),
 
     // Get waiter active orders count (for busy indicator)
-    getWaiterActiveOrdersCount: builder.query<Record<string, number>, void>({
+    
+    // Update rider location (live tracking)
+    updateRiderLocation: builder.mutation<any, { orderId: string; lat: number; lng: number; heading?: number; speed?: number }>({
+      query: ({ orderId, ...body }) => ({
+        url: `/pos/orders/${orderId}/rider-location`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['POS'],
+    }),
+
+    // Update rider info
+    updateRiderInfo: builder.mutation<any, { orderId: string; name?: string; phone?: string; vehicleType?: string; vehicleNumber?: string; riderId?: string }>({
+      query: ({ orderId, ...body }) => ({
+        url: `/pos/orders/${orderId}/rider-info`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['POS'],
+    }),
+
+    // Set delivery locations
+    setDeliveryLocations: builder.mutation<any, { 
+      orderId: string; 
+      pickupLocation?: { lat: number; lng: number; address: string };
+      dropoffLocation?: { lat: number; lng: number; address: string };
+      estimatedDeliveryMinutes?: number;
+    }>({
+      query: ({ orderId, ...body }) => ({
+        url: `/pos/orders/${orderId}/delivery-locations`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['POS'],
+    }),
+
+getWaiterActiveOrdersCount: builder.query<Record<string, number>, void>({
       query: () => ({
         url: '/pos/waiters/active-orders',
       }),
@@ -816,4 +852,7 @@ export const {
   useGetDeliveryOrdersQuery,
   useAssignDeliveryDriverMutation,
   useUpdateDeliveryStatusMutation,
+  useUpdateRiderLocationMutation,
+  useUpdateRiderInfoMutation,
+  useSetDeliveryLocationsMutation,
 } = posApi;

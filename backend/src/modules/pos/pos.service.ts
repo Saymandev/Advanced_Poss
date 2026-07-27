@@ -3072,8 +3072,30 @@ export class POSService {
     }
 
     const updatedOrder = await order.save();
-    // TODO: Optionally emit websocket event for delivery updates in future
-    // (No emit here because WebsocketsGateway doesn't expose a generic emit method yet)
+
+    // Emit WebSocket event for delivery assignment
+    try {
+      const orderIdStr = orderId.toString();
+      const branchId = order.branchId?.toString();
+      if (branchId) {
+        this.websocketsGateway.emitToBranch(branchId, 'delivery:driver-assigned', {
+          orderId: orderIdStr,
+          driverId,
+          driverName: (driver as any).name || `${(driver as any).firstName || ''} ${(driver as any).lastName || ''}`.trim(),
+        });
+      }
+      this.websocketsGateway.emitToOrder(orderIdStr, 'delivery:rider-assigned', {
+        orderId: orderIdStr,
+        riderInfo: {
+          name: (driver as any).name || `${(driver as any).firstName || ''} ${(driver as any).lastName || ''}`.trim(),
+          phone: (driver as any).phone,
+          riderId: driverId,
+        },
+      });
+    } catch (wsError) {
+      console.warn('Failed to emit driver assignment WebSocket event:', wsError);
+    }
+
     return updatedOrder;
   }
 
@@ -3127,7 +3149,26 @@ export class POSService {
     }
 
     const updatedOrder = await order.save();
-    // TODO: Optionally emit websocket event for delivery updates in future
+
+    // Emit WebSocket event for delivery status update
+    try {
+      const orderIdStr = orderId.toString();
+      const branchId = order.branchId?.toString();
+      if (branchId) {
+        this.websocketsGateway.emitToBranch(branchId, 'delivery:status-changed', {
+          orderId: orderIdStr,
+          deliveryStatus: status,
+          order: updatedOrder,
+        });
+      }
+      this.websocketsGateway.emitToOrder(orderIdStr, 'delivery:status-changed', {
+        orderId: orderIdStr,
+        deliveryStatus: status,
+      });
+    } catch (wsError) {
+      console.warn('Failed to emit delivery status WebSocket event:', wsError);
+    }
+
     return updatedOrder;
   }
 
@@ -3207,5 +3248,262 @@ export class POSService {
     this.websocketsGateway.notifyOrderStatusChanged(publicOrder.branchId.toString(), publicOrder);
 
     return newPOSOrder as POSOrderDocument;
+  }
+
+  // ============================================
+  // LIVE DELIVERY TRACKING METHODS
+  // ============================================
+
+  /**
+   * Update rider's GPS location and broadcast via WebSocket
+   */
+  async updateRiderLocation(
+    orderId: string,
+    location: { lat: number; lng: number; heading?: number; speed?: number },
+    branchId?: string,
+  ): Promise<any> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID');
+    }
+
+    const order = await this.posOrderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const riderLocation = {
+      lat: location.lat,
+      lng: location.lng,
+      heading: location.heading || 0,
+      speed: location.speed || 0,
+      updatedAt: new Date(),
+    };
+
+    // Update in database
+    const updatedOrder = await this.posOrderModel.findByIdAndUpdate(
+      orderId,
+      { riderLocation },
+      { new: true },
+    ).exec();
+
+    // Broadcast via WebSocket to order tracking room
+    const orderIdStr = orderId.toString();
+    const effectiveBranchId = branchId || order.branchId?.toString();
+    
+    try {
+      this.websocketsGateway.emitToOrder(orderIdStr, 'rider:location-update', {
+        orderId: orderIdStr,
+        location: riderLocation,
+      });
+    } catch (wsError) {
+      // WebSocket broadcast is best-effort
+      console.warn('Failed to broadcast rider location via WebSocket:', wsError);
+    }
+
+    return updatedOrder;
+  }
+
+  /**
+   * Update rider info (name, phone, vehicle) on an order
+   */
+  async updateRiderInfo(
+    orderId: string,
+    riderInfo: {
+      name?: string;
+      phone?: string;
+      riderId?: string;
+      vehicleType?: string;
+      vehicleNumber?: string;
+    },
+  ): Promise<any> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID');
+    }
+
+    const order = await this.posOrderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const updatedOrder = await this.posOrderModel.findByIdAndUpdate(
+      orderId,
+      { riderInfo },
+      { new: true },
+    ).exec();
+
+    // Broadcast rider assignment via WebSocket
+    try {
+      const orderIdStr = orderId.toString();
+      this.websocketsGateway.emitToOrder(orderIdStr, 'delivery:rider-assigned', {
+        orderId: orderIdStr,
+        riderInfo,
+      });
+    } catch (wsError) {
+      console.warn('Failed to broadcast rider info via WebSocket:', wsError);
+    }
+
+    return updatedOrder;
+  }
+
+  /**
+   * Set pickup and dropoff locations for delivery tracking
+   */
+  async setDeliveryLocations(
+    orderId: string,
+    data: {
+      pickupLocation?: { lat: number; lng: number; address: string };
+      dropoffLocation?: { lat: number; lng: number; address: string };
+      estimatedDeliveryMinutes?: number;
+    },
+  ): Promise<any> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID');
+    }
+
+    const updateData: any = {};
+    if (data.pickupLocation) updateData.pickupLocation = data.pickupLocation;
+    if (data.dropoffLocation) updateData.dropoffLocation = data.dropoffLocation;
+    if (data.estimatedDeliveryMinutes) {
+      updateData.estimatedDeliveryMinutes = data.estimatedDeliveryMinutes;
+      updateData.estimatedDeliveryAt = new Date(Date.now() + data.estimatedDeliveryMinutes * 60 * 1000);
+    }
+
+    const updatedOrder = await this.posOrderModel.findByIdAndUpdate(
+      orderId,
+      updateData,
+      { new: true },
+    ).exec();
+
+    if (!updatedOrder) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return updatedOrder;
+  }
+
+  /**
+   * Get full tracking data for an order (public-facing)
+   */
+  async getTrackingData(orderId: string): Promise<any> {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid order ID');
+    }
+
+    // Try POS order first
+    let order: any = await this.posOrderModel
+      .findById(orderId)
+      .select('orderNumber orderType status deliveryStatus deliveryDetails deliveryFee items totalAmount subtotal taxAmount serviceChargeAmount paymentMethod paymentStatus customerInfo riderInfo riderLocation pickupLocation dropoffLocation estimatedDeliveryMinutes estimatedDeliveryAt assignedDriverId assignedAt outForDeliveryAt deliveredAt completedAt cancelledAt createdAt branchId companyId')
+      .populate('assignedDriverId', 'firstName lastName name phone email')
+      .populate('branchId', 'name phone address slug')
+      .exec();
+
+    if (!order) {
+      // Try public Order model
+      order = await this.orderModel
+        .findById(orderId)
+        .select('orderNumber type status deliveryInfo items total subtotal taxAmount deliveryFee paymentMethod paymentStatus deliveryAddress guestName guestPhone createdAt confirmedAt startedPreparingAt readyAt servedAt completedAt branchId companyId')
+        .populate('branchId', 'name phone address slug')
+        .exec();
+
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      // Map public order fields
+      return {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        orderType: order.type || 'delivery',
+        status: order.status,
+        deliveryStatus: this.mapPublicStatusToDeliveryStatus(order.status),
+        items: order.items,
+        totalAmount: order.total || 0,
+        subtotal: order.subtotal || 0,
+        taxAmount: order.taxAmount || 0,
+        deliveryFee: order.deliveryFee || 0,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        customerInfo: {
+          name: order.deliveryInfo?.name || order.guestName,
+          phone: order.deliveryInfo?.phone || order.guestPhone,
+        },
+        deliveryAddress: order.deliveryAddress || order.deliveryInfo?.address,
+        riderInfo: null,
+        riderLocation: null,
+        pickupLocation: null,
+        dropoffLocation: null,
+        estimatedDeliveryMinutes: null,
+        estimatedDeliveryAt: null,
+        branch: order.branchId,
+        timeline: {
+          placed: order.createdAt,
+          confirmed: order.confirmedAt,
+          preparing: order.startedPreparingAt,
+          ready: order.readyAt,
+          outForDelivery: order.servedAt,
+          delivered: order.completedAt,
+        },
+      };
+    }
+
+    // Build rider info from assignedDriverId if riderInfo not set
+    let riderInfo = order.riderInfo;
+    if (!riderInfo && order.assignedDriverId) {
+      const driver = order.assignedDriverId;
+      if (typeof driver === 'object') {
+        riderInfo = {
+          name: driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim(),
+          phone: driver.phone,
+          riderId: driver._id?.toString(),
+        };
+      }
+    }
+
+    return {
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      orderType: order.orderType,
+      status: order.status,
+      deliveryStatus: order.deliveryStatus || 'pending',
+      items: order.items,
+      totalAmount: order.totalAmount || 0,
+      subtotal: order.subtotal || 0,
+      taxAmount: order.taxAmount || 0,
+      serviceChargeAmount: order.serviceChargeAmount || 0,
+      deliveryFee: order.deliveryFee || 0,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      customerInfo: order.customerInfo,
+      deliveryDetails: order.deliveryDetails,
+      riderInfo,
+      riderLocation: order.riderLocation || null,
+      pickupLocation: order.pickupLocation || null,
+      dropoffLocation: order.dropoffLocation || null,
+      estimatedDeliveryMinutes: order.estimatedDeliveryMinutes || null,
+      estimatedDeliveryAt: order.estimatedDeliveryAt || null,
+      branch: order.branchId,
+      timeline: {
+        placed: (order as any).createdAt,
+        confirmed: order.assignedAt ? undefined : undefined, // POS orders are confirmed at creation
+        assigned: order.assignedAt,
+        outForDelivery: order.outForDeliveryAt,
+        delivered: order.deliveredAt,
+        completed: order.completedAt,
+        cancelled: order.cancelledAt,
+      },
+    };
+  }
+
+  private mapPublicStatusToDeliveryStatus(status: string): string {
+    const mapping: Record<string, string> = {
+      pending: 'pending',
+      confirmed: 'confirmed',
+      preparing: 'confirmed',
+      ready: 'confirmed',
+      served: 'out_for_delivery',
+      completed: 'delivered',
+      cancelled: 'cancelled',
+    };
+    return mapping[status] || 'pending';
   }
 }

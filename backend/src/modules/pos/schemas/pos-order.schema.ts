@@ -212,6 +212,46 @@ export class POSOrder {
 
   @Prop({ default: 0 })
   exchangeCount?: number;
+
+  // === Live Delivery Tracking Fields ===
+
+  @Prop({ type: Object })
+  riderInfo?: {
+    name?: string;
+    phone?: string;
+    riderId?: string;
+    vehicleType?: string;  // 'bike', 'car', 'bicycle', 'scooter'
+    vehicleNumber?: string;
+  };
+
+  @Prop({ type: Object })
+  riderLocation?: {
+    lat: number;
+    lng: number;
+    heading?: number;       // Direction in degrees (0-360)
+    speed?: number;         // Speed in km/h
+    updatedAt: Date;
+  };
+
+  @Prop({ type: Object })
+  pickupLocation?: {
+    lat: number;
+    lng: number;
+    address: string;
+  };
+
+  @Prop({ type: Object })
+  dropoffLocation?: {
+    lat: number;
+    lng: number;
+    address: string;
+  };
+
+  @Prop({ type: Number })
+  estimatedDeliveryMinutes?: number;
+
+  @Prop()
+  estimatedDeliveryAt?: Date;
 }
 
 export const POSOrderSchema = SchemaFactory.createForClass(POSOrder);

@@ -305,5 +305,45 @@ export class POSController {
       req.user.id,
     );
   }
-}
 
+  @Patch('orders/:orderId/rider-location')
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @ApiOperation({ summary: 'Update rider GPS location for live tracking' })
+  async updateRiderLocation(
+    @Param('orderId') orderId: string,
+    @Body() body: { lat: number; lng: number; heading?: number; speed?: number },
+    @Request() req: any,
+  ) {
+    return this.posService.updateRiderLocation(orderId, body, req.user.branchId);
+  }
+
+  @Patch('orders/:orderId/rider-info')
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @ApiOperation({ summary: 'Set rider information on a delivery order' })
+  async updateRiderInfo(
+    @Param('orderId') orderId: string,
+    @Body() body: { name?: string; phone?: string; riderId?: string; vehicleType?: string; vehicleNumber?: string },
+  ) {
+    return this.posService.updateRiderInfo(orderId, body);
+  }
+
+  @Patch('orders/:orderId/delivery-locations')
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @ApiOperation({ summary: 'Set pickup/dropoff locations and ETA for delivery tracking' })
+  async setDeliveryLocations(
+    @Param('orderId') orderId: string,
+    @Body() body: {
+      pickupLocation?: { lat: number; lng: number; address: string };
+      dropoffLocation?: { lat: number; lng: number; address: string };
+      estimatedDeliveryMinutes?: number;
+    },
+  ) {
+    return this.posService.setDeliveryLocations(orderId, body);
+  }
+
+  @Get('orders/:orderId/tracking')
+  @ApiOperation({ summary: 'Get full tracking data for an order' })
+  async getTrackingData(@Param('orderId') orderId: string) {
+    return this.posService.getTrackingData(orderId);
+  }
+}

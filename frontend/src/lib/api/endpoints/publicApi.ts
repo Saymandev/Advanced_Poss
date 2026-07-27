@@ -291,6 +291,12 @@ export const publicApi = apiSlice.injectEndpoints({
         return response.data || response;
       },
     }),
+    getLiveTracking: builder.query<any, { orderId: string; companySlug: string; branchSlug: string }>({
+      query: ({ orderId, companySlug, branchSlug }) => `/public/companies/${companySlug}/branches/${branchSlug}/orders/${orderId}/live-tracking`,
+      transformResponse: (response: any) => {
+        return response.data || response;
+      },
+    }),
     getBranchZones: builder.query<DeliveryZone[], {
       companySlug: string;
       branchSlug: string;
@@ -467,4 +473,5 @@ export const {
   useCheckRoomAvailabilityQuery,
   useCreatePublicBookingMutation,
   useGetBookingDetailsQuery,
+  useGetLiveTrackingQuery,
 } = publicApi;

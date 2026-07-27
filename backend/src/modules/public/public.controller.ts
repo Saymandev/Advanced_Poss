@@ -19,6 +19,7 @@ import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service';
 import { MenuItemsService } from '../menu-items/menu-items.service';
 import { RoomsService } from '../rooms/rooms.service';
 import { ReviewsService } from '../reviews/reviews.service';
+import { POSService } from '../pos/pos.service';
 import { PublicService } from './public.service';
 
 @ApiTags('Public')
@@ -34,6 +35,7 @@ export class PublicController {
     private readonly roomsService: RoomsService,
     private readonly reviewsService: ReviewsService,
     private readonly bookingsService: BookingsService,
+    private readonly posService: POSService,
   ) {}
 
   @Public()
@@ -1091,6 +1093,23 @@ export class PublicController {
     return {
       success: true,
       data: publicBooking,
+    };
+  }
+  @Public()
+  @Get('companies/:companySlug/branches/:branchSlug/orders/:orderId/live-tracking')
+  @ApiOperation({ summary: 'Live tracking data for order (public, scoped to branch)' })
+  async getLiveTracking(
+    @Param('companySlug') companySlug: string,
+    @Param('branchSlug') branchSlug: string,
+    @Param('orderId') orderId: string,
+  ) {
+    const company = await this.companiesService.findBySlug(companySlug);
+    const companyId = (company as any)._id?.toString() || (company as any).id;
+    const branch = await this.branchesService.findBySlug(companyId, branchSlug);
+    
+    return {
+      success: true,
+      data: await this.posService.getTrackingData(orderId),
     };
   }
 }

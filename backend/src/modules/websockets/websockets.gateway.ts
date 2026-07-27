@@ -408,6 +408,10 @@ export class WebsocketsGateway
     this.server.emit(event, data);
     this.logger.debug(`Emitted ${event} to all clients`);
   }
+  emitToOrder(orderId: string, event: string, data: any) {
+    this.server.to(`order:${orderId}`).emit(event, data);
+    this.logger.debug(`Emitted ${event} to order room ${orderId}`);
+  }
   // Order events
   notifyNewOrder(branchId: string, order: any) {
     this.emitToBranch(branchId, 'order:new', order);
