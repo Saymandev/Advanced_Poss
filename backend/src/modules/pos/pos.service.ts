@@ -676,6 +676,7 @@ export class POSService {
               const companyName = receiptData.restaurantName || (receiptData as any).companyName || 'Raha POS';
               const publicUrl = receiptData.publicUrl || '';
               const orderReviewUrl = receiptData.orderReviewUrl || '';
+              const orderTrackingUrl = (receiptData as any).orderTrackingUrl || '';
               const logoUrl = receiptData.receiptSettings?.logoUrl || '';
               
               const customerEmail = customer?.email || createOrderDto.customerInfo?.email;
@@ -699,10 +700,13 @@ export class POSService {
                   logoUrl,
                   publicUrl,
                   orderReviewUrl,
+                  orderTrackingUrl,
                 );
               }
               if (customerPhone) {
-                const smsMessage = `Thank you for your order from ${companyName}! Order #${savedOrder.orderNumber} has been confirmed.${loyaltyPointsRedeemed > 0 ? ` You redeemed ${loyaltyPointsRedeemed} points for ${loyaltyDiscount} TK discount.` : ''} Total: ${savedOrder.totalAmount} TK.${publicUrl ? ` View your receipt or review us: ${publicUrl}` : ''}`;
+                const trackingText = (savedOrder.orderType === 'delivery' && orderTrackingUrl) ? ` Track Your Order: ${orderTrackingUrl}` : '';
+                const reviewText = publicUrl ? ` View your receipt or review us: ${publicUrl}` : '';
+                const smsMessage = `Thank you for your order from ${companyName}! Order #${savedOrder.orderNumber} has been confirmed.${loyaltyPointsRedeemed > 0 ? ` You redeemed ${loyaltyPointsRedeemed} points for ${loyaltyDiscount} TK discount.` : ''} Total: ${savedOrder.totalAmount} TK.${trackingText}${reviewText}`;
                 await this.smsService.sendSms(customerPhone, smsMessage);
               }
             } catch (notificationError) {
@@ -1462,17 +1466,23 @@ export class POSService {
         const companyName = receiptData.restaurantName || (receiptData as any).companyName || 'Raha POS';
         const publicUrl = receiptData.publicUrl || '';
         const orderReviewUrl = receiptData.orderReviewUrl || '';
+        const orderTrackingUrl = (receiptData as any).orderTrackingUrl || '';
         const logoUrl = receiptData.receiptSettings?.logoUrl || '';
 
+        const customerName = customer?.name || order.customerInfo?.name || 'Customer';
         const customerEmail = customer?.email || order.customerInfo?.email;
-        const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : order.customerInfo?.name || 'Customer';
         const customerPhone = customer?.phone || order.customerInfo?.phone;
+
+        // Build orderItems for email
+        const orderItems = order.items.map((item: any) => ({
+          name: item.name || 'Unknown Item',
+          quantity: item.quantity,
+          price: item.price,
+          total: item.total
+        }));
+
         if (customerEmail) {
-          const orderItems = order.items.map((item: any) => ({
-            name: item.name || 'Unknown Item',
-            quantity: item.quantity,
-            price: item.price,
-          }));
+          // Send email
           await this.emailService.sendPurchaseConfirmation(
             customerEmail,
             customerName,
@@ -1485,10 +1495,13 @@ export class POSService {
             logoUrl,
             publicUrl,
             orderReviewUrl,
+            orderTrackingUrl,
           );
         }
         if (customerPhone) {
-          const smsMessage = `Thank you for your order from ${companyName}! Order #${order.orderNumber} has been confirmed.${order.loyaltyPointsRedeemed ? ` You redeemed ${order.loyaltyPointsRedeemed} points for ${order.loyaltyDiscount || 0} TK discount.` : ''} Total: ${order.totalAmount} TK.${publicUrl ? ` View your receipt or review us: ${publicUrl}` : ''}`;
+          const trackingText = (order.orderType === 'delivery' && orderTrackingUrl) ? ` Track Your Order: ${orderTrackingUrl}` : '';
+          const reviewText = publicUrl ? ` View your receipt or review us: ${publicUrl}` : '';
+          const smsMessage = `Thank you for your order from ${companyName}! Order #${order.orderNumber} has been confirmed.${order.loyaltyPointsRedeemed ? ` You redeemed ${order.loyaltyPointsRedeemed} points for ${order.loyaltyDiscount || 0} TK discount.` : ''} Total: ${order.totalAmount} TK.${trackingText}${reviewText}`;
           await this.smsService.sendSms(customerPhone, smsMessage);
         }
       } catch (notificationError) {

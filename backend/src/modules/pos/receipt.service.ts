@@ -586,6 +586,11 @@ export class ReceiptService {
           'http://localhost:3000';
         return `${baseUrl}/display/customerreview/${orderId}`;
       })(),
+      orderTrackingUrl: (() => {
+        const orderId = (order as any)._id?.toString() || (order as any).id?.toString();
+        if (!orderId || !publicUrl) return null;
+        return `${publicUrl}/track/${orderId}`;
+      })(),
     };
     return receiptData;
   }
