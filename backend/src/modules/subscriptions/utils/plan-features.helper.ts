@@ -7,6 +7,7 @@ import { FEATURES } from '../../../common/constants/features.constants';
 
 /**
  * Map of legacy feature keys to new feature keys
+ */
 export const LEGACY_FEATURE_MAP: Record<string, string[]> = {
   pos: [
     FEATURES.ORDER_MANAGEMENT,
