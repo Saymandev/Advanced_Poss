@@ -782,6 +782,7 @@ export default function POSPage() {
   const [printReceiptPDF] = usePrintReceiptPDFMutation();
   const [downloadReceiptPDF] = useDownloadReceiptPDFMutation();
   const [updateOrder] = useUpdatePOSOrderMutation();
+  const [updatePublicOrderStatus] = useUpdateOrderStatusMutation();
   const [refundOrder] = useRefundOrderMutation();
   const { data: printers } = useGetPrintersQuery();
   const {
@@ -5099,9 +5100,9 @@ export default function POSPage() {
                             onClick={async () => {
                               if (!canActOnOrder) return;
                               try {
-                                await updateOrder({
+                                await updatePublicOrderStatus({
                                   id: detailId,
-                                  data: { status: 'confirmed' }
+                                  status: 'confirmed'
                                 }).unwrap();
                                 toast.success('Order confirmed');
                                 setQueueDetailId(null);

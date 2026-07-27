@@ -10,7 +10,7 @@ export class RolePermission {
 
   @Prop({
     type: String,
-    enum: ['owner', 'manager', 'chef', 'cook', 'waiter', 'cashier'],
+    enum: ['owner', 'manager', 'chef', 'cook', 'waiter', 'cashier', 'driver'],
     required: true,
   })
   role: string;
