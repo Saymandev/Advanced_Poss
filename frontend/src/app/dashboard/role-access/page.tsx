@@ -36,17 +36,40 @@ interface RoleAccess {
   color: string;
 }
 
-// Categories allowed per role (drives dynamic feature assignment)
-// MUST match backend getFeaturesByCategory() categories in plan-features.helper.ts
-const ROLE_CATEGORY_MAP: Partial<Record<UserRole, string[] | 'all'>> = {
+const DEFAULT_ROLE_FEATURES: Record<string, string[] | 'all'> = {
   [UserRole.SUPER_ADMIN]: 'all',
   [UserRole.OWNER]: 'all',
-  [UserRole.MANAGER]: ['Sales & POS', 'Staffing', 'Kitchen & Menu', 'Customer & Marketing', 'Inventory', 'Financial', 'AI Features', 'System', 'Hospitality'],
-  [UserRole.CHEF]: ['Sales & POS', 'Kitchen & Menu', 'Inventory', 'System'],
-  [UserRole.COOK]: ['Sales & POS', 'Inventory', 'System'],
-  [UserRole.WAITER]: ['Sales & POS', 'Customer & Marketing', 'System'],
-  [UserRole.CASHIER]: ['Sales & POS', 'Customer & Marketing', 'Financial', 'System'],
-  [UserRole.DRIVER]: ['Sales & POS', 'System'],
+  [UserRole.MANAGER]: [
+    'dashboard', 'reports', 'staff-management', 'attendance', 'schedule',
+    'menu-management', 'categories', 'qr-menus', 'order-management', 'delivery-management',
+    'table-management', 'kitchen-display', 'customer-display',
+    'customer-management', 'loyalty-program', 'marketing',
+    'ai-menu-optimization', 'ai-insights',
+    'inventory', 'suppliers', 'wastage-management',
+    'expenses', 'income', 'work-periods',
+    'notifications', 'room-management', 'booking-management', 'cms',
+  ],
+  [UserRole.CHEF]: [
+    'dashboard', 'menu-management', 'categories', 'kitchen-display',
+    'inventory', 'purchase-orders', 'wastage-management', 'notifications',
+  ],
+  [UserRole.COOK]: [
+    'dashboard', 'kitchen-display', 'inventory',
+    'wastage-management', 'notifications',
+  ],
+  [UserRole.WAITER]: [
+    'dashboard', 'order-management', 'delivery-management',
+    'table-management', 'customer-display', 'customer-management',
+    'loyalty-program', 'notifications',
+  ],
+  [UserRole.CASHIER]: [
+    'dashboard', 'order-management', 'customer-display',
+    'digital-receipts', 'customer-management',
+    'expenses', 'income', 'work-periods', 'notifications',
+  ],
+  [UserRole.DRIVER]: [
+    'dashboard', 'delivery-management', 'notifications',
+  ],
 };
 
 export default function RoleAccessPage() {
@@ -105,10 +128,10 @@ export default function RoleAccessPage() {
 
   const allRoleAccess: RoleAccess[] = useMemo(() => {
     const buildFeaturesForRole = (role: UserRole) => {
-      const allowed = ROLE_CATEGORY_MAP[role];
+      const allowed = DEFAULT_ROLE_FEATURES[role];
       if (!allowed) return [];
       if (allowed === 'all') return allFeatureKeys;
-      return allFeatureKeys.filter((key) => allowed.includes(featureCategoryMap[key]));
+      return allFeatureKeys.filter((key) => allowed.includes(key));
     };
 
     return [

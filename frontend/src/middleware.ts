@@ -39,6 +39,9 @@ const DEFAULT_ROLE_FEATURES: Record<string, string[]> = {
     'digital-receipts', 'customer-management',
     'expenses', 'income', 'work-periods', 'notifications',
   ],
+  driver: [
+    'dashboard', 'delivery-management', 'notifications',
+  ],
   super_admin: [],
 };
 
@@ -50,6 +53,7 @@ const ROUTE_FEATURE_MAP: Record<string, string[]> = {
   '/dashboard/orders': ['order-management'],
   '/dashboard/tables': ['table-management'],
   '/dashboard/deliveries': ['delivery-management'],
+  '/dashboard/rider': ['delivery-management'],
   '/dashboard/customers': ['customer-management'],
   '/dashboard/customer-display': ['customer-display', 'order-management'],
   '/dashboard/kitchen': ['kitchen-display'],
@@ -111,6 +115,7 @@ function getRoleDashboardPath(role: string): string {
     cook: '/dashboard/kitchen',
     manager: '/dashboard',
     owner: '/dashboard',
+    driver: '/dashboard/rider',
     super_admin: '/dashboard/super-admin',
   };
   return mapping[role?.toLowerCase()] || '/dashboard';
