@@ -23,11 +23,19 @@ export default function RiderDashboardPage() {
 
   const orders = ordersData as any || [];
   
-  // Filter only orders that are ready or served (out for delivery)
-  const activeOrders = orders.filter((o: any) => o.status === 'ready' || o.status === 'served');
+  // Filter active orders assigned to the rider that are not yet delivered/cancelled
+  const activeOrders = orders.filter((o: any) => 
+    o.deliveryStatus !== 'delivered' && 
+    o.deliveryStatus !== 'cancelled' &&
+    o.status !== 'cancelled'
+  );
   
   // Past orders
-  const completedOrders = orders.filter((o: any) => o.status === 'completed' || o.status === 'cancelled');
+  const completedOrders = orders.filter((o: any) => 
+    o.deliveryStatus === 'delivered' || 
+    o.deliveryStatus === 'cancelled' ||
+    o.status === 'cancelled'
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
@@ -69,8 +77,14 @@ export default function RiderDashboardPage() {
                             {formatDateTime(order.createdAt)}
                           </p>
                         </div>
-                        <Badge className={order.status === 'served' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}>
-                          {order.status === 'served' ? 'Out for Delivery' : 'Ready for Pickup'}
+                        <Badge className={
+                          order.deliveryStatus === 'out_for_delivery' || order.status === 'served' ? 'bg-blue-100 text-blue-800' :
+                          order.status === 'ready' ? 'bg-green-100 text-green-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }>
+                          {order.deliveryStatus === 'out_for_delivery' || order.status === 'served' ? 'Out for Delivery' :
+                           order.status === 'ready' ? 'Ready for Pickup' :
+                           'Assigned / Preparing'}
                         </Badge>
                       </div>
 
@@ -95,7 +109,7 @@ export default function RiderDashboardPage() {
                         <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(order.totalAmount || 0)}</span>
                         <Link href={`/dashboard/rider/${order.id || order._id}`}>
                           <Button className="w-full sm:w-auto shadow-md shadow-primary-500/20">
-                            {order.status === 'served' ? 'Continue Delivery' : 'Start Delivery'} <ArrowRightIcon className="w-4 h-4 ml-2" />
+                            {order.deliveryStatus === 'out_for_delivery' || order.status === 'served' ? 'Continue Delivery' : 'Start Delivery'} <ArrowRightIcon className="w-4 h-4 ml-2" />
                           </Button>
                         </Link>
                       </div>

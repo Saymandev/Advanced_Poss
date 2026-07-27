@@ -40,7 +40,7 @@ export default function DeliveriesPage() {
   // Require Delivery Management feature (separate from generic order-management)
   useFeatureRedirect('delivery-management');
 
-  const [statusFilter, setStatusFilter] = useState<DeliveryStatus | ''>('pending');
+  const [statusFilter, setStatusFilter] = useState<DeliveryStatus | ''>('');
   const [driverFilter, setDriverFilter] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
