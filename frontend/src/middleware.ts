@@ -269,8 +269,13 @@ export async function middleware(request: NextRequest) {
   const hasAccess = requiredFeatures.some((feature) => effectiveFeatures.includes(feature));
 
   if (!hasAccess) {
+    const targetPath = getRoleDashboardPath(role);
+    if (pathname === targetPath) {
+      // Prevent infinite redirect loop if they don't have access to their own default dashboard
+      return NextResponse.next();
+    }
     const url = request.nextUrl.clone();
-    url.pathname = getRoleDashboardPath(role);
+    url.pathname = targetPath;
     return NextResponse.redirect(url);
   }
 
