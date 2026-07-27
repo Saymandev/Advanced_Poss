@@ -46,6 +46,7 @@ const ROLE_CATEGORY_MAP: Partial<Record<UserRole, string[] | 'all'>> = {
   [UserRole.COOK]: ['Sales & POS', 'Inventory', 'System'],
   [UserRole.WAITER]: ['Sales & POS', 'Customer & Marketing', 'System'],
   [UserRole.CASHIER]: ['Sales & POS', 'Customer & Marketing', 'Financial', 'System'],
+  [UserRole.DRIVER]: ['Sales & POS', 'System'],
 };
 
 export default function RoleAccessPage() {
@@ -159,6 +160,13 @@ export default function RoleAccessPage() {
         description: 'Payment processing and order completion',
         color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
         features: buildFeaturesForRole(UserRole.CASHIER),
+      },
+      {
+        role: UserRole.DRIVER,
+        name: 'Driver / Rider',
+        description: 'Delivery operations',
+        color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
+        features: buildFeaturesForRole(UserRole.DRIVER),
       },
     ];
   }, [allFeatureKeys, featureCategoryMap]);
