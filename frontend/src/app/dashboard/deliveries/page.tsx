@@ -317,7 +317,15 @@ export default function DeliveriesPage() {
       title: 'Driver',
       header: 'Driver',
       render: (_: any, record: DeliveryOrder) => {
-        const assignedId = record.assignedDriverId || record.deliveryDetails?.assignedDriver;
+        let assignedId = '';
+        if (typeof record.assignedDriverId === 'object' && record.assignedDriverId !== null) {
+          assignedId = (record.assignedDriverId as any)._id || (record.assignedDriverId as any).id;
+        } else {
+          assignedId = record.assignedDriverId as any;
+        }
+        if (!assignedId) {
+          assignedId = record.deliveryDetails?.assignedDriver;
+        }
         return (
           <div className="space-y-1">
             <select
