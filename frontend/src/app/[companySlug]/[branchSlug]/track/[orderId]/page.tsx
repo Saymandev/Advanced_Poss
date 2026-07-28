@@ -261,7 +261,16 @@ export default function OrderTrackingPage() {
   const currentStep = getCurrentStepIndex();
 
   const isDelivery = order.type === 'delivery';
-  const showLiveTracking = isDelivery && (order.status === 'ready' || order.status === 'served' || order.status === 'completed');
+  const showLiveTracking = isDelivery && (
+    order.status === 'ready' || 
+    order.status === 'served' || 
+    order.status === 'completed' ||
+    order.status === 'out_for_delivery' ||
+    order.status === 'assigned' ||
+    order.status === 'picked_up' ||
+    order.deliveryStatus === 'out_for_delivery' ||
+    !!riderLocation // show map as soon as rider location exists
+  );
   return (
     <div className="h-[100dvh] w-full flex flex-col md:flex-row bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Left Sidebar */}
