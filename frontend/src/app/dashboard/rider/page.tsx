@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Pagination } from '@/components/ui/Pagination';
-import { useGetDeliveryOrdersQuery } from '@/lib/api/endpoints/posApi';
+import { useGetDeliveryOrdersQuery, useUpdateDeliveryStatusMutation } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { 
@@ -33,6 +33,8 @@ export default function RiderDashboardPage() {
   const [dateFilter, setDateFilter] = useState('');
   const [page, setPage] = useState(1);
   const limit = 12;
+
+  const [updateDeliveryStatus, { isLoading: isUpdating }] = useUpdateDeliveryStatusMutation();
 
   const driverId = (user as any)?._id || user?.id;
 
@@ -124,10 +126,21 @@ export default function RiderDashboardPage() {
     return { label: 'Preparing', color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', dot: 'bg-amber-500' };
   };
 
-  const handleStartDelivery = (order: any) => {
+  const handleStartDelivery = async (order: any) => {
     const id = order.id || order._id;
     if (id) {
-      router.push(`/dashboard/rider/${id}`);
+      if (order.deliveryStatus !== 'out_for_delivery' && order.status !== 'served') {
+        try {
+          await updateDeliveryStatus({ orderId: id, status: 'out_for_delivery' as any }).unwrap();
+          toast.success('Delivery started!');
+          router.push(`/dashboard/rider/${id}`);
+        } catch (error) {
+          console.error('Failed to start delivery:', error);
+          toast.error('Failed to start delivery. Please try again.');
+        }
+      } else {
+        router.push(`/dashboard/rider/${id}`);
+      }
     } else {
       toast.error('Order ID is missing!');
       console.error('Missing order ID for:', order);
