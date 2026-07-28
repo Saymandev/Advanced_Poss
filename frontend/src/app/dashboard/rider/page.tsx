@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Pagination } from '@/components/ui/Pagination';
 import { useGetDeliveryOrdersQuery } from '@/lib/api/endpoints/posApi';
 import { useAppSelector } from '@/lib/store';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -259,7 +260,7 @@ export default function RiderDashboardPage() {
                   )}
                 </div>
                 <p className="font-bold text-slate-700 dark:text-slate-300 text-lg mb-1">
-                  {(searchTerm || dateFilter) ? 'No matches found' : \`No \${activeTab} deliveries\`}
+                  {(searchTerm || dateFilter) ? 'No matches found' : `No ${activeTab} deliveries`}
                 </p>
                 <p className="text-sm max-w-sm mx-auto">
                   {(searchTerm || dateFilter) ? 'Try adjusting your search or date filter.' : activeTab === 'active' ? "You're all caught up! Wait for the restaurant to assign you new orders." : "You haven't completed any deliveries yet."}
@@ -411,26 +412,13 @@ export default function RiderDashboardPage() {
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-            <Button
-              variant="outline"
-              disabled={page <= 1}
-              onClick={() => setPage(p => p - 1)}
-              className="rounded-xl"
-            >
-              Previous
-            </Button>
-            <span className="text-sm font-semibold text-slate-500">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              disabled={page >= totalPages}
-              onClick={() => setPage(p => p + 1)}
-              className="rounded-xl"
-            >
-              Next Page
-            </Button>
+          <div className="mt-6 flex justify-center">
+            <Pagination 
+              currentPage={page} 
+              totalPages={totalPages} 
+              onPageChange={setPage} 
+              showItemsPerPage={false} 
+            />
           </div>
         )}
       </div>

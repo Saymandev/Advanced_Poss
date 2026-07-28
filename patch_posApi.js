@@ -1,56 +1,57 @@
 const fs = require('fs');
-const file = 'frontend/src/lib/api/endpoints/posApi.ts';
-let content = fs.readFileSync(file, 'utf8');
+let c = fs.readFileSync('frontend/src/lib/api/endpoints/posApi.ts', 'utf8');
 
-const mutationsToAdd = `
-    // Update rider location (live tracking)
-    updateRiderLocation: builder.mutation<any, { orderId: string; lat: number; lng: number; heading?: number; speed?: number }>({
-      query: ({ orderId, ...body }) => ({
-        url: \`/pos/orders/\${orderId}/rider-location\`,
-        method: 'PATCH',
-        body,
+const newStr = `    getDeliveryOrders: builder.query<{ orders: DeliveryOrder[], total: number, page: number, totalPages: number }, { deliveryStatus?: string; assignedDriverId?: string; search?: string; date?: string; page?: number; limit?: number }>({
+      query: (params) => ({
+        url: '/pos/delivery-orders',
+        params,
       }),
-      invalidatesTags: ['POS'],
-    }),
+      providesTags: ['POS'],
+      transformResponse: (response: any) => {
+        const data = response.data || response;
+        if (data && data.orders !== undefined) {
+          return {
+            ...data,
+            orders: data.orders.map((order: any) => ({
+              ...order,
+              id: order._id || order.id,
+            }))
+          };
+        }
+        let orders = [];
+        if (Array.isArray(data)) {
+          orders = data;
+        } else if (Array.isArray(data?.orders)) {
+          orders = data.orders;
+        }
+        return {
+          orders: orders.map((order: any) => ({
+            ...order,
+            id: order._id || order.id,
+          })),
+          total: orders.length,
+          page: 1,
+          totalPages: 1
+        };
+      },
+    }),`;
 
-    // Update rider info
-    updateRiderInfo: builder.mutation<any, { orderId: string; name?: string; phone?: string; vehicleType?: string; vehicleNumber?: string; riderId?: string }>({
-      query: ({ orderId, ...body }) => ({
-        url: \`/pos/orders/\${orderId}/rider-info\`,
-        method: 'PATCH',
-        body,
-      }),
-      invalidatesTags: ['POS'],
-    }),
+// We find the start index of "getDeliveryOrders: builder.query<DeliveryOrder[],"
+const startIdx = c.indexOf("getDeliveryOrders: builder.query<DeliveryOrder[],");
+if (startIdx === -1) {
+  console.log("Could not find start");
+  process.exit(1);
+}
 
-    // Set delivery locations
-    setDeliveryLocations: builder.mutation<any, { 
-      orderId: string; 
-      pickupLocation?: { lat: number; lng: number; address: string };
-      dropoffLocation?: { lat: number; lng: number; address: string };
-      estimatedDeliveryMinutes?: number;
-    }>({
-      query: ({ orderId, ...body }) => ({
-        url: \`/pos/orders/\${orderId}/delivery-locations\`,
-        method: 'PATCH',
-        body,
-      }),
-      invalidatesTags: ['POS'],
-    }),
+// We find the end index of the function by looking for assignDeliveryDriver
+const endIdx = c.indexOf("    // Assign driver to delivery order");
+if (endIdx === -1) {
+  console.log("Could not find end");
+  process.exit(1);
+}
 
-`;
+const before = c.substring(0, startIdx);
+const after = c.substring(endIdx);
 
-// Insert after updateDeliveryStatus
-const insertPos1 = content.indexOf('getWaiterActiveOrdersCount');
-content = content.slice(0, insertPos1) + mutationsToAdd + content.slice(insertPos1);
-
-// Add to exports
-const exportPos = content.indexOf('} = posApi;');
-const exportsToAdd = `  useUpdateRiderLocationMutation,
-  useUpdateRiderInfoMutation,
-  useSetDeliveryLocationsMutation,
-`;
-content = content.slice(0, exportPos) + exportsToAdd + content.slice(exportPos);
-
-fs.writeFileSync(file, content);
-console.log('posApi patched');
+fs.writeFileSync('frontend/src/lib/api/endpoints/posApi.ts', before + newStr + '\n\n' + after);
+console.log("Success");
