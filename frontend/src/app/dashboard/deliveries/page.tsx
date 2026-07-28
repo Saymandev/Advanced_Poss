@@ -324,7 +324,7 @@ export default function DeliveriesPage() {
           assignedId = record.assignedDriverId as any;
         }
         if (!assignedId) {
-          assignedId = record.deliveryDetails?.assignedDriver;
+          assignedId = record.deliveryDetails?.assignedDriver || '';
         }
         return (
           <div className="space-y-1">
