@@ -212,7 +212,7 @@ export const posApi = apiSlice.injectEndpoints({
     }),
 
     // Get delivery orders
-    getDeliveryOrders: builder.query<DeliveryOrder[], { deliveryStatus?: DeliveryStatus; assignedDriverId?: string }>({
+        getDeliveryOrders: builder.query<{ orders: DeliveryOrder[], total: number, page: number, totalPages: number }, { deliveryStatus?: string; assignedDriverId?: string; search?: string; date?: string; page?: number; limit?: number }>({
       query: (params) => ({
         url: '/pos/delivery-orders',
         params,
@@ -220,17 +220,30 @@ export const posApi = apiSlice.injectEndpoints({
       providesTags: ['POS'],
       transformResponse: (response: any) => {
         const data = response.data || response;
+        if (data && data.orders !== undefined) {
+          return {
+            ...data,
+            orders: data.orders.map((order: any) => ({
+              ...order,
+              id: order._id || order.id,
+            }))
+          };
+        }
         let orders = [];
         if (Array.isArray(data)) {
           orders = data;
         } else if (Array.isArray(data?.orders)) {
           orders = data.orders;
         }
-        // Normalize _id to id for consistency
-        return orders.map((order: any) => ({
-          ...order,
-          id: order._id || order.id,
-        }));
+        return {
+          orders: orders.map((order: any) => ({
+            ...order,
+            id: order._id || order.id,
+          })),
+          total: orders.length,
+          page: 1,
+          totalPages: 1
+        };
       },
     }),
 

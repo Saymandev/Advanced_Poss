@@ -17,7 +17,8 @@ import {
   TruckIcon,
   ShoppingBagIcon,
   MagnifyingGlassIcon,
-  CalendarIcon
+  CalendarIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -26,21 +27,60 @@ export default function RiderDashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
   const router = useRouter();
 
+  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 12;
 
   const driverId = (user as any)?._id || user?.id;
 
-  // We fetch active delivery orders assigned to this user
-  const { data: ordersData, isLoading, error } = useGetDeliveryOrdersQuery({ 
-    assignedDriverId: driverId
+  // We fetch active or completed delivery orders assigned to this user with backend pagination
+  const { data: rawData, isLoading } = useGetDeliveryOrdersQuery({ 
+    assignedDriverId: driverId,
+    deliveryStatus: activeTab,
+    search: searchTerm,
+    date: dateFilter,
+    page,
+    limit
   }, {
     skip: !driverId,
-    pollingInterval: 15000
+    pollingInterval: activeTab === 'active' ? 15000 : 0
   });
 
-  const orders = Array.isArray(ordersData) ? ordersData : (ordersData as any)?.orders || [];
+  const orders = rawData?.orders || [];
+  const totalPages = rawData?.totalPages || 1;
+
+  // We also fetch a separate quick query just to get the top stats without pagination/filters
+  const { data: statsData } = useGetDeliveryOrdersQuery({ 
+    assignedDriverId: driverId,
+    deliveryStatus: 'active',
+    limit: 500
+  }, {
+    skip: !driverId,
+    pollingInterval: 60000
+  });
   
+  const statsOrders = statsData?.orders || [];
+  const outForDeliveryCount = statsOrders.filter((o: any) => o.deliveryStatus === 'out_for_delivery' || o.status === 'served').length;
+  const readyForPickupCount = statsOrders.filter((o: any) => o.status === 'ready').length;
+  const preparingCount = statsOrders.length - outForDeliveryCount - readyForPickupCount;
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setPage(1);
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateFilter(e.target.value);
+    setPage(1);
+  };
+
+  const handleTabChange = (tab: 'active' | 'completed') => {
+    setActiveTab(tab);
+    setPage(1);
+  };
+
   const getCustomerName = (order: any) => {
     return order.customerName || order.customerInfo?.name || order.deliveryDetails?.contactName || 'Customer';
   };
@@ -67,44 +107,18 @@ export default function RiderDashboardPage() {
     return null;
   };
 
-  // Filter logic
-  const matchSearchAndDate = (o: any) => {
-    const cName = getCustomerName(o).toLowerCase();
-    const cPhone = getCustomerPhone(o).toLowerCase();
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = cName.includes(term) || cPhone.includes(term) || (o.orderNumber && o.orderNumber.toLowerCase().includes(term));
-    
-    let matchesDate = true;
-    if (dateFilter) {
-      const orderDate = new Date(o.createdAt).toISOString().split('T')[0];
-      matchesDate = orderDate === dateFilter;
-    }
-    
-    return matchesSearch && matchesDate;
-  };
-
-  // Filter active orders assigned to the rider that are not yet delivered/cancelled
-  const activeOrders = orders.filter((o: any) => 
-    o.deliveryStatus !== 'delivered' && 
-    o.deliveryStatus !== 'cancelled' &&
-    o.status !== 'cancelled' &&
-    matchSearchAndDate(o)
-  );
-  
-  // Past orders
-  const completedOrders = orders.filter((o: any) => 
-    (o.deliveryStatus === 'delivered' || 
-    o.deliveryStatus === 'cancelled' ||
-    o.status === 'cancelled') &&
-    matchSearchAndDate(o)
-  );
-
   const getStatusConfig = (order: any) => {
     if (order.deliveryStatus === 'out_for_delivery' || order.status === 'served') {
       return { label: 'Out for Delivery', color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', dot: 'bg-blue-500' };
     }
     if (order.status === 'ready') {
       return { label: 'Ready for Pickup', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', dot: 'bg-emerald-500 animate-pulse' };
+    }
+    if (order.deliveryStatus === 'delivered' || order.status === 'completed') {
+      return { label: 'Delivered', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', dot: 'bg-slate-400' };
+    }
+    if (order.deliveryStatus === 'cancelled' || order.status === 'cancelled') {
+      return { label: 'Cancelled', color: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300', dot: 'bg-rose-500' };
     }
     return { label: 'Preparing', color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', dot: 'bg-amber-500' };
   };
@@ -118,12 +132,6 @@ export default function RiderDashboardPage() {
       console.error('Missing order ID for:', order);
     }
   };
-
-  // Stats (ignoring filters for top stats is usually better so they know overall totals)
-  const allActiveForStats = orders.filter((o: any) => o.deliveryStatus !== 'delivered' && o.deliveryStatus !== 'cancelled' && o.status !== 'cancelled');
-  const outForDeliveryCount = allActiveForStats.filter((o: any) => o.deliveryStatus === 'out_for_delivery' || o.status === 'served').length;
-  const readyForPickupCount = allActiveForStats.filter((o: any) => o.status === 'ready').length;
-  const preparingCount = allActiveForStats.length - outForDeliveryCount - readyForPickupCount;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -173,7 +181,7 @@ export default function RiderDashboardPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         
         {/* Filters */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4">
@@ -186,7 +194,7 @@ export default function RiderDashboardPage() {
                 type="text"
                 placeholder="Search by customer name, phone, or order #"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={handleSearchChange}
                 className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow"
               />
             </div>
@@ -197,14 +205,14 @@ export default function RiderDashboardPage() {
               <input
                 type="date"
                 value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+                onChange={handleDateChange}
                 className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow"
               />
             </div>
             {(searchTerm || dateFilter) && (
               <Button 
                 variant="ghost" 
-                onClick={() => { setSearchTerm(''); setDateFilter(''); }}
+                onClick={() => { setSearchTerm(''); setDateFilter(''); setPage(1); }}
                 className="md:w-auto h-[42px] border border-slate-200 dark:border-slate-600 rounded-xl"
               >
                 Clear
@@ -213,42 +221,54 @@ export default function RiderDashboardPage() {
           </div>
         </div>
 
-        {/* Active Deliveries */}
-        <div>
-          <div className="flex items-center justify-between mb-5 px-1">
-            <h2 className="text-lg sm:text-xl font-extrabold text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
-              <TruckIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
-              Active Deliveries
-            </h2>
-            <div className="bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 font-bold px-3 py-1 rounded-full text-sm border border-primary-200 dark:border-primary-800">
-              {activeOrders.length}
-            </div>
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2 p-1 bg-slate-200/50 dark:bg-slate-800 rounded-xl w-full max-w-sm">
+          <button
+            onClick={() => handleTabChange('active')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all ${activeTab === 'active' ? 'bg-white dark:bg-slate-700 text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+          >
+            <TruckIcon className="w-4 h-4" />
+            Active
+          </button>
+          <button
+            onClick={() => handleTabChange('completed')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all ${activeTab === 'completed' ? 'bg-white dark:bg-slate-700 text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+          >
+            <CheckCircleIcon className="w-4 h-4" />
+            Completed
+          </button>
+        </div>
 
+        {/* Deliveries List */}
+        <div>
           {isLoading ? (
             <div className="flex justify-center p-16">
               <div className="flex flex-col items-center gap-3">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
-                <p className="text-sm text-slate-400 font-medium">Loading your deliveries...</p>
+                <p className="text-sm text-slate-400 font-medium">Loading deliveries...</p>
               </div>
             </div>
-          ) : activeOrders.length === 0 ? (
+          ) : orders.length === 0 ? (
             <Card className="border-0 shadow-md bg-white dark:bg-slate-800 rounded-2xl">
               <CardContent className="p-10 sm:p-16 text-center text-slate-500">
                 <div className="bg-slate-50 dark:bg-slate-700/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <TruckIcon className="w-10 h-10 text-slate-300 dark:text-slate-500" />
+                  {activeTab === 'active' ? (
+                     <TruckIcon className="w-10 h-10 text-slate-300 dark:text-slate-500" />
+                  ) : (
+                     <CheckCircleIcon className="w-10 h-10 text-slate-300 dark:text-slate-500" />
+                  )}
                 </div>
                 <p className="font-bold text-slate-700 dark:text-slate-300 text-lg mb-1">
-                  {(searchTerm || dateFilter) ? 'No matches found' : 'No active deliveries'}
+                  {(searchTerm || dateFilter) ? 'No matches found' : \`No \${activeTab} deliveries\`}
                 </p>
                 <p className="text-sm max-w-sm mx-auto">
-                  {(searchTerm || dateFilter) ? 'Try adjusting your search or date filter.' : "You're all caught up! Wait for the restaurant to assign you new orders."}
+                  {(searchTerm || dateFilter) ? 'Try adjusting your search or date filter.' : activeTab === 'active' ? "You're all caught up! Wait for the restaurant to assign you new orders." : "You haven't completed any deliveries yet."}
                 </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-              {activeOrders.map((order: any) => {
+              {orders.map((order: any) => {
                 const status = getStatusConfig(order);
                 const customerName = getCustomerName(order);
                 const customerPhone = getCustomerPhone(order);
@@ -272,11 +292,11 @@ export default function RiderDashboardPage() {
                             </p>
                             <p className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mt-1">
                               <ClockIcon className="w-3.5 h-3.5" />
-                              {formatDateTime(order.createdAt)}
+                              {formatDateTime(activeTab === 'completed' ? (order.completedAt || order.updatedAt || order.createdAt) : order.createdAt)}
                             </p>
                           </div>
                           <Badge className={`px-3 py-1 rounded-full font-semibold border-0 text-xs flex items-center gap-1.5 ${status.color}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`}></span>
+                            {activeTab === 'active' && <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`}></span>}
                             {status.label}
                           </Badge>
                         </div>
@@ -284,7 +304,6 @@ export default function RiderDashboardPage() {
 
                       {/* Customer Info */}
                       <div className="p-4 sm:p-5 py-3 space-y-3">
-                        {/* Customer Name */}
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
                             <UserIcon className="w-4 h-4 text-primary-600 dark:text-primary-400" />
@@ -302,7 +321,7 @@ export default function RiderDashboardPage() {
                               </a>
                             )}
                           </div>
-                          {customerPhone && (
+                          {customerPhone && activeTab === 'active' && (
                             <a 
                               href={`tel:${customerPhone}`}
                               onClick={(e) => e.stopPropagation()}
@@ -313,7 +332,6 @@ export default function RiderDashboardPage() {
                           )}
                         </div>
 
-                        {/* Delivery Address */}
                         {address && address.street && (
                           <div className="flex items-start gap-3">
                             <div className="w-9 h-9 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -328,7 +346,6 @@ export default function RiderDashboardPage() {
                           </div>
                         )}
 
-                        {/* Order Items Summary */}
                         {items.length > 0 && (
                           <div className="flex items-start gap-3">
                             <div className="w-9 h-9 rounded-full bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
@@ -359,16 +376,29 @@ export default function RiderDashboardPage() {
                               <p className="font-black text-lg text-slate-900 dark:text-white leading-tight">{formatCurrency(order.totalAmount || 0)}</p>
                             </div>
                           </div>
-                          <Button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStartDelivery(order);
-                            }}
-                            className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm"
-                          >
-                            {order.deliveryStatus === 'out_for_delivery' || order.status === 'served' ? 'Continue' : 'Start Delivery'}
-                            <ArrowRightIcon className="w-4 h-4 ml-1.5 stroke-[2.5]" />
-                          </Button>
+                          {activeTab === 'active' ? (
+                            <Button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartDelivery(order);
+                              }}
+                              className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm"
+                            >
+                              {order.deliveryStatus === 'out_for_delivery' || order.status === 'served' ? 'Continue' : 'Start Delivery'}
+                              <ArrowRightIcon className="w-4 h-4 ml-1.5 stroke-[2.5]" />
+                            </Button>
+                          ) : (
+                            <Button 
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartDelivery(order);
+                              }}
+                              className="rounded-xl font-bold text-sm px-5 py-2.5"
+                            >
+                              View Details
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -379,40 +409,28 @@ export default function RiderDashboardPage() {
           )}
         </div>
 
-        {/* Recently Completed */}
-        {completedOrders.length > 0 && (
-          <div className="pb-8">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-4 px-1 tracking-tight">Recently Completed</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {completedOrders.slice(0, 6).map((order: any) => {
-                const orderId = order.id || order._id;
-                const isDelivered = order.deliveryStatus === 'delivered' || order.status === 'completed';
-                return (
-                  <Card key={orderId} className="border-0 shadow-sm bg-white/80 dark:bg-slate-800/50 rounded-xl hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex justify-between items-center gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${isDelivered ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-500'}`}>
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            {isDelivered ? (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                            ) : (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                            )}
-                          </svg>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm text-slate-700 dark:text-slate-300 truncate">#{order.orderNumber}</p>
-                          <p className="text-xs font-medium text-slate-400 truncate">{formatDateTime(order.completedAt || order.updatedAt)}</p>
-                        </div>
-                      </div>
-                      <Badge className={`rounded-full px-2.5 py-1 font-semibold border-0 text-xs flex-shrink-0 ${isDelivered ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'}`}>
-                        {isDelivered ? 'Delivered' : 'Cancelled'}
-                      </Badge>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+            <Button
+              variant="outline"
+              disabled={page <= 1}
+              onClick={() => setPage(p => p - 1)}
+              className="rounded-xl"
+            >
+              Previous
+            </Button>
+            <span className="text-sm font-semibold text-slate-500">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => p + 1)}
+              className="rounded-xl"
+            >
+              Next Page
+            </Button>
           </div>
         )}
       </div>

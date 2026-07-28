@@ -266,6 +266,10 @@ export class POSController {
   async getDeliveryOrders(
     @Query('deliveryStatus') deliveryStatus: string | undefined,
     @Query('assignedDriverId') assignedDriverId: string | undefined,
+    @Query('search') search: string | undefined,
+    @Query('date') date: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('limit') limit: string | undefined,
     @Request() req: any,
   ) {
     const branchId = req.user?.branchId;
@@ -277,6 +281,10 @@ export class POSController {
       branchId,
       deliveryStatus as any,
       assignedDriverId,
+      search,
+      date,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
     );
   }
 

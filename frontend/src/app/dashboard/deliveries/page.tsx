@@ -60,7 +60,7 @@ export default function DeliveriesPage() {
   }>({});
 
   const { data: staffData } = useGetStaffQuery({ branchId: user?.branchId || '' }, { skip: !user?.branchId });
-  const { data: deliveryOrders = [], isLoading, refetch } = useGetDeliveryOrdersQuery(
+  const { data: rawData, isLoading, refetch } = useGetDeliveryOrdersQuery(
     {
       deliveryStatus: statusFilter || undefined,
       assignedDriverId: driverFilter || undefined,
@@ -69,6 +69,8 @@ export default function DeliveriesPage() {
       skip: !user?.branchId,
     }
   );
+
+  const deliveryOrders = rawData?.orders || [];
 
   const [assignDriver, { isLoading: assigning }] = useAssignDeliveryDriverMutation();
   const [updateDeliveryStatus, { isLoading: updatingStatus }] = useUpdateDeliveryStatusMutation();

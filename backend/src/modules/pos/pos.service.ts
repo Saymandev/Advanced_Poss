@@ -2943,48 +2943,104 @@ export class POSService {
    */
   async getDeliveryOrders(
     branchId: string,
-    deliveryStatus?: 'pending' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled',
+    deliveryStatus?: string,
     assignedDriverId?: string,
-  ): Promise<any[]> {
+    search?: string,
+    date?: string,
+    page: number = 1,
+    limit: number = 50,
+  ): Promise<{ orders: any[], total: number, page: number, totalPages: number }> {
     const branchObjectId = new Types.ObjectId(branchId);
     
+    // Build search filters (applies to both models where possible)
+    let searchFilter: any = {};
+    if (search) {
+      const searchRegex = { $regex: search, $options: 'i' };
+      searchFilter = {
+        $or: [
+          { 'customerInfo.name': searchRegex },
+          { 'customerInfo.phone': searchRegex },
+          { 'deliveryDetails.contactName': searchRegex },
+          { 'deliveryDetails.contactPhone': searchRegex },
+          { customerName: searchRegex },
+          { customerPhone: searchRegex },
+          { orderNumber: searchRegex },
+          { guestName: searchRegex },
+          { guestPhone: searchRegex }
+        ]
+      };
+    }
+    
+    let dateFilter: any = {};
+    if (date) {
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter = {
+        createdAt: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      };
+    }
+
     // 1. Fetch from POSOrder
     const posQuery: any = {
       branchId: branchObjectId,
       orderType: 'delivery',
+      ...searchFilter,
+      ...dateFilter
     };
-    if (deliveryStatus) {
+
+    if (deliveryStatus === 'active') {
+      posQuery.deliveryStatus = { $nin: ['delivered', 'cancelled'] };
+      posQuery.status = { $ne: 'cancelled' };
+    } else if (deliveryStatus === 'completed') {
+      posQuery.$or = [
+        { deliveryStatus: 'delivered' },
+        { deliveryStatus: 'cancelled' },
+        { status: 'cancelled' }
+      ];
+    } else if (deliveryStatus) {
       posQuery.deliveryStatus = deliveryStatus;
     }
+    
     if (assignedDriverId) {
       posQuery.assignedDriverId = new Types.ObjectId(assignedDriverId);
     }
-    const posOrders = await this.posOrderModel
-      .find(posQuery)
-      .populate('userId', 'firstName lastName email')
-      .populate('assignedDriverId', 'firstName lastName phone')
-      .sort({ createdAt: -1 })
-      .lean()
-      .exec();
 
-    // 2. Fetch from public Order (if they are unconfirmed/pending)
+    // 2. Fetch from public Order
     const publicQuery: any = {
       branchId: branchObjectId,
       type: 'delivery',
+      ...searchFilter,
+      ...dateFilter
     };
     
-    if (deliveryStatus === 'pending' || !deliveryStatus) {
+    if (deliveryStatus === 'pending' || !deliveryStatus || deliveryStatus === 'active') {
       publicQuery.status = { $in: ['pending', 'preparing', 'ready', 'confirmed'] };
     } else {
-      if (deliveryStatus) publicQuery.status = 'none';
+      publicQuery.status = 'none'; // effectively don't return public orders for completed status
     }
 
-    const publicOrders = await this.orderModel
-      .find(publicQuery)
-      .populate('waiterId', 'firstName lastName email')
-      .sort({ createdAt: -1 })
-      .lean()
-      .exec();
+    // Because merging and paginating two collections across a database is difficult,
+    // we fetch matching records, merge them, sort them, and paginate them in memory.
+    // For extreme scale, we'd limit the initial DB queries, but this handles most volumes fine.
+    
+    const [posOrders, publicOrders] = await Promise.all([
+      this.posOrderModel
+        .find(posQuery)
+        .populate('userId', 'firstName lastName email')
+        .populate('assignedDriverId', 'firstName lastName phone')
+        .lean()
+        .exec(),
+      this.orderModel
+        .find(publicQuery)
+        .populate('waiterId', 'firstName lastName email')
+        .lean()
+        .exec()
+    ]);
 
     const standardizedPos = posOrders.map(o => ({
       ...o,
@@ -3028,11 +3084,24 @@ export class POSService {
 
     // Merge and sort
     const allOrders = [...standardizedPos, ...standardizedPublic];
-    return allOrders.sort((a: any, b: any) => {
+    allOrders.sort((a: any, b: any) => {
       const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
       const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
-      return dateB - dateA;
+      return dateB - dateA; // newest first
     });
+    
+    // Memory Pagination
+    const total = allOrders.length;
+    const totalPages = Math.ceil(total / limit);
+    const skip = (page - 1) * limit;
+    const paginatedOrders = allOrders.slice(skip, skip + limit);
+
+    return {
+      orders: paginatedOrders,
+      total,
+      page,
+      totalPages
+    };
   }
 
   /**
