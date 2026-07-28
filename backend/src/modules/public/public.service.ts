@@ -444,6 +444,53 @@ export class PublicService {
           .lean();
       }
 
+      // If not found in public orders, try posorders collection (POS-created orders use this)
+      if (!order) {
+        const posOrdersCollection = this.orderModel.db.collection('posorders');
+        let posOrder = null;
+
+        if (Types.ObjectId.isValid(orderIdOrNumber) && orderIdOrNumber.length === 24) {
+          const posFilter: any = { _id: new Types.ObjectId(orderIdOrNumber) };
+          if (companyId && Types.ObjectId.isValid(companyId)) posFilter.companyId = new Types.ObjectId(companyId);
+          if (branchId && Types.ObjectId.isValid(branchId)) posFilter.branchId = new Types.ObjectId(branchId);
+          posOrder = await posOrdersCollection.findOne(posFilter);
+        }
+
+        if (!posOrder) {
+          const posFilter2: any = { orderNumber: orderIdOrNumber };
+          if (companyId && Types.ObjectId.isValid(companyId)) posFilter2.companyId = new Types.ObjectId(companyId);
+          if (branchId && Types.ObjectId.isValid(branchId)) posFilter2.branchId = new Types.ObjectId(branchId);
+          posOrder = await posOrdersCollection.findOne(posFilter2);
+        }
+
+        if (posOrder) {
+          let posCompany = null;
+          let posBranch = null;
+          try {
+            if (posOrder.companyId) {
+              posCompany = await this.orderModel.db.collection('companies').findOne(
+                { _id: new Types.ObjectId(posOrder.companyId.toString()) },
+                { projection: { name: 1, phone: 1, email: 1, slug: 1 } }
+              );
+            }
+            if (posOrder.branchId) {
+              posBranch = await this.orderModel.db.collection('branches').findOne(
+                { _id: new Types.ObjectId(posOrder.branchId.toString()) },
+                { projection: { name: 1, address: 1, phone: 1, slug: 1 } }
+              );
+            }
+          } catch (lookupErr) {
+            console.error('Failed to lookup company/branch for POS order tracking:', lookupErr);
+          }
+
+          order = {
+            ...posOrder,
+            companyId: posCompany || posOrder.companyId,
+            branchId: posBranch || posOrder.branchId,
+          };
+        }
+      }
+
       if (!order) {
         throw new BadRequestException('Order not found');
       }
