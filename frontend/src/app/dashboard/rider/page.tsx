@@ -21,7 +21,7 @@ import {
   CalendarIcon,
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 export default function RiderDashboardPage() {
@@ -147,11 +147,6 @@ export default function RiderDashboardPage() {
     }
   };
 
-  const handleViewDetails = (order: any) => {
-    const id = order.id || order._id;
-    if (id) {
-      router.push(`/dashboard/rider/${id}`);
-    }
   };
 
   return (
@@ -298,12 +293,11 @@ export default function RiderDashboardPage() {
                 const items = order.items || [];
 
                 return (
-                  <Card 
-                    key={orderId} 
-                    className="group overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white dark:bg-slate-800/90 rounded-2xl cursor-pointer"
-                    onClick={() => handleViewDetails(order)}
-                  >
-                    <CardContent className="p-0">
+                  <Link href={`/dashboard/rider/${orderId}`} key={orderId} className="block group">
+                    <Card 
+                      className="overflow-hidden border-0 shadow-md group-hover:shadow-xl transition-all duration-300 bg-white dark:bg-slate-800/90 rounded-2xl cursor-pointer"
+                    >
+                      <CardContent className="p-0">
                       {/* Card Header */}
                       <div className="p-4 sm:p-5 pb-3 border-b border-slate-100 dark:border-slate-700/50">
                         <div className="flex justify-between items-start">
@@ -398,44 +392,37 @@ export default function RiderDashboardPage() {
                             </div>
                           </div>
                           {activeTab === 'active' && order.status === 'ready' && order.deliveryStatus !== 'out_for_delivery' ? (
-                            <Button 
+                            <button 
                               onClick={(e) => {
+                                e.preventDefault();
                                 e.stopPropagation();
                                 handleStartDelivery(order);
                               }}
-                              className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm"
+                              className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm text-white flex items-center"
                             >
                               Start Delivery
                               <ArrowRightIcon className="w-4 h-4 ml-1.5 stroke-[2.5]" />
-                            </Button>
+                            </button>
                           ) : activeTab === 'active' && (order.deliveryStatus === 'out_for_delivery' || order.status === 'served') ? (
-                            <Button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewDetails(order);
-                              }}
-                              className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm"
+                            <div 
+                              className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm text-white flex items-center cursor-pointer"
                             >
                               Continue
                               <ArrowRightIcon className="w-4 h-4 ml-1.5 stroke-[2.5]" />
-                            </Button>
+                            </div>
                           ) : (
-                            <Button 
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewDetails(order);
-                              }}
-                              className="rounded-xl font-bold text-sm px-5 py-2.5"
+                            <div 
+                              className="rounded-xl font-bold text-sm px-5 py-2.5 border border-slate-200 text-slate-700 bg-white cursor-pointer hover:bg-slate-50 flex items-center"
                             >
                               View Details
-                            </Button>
+                            </div>
                           )}
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                );
+                </Link>
+              );
               })}
             </div>
           )}
