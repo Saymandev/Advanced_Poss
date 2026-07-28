@@ -78,6 +78,8 @@ export const useSocketInternal = (): UseSocketReturn => {
   // Memoize computed values to prevent infinite re-renders
   const userRole = useMemo(() => (user as any)?.role?.toLowerCase(), [user]);
   const isWaiter = useMemo(() => userRole === 'waiter' || userRole === 'server', [userRole]);
+  const isDriver = useMemo(() => userRole === 'driver' || userRole === 'rider', [userRole]);
+  const isWaiterOrDriver = useMemo(() => isWaiter || isDriver, [isWaiter, isDriver]);
   const isSuperAdmin = useMemo(() => userRole === 'super_admin', [userRole]);
 
   const branchId = useMemo(() => {
@@ -169,8 +171,8 @@ export const useSocketInternal = (): UseSocketReturn => {
     });
     // Order events
     newSocket.on('order:new', (data: any) => {
-      // Waiters should NOT get general order:new notifications - they only get order:assigned
-      if (!isWaiter) {
+      // Waiters/Drivers should NOT get general order:new notifications
+      if (!isWaiterOrDriver) {
         addNotification({
           type: 'order',
           title: 'New Order',
@@ -211,8 +213,8 @@ export const useSocketInternal = (): UseSocketReturn => {
       // Order updated event handler
     });
     newSocket.on('order:status-changed', (data: any) => {
-      // Waiters should only get status changes for their assigned orders
-      if (!isWaiter) {
+      // Waiters/Drivers should only get status changes for their assigned orders
+      if (!isWaiterOrDriver) {
         const statusMessages: Record<string, string> = {
           'pending': 'Order is pending',
           'preparing': 'Order is being prepared',
@@ -229,8 +231,8 @@ export const useSocketInternal = (): UseSocketReturn => {
       }
     });
     newSocket.on('order:payment-received', (data: any) => {
-      // Waiters should NOT get payment notifications
-      if (!isWaiter) {
+      // Waiters/Drivers should NOT get payment notifications
+      if (!isWaiterOrDriver) {
         addNotification({
           type: 'payment',
           title: 'Payment Received',
@@ -342,9 +344,9 @@ export const useSocketInternal = (): UseSocketReturn => {
         }
       }, 100);
     });
-    // Kitchen events - waiters should NOT get these
+    // Kitchen events - waiters/drivers should NOT get these
     newSocket.on('kitchen:new-order', (data: any) => {
-      if (!isWaiter) {
+      if (!isWaiterOrDriver) {
         addNotification({
           type: 'kitchen',
           title: 'New Kitchen Order',
@@ -360,8 +362,8 @@ export const useSocketInternal = (): UseSocketReturn => {
       // Kitchen order status changed event handler
     });
     newSocket.on('kitchen:item-ready', (data: any) => {
-      // Waiters can get item ready notifications for their orders
-      if (!isWaiter) {
+      // Waiters can get item ready notifications for their orders, but drivers don't need them
+      if (!isWaiterOrDriver) {
         addNotification({
           type: 'kitchen',
           title: 'Item Ready',
@@ -370,9 +372,9 @@ export const useSocketInternal = (): UseSocketReturn => {
         });
       }
     });
-    // Inventory events - waiters should NOT get these
+    // Inventory events - waiters/drivers should NOT get these
     newSocket.on('inventory:low-stock', (data: any) => {
-      if (!isWaiter) {
+      if (!isWaiterOrDriver) {
         addNotification({
           type: 'system',
           title: 'Low Stock Alert',
@@ -382,7 +384,7 @@ export const useSocketInternal = (): UseSocketReturn => {
       }
     });
     newSocket.on('inventory:out-of-stock', (data: any) => {
-      if (!isWaiter) {
+      if (!isWaiterOrDriver) {
         addNotification({
           type: 'system',
           title: 'Out of Stock Alert',
@@ -404,9 +406,9 @@ export const useSocketInternal = (): UseSocketReturn => {
     newSocket.on('table:payment-received', (_data: any) => {
       // Table payment received event handler
     });
-    // System events - waiters should NOT get these
+    // System events - waiters/drivers should NOT get these
     newSocket.on('system:alert', (data: any) => {
-      if (!isWaiter) {
+      if (!isWaiterOrDriver) {
         addNotification({
           type: 'system',
           title: data.title || 'System Alert',
@@ -416,8 +418,8 @@ export const useSocketInternal = (): UseSocketReturn => {
       }
     });
     newSocket.on('system:notification', (data: any) => {
-      // Waiters should only get review notifications, not other system notifications
-      if (!isWaiter || data.type === 'review') {
+      // Waiters/Drivers should only get review notifications, not other system notifications
+      if (!isWaiterOrDriver || data.type === 'review') {
         if (data.type === 'review') {
           addNotification({
             type: 'review',
@@ -425,7 +427,7 @@ export const useSocketInternal = (): UseSocketReturn => {
             message: data.message || 'A customer left a review',
             data: data.data || {},
           });
-        } else if (!isWaiter) {
+        } else if (!isWaiterOrDriver) {
           addNotification({
             type: 'system',
             title: data.title || 'Notification',
@@ -445,7 +447,7 @@ export const useSocketInternal = (): UseSocketReturn => {
       }
       newSocket.close();
     };
-  }, [branchId, addNotification, user, isWaiter, userRole, companyId, features, hydrateNotifications, isSuperAdmin, userId]);
+  }, [branchId, addNotification, user, isWaiter, isDriver, isWaiterOrDriver, userRole, companyId, features, hydrateNotifications, isSuperAdmin, userId]);
   const joinBranch = useCallback((branchId: string) => {
     if (socket && socket.connected) {
       socket.emit('join-branch', { branchId });

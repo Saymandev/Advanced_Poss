@@ -15,13 +15,13 @@ export default function RiderDashboardPage() {
 
   // We fetch active delivery orders assigned to this user
   const { data: ordersData, isLoading, error } = useGetDeliveryOrdersQuery({ 
-    assignedDriverId: user?.id
+    assignedDriverId: (user as any)?._id || user?.id
   }, {
-    skip: !user?.id,
+    skip: !((user as any)?._id || user?.id),
     pollingInterval: 15000 // poll every 15s for new orders
   });
 
-  const orders = ordersData as any || [];
+  const orders = Array.isArray(ordersData) ? ordersData : (ordersData as any)?.orders || [];
   
   // Filter active orders assigned to the rider that are not yet delivered/cancelled
   const activeOrders = orders.filter((o: any) => 
