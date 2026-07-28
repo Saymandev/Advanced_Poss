@@ -261,7 +261,7 @@ export class POSController {
   // ========== DELIVERY MANAGEMENT ENDPOINTS ==========
 
   @Get('delivery-orders')
-  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT, FEATURES.RIDER_DASHBOARD)
   @ApiOperation({ summary: 'Get delivery orders' })
   async getDeliveryOrders(
     @Query('deliveryStatus') deliveryStatus: string | undefined,
@@ -289,7 +289,7 @@ export class POSController {
   }
 
   @Post('orders/:orderId/assign-driver')
-  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT, FEATURES.RIDER_DASHBOARD)
   @ApiOperation({ summary: 'Assign driver to delivery order' })
   async assignDriver(
     @Param('orderId') orderId: string,
@@ -300,7 +300,7 @@ export class POSController {
   }
 
   @Patch('orders/:orderId/delivery-status')
-  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT, FEATURES.RIDER_DASHBOARD)
   @ApiOperation({ summary: 'Update delivery status' })
   async updateDeliveryStatus(
     @Param('orderId') orderId: string,
@@ -315,7 +315,7 @@ export class POSController {
   }
 
   @Patch('orders/:orderId/rider-location')
-  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT, FEATURES.RIDER_DASHBOARD)
   @ApiOperation({ summary: 'Update rider GPS location for live tracking' })
   async updateRiderLocation(
     @Param('orderId') orderId: string,
@@ -326,7 +326,7 @@ export class POSController {
   }
 
   @Patch('orders/:orderId/rider-info')
-  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT, FEATURES.RIDER_DASHBOARD)
   @ApiOperation({ summary: 'Set rider information on a delivery order' })
   async updateRiderInfo(
     @Param('orderId') orderId: string,
@@ -336,7 +336,7 @@ export class POSController {
   }
 
   @Patch('orders/:orderId/delivery-locations')
-  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT)
+  @RequiresFeature(FEATURES.DELIVERY_MANAGEMENT, FEATURES.RIDER_DASHBOARD)
   @ApiOperation({ summary: 'Set pickup/dropoff locations and ETA for delivery tracking' })
   async setDeliveryLocations(
     @Param('orderId') orderId: string,
