@@ -375,9 +375,24 @@ export default function RiderActiveDeliveryPage() {
 
         {/* Location Error */}
         {locationError && (
-          <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 p-4 rounded-xl flex items-start gap-3 mt-4 border border-rose-200 dark:border-rose-800">
-            <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <p className="text-sm font-medium">{locationError}</p>
+          <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 p-4 rounded-xl flex flex-col gap-3 mt-4 border border-rose-200 dark:border-rose-800">
+            <div className="flex items-start gap-3">
+              <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold mb-1">{locationError}</p>
+                <p className="text-xs text-rose-500 dark:text-rose-400">
+                  To enable: Open your browser settings → Site Settings → Location → Allow for this site. Then tap "Retry" below.
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={() => { setLocationError(null); startTracking(); }}
+              className="self-end border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40"
+            >
+              Retry Location Access
+            </Button>
           </div>
         )}
 

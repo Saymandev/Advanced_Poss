@@ -399,15 +399,22 @@ export default function RiderDashboardPage() {
                               }}
                               className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm text-white flex items-center"
                             >
-                              Start Delivery
+                              Pick Up
                               <ArrowRightIcon className="w-4 h-4 ml-1.5 stroke-[2.5]" />
                             </button>
                           ) : activeTab === 'active' && (order.deliveryStatus === 'out_for_delivery' || order.status === 'served') ? (
                             <div 
-                              className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm text-white flex items-center cursor-pointer"
+                              className="rounded-xl shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 border-0 px-5 py-2.5 font-bold text-sm text-white flex items-center cursor-pointer"
                             >
-                              Continue
-                              <ArrowRightIcon className="w-4 h-4 ml-1.5 stroke-[2.5]" />
+                              <TruckIcon className="w-4 h-4 mr-1.5" />
+                              Continue Delivery
+                            </div>
+                          ) : activeTab === 'active' && (order.status === 'preparing' || order.status === 'confirmed' || order.status === 'pending') ? (
+                            <div 
+                              className="rounded-xl font-bold text-sm px-5 py-2.5 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center gap-2 transition-colors"
+                            >
+                              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                              Preparing...
                             </div>
                           ) : (
                             <div 
