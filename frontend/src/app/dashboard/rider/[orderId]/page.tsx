@@ -20,7 +20,8 @@ import {
   ShoppingBagIcon,
   CurrencyDollarIcon,
   SignalIcon,
-  StopIcon
+  StopIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -44,6 +45,7 @@ export default function RiderActiveDeliveryPage() {
   const [watchId, setWatchId] = useState<number | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const [lastPings, setLastPings] = useState<number>(0);
+  const [showLocationModal, setShowLocationModal] = useState(false);
 
   const order = orderData as any;
 
@@ -73,10 +75,47 @@ export default function RiderActiveDeliveryPage() {
     }
   }, []);
 
+  // Check location permission on mount — show custom modal if not yet granted
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('permissions' in navigator)) return;
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      if (result.state === 'prompt') {
+        // Permission hasn't been asked yet — show our custom modal to prime the user
+        setShowLocationModal(true);
+      } else if (result.state === 'denied') {
+        setLocationError('Location permission denied. Please allow location access to continue tracking.');
+      }
+      // If 'granted', do nothing — rider can start tracking freely
+    }).catch(() => {
+      // permissions API not available — show modal as fallback
+      setShowLocationModal(true);
+    });
+  }, []);
+
+
+  // Called by the modal's "Allow" button — triggers the actual native browser permission prompt
+  const handleAllowLocation = async () => {
+    setShowLocationModal(false);
+    await startTracking();
+  };
+
   const startTracking = async () => {
     if (!('geolocation' in navigator)) {
       setLocationError('Geolocation is not supported by your browser.');
       return;
+    }
+
+    // Check current permission state — show modal if still in prompt state
+    if ('permissions' in navigator) {
+      const result = await navigator.permissions.query({ name: 'geolocation' });
+      if (result.state === 'prompt') {
+        setShowLocationModal(true);
+        return;
+      }
+      if (result.state === 'denied') {
+        setLocationError('Location permission denied. Please allow location access to continue tracking.');
+        return;
+      }
     }
 
     setLocationError(null);
@@ -146,6 +185,7 @@ export default function RiderActiveDeliveryPage() {
     setIsTracking(false);
     toast.success('Live tracking paused');
   };
+
 
   const markAsDelivered = async () => {
     if (!confirm('Are you sure you want to mark this order as delivered?')) return;
@@ -227,9 +267,76 @@ export default function RiderActiveDeliveryPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+
+      {/* ====== Location Permission Modal ====== */}
+      {showLocationModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Modal Header with gradient */}
+            <div className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-blue-500 px-6 pt-8 pb-10 text-white text-center overflow-hidden">
+              <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-white/10 blur-2xl"></div>
+              <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 rounded-full bg-white/10 blur-xl"></div>
+              
+              {/* Icon */}
+              <div className="relative z-10 w-20 h-20 rounded-full bg-white/20 border-4 border-white/30 flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <MapPinIcon className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="relative z-10 text-2xl font-black tracking-tight">Allow Location Access</h2>
+              <p className="relative z-10 text-primary-100 text-sm mt-1">Required for live tracking</p>
+
+              {/* Dismiss button */}
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="-mt-5 relative z-10 bg-white dark:bg-slate-800 rounded-t-3xl px-6 pt-5 pb-6">
+              <p className="text-slate-600 dark:text-slate-300 text-sm text-center mb-5">
+                We need your phone's GPS to share your real-time location with the customer, so they can track their order on the map.
+              </p>
+
+              {/* Bullet points */}
+              <div className="space-y-3 mb-6">
+                {[
+                  { emoji: '📍', text: 'Customer sees your live position on the map' },
+                  { emoji: '🔒', text: 'Location is only shared while you are on delivery' },
+                  { emoji: '🔕', text: 'Stops automatically when you mark the order as delivered' },
+                ].map((item) => (
+                  <div key={item.emoji} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl px-4 py-3">
+                    <span className="text-lg">{item.emoji}</span>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">{item.text}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleAllowLocation}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-bold text-base shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Allow Location Access
+                </button>
+                <button
+                  onClick={() => setShowLocationModal(false)}
+                  className="w-full py-3 rounded-2xl text-slate-400 dark:text-slate-500 font-medium text-sm hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-10 border-b border-slate-100 dark:border-slate-700">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+
           <div className="flex items-center justify-between">
             <button 
               onClick={() => router.push('/dashboard/rider')} 
