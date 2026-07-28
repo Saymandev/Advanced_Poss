@@ -245,7 +245,8 @@ export async function middleware(request: NextRequest) {
 
   let matchedRoute: string | null = null;
 
-  const routeEntries = Object.entries(ROUTE_FEATURE_MAP);
+  // Sort by length descending to match the most specific route first (e.g. /dashboard/rider before /dashboard)
+  const routeEntries = Object.entries(ROUTE_FEATURE_MAP).sort((a, b) => b[0].length - a[0].length);
   for (const [routePattern, _features] of routeEntries) {
     if (pathname === routePattern || pathname.startsWith(routePattern + '/')) {
       matchedRoute = routePattern;
