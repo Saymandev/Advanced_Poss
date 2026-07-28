@@ -105,6 +105,13 @@ export default function RiderActiveDeliveryPage() {
       return;
     }
 
+    // Geolocation API requires a secure context (HTTPS or localhost). 
+    // If the user accesses the site via HTTP (e.g., http://raha.bd), the browser automatically blocks it.
+    if (window.isSecureContext === false) {
+      setLocationError('Location blocked: Your site must use HTTPS (SSL) for live tracking to work. HTTP is not allowed by browsers.');
+      return;
+    }
+
     // Check current permission state — show modal if still in prompt state
     if (!skipPermissionCheck && 'permissions' in navigator) {
       try {
