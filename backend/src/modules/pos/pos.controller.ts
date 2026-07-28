@@ -63,7 +63,7 @@ export class POSController {
   }
 
   @Get('orders/:id')
-  @RequiresFeature(FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD)
+  @RequiresFeature(FEATURES.ORDER_MANAGEMENT, FEATURES.DASHBOARD, FEATURES.DELIVERY_MANAGEMENT, FEATURES.RIDER_DASHBOARD)
   async getOrderById(@Param('id') id: string) {
     return this.posService.getOrderById(id);
   }
