@@ -35,7 +35,7 @@ export default function RiderDashboardPage() {
   const [page, setPage] = useState(1);
   const limit = 12;
 
-  const [updateDeliveryStatus, { isLoading: isUpdating }] = useUpdateDeliveryStatusMutation();
+  const [updateDeliveryStatus] = useUpdateDeliveryStatusMutation();
 
   const driverId = (user as any)?._id || user?.id;
 
@@ -146,8 +146,6 @@ export default function RiderDashboardPage() {
       toast.error('Order ID is missing!');
       console.error('Missing order ID for:', order);
     }
-  };
-
   };
 
   return (
