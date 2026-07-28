@@ -147,6 +147,13 @@ export default function RiderDashboardPage() {
     }
   };
 
+  const handleViewDetails = (order: any) => {
+    const id = order.id || order._id;
+    if (id) {
+      router.push(`/dashboard/rider/${id}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Premium Header */}
@@ -294,7 +301,7 @@ export default function RiderDashboardPage() {
                   <Card 
                     key={orderId} 
                     className="group overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white dark:bg-slate-800/90 rounded-2xl cursor-pointer"
-                    onClick={() => handleStartDelivery(order)}
+                    onClick={() => handleViewDetails(order)}
                   >
                     <CardContent className="p-0">
                       {/* Card Header */}
@@ -390,7 +397,7 @@ export default function RiderDashboardPage() {
                               <p className="font-black text-lg text-slate-900 dark:text-white leading-tight">{formatCurrency(order.totalAmount || 0)}</p>
                             </div>
                           </div>
-                          {activeTab === 'active' ? (
+                          {activeTab === 'active' && order.status === 'ready' && order.deliveryStatus !== 'out_for_delivery' ? (
                             <Button 
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -398,7 +405,18 @@ export default function RiderDashboardPage() {
                               }}
                               className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm"
                             >
-                              {order.deliveryStatus === 'out_for_delivery' || order.status === 'served' ? 'Continue' : 'Start Delivery'}
+                              Start Delivery
+                              <ArrowRightIcon className="w-4 h-4 ml-1.5 stroke-[2.5]" />
+                            </Button>
+                          ) : activeTab === 'active' && (order.deliveryStatus === 'out_for_delivery' || order.status === 'served') ? (
+                            <Button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(order);
+                              }}
+                              className="rounded-xl shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 transition-all hover:scale-[1.03] bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 border-0 px-5 py-2.5 font-bold text-sm"
+                            >
+                              Continue
                               <ArrowRightIcon className="w-4 h-4 ml-1.5 stroke-[2.5]" />
                             </Button>
                           ) : (
@@ -406,7 +424,7 @@ export default function RiderDashboardPage() {
                               variant="outline"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleStartDelivery(order);
+                                handleViewDetails(order);
                               }}
                               className="rounded-xl font-bold text-sm px-5 py-2.5"
                             >
