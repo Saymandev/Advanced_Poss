@@ -96,25 +96,30 @@ export default function RiderActiveDeliveryPage() {
   // Called by the modal's "Allow" button — triggers the actual native browser permission prompt
   const handleAllowLocation = async () => {
     setShowLocationModal(false);
-    await startTracking();
+    await startTracking(true); // pass true to skip the check and force the native prompt
   };
 
-  const startTracking = async () => {
+  const startTracking = async (skipPermissionCheck = false) => {
     if (!('geolocation' in navigator)) {
       setLocationError('Geolocation is not supported by your browser.');
       return;
     }
 
     // Check current permission state — show modal if still in prompt state
-    if ('permissions' in navigator) {
-      const result = await navigator.permissions.query({ name: 'geolocation' });
-      if (result.state === 'prompt') {
-        setShowLocationModal(true);
-        return;
-      }
-      if (result.state === 'denied') {
-        setLocationError('Location permission denied. Please allow location access to continue tracking.');
-        return;
+    if (!skipPermissionCheck && 'permissions' in navigator) {
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' });
+        if (result.state === 'prompt') {
+          setShowLocationModal(true);
+          return;
+        }
+        if (result.state === 'denied') {
+          setLocationError('Location permission denied. Please allow location access to continue tracking.');
+          return;
+        }
+      } catch (e) {
+        // Some browsers (like older Safari) might throw on permissions.query
+        console.error("Permissions API error", e);
       }
     }
 
@@ -528,7 +533,7 @@ export default function RiderActiveDeliveryPage() {
                       <StopIcon className="w-4 h-4 mr-1.5" /> Pause
                     </Button>
                   ) : (
-                    <Button onClick={startTracking} size="sm" className="shadow-md shadow-primary-500/20">
+                    <Button onClick={() => startTracking()} size="sm" className="shadow-md shadow-primary-500/20">
                       <SignalIcon className="w-4 h-4 mr-1.5" /> Start Tracking
                     </Button>
                   )}
