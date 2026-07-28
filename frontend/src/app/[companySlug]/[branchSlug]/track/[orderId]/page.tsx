@@ -11,7 +11,8 @@ import {
   HomeIcon,
   PhoneIcon,
   XCircleIcon,
-  MapIcon
+  MapIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -261,278 +262,230 @@ export default function OrderTrackingPage() {
 
   const isDelivery = order.type === 'delivery';
   const showLiveTracking = isDelivery && (order.status === 'ready' || order.status === 'served' || order.status === 'completed');
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+    <div className="h-[100dvh] w-full flex flex-col md:flex-row bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {/* Left Sidebar */}
+      <div className="w-full md:w-[400px] h-[50vh] md:h-full flex flex-col flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-xl z-10 order-2 md:order-1">
+        
         {/* Header */}
-        <div className="mb-6 md:mb-8">
-          <Link href={`/${companySlug}/${branchSlug}/shop`}>
-            <Button variant="ghost" className="mb-4">
-              <HomeIcon className="w-5 h-5 mr-2" />
-              Back to Shop
-            </Button>
-          </Link>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 md:mb-3">
-                Order Tracking
-              </h1>
-              <div className="flex flex-wrap items-center gap-3 md:gap-4">
-                <Badge className={getStatusColor(order.status)}>
-                  <StatusIcon className="w-4 h-4 mr-1" />
-                  {order.status?.toUpperCase() || 'UNKNOWN'}
-                </Badge>
-                <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                  Order #{order.orderNumber || orderId}
-                </span>
-              </div>
-            </div>
-            {/* Real-time Connection Indicator */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <Link href={`/${companySlug}/${branchSlug}/shop`}>
+              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white -ml-2">
+                <ArrowLeftIcon className="w-4 h-4 mr-2" />
+                Order list
+              </Button>
+            </Link>
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                {isConnected ? 'Live Updates' : 'Connecting...'}
-              </span>
+              <span className="text-xs text-gray-500 hidden sm:inline">Live route refreshes every 5s</span>
             </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              {order.orderNumber || orderId}
+            </h1>
+            <Badge className={getStatusColor(order.status)}>
+              {order.status?.toUpperCase() || 'UNKNOWN'}
+            </Badge>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 flex flex-col gap-6">
-            {/* Status Timeline */}
-            <Card>
-              <CardContent className="p-4 md:p-6">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4 md:mb-6">
-                  Order Status
-                </h2>
-                <div className="relative">
-                  {steps.map((step, index) => {
-                    const isCompleted = index <= currentStep;
-                    const isCurrent = index === currentStep;
-                    const StepIcon = isCompleted ? CheckCircleIcon : ClockIcon;
-                    return (
-                      <div key={step.key} className="flex items-start gap-3 md:gap-4 mb-6 md:mb-8 last:mb-0">
-                        <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                          isCompleted 
-                            ? 'bg-green-500 dark:bg-green-600 shadow-lg shadow-green-500/50' 
-                            : isCurrent
-                              ? 'bg-primary-500 dark:bg-primary-600 animate-pulse shadow-lg shadow-primary-500/50'
-                              : 'bg-gray-300 dark:bg-gray-700'
-                        }`}>
-                          <StepIcon className={`w-5 h-5 sm:w-6 sm:h-6 transition-all ${isCompleted ? 'text-white' : isCurrent ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`font-semibold text-sm sm:text-base transition-colors ${
-                            isCurrent 
-                              ? 'text-primary-600 dark:text-primary-400' 
-                              : isCompleted 
-                                ? 'text-gray-900 dark:text-white' 
-                                : 'text-gray-400 dark:text-gray-500'
-                          }`}>
-                            {step.label}
-                            {isCurrent && (
-                              <span className="ml-2 text-xs animate-pulse">●</span>
-                            )}
-                          </div>
-                          {step.time && (
-                            <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-                              {formatDateTime(step.time)}
-                            </div>
-                          )}
-                          {!step.time && isCurrent && (
-                            <div className="text-xs sm:text-sm text-primary-600 dark:text-primary-400 mt-1 font-medium">
-                              In progress...
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Rider Section */}
+          {liveTrackingData?.data?.riderInfo && order.status === 'served' && (
+            <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Rider</h3>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <span className="font-bold text-lg">{liveTrackingData.data.riderInfo.name?.charAt(0) || 'R'}</span>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Rider Info */}
-            {liveTrackingData?.data?.riderInfo && order.status === 'served' && (
-              <Card>
-                <CardContent className="p-4 md:p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                    <span className="font-bold text-lg">{liveTrackingData.data.riderInfo.name?.charAt(0) || 'R'}</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white">{liveTrackingData.data.riderInfo.name || 'Your Rider'}</h3>
-                    <p className="text-sm text-gray-500">{liveTrackingData.data.riderInfo.vehicleNumber || 'On the way'}</p>
-                    {liveTrackingData.data.riderInfo.phone && (
-                      <a href={`tel:${liveTrackingData.data.riderInfo.phone}`} className="text-primary-600 text-sm mt-1 inline-flex items-center gap-1">
-                        <PhoneIcon className="w-3 h-3" /> Call Rider
-                      </a>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* Live Tracking Map */}
-            {showLiveTracking && (
-              <Card className="overflow-hidden">
-                <CardContent className="p-0 h-[400px] md:h-[500px] relative">
-                  <LiveTrackingMap 
-                    riderLocation={riderLocation}
-                    pickupLocation={liveTrackingData?.data?.pickupLocation}
-                    dropoffLocation={liveTrackingData?.data?.dropoffLocation}
-                    isFollowingRider={isFollowingRider}
-                  />
-                  {riderLocation && (
-                    <div className="absolute top-4 right-4 z-10 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-lg">
-                      <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={isFollowingRider}
-                          onChange={(e) => setIsFollowingRider(e.target.checked)}
-                          className="rounded text-primary-600"
-                        />
-                        Follow Rider
-                      </label>
-                    </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Rider Name</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{liveTrackingData.data.riderInfo.name || 'Your Rider'}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Vehicle</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{liveTrackingData.data.riderInfo.vehicleNumber || 'On the way'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Phone</p>
+                  {liveTrackingData.data.riderInfo.phone ? (
+                    <a href={`tel:${liveTrackingData.data.riderInfo.phone}`} className="font-medium text-primary-600 hover:underline flex items-center gap-1">
+                      <PhoneIcon className="w-3 h-3" /> Call Rider
+                    </a>
+                  ) : (
+                    <p className="font-medium text-gray-900 dark:text-white">-</p>
                   )}
-                  {liveTrackingData?.data?.estimatedDeliveryMinutes && (
-                    <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-gray-800/90 backdrop-blur px-4 py-2 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700">
-                      <p className="text-sm text-gray-500">Estimated Delivery</p>
-                      <p className="text-lg font-bold text-primary-600">
-                        {liveTrackingData.data.estimatedDeliveryMinutes} min
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              </div>
+            </div>
+          )}
 
-            {/* Order Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-              {/* Order Items */}
-              <Card>
-                <CardContent className="p-4 md:p-6">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4">
-                    Order Items
-                  </h2>
-                  <div className="space-y-3">
-                    {order.items?.map((item: any, index: number) => (
-                      <div key={index} className="flex justify-between items-start pb-3 border-b border-gray-200 dark:border-gray-700 last:border-0">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <p className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white truncate">
-                            {item.name || `Item ${index + 1}`}
-                          </p>
-                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                            Qty: {item.quantity || 1}
-                          </p>
-                          {item.specialInstructions && (
-                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 italic">
-                              {item.specialInstructions}
-                            </p>
-                          )}
-                        </div>
-                        <p className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white flex-shrink-0">
-                          {formatCurrency(item.totalPrice || item.price * (item.quantity || 1))}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-                    <div className="flex justify-between text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                      <span>Subtotal</span>
-                      <span>{formatCurrency(order.subtotal || 0)}</span>
-                    </div>
-                    {(order.taxAmount || 0) > 0 && (
-                      <div className="flex justify-between text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                        <span>Tax</span>
-                        <span>{formatCurrency(order.taxAmount || 0)}</span>
-                      </div>
-                    )}
-                    {(order.deliveryFee || 0) > 0 && (
-                      <div className="flex justify-between text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                        <span>Delivery Fee</span>
-                        <span>{formatCurrency(order.deliveryFee || 0)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-base sm:text-lg font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
-                      <span>Total</span>
-                      <span>{formatCurrency(order.total || order.totalAmount || 0)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Delivery & Contact Info */}
-              <Card>
-                <CardContent className="p-4 md:p-6">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4">
-                    Delivery Information
-                  </h2>
-                  {order.type === 'delivery' && order.deliveryAddress && (
-                    <div className="mb-4 md:mb-6">
-                      <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
-                        Delivery Address
-                      </h3>
-                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                        {order.deliveryAddress.street && `${order.deliveryAddress.street}, `}
-                        {order.deliveryAddress.city}
-                        {order.deliveryAddress.zipCode && ` ${order.deliveryAddress.zipCode}`}
-                      </p>
-                    </div>
-                  )}
-                  {order.type === 'pickup' && (
-                    <div className="mb-4 md:mb-6">
-                      <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
-                        Pickup Location
-                      </h3>
-                      {(order.branchId as any)?.address ? (
-                        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                          {(order.branchId as any).address.street && `${(order.branchId as any).address.street}, `}
-                          {(order.branchId as any).address.city}
-                        </p>
-                      ) : (
-                        <p className="text-sm sm:text-base text-gray-500 dark:text-gray-500">
-                          Please contact the restaurant for pickup details
-                        </p>
+          {/* History Timeline */}
+          <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Dispatch History</h3>
+            <div className="space-y-6">
+              {steps.map((step, index) => {
+                const isCompleted = index <= currentStep;
+                const isCurrent = index === currentStep;
+                
+                return (
+                  <div key={step.key} className="flex gap-4">
+                    <div className="relative flex flex-col items-center">
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 z-10 ${
+                        isCompleted 
+                          ? 'bg-green-500' 
+                          : isCurrent
+                            ? 'bg-primary-500 animate-pulse'
+                            : 'bg-gray-300 dark:bg-gray-700'
+                      }`} />
+                      {index !== steps.length - 1 && (
+                        <div className={`w-0.5 h-full absolute top-3 ${
+                          index < currentStep ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-800'
+                        }`} />
                       )}
                     </div>
-                  )}
-                  <div className="mb-4 md:mb-6">
-                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
-                      Payment Method
-                    </h3>
-                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 capitalize">
-                      {order.paymentMethod || 'Cash'}
-                    </p>
-                    <p className={`text-xs sm:text-sm mt-1 font-medium ${
-                      order.paymentStatus === 'paid' 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-yellow-600 dark:text-yellow-400'
-                    }`}>
-                      {order.paymentStatus === 'paid' ? '✓ Paid' : 'Pending Payment'}
-                    </p>
-                  </div>
-                  {contactPhone && (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                      <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-2">
-                        Need Help?
-                      </h3>
-                      <a 
-                        href={`tel:${contactPhone}`} 
-                        className="flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
-                      >
-                        <PhoneIcon className="w-5 h-5" />
-                        <span className="text-sm sm:text-base">{contactPhone}</span>
-                      </a>
+                    <div className="flex-1 pb-2">
+                      <div className="flex justify-between items-start">
+                        <p className={`text-sm font-medium ${isCurrent || isCompleted ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-500'}`}>
+                          {step.label}
+                        </p>
+                        {isCompleted && (
+                          <span className="text-[10px] font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">
+                            {step.key === 'confirmed' ? 'Accepted' : 'Completed'}
+                          </span>
+                        )}
+                      </div>
+                      {step.time ? (
+                        <p className="text-xs text-gray-500 mt-0.5">{formatDateTime(step.time)}</p>
+                      ) : isCurrent ? (
+                        <p className="text-xs text-primary-600 mt-0.5">In progress...</p>
+                      ) : null}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Locations */}
+          <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Locations</h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Pickup</p>
+                <p className="text-sm text-gray-900 dark:text-white">
+                  {liveTrackingData?.data?.pickupLocation?.address || branch?.address?.street || 'Restaurant Location'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Dropoff</p>
+                <p className="text-sm text-gray-900 dark:text-white">
+                  {liveTrackingData?.data?.dropoffLocation?.address || order?.deliveryAddress?.street || 'Customer Location'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Order Items */}
+          <div className="p-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Order Items</h3>
+            <div className="space-y-3">
+              {order.items?.map((item: any, index: number) => (
+                <div key={index} className="flex justify-between items-start border-b border-gray-100 dark:border-gray-800 pb-3 last:border-0 last:pb-0">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{item.name || `Item ${index + 1}`}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Qty: {item.quantity || 1}</p>
+                    {item.specialInstructions && (
+                      <p className="text-[10px] text-gray-500 italic mt-0.5">{item.specialInstructions}</p>
+                    )}
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatCurrency(item.totalPrice || item.price * (item.quantity || 1))}
+                  </p>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800 space-y-2">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>Subtotal</span>
+                <span>{formatCurrency(order.subtotal || 0)}</span>
+              </div>
+              {(order.taxAmount || 0) > 0 && (
+                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                  <span>Tax</span>
+                  <span>{formatCurrency(order.taxAmount)}</span>
+                </div>
+              )}
+              {(order.deliveryFee || 0) > 0 && (
+                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                  <span>Delivery Fee</span>
+                  <span>{formatCurrency(order.deliveryFee)}</span>
+                </div>
+              )}
+              {(order.discountAmount || 0) > 0 && (
+                <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                  <span>Discount</span>
+                  <span>-{formatCurrency(order.discountAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-base font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-800">
+                <span>Total</span>
+                <span>{formatCurrency(order.totalAmount || order.total || 0)}</span>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Right Map Panel */}
+      <div className="flex-1 relative h-[50vh] md:h-full bg-gray-100 dark:bg-gray-900 order-1 md:order-2">
+        {showLiveTracking ? (
+          <>
+            <div className="absolute inset-0 z-0">
+              <LiveTrackingMap 
+                riderLocation={riderLocation}
+                pickupLocation={liveTrackingData?.data?.pickupLocation}
+                dropoffLocation={liveTrackingData?.data?.dropoffLocation}
+                isFollowingRider={isFollowingRider}
+              />
+            </div>
+            {/* Overlay UI on map */}
+            <div className="absolute bottom-6 left-6 right-6 md:right-auto flex flex-col sm:flex-row gap-4 z-10">
+              {liveTrackingData?.data?.estimatedDeliveryMinutes && (
+                <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur shadow-xl rounded-xl px-4 py-3 border border-gray-200 dark:border-gray-800">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">ETA</p>
+                  <p className="text-xl font-bold text-primary-600">{liveTrackingData.data.estimatedDeliveryMinutes} min</p>
+                </div>
+              )}
+              {riderLocation && (
+                <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur shadow-xl rounded-xl px-4 py-3 border border-gray-200 dark:border-gray-800 flex items-center">
+                  <label className="flex items-center gap-2 text-sm font-medium cursor-pointer text-gray-900 dark:text-white">
+                    <input 
+                      type="checkbox" 
+                      checked={isFollowingRider}
+                      onChange={(e) => setIsFollowingRider(e.target.checked)}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    Follow Rider
+                  </label>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center flex-col bg-gray-50 dark:bg-gray-900 p-6 text-center z-10">
+            <MapIcon className="w-16 h-16 text-gray-300 dark:text-gray-700 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Live Tracking Unavailable</h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-sm">Live tracking will appear here once your order is out for delivery.</p>
+          </div>
+        )}
       </div>
     </div>
   );
