@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -15,13 +15,19 @@ import {
   UserIcon,
   CurrencyDollarIcon,
   TruckIcon,
-  ShoppingBagIcon
+  ShoppingBagIcon,
+  MagnifyingGlassIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 export default function RiderDashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
   const router = useRouter();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
 
   const driverId = (user as any)?._id || user?.id;
 
@@ -35,30 +41,6 @@ export default function RiderDashboardPage() {
 
   const orders = Array.isArray(ordersData) ? ordersData : (ordersData as any)?.orders || [];
   
-  // Filter active orders assigned to the rider that are not yet delivered/cancelled
-  const activeOrders = orders.filter((o: any) => 
-    o.deliveryStatus !== 'delivered' && 
-    o.deliveryStatus !== 'cancelled' &&
-    o.status !== 'cancelled'
-  );
-  
-  // Past orders
-  const completedOrders = orders.filter((o: any) => 
-    o.deliveryStatus === 'delivered' || 
-    o.deliveryStatus === 'cancelled' ||
-    o.status === 'cancelled'
-  );
-
-  const getStatusConfig = (order: any) => {
-    if (order.deliveryStatus === 'out_for_delivery' || order.status === 'served') {
-      return { label: 'Out for Delivery', color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', dot: 'bg-blue-500' };
-    }
-    if (order.status === 'ready') {
-      return { label: 'Ready for Pickup', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', dot: 'bg-emerald-500 animate-pulse' };
-    }
-    return { label: 'Preparing', color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', dot: 'bg-amber-500' };
-  };
-
   const getCustomerName = (order: any) => {
     return order.customerName || order.customerInfo?.name || order.deliveryDetails?.contactName || 'Customer';
   };
@@ -85,19 +67,63 @@ export default function RiderDashboardPage() {
     return null;
   };
 
+  // Filter logic
+  const matchSearchAndDate = (o: any) => {
+    const cName = getCustomerName(o).toLowerCase();
+    const cPhone = getCustomerPhone(o).toLowerCase();
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = cName.includes(term) || cPhone.includes(term) || (o.orderNumber && o.orderNumber.toLowerCase().includes(term));
+    
+    let matchesDate = true;
+    if (dateFilter) {
+      const orderDate = new Date(o.createdAt).toISOString().split('T')[0];
+      matchesDate = orderDate === dateFilter;
+    }
+    
+    return matchesSearch && matchesDate;
+  };
+
+  // Filter active orders assigned to the rider that are not yet delivered/cancelled
+  const activeOrders = orders.filter((o: any) => 
+    o.deliveryStatus !== 'delivered' && 
+    o.deliveryStatus !== 'cancelled' &&
+    o.status !== 'cancelled' &&
+    matchSearchAndDate(o)
+  );
+  
+  // Past orders
+  const completedOrders = orders.filter((o: any) => 
+    (o.deliveryStatus === 'delivered' || 
+    o.deliveryStatus === 'cancelled' ||
+    o.status === 'cancelled') &&
+    matchSearchAndDate(o)
+  );
+
+  const getStatusConfig = (order: any) => {
+    if (order.deliveryStatus === 'out_for_delivery' || order.status === 'served') {
+      return { label: 'Out for Delivery', color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', dot: 'bg-blue-500' };
+    }
+    if (order.status === 'ready') {
+      return { label: 'Ready for Pickup', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', dot: 'bg-emerald-500 animate-pulse' };
+    }
+    return { label: 'Preparing', color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', dot: 'bg-amber-500' };
+  };
+
   const handleStartDelivery = (order: any) => {
     const id = order.id || order._id;
     if (id) {
       router.push(`/dashboard/rider/${id}`);
+    } else {
+      toast.error('Order ID is missing!');
+      console.error('Missing order ID for:', order);
     }
   };
 
-  // Stats
-  const outForDeliveryCount = activeOrders.filter((o: any) => 
-    o.deliveryStatus === 'out_for_delivery' || o.status === 'served'
-  ).length;
-  const readyForPickupCount = activeOrders.filter((o: any) => o.status === 'ready').length;
-  const preparingCount = activeOrders.length - outForDeliveryCount - readyForPickupCount;
+  // Stats (ignoring filters for top stats is usually better so they know overall totals)
+  const allActiveForStats = orders.filter((o: any) => o.deliveryStatus !== 'delivered' && o.deliveryStatus !== 'cancelled' && o.status !== 'cancelled');
+  const outForDeliveryCount = allActiveForStats.filter((o: any) => o.deliveryStatus === 'out_for_delivery' || o.status === 'served').length;
+  const readyForPickupCount = allActiveForStats.filter((o: any) => o.status === 'ready').length;
+  const preparingCount = allActiveForStats.length - outForDeliveryCount - readyForPickupCount;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -149,6 +175,44 @@ export default function RiderDashboardPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         
+        {/* Filters */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search by customer name, phone, or order #"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow"
+              />
+            </div>
+            <div className="w-full md:w-64 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <CalendarIcon className="h-5 w-5 text-slate-400" />
+              </div>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow"
+              />
+            </div>
+            {(searchTerm || dateFilter) && (
+              <Button 
+                variant="ghost" 
+                onClick={() => { setSearchTerm(''); setDateFilter(''); }}
+                className="md:w-auto h-[42px] border border-slate-200 dark:border-slate-600 rounded-xl"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
+
         {/* Active Deliveries */}
         <div>
           <div className="flex items-center justify-between mb-5 px-1">
@@ -174,8 +238,12 @@ export default function RiderDashboardPage() {
                 <div className="bg-slate-50 dark:bg-slate-700/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <TruckIcon className="w-10 h-10 text-slate-300 dark:text-slate-500" />
                 </div>
-                <p className="font-bold text-slate-700 dark:text-slate-300 text-lg mb-1">No active deliveries</p>
-                <p className="text-sm max-w-sm mx-auto">You&apos;re all caught up! Wait for the restaurant to assign you new orders.</p>
+                <p className="font-bold text-slate-700 dark:text-slate-300 text-lg mb-1">
+                  {(searchTerm || dateFilter) ? 'No matches found' : 'No active deliveries'}
+                </p>
+                <p className="text-sm max-w-sm mx-auto">
+                  {(searchTerm || dateFilter) ? 'Try adjusting your search or date filter.' : "You're all caught up! Wait for the restaurant to assign you new orders."}
+                </p>
               </CardContent>
             </Card>
           ) : (
