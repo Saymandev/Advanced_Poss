@@ -39,6 +39,7 @@ export default function RiderActiveDeliveryPage() {
   const [updateStatus] = useUpdateDeliveryStatusMutation();
 
   const [isTracking, setIsTracking] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -54,6 +55,23 @@ export default function RiderActiveDeliveryPage() {
       }
     };
   }, [watchId]);
+
+  // Network connection listener
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    if (typeof window !== 'undefined') {
+      setIsOffline(!navigator.onLine);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+  }, []);
 
   const startTracking = async () => {
     if (!('geolocation' in navigator)) {
@@ -78,13 +96,15 @@ export default function RiderActiveDeliveryPage() {
       (position) => {
         const { latitude, longitude, heading, speed } = position.coords;
         
-        updateLocation({
-          orderId,
-          lat: latitude,
-          lng: longitude,
-          heading: heading || undefined,
-          speed: speed || undefined
-        }).catch(err => console.error("Failed to update rider location", err));
+        if (!isOffline && navigator.onLine) {
+          updateLocation({
+            orderId,
+            lat: latitude,
+            lng: longitude,
+            heading: heading || undefined,
+            speed: speed || undefined
+          }).catch(err => console.error("Failed to update rider location", err));
+        }
 
         setLastPings(p => p + 1);
         setLocationError(null);
@@ -235,6 +255,14 @@ export default function RiderActiveDeliveryPage() {
           </div>
         </div>
       </div>
+
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="bg-orange-500 text-white px-4 py-2.5 text-center text-sm font-semibold flex items-center justify-center gap-2 shadow-inner z-20">
+          <SignalIcon className="w-5 h-5 animate-pulse" />
+          You are offline. Live tracking updates are paused until you reconnect.
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-6 flex flex-col">
