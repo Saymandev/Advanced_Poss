@@ -215,7 +215,7 @@ export default function OrderTrackingPage() {
       { key: 'preparing', label: 'Preparing', time: (order as any).startedPreparingAt },
       { key: 'ready', label: 'Ready', time: (order as any).readyAt },
     ];
-    if (order.type === 'delivery') {
+    if (order.orderType === 'delivery' || order.type === 'delivery') {
       steps.push({ key: 'served', label: 'Out for Delivery', time: (order as any).servedAt });
       steps.push({ key: 'completed', label: 'Delivered', time: (order as any).completedAt });
     } else {
@@ -260,7 +260,7 @@ export default function OrderTrackingPage() {
   const steps = getStatusSteps();
   const currentStep = getCurrentStepIndex();
 
-  const isDelivery = order.type === 'delivery';
+  const isDelivery = order.orderType === 'delivery' || order.type === 'delivery';
   const showLiveTracking = isDelivery && (
     order.status === 'ready' || 
     order.status === 'served' || 
