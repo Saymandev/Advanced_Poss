@@ -500,7 +500,7 @@ export default function RiderActiveDeliveryPage() {
             <Button 
               variant="secondary" 
               size="sm" 
-              onClick={() => { setLocationError(null); startTracking(); }}
+              onClick={() => { setLocationError(null); startTracking(true); }}
               className="self-end border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40"
             >
               Retry Location Access
