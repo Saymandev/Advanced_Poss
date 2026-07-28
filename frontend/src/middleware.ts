@@ -222,6 +222,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Only /dashboard routes require authentication. All other routes (e.g. /slug/slug/track) are public.
+  if (!isDashboardRoute) {
+    return NextResponse.next();
+  }
+
   if (!userInfoCookie?.value) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
