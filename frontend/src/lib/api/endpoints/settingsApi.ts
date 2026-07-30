@@ -92,6 +92,9 @@ export interface CompanySettings {
     bin?: string;
     mushak?: string;
   };
+  posSettings?: {
+    showStock?: boolean;
+  };
   createdAt: string;
   updatedAt: string;
 }

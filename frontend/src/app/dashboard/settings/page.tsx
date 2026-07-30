@@ -1751,6 +1751,35 @@ export default function SettingsPage() {
                   disabled={!companyId}
                 />
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Show Stock in POS
+                </label>
+                <div className="flex items-center gap-3 mt-3">
+                  <input
+                    type="checkbox"
+                    checked={companySettings?.posSettings?.showStock ?? true}
+                    onChange={async (e) => {
+                      try {
+                        await updateCompanySettings({
+                          companyId,
+                          data: { posSettings: { showStock: e.target.checked } }
+                        }).unwrap();
+                        toast.success('POS stock visibility updated');
+                        await refetchCompanySettings();
+                      } catch (error: any) {
+                        toast.error(error.data?.message || 'Failed to update POS stock visibility');
+                      }
+                    }}
+                    disabled={!companyId}
+                    className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Display available stock quantities on POS items
+                  </span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

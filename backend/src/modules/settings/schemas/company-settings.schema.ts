@@ -100,6 +100,17 @@ export class CompanySettings {
     wifi?: string;
     wifiPassword?: string;
   };
+  @Prop({
+    type: {
+      showStock: { type: Boolean, default: true },
+    },
+    default: {
+      showStock: true,
+    },
+  })
+  posSettings?: {
+    showStock: boolean;
+  };
 }
 
 export const CompanySettingsSchema = SchemaFactory.createForClass(CompanySettings);

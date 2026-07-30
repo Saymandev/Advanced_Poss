@@ -88,6 +88,18 @@ export class UpdateCompanySettingsDto {
     wifi?: string;
     wifiPassword?: string;
   };
+
+  @ApiPropertyOptional({
+    example: {
+      showStock: true,
+    },
+    description: 'POS Settings',
+  })
+  @IsOptional()
+  @IsObject()
+  posSettings?: {
+    showStock?: boolean;
+  };
 }
 
 export class UpdateCompanySettingsRequestDto extends UpdateCompanySettingsDto {
