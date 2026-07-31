@@ -25,15 +25,18 @@ import {
 } from '@heroicons/react/24/outline';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { useSocket } from '@/lib/hooks/useSocket';
 
 export default function RiderActiveDeliveryPage() {
   const params = useParams();
   const router = useRouter();
   const orderId = params.orderId as string;
+  
+  const { isConnected } = useSocket();
 
   const { data: orderData, isLoading } = useGetPOSOrderQuery(orderId, {
     skip: !orderId,
-    pollingInterval: 10000
+    pollingInterval: isConnected ? 0 : 10000
   });
   
   const [updateLocation] = useUpdateRiderLocationMutation();

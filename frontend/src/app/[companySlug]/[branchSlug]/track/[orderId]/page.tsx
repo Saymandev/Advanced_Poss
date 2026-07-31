@@ -30,6 +30,9 @@ export default function OrderTrackingPage() {
   const companySlug = params.companySlug as string;
   const branchSlug = params.branchSlug as string;
   const orderId = params.orderId as string;
+  // WebSocket for real-time updates
+  const { socket, isConnected, joinOrder, leaveOrder } = usePublicSocket();
+
   const { 
     data: company, 
     isLoading: companyLoading,
@@ -46,13 +49,14 @@ export default function OrderTrackingPage() {
   } = useTrackOrderQuery({ orderId, companySlug, branchSlug }, {
     skip: !orderId,
     // WebSocket handles real-time updates, API call is for initial load and fallback
+    pollingInterval: isConnected ? 0 : 30000 // Poll as fallback if WS fails
   });
 
   const { data: liveTrackingData } = useGetLiveTrackingQuery(
     { orderId, companySlug, branchSlug },
     { 
       skip: !orderId, 
-      pollingInterval: 30000 // Poll every 30s as fallback if WS fails
+      pollingInterval: isConnected ? 0 : 30000 // Poll every 30s as fallback if WS fails
     }
   );
 
@@ -67,9 +71,6 @@ export default function OrderTrackingPage() {
   // Local state for live tracking
   const [riderLocation, setRiderLocation] = useState<any>(null);
   const [isFollowingRider, setIsFollowingRider] = useState(true);
-
-  // WebSocket for real-time updates
-  const { socket, isConnected, joinOrder, leaveOrder } = usePublicSocket();
   
   // Update local order state when data loads
   useEffect(() => {
