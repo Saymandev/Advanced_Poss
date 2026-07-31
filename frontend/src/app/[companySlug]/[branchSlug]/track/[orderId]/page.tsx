@@ -80,8 +80,9 @@ export default function OrderTrackingPage() {
 
   // Update tracking state when data loads
   useEffect(() => {
-    if (liveTrackingData?.data?.riderLocation) {
-      setRiderLocation(liveTrackingData.data.riderLocation);
+    const data = liveTrackingData?.data || liveTrackingData;
+    if (data?.riderLocation) {
+      setRiderLocation(data.riderLocation);
     }
   }, [liveTrackingData]);
 
@@ -151,12 +152,16 @@ export default function OrderTrackingPage() {
 
     const handleLocationUpdate = (data: any) => {
       if (data.orderId === orderId || data.orderId === order?.id || data.orderId === order?._id) {
-        setRiderLocation({
-          lat: data.lat,
-          lng: data.lng,
-          heading: data.heading,
-          speed: data.speed,
-        });
+        // Backend might send coordinates inside a `location` object or directly on `data`
+        const loc = data.location || data;
+        if (loc && typeof loc.lat === 'number') {
+          setRiderLocation({
+            lat: loc.lat,
+            lng: loc.lng,
+            heading: loc.heading,
+            speed: loc.speed,
+          });
+        }
       }
     };
 
