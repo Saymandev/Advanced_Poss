@@ -63,7 +63,11 @@ function MapBoundsUpdater({
   useEffect(() => {
     if (!map) return;
 
-    if (isFollowingRider && riderLocation) {
+    const isValidLocation = (loc: TrackingLocation | null | undefined): loc is TrackingLocation & { lat: number; lng: number } => {
+      return !!loc && typeof loc.lat === 'number' && typeof loc.lng === 'number';
+    };
+
+    if (isFollowingRider && isValidLocation(riderLocation)) {
       map.setView([riderLocation.lat, riderLocation.lng], map.getZoom(), {
         animate: true,
         duration: 1
@@ -72,9 +76,9 @@ function MapBoundsUpdater({
     }
 
     const points: L.LatLngTuple[] = [];
-    if (riderLocation) points.push([riderLocation.lat, riderLocation.lng]);
-    if (pickupLocation) points.push([pickupLocation.lat, pickupLocation.lng]);
-    if (dropoffLocation) points.push([dropoffLocation.lat, dropoffLocation.lng]);
+    if (isValidLocation(riderLocation)) points.push([riderLocation.lat, riderLocation.lng]);
+    if (isValidLocation(pickupLocation)) points.push([pickupLocation.lat, pickupLocation.lng]);
+    if (isValidLocation(dropoffLocation)) points.push([dropoffLocation.lat, dropoffLocation.lng]);
 
     if (points.length > 1) {
       const bounds = L.latLngBounds(points);
@@ -114,16 +118,20 @@ export default function LiveTrackingMap({
   // Default center (e.g. Dhaka)
   const defaultCenter: L.LatLngTuple = [23.8103, 90.4125];
   
-  const center = riderLocation 
-    ? [riderLocation.lat, riderLocation.lng] as L.LatLngTuple
-    : pickupLocation 
-      ? [pickupLocation.lat, pickupLocation.lng] as L.LatLngTuple
+  const isValidLocation = (loc: TrackingLocation | null | undefined): loc is TrackingLocation & { lat: number; lng: number } => {
+    return !!loc && typeof loc.lat === 'number' && typeof loc.lng === 'number';
+  };
+
+  const center: L.LatLngTuple = isValidLocation(riderLocation)
+    ? [riderLocation.lat, riderLocation.lng]
+    : isValidLocation(pickupLocation)
+      ? [pickupLocation.lat, pickupLocation.lng]
       : defaultCenter;
 
   const routePoints: L.LatLngTuple[] = [];
-  if (riderLocation) routePoints.push([riderLocation.lat, riderLocation.lng]);
-  else if (pickupLocation) routePoints.push([pickupLocation.lat, pickupLocation.lng]);
-  if (dropoffLocation) routePoints.push([dropoffLocation.lat, dropoffLocation.lng]);
+  if (isValidLocation(riderLocation)) routePoints.push([riderLocation.lat, riderLocation.lng]);
+  else if (isValidLocation(pickupLocation)) routePoints.push([pickupLocation.lat, pickupLocation.lng]);
+  if (isValidLocation(dropoffLocation)) routePoints.push([dropoffLocation.lat, dropoffLocation.lng]);
 
   return (
     <div className={`relative z-0 ${className}`}>
