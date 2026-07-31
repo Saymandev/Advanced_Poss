@@ -163,7 +163,7 @@ export default function LiveTrackingMap({
           />
         )}
 
-        {pickupLocation && (
+        {isValidLocation(pickupLocation) && (
           <Marker position={[pickupLocation.lat, pickupLocation.lng]} icon={PickupIcon}>
             <Popup>
               <strong>Pickup Location</strong>
@@ -173,7 +173,7 @@ export default function LiveTrackingMap({
           </Marker>
         )}
 
-        {dropoffLocation && (
+        {isValidLocation(dropoffLocation) && (
           <Marker position={[dropoffLocation.lat, dropoffLocation.lng]} icon={DropoffIcon}>
             <Popup>
               <strong>Delivery Location</strong>
@@ -183,7 +183,7 @@ export default function LiveTrackingMap({
           </Marker>
         )}
 
-        {riderLocation && (
+        {isValidLocation(riderLocation) && (
           <Marker 
             position={[riderLocation.lat, riderLocation.lng]} 
             icon={RiderIcon}
