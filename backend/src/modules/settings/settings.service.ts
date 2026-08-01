@@ -109,10 +109,23 @@ export class SettingsService {
     payload: UpdateCompanySettingsDto,
   ) {
     await this.assertCompany(companyId);
+    
+    // Flatten the payload for dot-notation update to prevent Mongoose embedded document issues
+    const flattenedPayload: any = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        for (const [subKey, subValue] of Object.entries(value)) {
+          flattenedPayload[`${key}.${subKey}`] = subValue;
+        }
+      } else {
+        flattenedPayload[key] = value;
+      }
+    }
+
     const updated = await this.companySettingsModel
       .findOneAndUpdate(
         { companyId: this.toObjectId(companyId) },
-        { $set: payload },
+        { $set: flattenedPayload },
         { new: true, upsert: true },
       )
       .lean();
