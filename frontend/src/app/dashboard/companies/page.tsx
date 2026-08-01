@@ -98,7 +98,7 @@ export default function CompaniesPage() {
   const [formData, setFormData] = useState<Partial<CreateCompanyRequest>>({
     name: '',
     email: '',
-    phoneNumber: '',
+    phone: '',
     website: '',
     slug: '',
     address: {
@@ -144,7 +144,7 @@ export default function CompaniesPage() {
     setFormData({
       name: '',
       email: '',
-      phoneNumber: '',
+      phone: '',
       website: '',
       slug: '',
       address: {
@@ -188,7 +188,7 @@ export default function CompaniesPage() {
       await createCompany({
         name: formData.name!.trim(),
         email: formData.email!.trim(),
-        phoneNumber: formData.phoneNumber?.trim(),
+        phone: formData.phone?.trim(),
         website: formData.website?.trim(),
         slug: formData.slug?.trim(),
         address: formData.address!,
@@ -254,7 +254,7 @@ export default function CompaniesPage() {
     setFormData({
       name: company.name,
       email: company.email,
-      phoneNumber: company.phoneNumber,
+      phone: company.phone,
       website: company.website,
       slug: (company as any).slug || '',
       address: company.address || {
@@ -368,12 +368,12 @@ export default function CompaniesPage() {
       ),
     },
     {
-      key: 'phoneNumber',
+      key: 'phone',
       title: 'Contact',
       render: (_value, company: Company) => (
         <div className="text-sm">
-          {company.phoneNumber && (
-            <p className="text-gray-900 dark:text-white">{company.phoneNumber}</p>
+          {company.phone && (
+            <p className="text-gray-900 dark:text-white">{company.phone}</p>
           )}
           {company.website && (
             <p className="text-gray-500 text-xs">{company.website}</p>
@@ -578,8 +578,8 @@ export default function CompaniesPage() {
             <div>
               <label className="block text-sm font-medium mb-1">Phone</label>
               <Input
-                value={formData.phoneNumber || ''}
-                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                value={formData.phone || ''}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="+1234567890"
               />
             </div>
@@ -721,8 +721,8 @@ export default function CompaniesPage() {
             <div>
               <label className="block text-sm font-medium mb-1">Phone</label>
               <Input
-                value={formData.phoneNumber || ''}
-                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                value={formData.phone || ''}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="+1234567890"
               />
             </div>
@@ -879,7 +879,7 @@ export default function CompaniesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Phone</p>
-                <p className="font-medium">{selectedCompany.phoneNumber || 'N/A'}</p>
+                <p className="font-medium">{selectedCompany.phone || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Subscription Status</p>

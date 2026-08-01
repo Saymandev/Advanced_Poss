@@ -5,7 +5,7 @@ export interface Company {
   slug: string;
   type: string;
   email: string;
-  phoneNumber?: string;
+  phone?: string;
   website?: string;
   description?: string;
   logo?: string;
@@ -63,7 +63,7 @@ export interface CreateCompanyRequest {
   name: string;
   type: string;
   email: string;
-  phoneNumber?: string;
+  phone?: string;
   website?: string;
   description?: string;
   slug?: string;
