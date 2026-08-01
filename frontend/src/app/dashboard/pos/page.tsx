@@ -3383,8 +3383,9 @@ export default function POSPage() {
         ) : filteredMenuItems.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
             {filteredMenuItems.map((item, idx) => {
-              const outOfStock = item.isOutOfStock || (item.trackInventory && item.stock != null && item.stock <= 0);
-              const lowStock = !outOfStock && (item.isLowStock || (item.trackInventory && item.stock != null && item.stock > 0 && item.stock < 5));
+              const showStock = companySettings?.posSettings?.showStock ?? true;
+              const outOfStock = showStock && (item.isOutOfStock || (item.trackInventory && item.stock != null && item.stock <= 0));
+              const lowStock = showStock && !outOfStock && (item.isLowStock || (item.trackInventory && item.stock != null && item.stock > 0 && item.stock < 5));
               
               return (
               <Card
@@ -3448,7 +3449,7 @@ export default function POSPage() {
                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tighter">
                           {item.category.name}
                         </span>
-                        {item.trackInventory && item.stock != null && (companySettings?.posSettings?.showStock ?? true) && (
+                        {item.trackInventory && item.stock != null && showStock && (
                           <span className={cn(
                             "text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tighter border",
                             item.stock <= 0 ? 'bg-red-50 text-red-500 border-red-200 dark:bg-red-900/20 dark:border-red-800/50' :
