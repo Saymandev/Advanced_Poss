@@ -47,7 +47,8 @@ export class EncryptionInterceptor implements NestInterceptor {
       url.startsWith('/docs') ||
       url.startsWith('/health') ||
       url.startsWith('/api/health') ||
-      url.includes('/public/resolve-domain')
+      url.includes('/public/resolve-domain') ||
+      url.includes('/settings/company') // TEMPORARILY disable for debugging POS stock
     ) {
       return next.handle();
     }
