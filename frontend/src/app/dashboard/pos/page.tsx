@@ -3383,7 +3383,7 @@ export default function POSPage() {
         ) : filteredMenuItems.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
             {filteredMenuItems.map((item, idx) => {
-              const showStock = companySettings?.posSettings?.showStock ?? true;
+              const showStock = isOwnerOrSuperAdmin || (companySettings?.posSettings?.showStock ?? true);
               const outOfStock = showStock && (item.isOutOfStock || (item.trackInventory && item.stock != null && item.stock <= 0));
               const lowStock = showStock && !outOfStock && (item.isLowStock || (item.trackInventory && item.stock != null && item.stock > 0 && item.stock < 5));
               
