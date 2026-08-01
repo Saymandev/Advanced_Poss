@@ -35,8 +35,15 @@ export function OfflineBanner({
     };
   }, []);
 
+  // Filter out expected subscription restriction errors (e.g., bookings or rooms 403)
+  const filteredSyncErrors = syncErrors.filter((err) => {
+    const isIgnoredResource = err.toLowerCase().includes('bookings') || err.toLowerCase().includes('rooms');
+    const isAccessDenied = err.includes('HTTP 403') || err.includes('HTTP 401') || err.toLowerCase().includes('access denied');
+    return !(isIgnoredResource && isAccessDenied);
+  });
+
   // When online and no pending orders and no errors, show nothing
-  if (isOnline && pendingCount === 0 && syncErrors.length === 0 && !isSyncing) return null;
+  if (isOnline && pendingCount === 0 && filteredSyncErrors.length === 0 && !isSyncing) return null;
 
   // Show syncing indicator when online and syncing background snapshot
   if (isOnline && isSyncing) {
@@ -49,7 +56,7 @@ export function OfflineBanner({
   }
 
   // Show sync warning if we have errors (e.g. tablet sync failed)
-  if (isOnline && syncErrors.length > 0) {
+  if (isOnline && filteredSyncErrors.length > 0) {
     const formatSyncErrors = (errors: string[]) => {
       if (!errors || errors.length === 0) return '';
       
@@ -82,7 +89,7 @@ export function OfflineBanner({
       <div className="flex items-center justify-between gap-2 px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 text-rose-400 text-xs">
         <div className="flex items-center gap-2 overflow-hidden">
           <SignalSlashIcon className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate whitespace-nowrap">Warning: Some data failed to sync ({formatSyncErrors(syncErrors)}).</span>
+          <span className="truncate whitespace-nowrap">Warning: Some data failed to sync ({formatSyncErrors(filteredSyncErrors)}).</span>
         </div>
         <button
           onClick={onSyncNow}
