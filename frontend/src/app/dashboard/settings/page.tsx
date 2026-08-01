@@ -127,6 +127,7 @@ export default function SettingsPage() {
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loyaltyRate, setLoyaltyRate] = useState<number>(100);
+  const [showStockInPos, setShowStockInPos] = useState<boolean>(true);
 
   // General Settings
   const { data: companySettings, refetch: refetchCompanySettings } = useGetCompanySettingsQuery(
@@ -149,6 +150,9 @@ export default function SettingsPage() {
     }
     if (companySettings?.loyaltyPointsPerCurrency) {
       setLoyaltyRate(companySettings.loyaltyPointsPerCurrency);
+    }
+    if (companySettings?.posSettings !== undefined) {
+      setShowStockInPos(companySettings.posSettings.showStock ?? true);
     }
   }, [companySettings]);
 
@@ -1759,16 +1763,19 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3 mt-3">
                   <input
                     type="checkbox"
-                    checked={companySettings?.posSettings?.showStock ?? true}
+                    checked={showStockInPos}
                     onChange={async (e) => {
+                      const newValue = e.target.checked;
+                      setShowStockInPos(newValue); // Optimistic UI update
                       try {
                         await updateCompanySettings({
                           companyId,
-                          data: { posSettings: { showStock: e.target.checked } }
+                          data: { posSettings: { showStock: newValue } }
                         }).unwrap();
                         toast.success('POS stock visibility updated');
                         await refetchCompanySettings();
                       } catch (error: any) {
+                        setShowStockInPos(!newValue); // Revert on failure
                         toast.error(error.data?.message || 'Failed to update POS stock visibility');
                       }
                     }}
