@@ -28,7 +28,7 @@ export const companyApi = apiSlice.injectEndpoints({
       query: () => '/company/settings',
       providesTags: ['Company'],
     }),
-    updateCompanySettings: builder.mutation<CompanySettings, Partial<CompanySettings>>({
+    updateCompanySettingsDeprecated: builder.mutation<CompanySettings, Partial<CompanySettings>>({
       query: (settings) => ({
         url: '/company/settings',
         method: 'PATCH',
@@ -65,7 +65,7 @@ export const companyApi = apiSlice.injectEndpoints({
 
 export const {
   useGetCompanySettingsQuery,
-  useUpdateCompanySettingsMutation,
+  useUpdateCompanySettingsDeprecatedMutation,
   useUploadCompanyLogoMutation,
   useUploadCompanyFaviconMutation,
   useGetCompanyQRCodeQuery,

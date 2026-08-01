@@ -189,7 +189,7 @@ export const companiesApi = apiSlice.injectEndpoints({
     }),
     // Legacy compatibility: we no longer use /companies/:id/settings for general settings.
     // Forward to settings endpoint with validated companyId.
-    updateCompanySettings: builder.mutation<
+    updateCompanySettingsLegacy: builder.mutation<
       Company,
       { id?: string; companyId?: string; settings: Partial<Company['settings']> }
     >({
@@ -318,8 +318,9 @@ export const {
   useDeleteCompanyMutation,
   useUploadCompanyLogoMutation,
   useUploadCompanyFaviconMutation,
-  useGetCustomDomainInfoQuery,
-  useAddCustomDomainMutation,
   useVerifyCustomDomainMutation,
+  useAddCustomDomainMutation,
   useRemoveCustomDomainMutation,
+  useGetCustomDomainInfoQuery,
+  useUpdateCompanySettingsLegacyMutation,
 } = companiesApi;
