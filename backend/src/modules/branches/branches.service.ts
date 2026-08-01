@@ -193,6 +193,8 @@ export class BranchesService {
     // Exclude soft deleted branches by default unless explicitly requested
     if (!includeDeleted) {
       query.deletedAt = { $exists: false };
+    } else {
+      query.deletedAt = { $exists: true };
     }
 
     if (filter.status === 'active') {
