@@ -1,5 +1,94 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsMongoId, IsNotEmpty, IsObject, IsOptional, IsString, IsNumber, Min } from 'class-validator';
+import { IsEnum, IsMongoId, IsNotEmpty, IsObject, IsOptional, IsString, IsNumber, Min, IsBoolean, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class PosSettingsDto {
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  showStock?: boolean;
+}
+
+class NotificationsDto {
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  email?: boolean;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  sms?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  push?: boolean;
+}
+
+class FeaturesDto {
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  inventory?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  kitchen?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  reports?: boolean;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  analytics?: boolean;
+}
+
+class ReceiptSettingsDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  header?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  footer?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  showLogo?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  logoUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  fontSize?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  paperWidth?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  wifi?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  wifiPassword?: string;
+}
 
 export class UpdateCompanySettingsDto {
   @ApiPropertyOptional({ example: 'USD' })
@@ -37,25 +126,18 @@ export class UpdateCompanySettingsDto {
     description: 'Notification preferences',
   })
   @IsOptional()
-  @IsObject()
-  notifications?: {
-    email?: boolean;
-    sms?: boolean;
-    push?: boolean;
-  };
+  @ValidateNested()
+  @Type(() => NotificationsDto)
+  notifications?: NotificationsDto;
 
   @ApiPropertyOptional({
     example: { inventory: true, kitchen: true, reports: true, analytics: false },
     description: 'Feature toggles',
   })
   @IsOptional()
-  @IsObject()
-  features?: {
-    inventory?: boolean;
-    kitchen?: boolean;
-    reports?: boolean;
-    analytics?: boolean;
-  };
+  @ValidateNested()
+  @Type(() => FeaturesDto)
+  features?: FeaturesDto;
 
   @ApiPropertyOptional({ example: 100 })
   @IsOptional()
@@ -77,17 +159,9 @@ export class UpdateCompanySettingsDto {
     description: 'Company-wide receipt settings (fallback for branches)',
   })
   @IsOptional()
-  @IsObject()
-  receiptSettings?: {
-    header?: string;
-    footer?: string;
-    showLogo?: boolean;
-    logoUrl?: string;
-    fontSize?: number;
-    paperWidth?: number;
-    wifi?: string;
-    wifiPassword?: string;
-  };
+  @ValidateNested()
+  @Type(() => ReceiptSettingsDto)
+  receiptSettings?: ReceiptSettingsDto;
 
   @ApiPropertyOptional({
     example: {
@@ -96,10 +170,9 @@ export class UpdateCompanySettingsDto {
     description: 'POS Settings',
   })
   @IsOptional()
-  @IsObject()
-  posSettings?: {
-    showStock?: boolean;
-  };
+  @ValidateNested()
+  @Type(() => PosSettingsDto)
+  posSettings?: PosSettingsDto;
 }
 
 export class UpdateCompanySettingsRequestDto extends UpdateCompanySettingsDto {
