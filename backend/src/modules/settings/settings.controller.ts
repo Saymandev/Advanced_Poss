@@ -56,7 +56,7 @@ export class SettingsController {
   @RequiresFeature(FEATURES.SETTINGS)
   @ApiOperation({ summary: 'Update company level settings' })
   updateCompanySettings(
-    @Body() body: UpdateCompanySettingsRequestDto,
+    @Body() body: any,
   ) {
     const { companyId, ...payload } = body;
     return this.settingsService.updateCompanySettings(companyId, payload);
