@@ -312,7 +312,6 @@ export const {
   useGetSystemStatsQuery,
   useCreateCompanyMutation,
   useUpdateCompanyMutation,
-  useUpdateCompanySettingsMutation,
   useDeactivateCompanyMutation,
   useActivateCompanyMutation,
   useDeleteCompanyMutation,
