@@ -310,7 +310,7 @@ export const publicApi = apiSlice.injectEndpoints({
     findDeliveryZone: builder.mutation<DeliveryZone | null, {
       companySlug: string;
       branchSlug: string;
-      address: { zipCode?: string; city?: string; street?: string };
+      address: { zipCode?: string; city?: string; street?: string; lat?: number; lng?: number; };
     }>({
       query: ({ companySlug, branchSlug, address }) => ({
         url: `/public/companies/${companySlug}/branches/${branchSlug}/find-zone`,

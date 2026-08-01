@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FEATURES } from '../../common/constants/features.constants';
@@ -26,6 +27,15 @@ import { UpdateDeliveryZoneDto } from './dto/update-delivery-zone.dto';
 @Controller('delivery-zones')
 export class DeliveryZonesController {
   constructor(private readonly zonesService: DeliveryZonesService) { }
+
+  @Post('find-zone')
+  @ApiOperation({ summary: 'Find delivery zone by address (internal)' })
+  async findZone(@Body() addressData: any, @Request() req: any) {
+    const companyId = req.user.companyId;
+    const branchId = req.user.branchId || req.body.branchId || addressData.branchId;
+    const zone = await this.zonesService.findZoneByAddress(companyId, branchId, addressData);
+    return { success: true, data: zone };
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create delivery zone' })

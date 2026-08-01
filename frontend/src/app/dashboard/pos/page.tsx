@@ -11,7 +11,7 @@ import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { Booking, useCreateBookingMutation, useGetBookingsQuery } from '@/lib/api/endpoints/bookingsApi';
 import { useGetCategoriesQuery } from '@/lib/api/endpoints/categoriesApi';
 import { useGetCustomerByIdQuery, useLazySearchCustomersQuery } from '@/lib/api/endpoints/customersApi';
-import { useGetDeliveryZonesByBranchQuery } from '@/lib/api/endpoints/deliveryZonesApi';
+import { useGetDeliveryZonesByBranchQuery, useFindDeliveryZoneMutation } from '@/lib/api/endpoints/deliveryZonesApi';
 import { useGetPaymentMethodsByBranchQuery } from '@/lib/api/endpoints/paymentMethodsApi';
 import type { CreatePOSOrderRequest } from '@/lib/api/endpoints/posApi';
 import {
@@ -210,7 +210,7 @@ const createDefaultTakeawayDetails = (): TakeawayDetailsState => ({
   instructions: '',
   assignedDriver: '',
 });
-const sanitizeDetails = <T extends Record<string, string>>(details: T): Partial<T> => {
+const sanitizeDetails = <T extends Record<string, any>>(details: T): Partial<T> => {
   const sanitized: Partial<T> = {};
   Object.entries(details).forEach(([key, value]) => {
     if (typeof value === 'string') {
@@ -218,6 +218,8 @@ const sanitizeDetails = <T extends Record<string, string>>(details: T): Partial<
       if (trimmed) {
         sanitized[key as keyof T] = trimmed as T[keyof T];
       }
+    } else if (typeof value === 'number') {
+      sanitized[key as keyof T] = value as T[keyof T];
     }
   });
   return sanitized;
@@ -560,6 +562,7 @@ export default function POSPage() {
     { branchId: currentBranchId },
     { skip: !currentBranchId }
   );
+  const [findZone] = useFindDeliveryZoneMutation();
   // Payment methods for POS (branch-based, includes system + company + branch methods)
   const { data: paymentMethods = [], isLoading: paymentMethodsLoading } = useGetPaymentMethodsByBranchQuery(
     { companyId: currentCompanyId, branchId: currentBranchId },
@@ -3769,6 +3772,62 @@ export default function POSPage() {
                           />
                         </div>
                       </div>
+
+                      <div className="space-y-1 mt-4">
+                        <button
+                          type="button"
+                          onClick={() => setShowDeliveryMap(!showDeliveryMap)}
+                          className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-primary-600 hover:text-primary-500 border border-dashed border-primary-300 dark:border-primary-800 rounded-lg transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          {showDeliveryMap ? 'Hide Map' : 'Locate on Map'}
+                        </button>
+                      </div>
+
+                      {showDeliveryMap && (
+                        <div className="my-3">
+                          <AddressMap
+                            height="200px"
+                            onChange={async (data) => {
+                              const parts = data.address.split(',');
+                              const newDetails: any = {
+                                ...deliveryDetails,
+                                addressLine1: parts[0]?.trim() || deliveryDetails.addressLine1,
+                                city: parts[1]?.trim() || parts[2]?.trim() || deliveryDetails.city,
+                                postalCode: parts.find((p) => /\d{4,}/.test(p))?.trim() || deliveryDetails.postalCode,
+                                lat: data.lat,
+                                lng: data.lng,
+                              };
+                              
+                                // Auto-detect zone
+                                try {
+                                  const zoneData = await findZone({
+                                    branchId: (user as any)?.branchId || (companyContext as any)?.branchId,
+                                    zipCode: newDetails.postalCode,
+                                    city: newDetails.city,
+                                    lat: data.lat,
+                                    lng: data.lng,
+                                  }).unwrap();
+
+                                if (zoneData) {
+                                  const zone = zoneData;
+                                  newDetails.zoneId = zone.id || (zone as any)._id;
+                                  setDeliveryFee(String(zone.deliveryCharge || 0));
+                                  toast.success(`Auto-selected zone: ${zone.name}`);
+                                }
+                              } catch(e) {
+                                console.error('Zone auto-detect failed:', e);
+                              }
+                              
+                              setDeliveryDetails(newDetails as any);
+                            }}
+                          />
+                        </div>
+                      )}
+
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Address Line 1 *</label>
                         <Input

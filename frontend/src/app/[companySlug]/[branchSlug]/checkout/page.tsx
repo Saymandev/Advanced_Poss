@@ -101,6 +101,13 @@ export default function CheckoutPage() {
   const [isLoadingCart, setIsLoadingCart] = useState(true);
   const [showAddressMap, setShowAddressMap] = useState(false);
 
+  // Show map automatically when delivery is selected
+  useEffect(() => {
+    if (formData.deliveryType === 'delivery') {
+      setShowAddressMap(true);
+    }
+  }, [formData.deliveryType]);
+
   useEffect(() => {
     if (companyError) {
       toast.error('Failed to load company information');
@@ -134,15 +141,12 @@ export default function CheckoutPage() {
   // Auto-detect zone when address changes
   useEffect(() => {
     const detectZone = async () => {
-      if (formData.deliveryType === 'delivery' && (formData.zipCode || formData.city)) {
+      if (formData.deliveryType === 'delivery' && (formData.zipCode || formData.city || (formData.lat && formData.lng))) {
         try {
           const zone = await findZone({
             companySlug,
             branchSlug,
-            address: {
-              zipCode: formData.zipCode,
-              city: formData.city,
-            },
+            address: { zipCode: formData.zipCode, city: formData.city, lat: formData.lat, lng: formData.lng },
           }).unwrap();
           
           if (zone) {
@@ -161,7 +165,7 @@ export default function CheckoutPage() {
 
     const timeoutId = setTimeout(detectZone, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.zipCode, formData.city, formData.deliveryType, companySlug, branchSlug, findZone]);
+  }, [formData.zipCode, formData.city, formData.lat, formData.lng, formData.deliveryType, companySlug, branchSlug, findZone]);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};

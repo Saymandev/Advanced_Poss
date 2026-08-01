@@ -68,6 +68,20 @@ export const deliveryZonesApi = apiSlice.injectEndpoints({
         method: 'DELETE',
       }),
     }),
+    findDeliveryZone: builder.mutation<DeliveryZone, {
+      branchId: string;
+      zipCode?: string;
+      city?: string;
+      lat?: number;
+      lng?: number;
+    }>({
+      query: (body) => ({
+        url: '/delivery-zones/find-zone',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (response: any) => response?.data ?? response,
+    }),
   }),
 });
 
@@ -76,6 +90,7 @@ export const {
   useCreateDeliveryZoneMutation,
   useUpdateDeliveryZoneMutation,
   useDeleteDeliveryZoneMutation,
+  useFindDeliveryZoneMutation,
 } = deliveryZonesApi;
 
 

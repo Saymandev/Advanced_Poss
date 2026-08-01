@@ -98,6 +98,14 @@ export class DeliveryDetailsDto {
   @IsOptional()
   @IsString()
   zoneId?: string; // Delivery zone ID
+
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
 }
 
 export class CreatePOSOrderDto {
