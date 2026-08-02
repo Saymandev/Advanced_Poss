@@ -1768,131 +1768,200 @@ export default function SettingsPage() {
                   disabled={!companyId}
                 />
               </div>
-              
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ─── POS Settings Card ─── */}
+        <Card className="border-sky-200 dark:border-sky-800/40 shadow-lg shadow-sky-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2.5">
+              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/30">
+                <CogIcon className="w-5 h-5" />
+              </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Show Stock in POS
-                </label>
-                <div className="flex items-center gap-3 mt-3">
-                  <input
-                    type="checkbox"
-                    checked={showStockInPos}
-                    onChange={async (e) => {
-                      const newValue = e.target.checked;
-                      setShowStockInPos(newValue); // Optimistic UI update
-                      try {
-                        await updateCompanySettings({
-                          companyId,
-                          data: { posSettings: { showStock: newValue } }
-                        }).unwrap();
-                        toast.success('POS stock visibility updated');
-                        await refetchCompanySettings();
-                      } catch (error: any) {
-                        setShowStockInPos(!newValue); // Revert on failure
-                        toast.error(error.data?.message || 'Failed to update POS stock visibility');
-                      }
-                    }}
-                    disabled={!companyId}
-                    className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Display available stock quantities on POS items
-                  </span>
+                <span className="text-base font-bold">POS Settings</span>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-normal mt-0.5">
+                  Configure how your Point of Sale terminal looks and behaves
+                </p>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-2">
+            {/* Show Stock Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10 border border-emerald-200/60 dark:border-emerald-800/30">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
+                    <path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    Show Stock on POS Items
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Display available stock quantities on each item card in the POS screen
+                  </p>
                 </div>
               </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showStockInPos}
+                onClick={async () => {
+                  const newValue = !showStockInPos;
+                  setShowStockInPos(newValue);
+                  try {
+                    await updateCompanySettings({
+                      companyId,
+                      data: { posSettings: { showStock: newValue } }
+                    }).unwrap();
+                    toast.success(newValue ? 'Stock display enabled' : 'Stock display disabled');
+                    await refetchCompanySettings();
+                  } catch (error: any) {
+                    setShowStockInPos(!newValue);
+                    toast.error(error.data?.message || 'Failed to update POS stock visibility');
+                  }
+                }}
+                disabled={!companyId}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  showStockInPos ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-slate-600'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    showStockInPos ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  POS Order Types
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  Enable/disable and reorder the order types shown in POS. Drag order determines display order.
-                </p>
-                <div className="space-y-2">
-                  {orderTypes.map((ot, index) => {
-                    const labels: Record<string, string> = {
-                      'dine-in': 'Dine-In',
-                      'delivery': 'Delivery',
-                      'takeaway': 'Takeaway',
-                      'room-booking': 'Room Booking',
-                      'room-service': 'Room Service',
-                    };
-                    return (
-                      <div key={ot.type} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50">
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            type="button"
-                            disabled={index === 0 || !companyId}
-                            onClick={async () => {
-                              const newOrder = [...orderTypes];
-                              [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-                              setOrderTypes(newOrder);
-                              try {
-                                await updateCompanySettings({
-                                  companyId,
-                                  data: { posSettings: { showStock: showStockInPos, orderTypes: newOrder } }
-                                }).unwrap();
-                                await refetchCompanySettings();
-                              } catch (error: any) {
-                                toast.error(error.data?.message || 'Failed to update order');
-                              }
-                            }}
-                            className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          >
-                            <ArrowUpIcon className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={index === orderTypes.length - 1 || !companyId}
-                            onClick={async () => {
-                              const newOrder = [...orderTypes];
-                              [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                              setOrderTypes(newOrder);
-                              try {
-                                await updateCompanySettings({
-                                  companyId,
-                                  data: { posSettings: { showStock: showStockInPos, orderTypes: newOrder } }
-                                }).unwrap();
-                                await refetchCompanySettings();
-                              } catch (error: any) {
-                                toast.error(error.data?.message || 'Failed to update order');
-                              }
-                            }}
-                            className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          >
-                            <ArrowDownIcon className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                          </button>
-                        </div>
-                        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200">
-                          {labels[ot.type] || ot.type}
+            {/* Order Types */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                  Order Types
+                </h4>
+                <Badge variant="default" className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 border-sky-200 dark:border-sky-800/40">
+                  {orderTypes.filter(ot => ot.enabled).length} Active
+                </Badge>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Choose which order types are available in POS. Use the arrows to set the display order — the first enabled type will be the default.
+              </p>
+              <div className="space-y-2">
+                {orderTypes.map((ot, index) => {
+                  const orderTypeConfig: Record<string, { label: string; emoji: string; color: string }> = {
+                    'dine-in': { label: 'Dine-In', emoji: '🍽️', color: 'from-violet-50 to-purple-50 dark:from-violet-900/10 dark:to-purple-900/10 border-violet-200/60 dark:border-violet-800/30' },
+                    'delivery': { label: 'Delivery', emoji: '🚚', color: 'from-orange-50 to-amber-50 dark:from-orange-900/10 dark:to-amber-900/10 border-orange-200/60 dark:border-orange-800/30' },
+                    'takeaway': { label: 'Takeaway', emoji: '🛍️', color: 'from-cyan-50 to-sky-50 dark:from-cyan-900/10 dark:to-sky-900/10 border-cyan-200/60 dark:border-cyan-800/30' },
+                    'room-booking': { label: 'Room Booking', emoji: '🏨', color: 'from-rose-50 to-pink-50 dark:from-rose-900/10 dark:to-pink-900/10 border-rose-200/60 dark:border-rose-800/30' },
+                    'room-service': { label: 'Room Service', emoji: '🛎️', color: 'from-indigo-50 to-blue-50 dark:from-indigo-900/10 dark:to-blue-900/10 border-indigo-200/60 dark:border-indigo-800/30' },
+                  };
+                  const config = orderTypeConfig[ot.type] || { label: ot.type, emoji: '📦', color: 'from-gray-50 to-slate-50 dark:from-gray-900/10 dark:to-slate-900/10 border-gray-200/60 dark:border-gray-800/30' };
+                  return (
+                    <div
+                      key={ot.type}
+                      className={`flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r ${config.color} border transition-all duration-200 ${
+                        ot.enabled ? 'opacity-100' : 'opacity-50'
+                      }`}
+                    >
+                      {/* Position badge */}
+                      <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs font-black text-gray-500 dark:text-gray-400 shadow-sm">
+                        {index + 1}
+                      </div>
+                      {/* Emoji + Label */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-lg">{config.emoji}</span>
+                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
+                          {config.label}
                         </span>
-                        <input
-                          type="checkbox"
-                          checked={ot.enabled}
-                          onChange={async (e) => {
-                            const newOrder = orderTypes.map((item, i) =>
-                              i === index ? { ...item, enabled: e.target.checked } : item
-                            );
+                      </div>
+                      {/* Reorder buttons */}
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          disabled={index === 0 || !companyId}
+                          onClick={async () => {
+                            const newOrder = [...orderTypes];
+                            [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
                             setOrderTypes(newOrder);
                             try {
                               await updateCompanySettings({
                                 companyId,
                                 data: { posSettings: { showStock: showStockInPos, orderTypes: newOrder } }
                               }).unwrap();
-                              toast.success(`${labels[ot.type] || ot.type} ${e.target.checked ? 'enabled' : 'disabled'}`);
                               await refetchCompanySettings();
                             } catch (error: any) {
-                              setOrderTypes(orderTypes); // Revert
-                              toast.error(error.data?.message || 'Failed to update order type');
+                              toast.error(error.data?.message || 'Failed to update order');
                             }
                           }}
-                          disabled={!companyId}
-                          className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                        />
+                          className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-sm"
+                          title="Move up"
+                        >
+                          <ArrowUpIcon className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === orderTypes.length - 1 || !companyId}
+                          onClick={async () => {
+                            const newOrder = [...orderTypes];
+                            [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                            setOrderTypes(newOrder);
+                            try {
+                              await updateCompanySettings({
+                                companyId,
+                                data: { posSettings: { showStock: showStockInPos, orderTypes: newOrder } }
+                              }).unwrap();
+                              await refetchCompanySettings();
+                            } catch (error: any) {
+                              toast.error(error.data?.message || 'Failed to update order');
+                            }
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-sm"
+                          title="Move down"
+                        >
+                          <ArrowDownIcon className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
+                      {/* Toggle */}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={ot.enabled}
+                        onClick={async () => {
+                          const newOrder = orderTypes.map((item, i) =>
+                            i === index ? { ...item, enabled: !item.enabled } : item
+                          );
+                          setOrderTypes(newOrder);
+                          try {
+                            await updateCompanySettings({
+                              companyId,
+                              data: { posSettings: { showStock: showStockInPos, orderTypes: newOrder } }
+                            }).unwrap();
+                            toast.success(`${config.label} ${!ot.enabled ? 'enabled' : 'disabled'}`);
+                            await refetchCompanySettings();
+                          } catch (error: any) {
+                            setOrderTypes(orderTypes);
+                            toast.error(error.data?.message || 'Failed to update order type');
+                          }
+                        }}
+                        disabled={!companyId}
+                        className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                          ot.enabled ? 'bg-sky-500' : 'bg-gray-300 dark:bg-slate-600'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                            ot.enabled ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </CardContent>
