@@ -61,6 +61,7 @@ import {
     XMarkIcon,
     ArrowUpIcon,
     ArrowDownIcon,
+    ComputerDesktopIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -103,6 +104,9 @@ export default function SettingsPage() {
     ? (selectedCompanyId || companyContext?.companyId || '')
     : (companyContext?.companyId || user?.companyId || '');
   const branchId = user?.branchId || '';
+
+  const [activeTab, setActiveTab] = useState<'general' | 'pos-settings' | 'taxes' | 'service-charges' | 'invoice' | 'payment-methods' | 'custom-domain'>('general');
+
   // Clear stale companyContext for Super Admin on mount
   useEffect(() => {
     if (isSuperAdmin && companyContext?.companyId && !selectedCompanyId) {
@@ -581,6 +585,7 @@ export default function SettingsPage() {
   };
   const tabs = [
     { id: 'general', label: 'General', icon: CogIcon },
+    { id: 'pos-settings', label: 'POS Settings', icon: ComputerDesktopIcon },
     { id: 'taxes', label: 'Tax Settings', icon: ReceiptPercentIcon },
     { id: 'service-charges', label: 'Service Charges', icon: CurrencyDollarIcon },
     { id: 'invoice', label: 'Invoice Settings', icon: DocumentIcon },
@@ -1772,6 +1777,11 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        </div>
+      )}
+      
+      {activeTab === 'pos-settings' && (
+        <div className="space-y-6">
         {/* ─── POS Settings Card ─── */}
         <Card className="border-sky-200 dark:border-sky-800/40 shadow-lg shadow-sky-500/5">
           <CardHeader className="pb-2">
