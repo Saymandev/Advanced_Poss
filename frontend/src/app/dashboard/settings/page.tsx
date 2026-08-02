@@ -114,7 +114,7 @@ export default function SettingsPage() {
       setSelectedCompanyId('');
     }
   }, [isSuperAdmin, companyContext, selectedCompanyId]);
-  const [activeTab, setActiveTab] = useState<'general' | 'taxes' | 'service-charges' | 'invoice' | 'payment-methods' | 'custom-domain'>('general');
+
   const [invoiceForm, setInvoiceForm] = useState<Partial<InvoiceSettings>>({});
   const [receiptSettingsForm, setReceiptSettingsForm] = useState({
     header: '',
