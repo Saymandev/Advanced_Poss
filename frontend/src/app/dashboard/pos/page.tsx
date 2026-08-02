@@ -3982,7 +3982,10 @@ export default function POSPage() {
                           <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Name</label>
                           <Input
                             value={takeawayDetails.contactName}
-                            onChange={(e) => setTakeawayDetails({...takeawayDetails, contactName: e.target.value})}
+                            onChange={(e) => {
+                              setTakeawayDetails({...takeawayDetails, contactName: e.target.value});
+                              setCustomerInfo(prev => ({ ...prev, name: e.target.value }));
+                            }}
                             placeholder="Customer name (optional)"
                             className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
                           />
@@ -3991,7 +3994,10 @@ export default function POSPage() {
                           <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Phone</label>
                           <Input
                             value={takeawayDetails.contactPhone}
-                            onChange={(e) => setTakeawayDetails({...takeawayDetails, contactPhone: e.target.value})}
+                            onChange={(e) => {
+                              setTakeawayDetails({...takeawayDetails, contactPhone: e.target.value});
+                              setCustomerInfo(prev => ({ ...prev, phone: e.target.value }));
+                            }}
                             placeholder="+880... (optional)"
                             className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
                           />
@@ -4065,6 +4071,9 @@ export default function POSPage() {
                         if (orderType === 'delivery') {
                           setDeliveryDetails(prev => ({ ...prev, contactName: e.target.value }));
                         }
+                        if (orderType === 'takeaway') {
+                          setTakeawayDetails(prev => ({ ...prev, contactName: e.target.value }));
+                        }
                       }}
                       placeholder="Start typing name..."
                       className="h-12 text-sm rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
@@ -4078,6 +4087,9 @@ export default function POSPage() {
                         setCustomerInfo({...customerInfo, phone: e.target.value});
                         if (orderType === 'delivery') {
                           setDeliveryDetails(prev => ({ ...prev, contactPhone: e.target.value }));
+                        }
+                        if (orderType === 'takeaway') {
+                          setTakeawayDetails(prev => ({ ...prev, contactPhone: e.target.value }));
                         }
                       }}
                       placeholder="+880..."
