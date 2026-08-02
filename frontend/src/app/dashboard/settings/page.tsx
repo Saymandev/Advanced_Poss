@@ -15,7 +15,7 @@ import {
     useGetCustomDomainInfoQuery,
     useRemoveCustomDomainMutation,
     useUploadCompanyLogoMutation,
-  useUploadCompanyFaviconMutation,
+    useUploadCompanyFaviconMutation,
     useVerifyCustomDomainMutation,
     useUpdateCompanyMutation,
 } from '@/lib/api/endpoints/companiesApi';
@@ -45,7 +45,7 @@ import { useGetSubscriptionByCompanyQuery } from '@/lib/api/endpoints/subscripti
 import { useAppSelector, useAppDispatch } from '@/lib/store';
 import { setCompanyContext } from '@/lib/slices/authSlice';
 import {
-  BuildingOfficeIcon,
+    BuildingOfficeIcon,
     ClipboardDocumentIcon,
     CogIcon,
     CreditCardIcon,

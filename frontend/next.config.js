@@ -105,4 +105,20 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   },
 });
 
-module.exports = withPWA(nextConfig);
+const { withSentryConfig } = require("@sentry/nextjs");
+
+const finalConfig = withPWA(nextConfig);
+
+module.exports = withSentryConfig(
+  finalConfig,
+  {
+    silent: true,
+  },
+  {
+    widenClientFileUpload: true,
+    transpileClientSDK: true,
+    tunnelRoute: "/monitoring",
+    hideSourceMaps: true,
+    disableLogger: true,
+  }
+);

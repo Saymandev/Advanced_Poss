@@ -1,6 +1,6 @@
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory, Reflector, BaseExceptionFilter } from '@nestjs/core';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -16,10 +16,25 @@ import { EncryptionInterceptor } from './common/interceptors/encryption.intercep
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
-// import { WinstonLogger } from './common/logger/winston.logger';
+import { WinstonLogger } from './common/logger/winston.logger';
+import * as Sentry from "@sentry/nestjs";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
+
+Sentry.init({
+  dsn: "https://1bf01c6a65c2039cada8e02d3e9ac22b@o4511839915868160.ingest.us.sentry.io/4511839921111040",
+  integrations: [
+    nodeProfilingIntegration(),
+  ],
+  enableLogs: true,
+  tracesSampleRate: 1.0,
+  profileSessionSampleRate: 1.0,
+  profileLifecycle: 'trace',
+});
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: new WinstonLogger(),
+  });
   // Cookie parser (for httpOnly cookies)
   app.use(cookieParser());
   // Increase body size limit moderately for base64 images, but avoid 50mb DoS risk

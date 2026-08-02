@@ -5,6 +5,7 @@ module.exports = function (options, webpack) {
       // Externalize bcrypt to avoid bundling native modules
       'bcrypt': 'commonjs2 bcrypt',
       '@mapbox/node-pre-gyp': 'commonjs2 @mapbox/node-pre-gyp',
+      '@sentry/profiling-node': 'commonjs2 @sentry/profiling-node',
     },
     module: {
       rules: [
