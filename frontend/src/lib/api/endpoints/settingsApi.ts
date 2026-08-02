@@ -94,6 +94,7 @@ export interface CompanySettings {
   };
   posSettings?: {
     showStock?: boolean;
+    orderTypes?: { type: string; enabled: boolean }[];
   };
   createdAt: string;
   updatedAt: string;

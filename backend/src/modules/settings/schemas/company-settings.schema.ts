@@ -103,13 +103,36 @@ export class CompanySettings {
   @Prop({
     type: {
       showStock: { type: Boolean, default: true },
+      orderTypes: {
+        type: [
+          {
+            type: { type: String, required: true },
+            enabled: { type: Boolean, default: true }
+          }
+        ],
+        default: [
+          { type: 'dine-in', enabled: true },
+          { type: 'delivery', enabled: true },
+          { type: 'takeaway', enabled: true },
+          { type: 'room-booking', enabled: true },
+          { type: 'room-service', enabled: true },
+        ],
+      },
     },
     default: {
       showStock: true,
+      orderTypes: [
+        { type: 'dine-in', enabled: true },
+        { type: 'delivery', enabled: true },
+        { type: 'takeaway', enabled: true },
+        { type: 'room-booking', enabled: true },
+        { type: 'room-service', enabled: true },
+      ],
     },
   })
   posSettings?: {
     showStock: boolean;
+    orderTypes?: { type: string; enabled: boolean }[];
   };
 }
 

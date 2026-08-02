@@ -58,7 +58,9 @@ import {
     PlusIcon,
     ReceiptPercentIcon,
     TrashIcon,
-    XMarkIcon
+    XMarkIcon,
+    ArrowUpIcon,
+    ArrowDownIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -128,6 +130,14 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loyaltyRate, setLoyaltyRate] = useState<number>(100);
   const [showStockInPos, setShowStockInPos] = useState<boolean>(true);
+  const [orderTypes, setOrderTypes] = useState<{type: string; enabled: boolean}[]>([
+    { type: 'dine-in', enabled: true },
+    { type: 'delivery', enabled: true },
+    { type: 'takeaway', enabled: true },
+    { type: 'room-booking', enabled: true },
+    { type: 'room-service', enabled: true },
+  ]);
+
 
   // General Settings
   const { data: companySettings, refetch: refetchCompanySettings } = useGetCompanySettingsQuery(
@@ -153,6 +163,9 @@ export default function SettingsPage() {
     }
     if (companySettings?.posSettings !== undefined) {
       setShowStockInPos(companySettings.posSettings.showStock ?? true);
+      if (companySettings.posSettings.orderTypes && companySettings.posSettings.orderTypes.length > 0) {
+        setOrderTypes(companySettings.posSettings.orderTypes);
+      }
     }
   }, [companySettings]);
 
@@ -1785,6 +1798,100 @@ export default function SettingsPage() {
                   <span className="text-sm text-gray-600 dark:text-gray-400">
                     Display available stock quantities on POS items
                   </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  POS Order Types
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Enable/disable and reorder the order types shown in POS. Drag order determines display order.
+                </p>
+                <div className="space-y-2">
+                  {orderTypes.map((ot, index) => {
+                    const labels: Record<string, string> = {
+                      'dine-in': 'Dine-In',
+                      'delivery': 'Delivery',
+                      'takeaway': 'Takeaway',
+                      'room-booking': 'Room Booking',
+                      'room-service': 'Room Service',
+                    };
+                    return (
+                      <div key={ot.type} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50">
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            disabled={index === 0 || !companyId}
+                            onClick={async () => {
+                              const newOrder = [...orderTypes];
+                              [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                              setOrderTypes(newOrder);
+                              try {
+                                await updateCompanySettings({
+                                  companyId,
+                                  data: { posSettings: { showStock: showStockInPos, orderTypes: newOrder } }
+                                }).unwrap();
+                                await refetchCompanySettings();
+                              } catch (error: any) {
+                                toast.error(error.data?.message || 'Failed to update order');
+                              }
+                            }}
+                            className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ArrowUpIcon className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === orderTypes.length - 1 || !companyId}
+                            onClick={async () => {
+                              const newOrder = [...orderTypes];
+                              [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                              setOrderTypes(newOrder);
+                              try {
+                                await updateCompanySettings({
+                                  companyId,
+                                  data: { posSettings: { showStock: showStockInPos, orderTypes: newOrder } }
+                                }).unwrap();
+                                await refetchCompanySettings();
+                              } catch (error: any) {
+                                toast.error(error.data?.message || 'Failed to update order');
+                              }
+                            }}
+                            className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ArrowDownIcon className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                          </button>
+                        </div>
+                        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                          {labels[ot.type] || ot.type}
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={ot.enabled}
+                          onChange={async (e) => {
+                            const newOrder = orderTypes.map((item, i) =>
+                              i === index ? { ...item, enabled: e.target.checked } : item
+                            );
+                            setOrderTypes(newOrder);
+                            try {
+                              await updateCompanySettings({
+                                companyId,
+                                data: { posSettings: { showStock: showStockInPos, orderTypes: newOrder } }
+                              }).unwrap();
+                              toast.success(`${labels[ot.type] || ot.type} ${e.target.checked ? 'enabled' : 'disabled'}`);
+                              await refetchCompanySettings();
+                            } catch (error: any) {
+                              setOrderTypes(orderTypes); // Revert
+                              toast.error(error.data?.message || 'Failed to update order type');
+                            }
+                          }}
+                          disabled={!companyId}
+                          className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

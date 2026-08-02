@@ -2,11 +2,26 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsMongoId, IsNotEmpty, IsObject, IsOptional, IsString, IsNumber, Min, IsBoolean, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
+class OrderTypeSettingDto {
+  @IsString()
+  @IsNotEmpty()
+  type: string;
+
+  @IsBoolean()
+  enabled: boolean;
+}
+
 class PosSettingsDto {
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   @IsBoolean()
   showStock?: boolean;
+
+  @ApiPropertyOptional({ example: [{ type: 'dine-in', enabled: true }] })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => OrderTypeSettingDto)
+  orderTypes?: OrderTypeSettingDto[];
 }
 
 class NotificationsDto {

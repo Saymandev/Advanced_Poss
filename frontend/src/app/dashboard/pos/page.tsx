@@ -272,13 +272,31 @@ export default function POSPage() {
     user?.role === 'owner' || user?.role === 'super_admin';
   // Check if user has access to booking management feature (for room booking / room service)
   const { hasAccess: hasBookingAccess } = useFeatureAccess('booking-management');
-  // Build order type options based on feature access
-  const ORDER_TYPE_OPTIONS = useMemo(() => {
-    if (hasBookingAccess) {
-      return [...BASE_ORDER_TYPE_OPTIONS, ROOM_BOOKING_OPTION, ROOM_SERVICE_OPTION];
-    }
-    return BASE_ORDER_TYPE_OPTIONS;
+  // Build order type options based on feature access and company settings
+  const ALL_ORDER_TYPE_OPTIONS = useMemo(() => {
+    const allOptions = hasBookingAccess
+      ? [...BASE_ORDER_TYPE_OPTIONS, ROOM_BOOKING_OPTION, ROOM_SERVICE_OPTION]
+      : [...BASE_ORDER_TYPE_OPTIONS];
+    return allOptions;
   }, [hasBookingAccess]);
+
+  const ORDER_TYPE_OPTIONS = useMemo(() => {
+    const savedOrderTypes = companySettings?.posSettings?.orderTypes;
+    if (!savedOrderTypes || savedOrderTypes.length === 0) {
+      return ALL_ORDER_TYPE_OPTIONS;
+    }
+    // Filter to only enabled types, in the saved order
+    const enabledTypes = savedOrderTypes
+      .filter((ot) => ot.enabled)
+      .map((ot) => ot.type);
+    // Map to the actual option objects, preserving saved order
+    const ordered = enabledTypes
+      .map((type) => ALL_ORDER_TYPE_OPTIONS.find((opt) => opt.value === type))
+      .filter(Boolean) as typeof ALL_ORDER_TYPE_OPTIONS;
+    // If everything got filtered out, fall back to all options
+    return ordered.length > 0 ? ordered : ALL_ORDER_TYPE_OPTIONS;
+  }, [ALL_ORDER_TYPE_OPTIONS, companySettings?.posSettings?.orderTypes]);
+
   const {
     data: activeWorkPeriod,
     isLoading: workPeriodLoading,
@@ -301,15 +319,29 @@ export default function POSPage() {
     }
     return 'dine-in';
   });
-  // Reset orderType to 'dine-in' if user loses access to hotel features and it's currently selected
+  // Reset orderType if user loses access or the type is disabled
   useEffect(() => {
     if ((orderType === 'room-booking' || orderType === 'room-service') && hasBookingAccess === false) {
       setOrderType('dine-in');
       if (typeof window !== 'undefined') {
         localStorage.setItem('pos_orderType', 'dine-in');
       }
+      return;
     }
-  }, [orderType, hasBookingAccess]);
+    // Also reset if current order type is disabled in settings
+    const savedOrderTypes = companySettings?.posSettings?.orderTypes;
+    if (savedOrderTypes && savedOrderTypes.length > 0) {
+      const currentEnabled = savedOrderTypes.find((ot) => ot.type === orderType);
+      if (currentEnabled && !currentEnabled.enabled) {
+        const firstEnabled = savedOrderTypes.find((ot) => ot.enabled);
+        const fallback = (firstEnabled?.type as OrderType) || 'dine-in';
+        setOrderType(fallback);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pos_orderType', fallback);
+        }
+      }
+    }
+  }, [orderType, hasBookingAccess, companySettings?.posSettings?.orderTypes]);
   const [selectedTable, setSelectedTable] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('pos_selectedTable') || '';
@@ -4370,11 +4402,9 @@ export default function POSPage() {
                 onChange={(e) => handleOrderTypeChange(e.target.value as OrderType)}
                 className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer"
               >
-                <option value="dine-in" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Dine-In</option>
-                <option value="delivery" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Delivery</option>
-                <option value="takeaway" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Takeaway</option>
-                <option value="room-service" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Room Service</option>
-                <option value="room-booking" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Room Booking</option>
+                {ORDER_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">{opt.label}</option>
+                ))}
               </select>
             </div>
 
