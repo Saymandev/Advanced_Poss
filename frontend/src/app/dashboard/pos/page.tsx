@@ -623,17 +623,7 @@ export default function POSPage() {
   const requiresRoomService = orderType === 'room-service';
   const orderTypeLabel = ORDER_TYPE_OPTIONS.find(option => option.value === orderType)?.label ?? 'Dine-In';
 
-  // Sync delivery details to customer info when delivery form is filled
-  useEffect(() => {
-    if (!requiresDeliveryDetails) return;
-    if ((!customerInfo.name || !customerInfo.phone) && (deliveryDetails.contactName || deliveryDetails.contactPhone)) {
-      setCustomerInfo(prev => ({
-        ...prev,
-        name: prev.name || deliveryDetails.contactName,
-        phone: prev.phone || deliveryDetails.contactPhone,
-      }));
-    }
-  }, [deliveryDetails.contactName, deliveryDetails.contactPhone, requiresDeliveryDetails]);
+
   const activeOrderTypeOption = useMemo(() => ORDER_TYPE_OPTIONS.find(option => option.value === orderType), [orderType, ORDER_TYPE_OPTIONS]);
   const ActiveOrderIcon = activeOrderTypeOption?.icon ?? HomeModernIcon;
   // Room booking queries
@@ -1482,8 +1472,8 @@ export default function POSPage() {
     // Also sync to delivery details for delivery orders
     setDeliveryDetails(prev => ({
       ...prev,
-      contactName: prev.contactName || composedName,
-      contactPhone: prev.contactPhone || phone,
+      contactName: composedName,
+      contactPhone: phone,
     }));
     setIsCustomerLookupOpen(false);
     toast.success(`Linked customer ${composedName}`);
@@ -3352,7 +3342,12 @@ export default function POSPage() {
                   </label>
                   <Input
                     value={customerInfo.name}
-                    onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                    onChange={(e) => {
+                      setCustomerInfo({ ...customerInfo, name: e.target.value });
+                      if (orderType === 'delivery') {
+                        setDeliveryDetails(prev => ({ ...prev, contactName: e.target.value }));
+                      }
+                    }}
                     placeholder="Enter guest name"
                     className="w-full"
                     required
@@ -3364,7 +3359,12 @@ export default function POSPage() {
                   </label>
                   <Input
                     value={customerInfo.phone}
-                    onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                    onChange={(e) => {
+                      setCustomerInfo({ ...customerInfo, phone: e.target.value });
+                      if (orderType === 'delivery') {
+                        setDeliveryDetails(prev => ({ ...prev, contactPhone: e.target.value }));
+                      }
+                    }}
                     placeholder="Enter phone number"
                     className="w-full"
                     required
@@ -3790,7 +3790,10 @@ export default function POSPage() {
                           <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Name</label>
                           <Input
                             value={deliveryDetails.contactName}
-                            onChange={(e) => setDeliveryDetails({...deliveryDetails, contactName: e.target.value})}
+                            onChange={(e) => {
+                              setDeliveryDetails({...deliveryDetails, contactName: e.target.value});
+                              setCustomerInfo(prev => ({ ...prev, name: e.target.value }));
+                            }}
                             placeholder="Recipient name"
                             className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
                           />
@@ -3799,7 +3802,10 @@ export default function POSPage() {
                           <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Phone *</label>
                           <Input
                             value={deliveryDetails.contactPhone}
-                            onChange={(e) => setDeliveryDetails({...deliveryDetails, contactPhone: e.target.value})}
+                            onChange={(e) => {
+                              setDeliveryDetails({...deliveryDetails, contactPhone: e.target.value});
+                              setCustomerInfo(prev => ({ ...prev, phone: e.target.value }));
+                            }}
                             placeholder="+880..."
                             className="h-10 text-xs rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
                           />
@@ -4060,7 +4066,12 @@ export default function POSPage() {
                     <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Full Name</label>
                     <Input
                       value={customerInfo.name}
-                      onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+                      onChange={(e) => {
+                        setCustomerInfo({...customerInfo, name: e.target.value});
+                        if (orderType === 'delivery') {
+                          setDeliveryDetails(prev => ({ ...prev, contactName: e.target.value }));
+                        }
+                      }}
                       placeholder="Start typing name..."
                       className="h-12 text-sm rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
                     />
@@ -4069,7 +4080,12 @@ export default function POSPage() {
                     <label className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-tighter">Contact Number</label>
                     <Input
                       value={customerInfo.phone}
-                      onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                      onChange={(e) => {
+                        setCustomerInfo({...customerInfo, phone: e.target.value});
+                        if (orderType === 'delivery') {
+                          setDeliveryDetails(prev => ({ ...prev, contactPhone: e.target.value }));
+                        }
+                      }}
                       placeholder="+880..."
                       className="h-12 text-sm rounded-xl border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950"
                     />
