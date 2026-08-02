@@ -3344,9 +3344,6 @@ export default function POSPage() {
                     value={customerInfo.name}
                     onChange={(e) => {
                       setCustomerInfo({ ...customerInfo, name: e.target.value });
-                      if (orderType === 'delivery') {
-                        setDeliveryDetails(prev => ({ ...prev, contactName: e.target.value }));
-                      }
                     }}
                     placeholder="Enter guest name"
                     className="w-full"
@@ -3361,9 +3358,6 @@ export default function POSPage() {
                     value={customerInfo.phone}
                     onChange={(e) => {
                       setCustomerInfo({ ...customerInfo, phone: e.target.value });
-                      if (orderType === 'delivery') {
-                        setDeliveryDetails(prev => ({ ...prev, contactPhone: e.target.value }));
-                      }
                     }}
                     placeholder="Enter phone number"
                     className="w-full"
